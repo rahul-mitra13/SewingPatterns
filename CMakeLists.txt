@@ -83,6 +83,7 @@ add_subdirectory("deps/geometry-central")
 add_executable(
         sewingPattern
         src/main.cpp
+        src/model.cpp
         )
 
 # Include settings
