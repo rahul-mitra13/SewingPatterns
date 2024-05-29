@@ -5,6 +5,10 @@
 
 #include "geometrycentral/surface/direction_fields.h"
 
+
+#include "geometrycentral/surface/direction_fields.h"
+#include "geometrycentral/surface/direction_fields.h"
+
 #include "polyscope/polyscope.h"
 #include "polyscope/surface_mesh.h"
 #include "polyscope/curve_network.h"
@@ -12,6 +16,10 @@
 #include "args/args.hxx"
 #include "nlohmann/json.hpp"
 #include "imgui.h"
+
+//file includes
+#include "knitting_utils.h"
+#include "helpers.h"//for testing now, gonna remove eventually
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -29,17 +37,35 @@ float param1 = 42.0;
 // Example computation function -- this one computes and registers a scalar
 // quantity
 void showStripePatterns() {
-  // polyscope::warning("Computing Gaussian curvature.\nalso, parameter value = " +
-  //                    std::to_string(param1));
 
-  geometry->requireVertexGaussianCurvatures();
-  psMesh->addVertexScalarQuantity("curvature",
-                                  geometry->vertexGaussianCurvatures,
-                                  polyscope::DataType::SYMMETRIC);
+
+  std::vector<Vertex> zeroVertices = getBoundaryVertices(*geometry, 1).first;
+  std::vector<Vertex> oneVertices = getBoundaryVertices(*geometry, 1).second;
+
+  VertexData<double> timeFunction = solveLaplace(*geometry, zeroVertices, oneVertices);
+
+  psMesh -> addVertexScalarQuantity("time function", timeFunction);
+  FaceData<Vector3> faceGrads = computeTimeFunctionFaceGrad(*geometry, timeFunction);
+  psMesh -> addFaceVectorQuantity("face gradients", faceGrads);
+  VertexData<Vector3> vertexValuedField = computeVertexValuedField(*geometry, timeFunction);
+  psMesh -> addVertexVectorQuantity("vertex valued field", vertexValuedField);
 
   // Generate a guiding field
   VertexData<Vector2> guideField =
-    geometrycentral::surface::computeSmoothestVertexDirectionField(*geometry, 2);
+    geometrycentral::surface::computeSmoothestBoundaryAlignedVertexDirectionField(*geometry, 2);
+
+  geometry->requireVertexTangentBasis();
+  VertexData<Vector3> vBasisX(*mesh);
+  VertexData<Vector3> vBasisY(*mesh);
+
+  for (Vertex v : mesh->vertices()) {
+    vBasisX[v] = geometry->vertexTangentBasis[v][0];
+    vBasisY[v] = geometry->vertexTangentBasis[v][1];
+  }
+
+  auto vField =
+      geometrycentral::surface::computeSmoothestBoundaryAlignedVertexDirectionField(*geometry);
+  psMesh->addVertexTangentVectorQuantity("VF", vField, vBasisX, vBasisY);
 
   // Compute the stripe pattern
   double constantFreq = 40.;
@@ -111,17 +137,17 @@ int main(int argc, char **argv) {
       polyscopePermutations(*mesh));
 
   // Set vertex tangent spaces
-  geometry->requireVertexTangentBasis();
-  VertexData<Vector3> vBasisX(*mesh);
-  VertexData<Vector3> vBasisY(*mesh);
-  for (Vertex v : mesh->vertices()) {
-    vBasisX[v] = geometry->vertexTangentBasis[v][0];
-    vBasisY[v] = geometry->vertexTangentBasis[v][1];
-  }
+  // geometry->requireVertexTangentBasis();
+  // VertexData<Vector3> vBasisX(*mesh);
+  // VertexData<Vector3> vBasisY(*mesh);
+  // for (Vertex v : mesh->vertices()) {
+  //   vBasisX[v] = geometry->vertexTangentBasis[v][0];
+  //   vBasisY[v] = geometry->vertexTangentBasis[v][1];
+  // }
 
-  auto vField =
-      geometrycentral::surface::computeSmoothestVertexDirectionField(*geometry);
-  psMesh->addVertexTangentVectorQuantity("VF", vField, vBasisX, vBasisY);
+  // auto vField =
+  //     geometrycentral::surface::computeSmoothestVertexDirectionField(*geometry);
+  // psMesh->addVertexTangentVectorQuantity("VF", vField, vBasisX, vBasisY);
 
   // Give control to the polyscope gui
   polyscope::show();
