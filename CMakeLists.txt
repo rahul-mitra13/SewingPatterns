@@ -84,6 +84,8 @@ add_executable(
         sewingPattern
         src/main.cpp
         src/model.cpp
+        src/knitting_utils.cpp
+        src/helper.cpp
         )
 
 # Include settings
