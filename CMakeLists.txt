@@ -85,7 +85,7 @@ add_executable(
         src/main.cpp
         src/model.cpp
         src/knitting_utils.cpp
-        src/helper.cpp
+        src/helpers.cpp
         )
 
 # Include settings
