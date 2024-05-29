@@ -1,11 +1,13 @@
 #include "geometrycentral/surface/manifold_surface_mesh.h"
 #include "geometrycentral/surface/meshio.h"
 #include "geometrycentral/surface/vertex_position_geometry.h"
+#include "geometrycentral/surface/stripe_patterns.h"
 
 #include "geometrycentral/surface/direction_fields.h"
 
 #include "polyscope/polyscope.h"
 #include "polyscope/surface_mesh.h"
+#include "polyscope/curve_network.h"
 
 #include "args/args.hxx"
 #include "nlohmann/json.hpp"
@@ -26,26 +28,47 @@ float param1 = 42.0;
 
 // Example computation function -- this one computes and registers a scalar
 // quantity
-void doWork() {
-  polyscope::warning("Computing Gaussian curvature.\nalso, parameter value = " +
-                     std::to_string(param1));
+void showStripePatterns() {
+  // polyscope::warning("Computing Gaussian curvature.\nalso, parameter value = " +
+  //                    std::to_string(param1));
 
   geometry->requireVertexGaussianCurvatures();
   psMesh->addVertexScalarQuantity("curvature",
                                   geometry->vertexGaussianCurvatures,
                                   polyscope::DataType::SYMMETRIC);
+
+  // Generate a guiding field
+  VertexData<Vector2> guideField =
+    geometrycentral::surface::computeSmoothestVertexDirectionField(*geometry, 2);
+
+  // Compute the stripe pattern
+  double constantFreq = 40.;
+  VertexData<double> frequencies(*mesh, constantFreq);
+  CornerData<double> periodicFunc;
+  FaceData<int> zeroIndices;
+  FaceData<int> branchIndices;
+  std::tie(periodicFunc, zeroIndices, branchIndices) =
+      computeStripePattern(*geometry, frequencies, guideField);
+
+  // Extract isolines
+  std::vector<Vector3> isolineVerts;
+  std::vector<std::array<size_t, 2>> isolineEdges;
+  std::tie(isolineVerts, isolineEdges) = extractPolylinesFromStripePattern(
+    *geometry, periodicFunc, zeroIndices, branchIndices, guideField, false);
+
+  polyscope::registerCurveNetwork("stripe patterns", isolineVerts, isolineEdges);
 }
 
 // A user-defined callback, for creating control panels (etc)
 // Use ImGUI commands to build whatever you want here, see
 // https://github.com/ocornut/imgui/blob/master/imgui.h
-void myCallback() {
-
-  if (ImGui::Button("do work")) {
-    doWork();
-  }
+void callBacks() {
 
   ImGui::SliderFloat("param", &param1, 0., 100.);
+  
+  if (ImGui::Button("Show Stripe Patterns")) {
+    showStripePatterns();
+  }
 }
 
 int main(int argc, char **argv) {
@@ -76,7 +99,7 @@ int main(int argc, char **argv) {
   polyscope::init();
 
   // Set the callback function
-  polyscope::state::userCallback = myCallback;
+  polyscope::state::userCallback = callBacks;
 
   // Load mesh
   std::tie(mesh, geometry) = readManifoldSurfaceMesh(args::get(inputFilename));
