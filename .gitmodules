@@ -5,3 +5,7 @@
 [submodule "deps/libigl"]
 	path = deps/libigl
 	url = https://github.com/libigl/libigl.git
+[submodule "dep/geometry-centra"]
+	path = deps/geometry-central
+	url = https://github.com/nmwsharp/polyscope.git
+
