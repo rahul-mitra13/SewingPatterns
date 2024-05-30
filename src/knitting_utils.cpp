@@ -139,9 +139,11 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, 
 }
 
 //compute a vector (in ambient space) per vertex that is aligned with the gradient of a scalar field
-VertexData<Vector3> computeVertexValuedField(VertexPositionGeometry& geometry, VertexData<double>& vertexScalarFunction){
+VertexData<Vector3> computeVertexValuedField(VertexPositionGeometry& geometry, VertexData<double>& vertexScalarFunction, double angle){
 
     SurfaceMesh& mesh = geometry.mesh;
+    geometry.requireVertexNormals();
+    
     VertexData<Vector3> vertexValuedField(mesh);
 
     Eigen::MatrixXd V(mesh.nVertices(), 3);
@@ -181,6 +183,8 @@ VertexData<Vector3> computeVertexValuedField(VertexPositionGeometry& geometry, V
     //store as vector on each vertex 
     for (Vertex v : mesh.vertices()){
         vertexValuedField[v] = Vector3{S(v.getIndex(), 0), S(v.getIndex(), 1), S(v.getIndex(), 2)};
+        //rotate by specified angle 
+        vertexValuedField[v] = vertexValuedField[v].rotateAround(geometry.vertexNormals[v], angle);
     }
 
     return vertexValuedField;
@@ -192,6 +196,8 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
 
     SurfaceMesh& mesh = geometry.mesh;
     VertexData<Vector2> directionField(mesh);
+
+    geometry.requireVertexNormals();
 
     //convert vertexValuedField to eigen matrix
     Eigen::MatrixXd vertex_valued_field(mesh.nVertices(), 3);
@@ -281,8 +287,7 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
         directionField[v] = Vector2::fromComplex(complexDirectionField);
         directionField[v] = unit(directionField[v]);
 
-        //to rotate the field 90 degrees
-        //directionField[v] = directionField[v].rotate90();
+        //directionField[v] = rotate90 ? directionField[v].rotate90() : directionField[v];
     }
 
     //way to convert a 1-direction field vector to a 2-direction field vector as defined by geometry central 
