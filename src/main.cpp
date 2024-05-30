@@ -47,43 +47,42 @@ void showStripePatterns() {
   psMesh -> addVertexScalarQuantity("time function", timeFunction);
   FaceData<Vector3> faceGrads = computeTimeFunctionFaceGrad(*geometry, timeFunction);
   psMesh -> addFaceVectorQuantity("face gradients", faceGrads);
-  VertexData<Vector3> vertexValuedField = computeVertexValuedField(*geometry, timeFunction);
-  psMesh -> addVertexVectorQuantity("vertex valued field", vertexValuedField);
+  
 
-  // Generate a guiding field for the stripe patterns
-  VertexData<Vector2> guideField =
-    geometrycentral::surface::computeSmoothestBoundaryAlignedVertexDirectionField(*geometry, 2);
-
-  geometry->requireVertexTangentBasis();
-  VertexData<Vector3> vBasisX(*mesh);
-  VertexData<Vector3> vBasisY(*mesh);
-
-  VertexData<Vector2> lineField = vertexDirectionField(*geometry, vertexValuedField);
-  for (Vertex v : mesh->vertices()) {
-    vBasisX[v] = geometry->vertexTangentBasis[v][0];
-    vBasisY[v] = geometry->vertexTangentBasis[v][1];
-  }
-
-  auto vField =
-      geometrycentral::surface::computeSmoothestBoundaryAlignedVertexDirectionField(*geometry);
-  psMesh->addVertexTangentVectorQuantity("VF", vField, vBasisX, vBasisY);
-
-  // Compute the stripe pattern
+  //Compute course stripe patterns
+  VertexData<Vector3> courseVertexValuedField = computeVertexValuedField(*geometry, timeFunction, 0);
+  psMesh -> addVertexVectorQuantity("course vertex valued field", courseVertexValuedField);
+  VertexData<Vector2> lineFieldCourse = vertexDirectionField(*geometry, courseVertexValuedField);
   double constantFreq = 40.;
   VertexData<double> frequencies(*mesh, constantFreq);
   CornerData<double> periodicFunc;
   FaceData<int> zeroIndices;
   FaceData<int> branchIndices;
   std::tie(periodicFunc, zeroIndices, branchIndices) =
-      computeStripePattern(*geometry, frequencies, lineField);
+      computeStripePattern(*geometry, frequencies, lineFieldCourse);
 
   // Extract isolines
   std::vector<Vector3> isolineVerts;
   std::vector<std::array<size_t, 2>> isolineEdges;
   std::tie(isolineVerts, isolineEdges) = extractPolylinesFromStripePattern(
-    *geometry, periodicFunc, zeroIndices, branchIndices, lineField, false);
+    *geometry, periodicFunc, zeroIndices, branchIndices, lineFieldCourse, false);
 
-  polyscope::registerCurveNetwork("stripe patterns", isolineVerts, isolineEdges);
+  polyscope::registerCurveNetwork("course stripe patterns", isolineVerts, isolineEdges);
+
+
+  // Compute wale stripe patterns
+  VertexData<Vector3> waleVertexValuedField = computeVertexValuedField(*geometry, timeFunction, PI/2);
+  psMesh -> addVertexVectorQuantity("wale vertex valued field", waleVertexValuedField);
+  VertexData<Vector2> lineFieldWale = vertexDirectionField(*geometry, waleVertexValuedField);
+  std::tie(periodicFunc, zeroIndices, branchIndices) =
+      computeStripePattern(*geometry, frequencies, lineFieldWale);
+
+  // Extract isolines
+  std::tie(isolineVerts, isolineEdges) = extractPolylinesFromStripePattern(
+    *geometry, periodicFunc, zeroIndices, branchIndices, lineFieldWale, false);
+
+  polyscope::registerCurveNetwork("wale stripe patterns", isolineVerts, isolineEdges);
+
 }
 
 // A user-defined callback, for creating control panels (etc)
