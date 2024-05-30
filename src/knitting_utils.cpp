@@ -186,3 +186,114 @@ VertexData<Vector3> computeVertexValuedField(VertexPositionGeometry& geometry, V
     return vertexValuedField;
 
 }
+
+
+//get a line field per vertex from a vertex valued vector field in ambient space
+VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, VertexData<Vector3>& vertexValuedField){
+
+    SurfaceMesh& mesh = geometry.mesh;
+    VertexData<Vector2> directionField(mesh);
+
+    //convert vertexValuedField to eigen matrix
+    Eigen::MatrixXd vertex_valued_field(mesh.nVertices(), 3);
+    for (Vertex v : mesh.vertices()){
+        vertex_valued_field(v.getIndex(), 0) = vertexValuedField[v][0];
+        vertex_valued_field(v.getIndex(), 1) = vertexValuedField[v][1];
+        vertex_valued_field(v.getIndex(), 2) = vertexValuedField[v][2];
+
+    }
+
+    //angular coordinate of every halfedge
+    HalfedgeData<double> angularCoordinate(mesh);
+
+    //first compute the angle of each halfedge 
+    HalfedgeData<double> angle(mesh);
+  
+    for (Halfedge he : mesh.halfedges()){
+        Vector3 a = geometry.vertexPositions[he.next().next().tailVertex()];
+        Vector3 b = geometry.vertexPositions[he.tailVertex()];
+        Vector3 c = geometry.vertexPositions[he.next().tailVertex()];
+        Vector3 u = (b - a).unit();
+        Vector3 v = (c - a).unit();
+        angle[he] = std::acos(std::max(-1.0, std::min(1.0, dot(u, v))));
+    }
+
+    //compute angular coordinate at each outgoing halfedge 
+    for (Vertex v : mesh.vertices()){
+        //compute the cumulative angle at each outgoing
+        //halfedge, relative to the intitial halfedge
+        double cumulativeAngle = 0.0;
+        Halfedge he = v.halfedge();
+        if (!v.isBoundary()){
+            do{
+                angularCoordinate[he] = cumulativeAngle;
+                cumulativeAngle += angle[he.next()];
+                he = he.next().next().twin();
+            }
+            while(he != v.halfedge());
+            do{
+                angularCoordinate[he] *= 2.0*PI / cumulativeAngle;
+                he = he.twin().next();
+            }
+            while(he != v.halfedge());
+        }
+        else{
+            //ensure the halfedge starts "on boundary" (twin is member of boundary cycle)
+            while(!he.twin().face().isBoundaryLoop()){
+                he = he.twin().next();
+            }
+            //get the halfedge on the boundary
+            he = he.twin().next();
+            Halfedge start = he;
+            //calculate the cumulative angle
+            while(!he.face().isBoundaryLoop()){
+                angularCoordinate[he] = cumulativeAngle;
+                cumulativeAngle += angle[he.next()];
+                he = he.next().next().twin();
+            }
+            angularCoordinate[he] = cumulativeAngle;//assign angular coordinate for last halfedge
+            //reset he
+            he = start;
+            //shift angle so reference halfedge is 0
+            //loop over the one-ring of the boundary vertex until you find a halfedge that's part of the boundary cycle
+            Halfedge bdy_he = v.halfedge();
+            while(bdy_he.isInterior()){
+                bdy_he = bdy_he.next().next().twin();
+            }
+            double shift = angularCoordinate[v.halfedge()];
+            while(!he.face().isBoundaryLoop()){
+                angularCoordinate[he] -= shift;
+                he = he.next().next().twin();
+            }
+            angularCoordinate[he] -= shift;//assign angular coordinate for last halfedge
+        }
+    }
+
+    for (Vertex v : mesh.vertices()){
+        //think this code already converts a 1-direction field to a 2-direction field
+        double alpha = angularCoordinate[v.halfedge()];
+        //if it's a 2-direction field 
+        //std::complex<double> r(cos (2.0 * alpha), sin(1.0 * alpha));
+        //if it's a 1-direction field 
+        //this flips vectors on boundary vertices, don't know why lol
+        std::complex<double> r(cos(1.0 * alpha), sin(1.0 * alpha));
+        int i = v.getIndex();
+        Vector3 n = geometry.vertexNormals[v];
+        Vector3 e = geometry.vertexPositions[v.halfedge().tipVertex()] - geometry.vertexPositions[v.halfedge().tailVertex()];
+        Vector2 u = projectOntoPlane(vertex_valued_field.row(i).transpose(), {n.x, n.y, n.z}, {e.x, e.y, e.z});
+        double a = std::atan2(u.y, u.x);
+        //for a 2-direction field
+        std::complex<double> complexDirectionField(r * std::complex<double>(cos(2.0 * a), sin(2.0 * a)));
+        //for a 1-direction field 
+        //std::complex<double> complexDirectionField(r * std::complex<double>(cos(a), sin(a)));
+        directionField[v] = Vector2::fromComplex(complexDirectionField);
+        directionField[v] = unit(directionField[v]);
+    }
+
+    //way to convert a 1-direction field vector to a 2-direction field vector as defined by geometry central 
+    // 1. rotate the vector 90 degrees then square
+    // 2. square the vector then rotate by 180 degrees
+
+    return directionField;
+
+}

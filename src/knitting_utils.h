@@ -16,6 +16,9 @@
 #include <igl/grad.h>
 #include <igl/average_onto_vertices.h>
 
+//helper files
+#include "helpers.h"
+
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
@@ -49,4 +52,6 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, 
 //
 //@return       vertexValuedField       VertexData<Vector3>     #V by 3 vector per face     
 VertexData<Vector3> computeVertexValuedField(VertexPositionGeometry& geometry, VertexData<double>& vertexScalarFunction);
+
+VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, VertexData<Vector3>& vertexValuedField);
 
