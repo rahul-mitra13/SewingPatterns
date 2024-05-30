@@ -19,3 +19,15 @@ using namespace geometrycentral::surface;
 //
 //@return       pair of two vertex lists    pair<vector<Vertex>, vector<Vertex>>    pair of vertex lists that represent the vertices at the extremes
 std::pair<std::vector<Vertex>, std::vector<Vertex>> getBoundaryVertices(VertexPositionGeometry& geometry, int axis);
+
+
+//
+/// Project a vector onto a given plane.
+///
+/// @param[in]  vec     The vector to project onto the plane.
+/// @param[in]  normal  Normal to the plane to project onto.
+/// @param[in]  axis    Axis vector whose projection onto the plane defines the local X axis.
+///
+/// @return     Projected vector.
+///
+Vector2 projectOntoPlane(const Eigen::Vector3d &vec, const Eigen::Vector3d &normal, const Eigen::Vector3d &axis);
