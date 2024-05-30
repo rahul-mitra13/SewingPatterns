@@ -53,5 +53,12 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, 
 //@return       vertexValuedField       VertexData<Vector3>     #V by 3 vector per face     
 VertexData<Vector3> computeVertexValuedField(VertexPositionGeometry& geometry, VertexData<double>& vertexScalarFunction);
 
+
+//compute a direction field per vertex from a vector field (in ambient space) per vertex
+//
+//@param[in]    geometry            VertexPositionGeometry geometry     input geometry
+//@param[in]    vertexValuedField   VertexData<Vector3>                 #V by 3 vector per vertex
+//
+//@return       directionField      VertexData<Vector2>                 direction field at each vertex
 VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, VertexData<Vector3>& vertexValuedField);
 

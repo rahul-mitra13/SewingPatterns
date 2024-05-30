@@ -187,7 +187,6 @@ VertexData<Vector3> computeVertexValuedField(VertexPositionGeometry& geometry, V
 
 }
 
-
 //get a line field per vertex from a vertex valued vector field in ambient space
 VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, VertexData<Vector3>& vertexValuedField){
 
@@ -270,13 +269,8 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
     }
 
     for (Vertex v : mesh.vertices()){
-        //think this code already converts a 1-direction field to a 2-direction field
-        double alpha = angularCoordinate[v.halfedge()];
-        //if it's a 2-direction field 
-        //std::complex<double> r(cos (2.0 * alpha), sin(1.0 * alpha));
-        //if it's a 1-direction field 
-        //this flips vectors on boundary vertices, don't know why lol
-        std::complex<double> r(cos(1.0 * alpha), sin(1.0 * alpha));
+        double alpha = angularCoordinate[v.halfedge()]; 
+        std::complex<double> r(cos (2.0 * alpha), sin(1.0 * alpha));
         int i = v.getIndex();
         Vector3 n = geometry.vertexNormals[v];
         Vector3 e = geometry.vertexPositions[v.halfedge().tipVertex()] - geometry.vertexPositions[v.halfedge().tailVertex()];
@@ -284,10 +278,11 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
         double a = std::atan2(u.y, u.x);
         //for a 2-direction field
         std::complex<double> complexDirectionField(r * std::complex<double>(cos(2.0 * a), sin(2.0 * a)));
-        //for a 1-direction field 
-        //std::complex<double> complexDirectionField(r * std::complex<double>(cos(a), sin(a)));
         directionField[v] = Vector2::fromComplex(complexDirectionField);
         directionField[v] = unit(directionField[v]);
+
+        //to rotate the field 90 degrees
+        //directionField[v] = directionField[v].rotate90();
     }
 
     //way to convert a 1-direction field vector to a 2-direction field vector as defined by geometry central 
