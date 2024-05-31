@@ -24,12 +24,21 @@
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
+//Let's say for now we're dealing with only 2 patches 
+
 // == Geometry-central data
-std::unique_ptr<ManifoldSurfaceMesh> mesh;
-std::unique_ptr<VertexPositionGeometry> geometry;
+std::unique_ptr<ManifoldSurfaceMesh> mesh1;
+std::unique_ptr<VertexPositionGeometry> geometry1;
 
 // Polyscope visualization handle, to quickly add data to the surface
-polyscope::SurfaceMesh *psMesh;
+polyscope::SurfaceMesh *psMesh1;
+
+// == Geometry-central data
+std::unique_ptr<ManifoldSurfaceMesh> mesh2;
+std::unique_ptr<VertexPositionGeometry> geometry2;
+
+// Polyscope visualization handle, to quickly add data to the surface
+polyscope::SurfaceMesh *psMesh2;
 
 // Some algorithm parameters
 float param1 = 42.0;
@@ -39,47 +48,47 @@ float param1 = 42.0;
 void showStripePatterns() {
 
 
-  std::vector<Vertex> zeroVertices = getBoundaryVertices(*geometry, 1).first;
-  std::vector<Vertex> oneVertices = getBoundaryVertices(*geometry, 1).second;
+  std::vector<Vertex> zeroVertices = getBoundaryVertices(*geometry1, 1).first;
+  std::vector<Vertex> oneVertices = getBoundaryVertices(*geometry1, 1).second;
 
-  VertexData<double> timeFunction = solveLaplace(*geometry, zeroVertices, oneVertices);
+  VertexData<double> timeFunction = solveLaplace(*geometry1, zeroVertices, oneVertices);
 
-  psMesh -> addVertexScalarQuantity("time function", timeFunction);
-  FaceData<Vector3> faceGrads = computeTimeFunctionFaceGrad(*geometry, timeFunction);
-  psMesh -> addFaceVectorQuantity("face gradients", faceGrads);
+  psMesh1 -> addVertexScalarQuantity("time function", timeFunction);
+  FaceData<Vector3> faceGrads = computeTimeFunctionFaceGrad(*geometry1, timeFunction);
+  psMesh1 -> addFaceVectorQuantity("face gradients", faceGrads);
   
 
   //Compute course stripe patterns
-  VertexData<Vector3> courseVertexValuedField = computeVertexValuedField(*geometry, timeFunction, 0);
-  psMesh -> addVertexVectorQuantity("course vertex valued field", courseVertexValuedField);
-  VertexData<Vector2> lineFieldCourse = vertexDirectionField(*geometry, courseVertexValuedField);
+  VertexData<Vector3> courseVertexValuedField = computeVertexValuedField(*geometry1, timeFunction, 0);
+  psMesh1 -> addVertexVectorQuantity("course vertex valued field", courseVertexValuedField);
+  VertexData<Vector2> lineFieldCourse = vertexDirectionField(*geometry1, courseVertexValuedField);
   double constantFreq = 40.;
-  VertexData<double> frequencies(*mesh, constantFreq);
+  VertexData<double> frequencies(*mesh1, constantFreq);
   CornerData<double> periodicFunc;
   FaceData<int> zeroIndices;
   FaceData<int> branchIndices;
   std::tie(periodicFunc, zeroIndices, branchIndices) =
-      computeStripePattern(*geometry, frequencies, lineFieldCourse);
+      computeStripePattern(*geometry1, frequencies, lineFieldCourse);
 
   // Extract isolines
   std::vector<Vector3> isolineVerts;
   std::vector<std::array<size_t, 2>> isolineEdges;
   std::tie(isolineVerts, isolineEdges) = extractPolylinesFromStripePattern(
-    *geometry, periodicFunc, zeroIndices, branchIndices, lineFieldCourse, false);
+    *geometry1, periodicFunc, zeroIndices, branchIndices, lineFieldCourse, false);
 
   polyscope::registerCurveNetwork("course stripe patterns", isolineVerts, isolineEdges);
 
 
   // Compute wale stripe patterns
-  VertexData<Vector3> waleVertexValuedField = computeVertexValuedField(*geometry, timeFunction, PI/2);
-  psMesh -> addVertexVectorQuantity("wale vertex valued field", waleVertexValuedField);
-  VertexData<Vector2> lineFieldWale = vertexDirectionField(*geometry, waleVertexValuedField);
+  VertexData<Vector3> waleVertexValuedField = computeVertexValuedField(*geometry1, timeFunction, PI/2);
+  psMesh1 -> addVertexVectorQuantity("wale vertex valued field", waleVertexValuedField);
+  VertexData<Vector2> lineFieldWale = vertexDirectionField(*geometry1, waleVertexValuedField);
   std::tie(periodicFunc, zeroIndices, branchIndices) =
-      computeStripePattern(*geometry, frequencies, lineFieldWale);
+      computeStripePattern(*geometry1, frequencies, lineFieldWale);
 
   // Extract isolines
   std::tie(isolineVerts, isolineEdges) = extractPolylinesFromStripePattern(
-    *geometry, periodicFunc, zeroIndices, branchIndices, lineFieldWale, false);
+    *geometry1, periodicFunc, zeroIndices, branchIndices, lineFieldWale, false);
 
   polyscope::registerCurveNetwork("wale stripe patterns", isolineVerts, isolineEdges);
 
@@ -99,56 +108,30 @@ void callBacks() {
 
 int main(int argc, char **argv) {
 
-  // Configure the argument parser
-  args::ArgumentParser parser("geometry-central & Polyscope example project");
-  args::Positional<std::string> inputFilename(parser, "mesh", "A mesh file.");
-
-  // Parse args
-  try {
-    parser.ParseCLI(argc, argv);
-  } catch (args::Help &h) {
-    std::cout << parser;
-    return 0;
-  } catch (args::ParseError &e) {
-    std::cerr << e.what() << std::endl;
-    std::cerr << parser;
-    return 1;
-  }
-
-  // Make sure a mesh name was given
-  if (!inputFilename) {
-    std::cerr << "Please specify a mesh file as argument" << std::endl;
-    return EXIT_FAILURE;
-  }
-
   // Initialize polyscope
   polyscope::init();
 
   // Set the callback function
   polyscope::state::userCallback = callBacks;
 
-  // Load mesh
-  std::tie(mesh, geometry) = readManifoldSurfaceMesh(args::get(inputFilename));
+  // Load the first mesh
+  std::tie(mesh1, geometry1) = readManifoldSurfaceMesh(argv[1]);
 
   // Register the mesh with polyscope
-  psMesh = polyscope::registerSurfaceMesh(
-      polyscope::guessNiceNameFromPath(args::get(inputFilename)),
-      geometry->inputVertexPositions, mesh->getFaceVertexList(),
-      polyscopePermutations(*mesh));
+  psMesh1 = polyscope::registerSurfaceMesh(
+      polyscope::guessNiceNameFromPath(argv[1]),
+      geometry1->inputVertexPositions, mesh1->getFaceVertexList(),
+      polyscopePermutations(*mesh1));
 
-  // Set vertex tangent spaces
-  // geometry->requireVertexTangentBasis();
-  // VertexData<Vector3> vBasisX(*mesh);
-  // VertexData<Vector3> vBasisY(*mesh);
-  // for (Vertex v : mesh->vertices()) {
-  //   vBasisX[v] = geometry->vertexTangentBasis[v][0];
-  //   vBasisY[v] = geometry->vertexTangentBasis[v][1];
-  // }
+  // Load the second mesh
+  std::tie(mesh2, geometry2) = readManifoldSurfaceMesh(argv[2]);
 
-  // auto vField =
-  //     geometrycentral::surface::computeSmoothestVertexDirectionField(*geometry);
-  // psMesh->addVertexTangentVectorQuantity("VF", vField, vBasisX, vBasisY);
-
+  // Register the mesh with polyscope
+  psMesh2 = polyscope::registerSurfaceMesh(
+      polyscope::guessNiceNameFromPath(argv[2]),
+      geometry2->inputVertexPositions, mesh2->getFaceVertexList(),
+      polyscopePermutations(*mesh2));
+ 
   // Give control to the polyscope gui
   polyscope::show();
 
