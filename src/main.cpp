@@ -105,6 +105,8 @@ int main(int argc, char **argv) {
 
   numPatches = argc - 1;
 
+  std::cout << "Testing windows build" << std::endl;
+
   //resize vectors to account for all the input patches 
   meshes.resize(numPatches);
   geometries.resize(numPatches);
