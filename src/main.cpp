@@ -33,8 +33,8 @@ std::vector<std::unique_ptr<VertexPositionGeometry>> geometries;
 std::vector<polyscope::SurfaceMesh *> psMeshes;
 
 
-// Some algorithm parameters
-float param1 = 42.0;
+// Striping frequency
+float constantFreq = 40.0;
 
 // Example computation function -- this one computes and registers a scalar
 // quantity
@@ -57,7 +57,6 @@ void showStripePatterns() {
     VertexData<Vector3> courseVertexValuedField = computeVertexValuedField(*geometries[i], timeFunction, 0);
     psMeshes[i] -> addVertexVectorQuantity("course vertex valued field_" + std::to_string(i), courseVertexValuedField);
     VertexData<Vector2> lineFieldCourse = vertexDirectionField(*geometries[i], courseVertexValuedField);
-    double constantFreq = 40.;
     VertexData<double> frequencies(*meshes[i], constantFreq);
     CornerData<double> periodicFunc;
     FaceData<int> zeroIndices;
@@ -94,7 +93,7 @@ void showStripePatterns() {
 // https://github.com/ocornut/imgui/blob/master/imgui.h
 void callBacks() {
 
-  ImGui::SliderFloat("param", &param1, 0., 100.);
+  ImGui::SliderFloat("Striping Frequency", &constantFreq, 0., 100.);
   
   if (ImGui::Button("Show Stripe Patterns")) {
     showStripePatterns();
