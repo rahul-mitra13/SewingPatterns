@@ -143,7 +143,7 @@ VertexData<Vector3> computeVertexValuedField(VertexPositionGeometry& geometry, V
 
     SurfaceMesh& mesh = geometry.mesh;
     geometry.requireVertexNormals();
-    
+
     VertexData<Vector3> vertexValuedField(mesh);
 
     Eigen::MatrixXd V(mesh.nVertices(), 3);
@@ -293,7 +293,39 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
     //way to convert a 1-direction field vector to a 2-direction field vector as defined by geometry central 
     // 1. rotate the vector 90 degrees then square
     // 2. square the vector then rotate by 180 degrees
+    
 
     return directionField;
 
 }
+
+//compute a 1-form over the mesh given an input optimization problem 
+EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& model){
+
+    SurfaceMesh& mesh = geometry.mesh;
+    EdgeData<double> oneForm(mesh);
+
+    //solve the model
+    using namespace std;
+    try {
+        //NOTE: APPARENTLY += is not the fastest
+        //should look up the gurobi way of doing this
+
+        // Create an environment
+        GRBEnv env = GRBEnv(true);
+        env.set("LogFile", "1-form computation.log");
+        env.start();
+
+        // Create an empty model
+        GRBModel model = GRBModel(env);
+    }
+    catch(GRBException e) {
+        cout << "Error code = " << e.getErrorCode() << endl;
+        cout << e.getMessage() << endl;
+    } catch(...) {
+        cout << "Exception during optimization" << endl;
+    }
+
+    return oneForm;
+}
+

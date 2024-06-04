@@ -19,6 +19,10 @@
 //helper files
 #include "helpers.h"
 
+//includes to solve the optimization problem
+#include "gurobi_c++.h"
+#include "model.h"
+
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
@@ -62,4 +66,12 @@ VertexData<Vector3> computeVertexValuedField(VertexPositionGeometry& geometry, V
 //
 //@return       directionField      VertexData<Vector2>                 direction field at each vertex
 VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, VertexData<Vector3>& vertexValuedField);
+
+//compute a 1-form that will be used to generate the stripes over the quad patches 
+//
+//@param[in]    geometry    VertexPositionGeometry  input geometry 
+//@param[in]    model       Model                   The gurobi model we're interested in solving
+//
+//@return       oneForm     EdgeData<double>        The course 1-form used to specify the stripes
+EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& model);
 
