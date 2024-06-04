@@ -1,6 +1,18 @@
 cmake_minimum_required(VERSION 3.0.0)
 
-project("Sewing Patterns")
+project("SewingPatterns")
+set(CMAKE_CXX_STANDARD 11)
+
+if(CXX)
+  enable_language(CXX)
+endif()
+option(CXX "enable C++ compilation" ON)
+
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR})
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "Release")
+endif()
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 # Maybe stop from CMAKEing in the wrong place
 if (CMAKE_BINARY_DIR STREQUAL CMAKE_SOURCE_DIR)
@@ -18,7 +30,7 @@ set( CMAKE_EXPORT_COMPILE_COMMANDS 1 ) # Emit a compile flags file to support co
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
   # using Clang (linux or apple) or GCC
   message("Using clang/gcc compiler flags")
-  SET(BASE_CXX_FLAGS "-std=c++11 -Wall -Wextra -g3")
+  SET(BASE_CXX_FLAGS "-std=c++14 -Wall -Wextra -g3")
   SET(DISABLED_WARNINGS " -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -Wno-missing-braces")
   SET(TRACE_INCLUDES " -H -Wno-error=unused-command-line-argument")
 
@@ -61,12 +73,12 @@ else()
 endif()
 
 # Find Eigen
-find_package(Eigen3 3.4 REQUIRED NO_MODULE)
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
 # Add polyscope
 message("\n\n == CMAKE recursively building Polyscope\n")
 add_subdirectory("deps/polyscope")
-add_subdirectory("deps/geometry-central")
+add_subdirectory("deps/geometry-central") # wherever you put it
 
 # Add libIGL
 # With these lines commented out, we use libIGL in "header only" mode.  Uncomment to recurse and get the full package.
@@ -79,31 +91,47 @@ add_subdirectory("deps/geometry-central")
 #set(LIBIGL_WITH_OPENGL_GLFW_IMGUI OFF CACHE BOOL "Use ImGui" )
 #add_subdirectory("deps/libIGL")
 
+find_package(GUROBI REQUIRED)
+
+include_directories(${GUROBI_INCLUDE_DIRS})
+
+#Visual Studio compiler with static runtime libraries
+if(MSVC AND MT)
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
+  set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
+  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
+endif()
+
 # Create an executable
 add_executable(
-        sewingPattern
+        SewingPatterns
         src/main.cpp
         src/model.cpp
         src/knitting_utils.cpp
         src/helpers.cpp
-        )
+)
 
 # Include settings
-target_include_directories(sewingPattern PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/libigl/include")
+target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/libigl/include")
 #add args
-target_include_directories(sewingPattern PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/polyscope/deps/args")
+target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/polyscope/deps/args")
 #add json
-target_include_directories(sewingPattern PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/polyscope/deps/json/include/")
+target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/polyscope/deps/json/include/")
 
 if(CXX)
-  target_link_libraries(StripePatterns optimized ${GUROBI_CXX_LIBRARY}
+  target_link_libraries(SewingPatterns optimized ${GUROBI_CXX_LIBRARY}
                         debug ${GUROBI_CXX_DEBUG_LIBRARY})
 endif()
 
-
 # Link settings
-target_link_libraries(sewingPattern
-                      polyscope 
-                      geometry-central
-                      Eigen3::Eigen
-                      ${GUROBI_LIBRARY})
+target_link_libraries(SewingPatterns
+			polyscope
+			Eigen3::Eigen
+			geometry-central
+			${GUROBI_LIBRARY})
+
+if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
+  include(FeatureSummary)
+  feature_summary(WHAT ALL)
+endif()
