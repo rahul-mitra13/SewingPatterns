@@ -300,17 +300,28 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
 }
 
 //compute a 1-form over the mesh given an input optimization problem 
-EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& model){
+EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel){
 
     SurfaceMesh& mesh = geometry.mesh;
+    geometry.requireDECOperators();
+
+    Eigen::SparseMatrix<double, Eigen::RowMajor> d_one;
+    d_one = geometry.d1;
+
     EdgeData<double> oneForm(mesh);
 
-    //solve the model
-    using namespace std;
-    try {
-        //NOTE: APPARENTLY += is not the fastest
-        //should look up the gurobi way of doing this
+    std::vector<double> omega = gbModel.getMatchingTerms();
+    std::vector<int> bdyEdges = gbModel.getCourseBdyEdges();
+    double period = 0.01;
 
+    std::cout << "size of omega = " << omega.size() << std::endl;
+    std::cout << "number of bdy edges = " << bdyEdges.size() << std::endl;
+
+    for (int i = 0; i < mesh.nEdges(); i++){
+        std::cout << "omega[i] = " << omega[i] << std::endl;
+    }
+    
+    try {
         // Create an environment
         GRBEnv env = GRBEnv(true);
         env.set("LogFile", "1-form computation.log");
@@ -318,14 +329,105 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& model){
 
         // Create an empty model
         GRBModel model = GRBModel(env);
+
+        //add variable 1-form variable sigma (per edge)
+        std::vector<GRBVar> sigma;
+
+        for (size_t i = 0; i < mesh.nEdges(); i++){
+            GRBVar sigma_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS);
+            //add gurobi vars
+            sigma.push_back(sigma_i);//decision variables
+        }
+
+        //add variable for integral of 1-form over each face
+        std::vector<GRBVar> k;
+        //add integer variable k (per face) (not including faces represented as boundaries)
+        for (size_t i = 0; i < mesh.nFaces(); i++){
+            GRBVar k_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_INTEGER);
+            k.push_back(k_i);//decision variables
+        }
+
+        //first constraint - sigma at boundary edges should be 0
+        for (int bdy_edge_index : bdyEdges){
+            model.addConstr(sigma[bdy_edge_index] == 0.0, "Boundary Constraint");
+        }
+
+        //second constraint - (d1*sigma) == period*k
+        for (int r = 0; r < d_one.outerSize(); ++r ) {
+            GRBLinExpr lhs = 0;
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_one, r); it; ++it ) {
+                lhs += it.value() * sigma[it.col()];
+            }
+            model.addConstr(lhs == 0, "Integral Constraint");
+            //model.addConstr(lhs == period * k[r], "Integral Constraint");
+        }
+
+        //trying to match energies
+        GRBQuadExpr diff1_sum = 0;
+
+        for (int i = 0; i < mesh.nEdges(); i++){
+            diff1_sum += (sigma[i] - omega[i]) * (sigma[i] - omega[i]);
+        }
+
+
+        GRBQuadExpr obj = diff1_sum;
+
+        model.setObjective(obj);
+        model.optimize(); 
+        std::cout << "Obj: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
+    
+        //put the computed one-form into an edge vector
+        for (Edge e : mesh.edges()){
+            std::cout << "sigma at edge " << e << " is = " << sigma[e.getIndex()].get(GRB_DoubleAttr_X) << std::endl;
+            oneForm[e] = sigma[e.getIndex()].get(GRB_DoubleAttr_X);
+        }
     }
     catch(GRBException e) {
-        cout << "Error code = " << e.getErrorCode() << endl;
-        cout << e.getMessage() << endl;
+        std::cout << "Error code = " << e.getErrorCode() << std::endl;
+        std::cout << e.getMessage() << std::endl;
     } catch(...) {
-        cout << "Exception during optimization" << endl;
+        std::cout << "Exception during optimization" << std::endl;
     }
 
     return oneForm;
+}
+
+//compute \omega that is the 1-form we're trying to match over each edge 
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction){
+    
+    SurfaceMesh& mesh = geometry.mesh;
+    EdgeData<double> d0_f_avg(mesh);
+
+    std::vector<Vertex> zeroVertices = getBoundaryVertices(geometry, 1).first;
+    std::vector<Vertex> oneVertices = getBoundaryVertices(geometry, 1).second;
+    VertexData<double> timeFunction = solveLaplace(geometry, zeroVertices, oneVertices);
+    FaceData<Vector3> faceGradients = computeTimeFunctionFaceGrad(geometry, timeFunction);
+
+    //evaluate the matching energy
+    for (Edge edge : mesh.edges()){
+        //normalize the gradients first
+        faceGradients[edge.halfedge().face()] = faceGradients[edge.halfedge().face()].normalize();
+        faceGradients[edge.halfedge().twin().face()] = faceGradients[edge.halfedge().twin().face()].normalize();
+        //if halfedge is interior
+        if (edge.halfedge().twin().isInterior()){
+            if (edge.halfedge().orientation()){
+                d0_f_avg[edge] = 0.5 * dot((faceGradients[edge.halfedge().face()] + faceGradients[edge.halfedge().twin().face()]),
+                                    geometry.vertexPositions[edge.halfedge().tipVertex()] - geometry.vertexPositions[edge.halfedge().tailVertex()]);
+            }
+        }
+      	//handle edges on the boundary
+      	else{
+      		if (edge.halfedge().orientation()){
+                d0_f_avg[edge] = dot(faceGradients[edge.halfedge().face()], geometry.vertexPositions[edge.halfedge().tipVertex()] - 
+                                                                                geometry.vertexPositions[edge.halfedge().tailVertex()]);
+            }
+      		else{//should never actually hit this case
+                d0_f_avg[edge] = dot(faceGradients[edge.halfedge().face()], geometry.vertexPositions[edge.halfedge().tailVertex()] - 
+                                                                                geometry.vertexPositions[edge.halfedge().tipVertex()]);
+      		}
+      	}
+    }
+
+    return d0_f_avg;
 }
 
