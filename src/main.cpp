@@ -86,6 +86,44 @@ void showStripePatterns() {
 
     polyscope::registerCurveNetwork("wale stripe patterns_" + std::to_string(i), isolineVerts, isolineEdges);
   }
+
+  //do this for every patch
+  for (int i = 0; i < numPatches; i++){  
+    std::vector<Edge> lowestEdges = getBoundaryEdges(*geometries[i], 1).first;
+    std::vector<Edge> highestEdges = getBoundaryEdges(*geometries[i], 1).second;
+    EdgeData<double>  matchingOneForm = computeMatchingOneForm(*geometries[i], 0);
+
+    //set up the optimization model 
+    Model model;
+    //put all the boundary edges into a single vector 
+    std::vector<int> modelCourseBdyEdges;
+    //put the edge terms we're trying to match in a vector
+    std::vector<double> modelMatchingTerms;
+
+    for (Edge e : lowestEdges) modelCourseBdyEdges.push_back(e.getIndex());
+    for (Edge e : highestEdges) modelCourseBdyEdges.push_back(e.getIndex());
+    for (Edge e : meshes[i]->edges()) modelMatchingTerms.push_back(matchingOneForm[e]);
+    
+    std::cout << " Number of edges in the mesh = " << meshes[i] -> nEdges() << std::endl;
+    std::cout << "Number of highest edges = " << highestEdges.size() << std::endl;
+    std::cout << "Number of lowest edges = " << lowestEdges.size() << std::endl;
+    std::cout << "Number of modelMatchingTerms = " << modelMatchingTerms.size() << std::endl;
+
+    model.setCourseBdyEdges(modelCourseBdyEdges);
+    model.setMatchingTerms(modelMatchingTerms);
+
+    EdgeData<double> courseOneForm = computeOneForm(*geometries[i], model);
+
+    CornerData<double> stripeValuesSigma;
+    FaceData<int> stripeIndicesSigma;  
+    std::vector<Vector3> positions;
+    std::vector<std::array<int, 2>> edges;
+
+    //compute stripe patterns from 1-form
+    std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneForm(*geometries[i], courseOneForm, 0.01);
+    std::tie(positions, edges) = generateIsoLines(*geometries[i], stripeValuesSigma, stripeIndicesSigma, 0.01);
+    polyscope::registerCurveNetwork("course stripe patterns_" + std::to_string(i), positions, edges);
+  }
 }
 
 // A user-defined callback, for creating control panels (etc)
