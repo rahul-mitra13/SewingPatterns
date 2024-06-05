@@ -21,20 +21,7 @@ VertexData<double> solveLaplace(VertexPositionGeometry& geometry, std::vector<Ve
     Eigen::MatrixXd V(mesh.nVertices(), 3);
     Eigen::MatrixXi F(mesh.nFaces(), 3);
 
-    for (Vertex v : mesh.vertices()){
-        Vector3 pos = geometry.vertexPositions[v];
-        V(v.getIndex(), 0) = pos.x;
-        V(v.getIndex(), 1) = pos.y;
-        V(v.getIndex(), 2) = pos.z;
-    }
-
-    std::vector<std::vector<size_t>> faceVertexIndices = mesh.getFaceVertexList();
-
-    for (int i = 0; i < faceVertexIndices.size(); i++){
-        F(i, 0) = faceVertexIndices[i][0];
-        F(i, 1) = faceVertexIndices[i][1];
-        F(i, 2) = faceVertexIndices[i][2];
-    }
+    std::tie(V, F) = getVertexPositionsandFaceLists(geometry);
 
 
     //set up eigen code for solving laplace equation
@@ -101,20 +88,7 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, 
     Eigen::MatrixXd V(mesh.nVertices(), 3);
     Eigen::MatrixXi F(mesh.nFaces(), 3);
 
-    for (Vertex v : mesh.vertices()){
-        Vector3 pos = geometry.vertexPositions[v];
-        V(v.getIndex(), 0) = pos.x;
-        V(v.getIndex(), 1) = pos.y;
-        V(v.getIndex(), 2) = pos.z;
-    }
-
-    std::vector<std::vector<size_t>> faceVertexIndices = mesh.getFaceVertexList();
-
-    for (int i = 0; i < faceVertexIndices.size(); i++){
-        F(i, 0) = faceVertexIndices[i][0];
-        F(i, 1) = faceVertexIndices[i][1];
-        F(i, 2) = faceVertexIndices[i][2];
-    }
+    std::tie(V, F) = getVertexPositionsandFaceLists(geometry);
 
     Eigen::VectorXd U(mesh.nVertices());
     //convert time function to eigen matrix 
@@ -149,20 +123,7 @@ VertexData<Vector3> computeVertexValuedField(VertexPositionGeometry& geometry, V
     Eigen::MatrixXd V(mesh.nVertices(), 3);
     Eigen::MatrixXi F(mesh.nFaces(), 3);
 
-    for (Vertex v : mesh.vertices()){
-        Vector3 pos = geometry.vertexPositions[v];
-        V(v.getIndex(), 0) = pos.x;
-        V(v.getIndex(), 1) = pos.y;
-        V(v.getIndex(), 2) = pos.z;
-    }
-
-    std::vector<std::vector<size_t>> faceVertexIndices = mesh.getFaceVertexList();
-
-    for (int i = 0; i < faceVertexIndices.size(); i++){
-        F(i, 0) = faceVertexIndices[i][0];
-        F(i, 1) = faceVertexIndices[i][1];
-        F(i, 2) = faceVertexIndices[i][2];
-    }
+    std::tie(V, F) = getVertexPositionsandFaceLists(geometry);
 
     Eigen::VectorXd U(mesh.nVertices());
     //convert time function to eigen matrix 
@@ -312,15 +273,8 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
 
     std::vector<double> omega = gbModel.getMatchingTerms();
     std::vector<int> bdyEdges = gbModel.getCourseBdyEdges();
-    double period = 0.01;
+    double period = gbModel.getPeriod();
 
-    std::cout << "size of omega = " << omega.size() << std::endl;
-    std::cout << "number of bdy edges = " << bdyEdges.size() << std::endl;
-
-    for (int i = 0; i < mesh.nEdges(); i++){
-        std::cout << "omega[i] = " << omega[i] << std::endl;
-    }
-    
     try {
         // Create an environment
         GRBEnv env = GRBEnv(true);
@@ -378,7 +332,6 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     
         //put the computed one-form into an edge vector
         for (Edge e : mesh.edges()){
-            std::cout << "sigma at edge " << e << " is = " << sigma[e.getIndex()].get(GRB_DoubleAttr_X) << std::endl;
             oneForm[e] = sigma[e.getIndex()].get(GRB_DoubleAttr_X);
         }
     }

@@ -35,6 +35,8 @@ std::vector<polyscope::SurfaceMesh *> psMeshes;
 
 // Striping frequency
 float constantFreq = 40.0;
+//1-form optimization period
+float period = 0.1;
 
 // Example computation function -- this one computes and registers a scalar
 // quantity
@@ -63,6 +65,8 @@ void showStripePatterns() {
     FaceData<int> branchIndices;
     std::tie(periodicFunc, zeroIndices, branchIndices) =
         computeStripePattern(*geometries[i], frequencies, lineFieldCourse);
+    
+    psMeshes[i] -> addFaceScalarQuantity("knoppel singularities_" + std::to_string(i), zeroIndices);
 
     // Extract isolines
     std::vector<Vector3> isolineVerts;
@@ -103,14 +107,10 @@ void showStripePatterns() {
     for (Edge e : lowestEdges) modelCourseBdyEdges.push_back(e.getIndex());
     for (Edge e : highestEdges) modelCourseBdyEdges.push_back(e.getIndex());
     for (Edge e : meshes[i]->edges()) modelMatchingTerms.push_back(matchingOneForm[e]);
-    
-    std::cout << " Number of edges in the mesh = " << meshes[i] -> nEdges() << std::endl;
-    std::cout << "Number of highest edges = " << highestEdges.size() << std::endl;
-    std::cout << "Number of lowest edges = " << lowestEdges.size() << std::endl;
-    std::cout << "Number of modelMatchingTerms = " << modelMatchingTerms.size() << std::endl;
 
     model.setCourseBdyEdges(modelCourseBdyEdges);
     model.setMatchingTerms(modelMatchingTerms);
+    model.setPeriod(period);
 
     EdgeData<double> courseOneForm = computeOneForm(*geometries[i], model);
 
@@ -120,9 +120,9 @@ void showStripePatterns() {
     std::vector<std::array<int, 2>> edges;
 
     //compute stripe patterns from 1-form
-    std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneForm(*geometries[i], courseOneForm, 0.01);
-    std::tie(positions, edges) = generateIsoLines(*geometries[i], stripeValuesSigma, stripeIndicesSigma, 0.01);
-    polyscope::registerCurveNetwork("course stripe patterns_" + std::to_string(i), positions, edges);
+    std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneForm(*geometries[i], courseOneForm, period);
+    std::tie(positions, edges) = generateIsoLines(*geometries[i], stripeValuesSigma, stripeIndicesSigma, period);
+    //polyscope::registerCurveNetwork("course stripe patterns_" + std::to_string(i), positions, edges);
   }
 }
 
@@ -131,7 +131,7 @@ void showStripePatterns() {
 // https://github.com/ocornut/imgui/blob/master/imgui.h
 void callBacks() {
 
-  ImGui::SliderFloat("Striping Frequency", &constantFreq, 0., 100.);
+  ImGui::InputFloat("1-form period", &period);
   
   if (ImGui::Button("Show Stripe Patterns")) {
     showStripePatterns();
@@ -141,8 +141,6 @@ void callBacks() {
 int main(int argc, char **argv) {
 
   numPatches = argc - 1;
-
-  std::cout << "Testing windows build" << std::endl;
 
   //resize vectors to account for all the input patches 
   meshes.resize(numPatches);
