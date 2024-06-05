@@ -1,5 +1,6 @@
 #include "helpers.h"
 
+//get a pair of vertex lists that are at the extremes of a panel
 std::pair<std::vector<Vertex>, std::vector<Vertex>> getBoundaryVertices(VertexPositionGeometry& geometry, int axis){
     
     SurfaceMesh& mesh = geometry.mesh;
@@ -38,4 +39,38 @@ Vector2 projectOntoPlane(const Eigen::Vector3d &vec, const Eigen::Vector3d &norm
     Eigen::Vector3d eX = eY.cross(normal).normalized();
     Eigen::Vector2d toReturn =  {eX.dot(vec), eY.dot(vec)};
     return Vector2{toReturn(0), toReturn(1)};
+}
+
+
+//get a pair of boundary edges that are at the extremes of a panel
+std::pair<std::vector<Edge>, std::vector<Edge>> getBoundaryEdges(VertexPositionGeometry& geometry, int axis){
+
+    SurfaceMesh& mesh = geometry.mesh;
+
+    std::vector<Edge> lowestEdges;
+    std::vector<Edge> highestEdges;
+    
+    std::vector<Vertex> lowestVertices = getBoundaryVertices(geometry, axis).first;
+    std::vector<Vertex> highestVertices = getBoundaryVertices(geometry, axis).second;
+
+    for (Vertex v : lowestVertices){
+        for (Halfedge he : v.outgoingHalfedges()){
+            if (std::find(lowestVertices.begin(), lowestVertices.end(), he.tipVertex()) != lowestVertices.end()){//the outgoing halfedge points to a vertex in the set
+                if (std::find(lowestEdges.begin(), lowestEdges.end(), he.edge()) == lowestEdges.end())
+                    lowestEdges.push_back(he.edge());
+            }
+        } 
+    }
+    //do the same for highest vertices 
+    for (Vertex v : highestVertices){
+        for (Halfedge he : v.outgoingHalfedges()){
+            if (std::find(highestVertices.begin(), highestVertices.end(), he.tipVertex()) != highestVertices.end()){//the outgoing halfedge points to a vertex in the set
+                if (std::find(highestEdges.begin(), highestEdges.end(), he.edge()) == highestEdges.end())
+                    highestEdges.push_back(he.edge());
+            }
+        } 
+    }
+
+    return std::make_pair(lowestEdges, highestEdges);
+
 }

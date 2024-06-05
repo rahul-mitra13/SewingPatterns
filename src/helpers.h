@@ -10,15 +10,25 @@ using namespace geometrycentral::surface;
 
 //this file contains even more auxilliary functions used for experimentation, accessing basic mesh data etc
 //1. getBoundaryVertices()
+//2. getBoundaryEdges()
 
 //
-//get a pair of vertices that are at the extremes of a panel
+//get a pair of vertex lists that are at the extremes of a panel (this probably needs user input eventually)
 //
 //@param[in]    geometry                    VertexPositionGeometry                  input geometry
 //@param[in]    axis                        int                                     axis whose extremes we're interested in (0 -> x, 1 -> y, 2 -> z)
 //
 //@return       pair of two vertex lists    pair<vector<Vertex>, vector<Vertex>>    pair of vertex lists that represent the vertices at the extremes
 std::pair<std::vector<Vertex>, std::vector<Vertex>> getBoundaryVertices(VertexPositionGeometry& geometry, int axis);
+
+//
+//get a pair of boundary edges that are at the extremes of a panel (this probably needs user input eventually)
+//@param[in]    geometry                VertexPositionGeometry              input geometry 
+//@param[in]    axis                    int                                 axis whose extremes we're interested in (0 -> x, 1 -> y, 2 -> z)
+//
+//@return       pair of 2 edge lists    pair<vector<Edge, vector<Edge>>     pair of edge lists that represent the edges at the extremes 
+std::pair<std::vector<Edge>, std::vector<Edge>> getBoundaryEdges(VertexPositionGeometry& geometry, int axis);
+
 
 
 //
