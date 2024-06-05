@@ -74,3 +74,28 @@ std::pair<std::vector<Edge>, std::vector<Edge>> getBoundaryEdges(VertexPositionG
     return std::make_pair(lowestEdges, highestEdges);
 
 }
+
+// Get vertex positions and face lists from an input geometry
+std::pair<Eigen::MatrixXd, Eigen::MatrixXi> getVertexPositionsandFaceLists(VertexPositionGeometry& geometry){
+
+    SurfaceMesh& mesh = geometry.mesh;
+    Eigen::MatrixXd V(mesh.nVertices(), 3);
+    Eigen::MatrixXi F(mesh.nFaces(), 3);
+
+    for (Vertex v : mesh.vertices()){
+        Vector3 pos = geometry.vertexPositions[v];
+        V(v.getIndex(), 0) = pos.x;
+        V(v.getIndex(), 1) = pos.y;
+        V(v.getIndex(), 2) = pos.z;
+    }
+
+    std::vector<std::vector<size_t>> faceVertexIndices = mesh.getFaceVertexList();
+
+    for (int i = 0; i < faceVertexIndices.size(); i++){
+        F(i, 0) = faceVertexIndices[i][0];
+        F(i, 1) = faceVertexIndices[i][1];
+        F(i, 2) = faceVertexIndices[i][2];
+    }
+
+    return std::make_pair(V, F);
+}
