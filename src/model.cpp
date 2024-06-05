@@ -25,6 +25,17 @@ void Model::setSmoothFaceIndices(std::vector<int> smoothFaces){
     this->smoothFaces = smoothFaces;
 }
 
+void Model::setCourseBdyEdges(std::vector<int> courseBdyEdges){
+
+    this->courseBdyEdges = courseBdyEdges;
+}
+
+void Model::setMatchingTerms(std::vector<double> matchingTerms){
+
+    this->matchingTerms = matchingTerms;
+
+}
+
 double Model::getPeriod(){
 
     return this->period;
@@ -38,6 +49,18 @@ double Model::getTimeOut(){
 std::vector<std::pair<std::vector<double>, double>> Model::getEdgePathConstraints(){
 
     return this->edgePathConstraints;
+}
+
+std::vector<int> Model::getCourseBdyEdges(){
+    
+    return this->courseBdyEdges;
+
+}
+
+std::vector<double> Model::getMatchingTerms(){
+
+    return this->matchingTerms;
+
 }
 
 
