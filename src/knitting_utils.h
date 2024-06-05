@@ -29,6 +29,9 @@ using namespace geometrycentral::surface;
 //this is a utility file that will handle basic mesh processing tasks such as 
 //1. solveLaplace()
 //2. computeTimeFunctionGrad()
+//3. computeVertexValuedField()
+//4. vertexDirectionField()
+//5. computeOneForm()
 
 //
 //solve Laplace equation over an input mesh 
@@ -74,4 +77,12 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
 //
 //@return       oneForm     EdgeData<double>        The course 1-form used to specify the stripes
 EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& model);
+
+//compute \omega i.e., the 1-form we're trying to match over each edge 
+//
+//@param[in]    geometry            VertexPositionGeometry  input geometry
+//@param[in]    direction           int                     integer representing the direction for omega that we're attempting to generate (0 -> course, 1 -> wale)
+//
+//@return       matchingOneForm     EdgeData<double>        The 1-form we're trying to match 
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction);    
 
