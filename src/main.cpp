@@ -89,6 +89,7 @@ void showStripePatterns() {
       *geometries[i], periodicFunc, zeroIndices, branchIndices, lineFieldWale, false);
 
     polyscope::registerCurveNetwork("wale stripe patterns_" + std::to_string(i), isolineVerts, isolineEdges);
+  
   }
 
   //do this for every patch
