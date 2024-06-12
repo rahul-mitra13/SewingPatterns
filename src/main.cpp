@@ -2,8 +2,8 @@
 #include "geometrycentral/surface/meshio.h"
 #include "geometrycentral/surface/vertex_position_geometry.h"
 #include "geometrycentral/surface/stripe_patterns.h"
-
 #include "geometrycentral/surface/direction_fields.h"
+
 
 
 #include "geometrycentral/surface/direction_fields.h"
@@ -19,7 +19,8 @@
 
 //file includes
 #include "knitting_utils.h"
-#include "helpers.h"//for testing now, gonna remove eventually
+#include "helpers.h"
+#include "GUI_helpers.h"
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -27,10 +28,17 @@ using namespace geometrycentral::surface;
 int numPatches;//number of patches
 
 //make a vector to handle all the patches 
-//meshes + geometries 
+//meshes + geometries + polyscope surface meshes
 std::vector<std::unique_ptr<ManifoldSurfaceMesh>> meshes;
 std::vector<std::unique_ptr<VertexPositionGeometry>> geometries;
 std::vector<polyscope::SurfaceMesh *> psMeshes;
+//boundary vertices for each patch
+//for each patch we hold a pair i.e., pair<vertices on the knitting start boundary, vertices on the knitting end boundary>
+std::vector<std::pair<std::vector<Vertex>, std::vector<Vertex>>> boundaryVertices;
+//boundary edges for each patch
+//for each patch we hold a pair i.e., pair<edges on the knitting start boundary, edges on the knitting end boundary>
+std::vector<std::pair<std::vector<Edge>, std::vector<Edge>>> boundaryEdges;
+
 
 
 // Striping frequency
@@ -38,26 +46,29 @@ float constantFreq = 40.0;
 //1-form optimization period
 float period = 0.1;
 
-// Example computation function -- this one computes and registers a scalar
-// quantity
-void showStripePatterns() {
 
-
+//testing vertex selection UI 
+void showBoundaryVertexSelectionUI(){
   //do this for every patch
-  for (int i = 0; i < numPatches; i++){  
-    std::vector<Vertex> zeroVertices = getBoundaryVertices(*geometries[i], 1).first;
-    std::vector<Vertex> oneVertices = getBoundaryVertices(*geometries[i], 1).second;
+  for (int i = 0; i < numPatches; i++){
+    std::tie(boundaryVertices[i].first, boundaryEdges[i].first) = getAndRenderUserSpecifiedBoundaryInfo(*geometries[i], *psMeshes[i], 0);
+    std::tie(boundaryVertices[i].second, boundaryEdges[i].second) = getAndRenderUserSpecifiedBoundaryInfo(*geometries[i], *psMeshes[i], 1);
+  }
+}
 
+//render stripe patterns over the surface
+void showStripePatterns() {
+  
+  for (int i = 0; i < numPatches; i++){
+    std::vector<Vertex> zeroVertices, oneVertices;
+    std::tie(zeroVertices, oneVertices) = boundaryVertices[i];
     VertexData<double> timeFunction = solveLaplace(*geometries[i], zeroVertices, oneVertices);
-
     psMeshes[i] -> addVertexScalarQuantity("time function_" + std::to_string(i), timeFunction);
     FaceData<Vector3> faceGrads = computeTimeFunctionFaceGrad(*geometries[i], timeFunction);
     psMeshes[i] -> addFaceVectorQuantity("face gradients_" + std::to_string(i), faceGrads);
-  
 
-    //Compute course stripe patterns
+    //Compute knoppel course stripe patterns
     VertexData<Vector3> courseVertexValuedField = computeVertexValuedField(*geometries[i], timeFunction, 0);
-    psMeshes[i] -> addVertexVectorQuantity("course vertex valued field_" + std::to_string(i), courseVertexValuedField);
     VertexData<Vector2> lineFieldCourse = vertexDirectionField(*geometries[i], courseVertexValuedField);
     VertexData<double> frequencies(*meshes[i], constantFreq);
     CornerData<double> periodicFunc;
@@ -65,51 +76,40 @@ void showStripePatterns() {
     FaceData<int> branchIndices;
     std::tie(periodicFunc, zeroIndices, branchIndices) =
         computeStripePattern(*geometries[i], frequencies, lineFieldCourse);
-    
     psMeshes[i] -> addFaceScalarQuantity("knoppel singularities_" + std::to_string(i), zeroIndices);
-
     // Extract isolines
     std::vector<Vector3> isolineVerts;
     std::vector<std::array<size_t, 2>> isolineEdges;
     std::tie(isolineVerts, isolineEdges) = extractPolylinesFromStripePattern(
       *geometries[i], periodicFunc, zeroIndices, branchIndices, lineFieldCourse, false);
 
-    polyscope::registerCurveNetwork("course stripe patterns_" + std::to_string(i), isolineVerts, isolineEdges);
-
-
-    // // Compute wale stripe patterns
+    //Compute wale stripe patterns using knoppel's method
     VertexData<Vector3> waleVertexValuedField = computeVertexValuedField(*geometries[i], timeFunction, PI/2);
     psMeshes[i] -> addVertexVectorQuantity("wale vertex valued field_" + std::to_string(i), waleVertexValuedField);
     VertexData<Vector2> lineFieldWale = vertexDirectionField(*geometries[i], waleVertexValuedField);
     std::tie(periodicFunc, zeroIndices, branchIndices) =
       computeStripePattern(*geometries[i], frequencies, lineFieldWale);
-
     // Extract isolines
     std::tie(isolineVerts, isolineEdges) = extractPolylinesFromStripePattern(
       *geometries[i], periodicFunc, zeroIndices, branchIndices, lineFieldWale, false);
-
     polyscope::registerCurveNetwork("wale stripe patterns_" + std::to_string(i), isolineVerts, isolineEdges);
-  
-  }
 
-  //do this for every patch
-  for (int i = 0; i < numPatches; i++){  
-    std::vector<Edge> lowestEdges = getBoundaryEdges(*geometries[i], 1).first;
-    std::vector<Edge> highestEdges = getBoundaryEdges(*geometries[i], 1).second;
-    EdgeData<double>  matchingOneForm = computeMatchingOneForm(*geometries[i], 0);
-
+    //generate course stripe patterns using 1-form approach 
+    std::vector<Edge> lowestEdges, highestEdges;
+    std::tie(lowestEdges, highestEdges) = boundaryEdges[i];
+    EdgeData<double>  matchingOneForm = computeMatchingOneForm(*geometries[i], 0, faceGrads);
     //set up the optimization model 
     Model model;
     //put all the boundary edges into a single vector 
-    std::vector<int> modelCourseBdyEdges;
+    std::vector<int> modelBdyEdges;
     //put the edge terms we're trying to match in a vector
     std::vector<double> modelMatchingTerms;
 
-    for (Edge e : lowestEdges) modelCourseBdyEdges.push_back(e.getIndex());
-    for (Edge e : highestEdges) modelCourseBdyEdges.push_back(e.getIndex());
+    for (Edge e : lowestEdges) modelBdyEdges.push_back(e.getIndex());
+    for (Edge e : highestEdges) modelBdyEdges.push_back(e.getIndex());
     for (Edge e : meshes[i]->edges()) modelMatchingTerms.push_back(matchingOneForm[e]);
 
-    model.setCourseBdyEdges(modelCourseBdyEdges);
+    model.setBdyEdges(modelBdyEdges);
     model.setMatchingTerms(modelMatchingTerms);
     model.setPeriod(period);
 
@@ -123,7 +123,7 @@ void showStripePatterns() {
     //compute stripe patterns from 1-form
     std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneForm(*geometries[i], courseOneForm, period);
     std::tie(positions, edges) = generateIsoLines(*geometries[i], stripeValuesSigma, stripeIndicesSigma, period);
-    //polyscope::registerCurveNetwork("course stripe patterns_" + std::to_string(i), positions, edges);
+    polyscope::registerCurveNetwork("course stripe patterns_" + std::to_string(i), positions, edges);
   }
 }
 
@@ -134,8 +134,12 @@ void callBacks() {
 
   ImGui::InputFloat("1-form period", &period);
   
-  if (ImGui::Button("Show Stripe Patterns")) {
+  if (ImGui::Button("Show Stripe Patterns")){
     showStripePatterns();
+  }
+
+  if (ImGui::Button("Select Vertex")){
+    showBoundaryVertexSelectionUI();
   }
 }
 
@@ -147,6 +151,8 @@ int main(int argc, char **argv) {
   meshes.resize(numPatches);
   geometries.resize(numPatches);
   psMeshes.resize(numPatches);
+  boundaryVertices.resize(numPatches);
+  boundaryEdges.resize(numPatches);
 
   polyscope::init();
 
