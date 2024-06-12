@@ -82,7 +82,8 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& model);
 //
 //@param[in]    geometry            VertexPositionGeometry  input geometry
 //@param[in]    direction           int                     integer representing the direction for omega that we're attempting to generate (0 -> course, 1 -> wale)
+//@param[in]    faceGradients       FaceData<Vector3>       the gradients of the time functions we're using to solve for the matching 1-form
 //
 //@return       matchingOneForm     EdgeData<double>        The 1-form we're trying to match 
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction);    
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3> faceGradients);    
 

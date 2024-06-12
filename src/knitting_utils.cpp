@@ -272,7 +272,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     EdgeData<double> oneForm(mesh);
 
     std::vector<double> omega = gbModel.getMatchingTerms();
-    std::vector<int> bdyEdges = gbModel.getCourseBdyEdges();
+    std::vector<int> bdyEdges = gbModel.getBdyEdges();
     double period = gbModel.getPeriod();
 
     try {
@@ -346,15 +346,19 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
 }
 
 //compute \omega that is the 1-form we're trying to match over each edge 
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction){
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3> faceGradients){
     
     SurfaceMesh& mesh = geometry.mesh;
+    geometry.requireFaceNormals();
     EdgeData<double> d0_f_avg(mesh);
 
-    std::vector<Vertex> zeroVertices = getBoundaryVertices(geometry, 1).first;
-    std::vector<Vertex> oneVertices = getBoundaryVertices(geometry, 1).second;
-    VertexData<double> timeFunction = solveLaplace(geometry, zeroVertices, oneVertices);
-    FaceData<Vector3> faceGradients = computeTimeFunctionFaceGrad(geometry, timeFunction);
+
+    //if we're computing the matching 1-form in the wale direction, rotate all the gradients 
+    if (direction == 1){
+        for (Face f : mesh.faces()){
+            faceGradients[f] = faceGradients[f].rotateAround(geometry.faceNormals[f], PI/2);
+        }
+    }
 
     //evaluate the matching energy
     for (Edge edge : mesh.edges()){

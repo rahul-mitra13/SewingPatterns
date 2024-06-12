@@ -19,8 +19,8 @@ class Model{
         //singular face indices
         std::vector<int> singularFaces;
 
-        //boundary edges (in the course direction) for a single patch 
-        std::vector<int> courseBdyEdges;
+        //boundary edges for a single patch 
+        std::vector<int> bdyEdges;
 
         //these are the values we'll try to match using a quadratic minimization 
         std::vector<double> matchingTerms;
@@ -43,7 +43,7 @@ class Model{
         void setSmoothFaceIndices(std::vector<int> smoothFaces);
 
         //set course boundary edges
-        void setCourseBdyEdges(std::vector<int> courseBdyEdges);
+        void setBdyEdges(std::vector<int> bdyEdges);
 
         //set matching terms 
         void setMatchingTerms(std::vector<double> matchingTerms);
@@ -64,7 +64,7 @@ class Model{
         double getSingularFaces();
 
         //get course boundary edges 
-        std::vector<int> getCourseBdyEdges();
+        std::vector<int> getBdyEdges();
 
         //get matching energy
         std::vector<double> getMatchingTerms();
