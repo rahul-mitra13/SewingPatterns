@@ -1,9 +1,17 @@
+#pragma once
+
 //C++ includes
 #include <cfloat>
+#include <unordered_map>
+#include <algorithm>
+#include <queue>
+#include <utility>
+#include <vector>
 
 //geometry central includes
 #include "geometrycentral/surface/meshio.h"
 #include "geometrycentral/surface/vertex_position_geometry.h"
+#include "geometrycentral/surface/mesh_graph_algorithms.h"
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -12,6 +20,7 @@ using namespace geometrycentral::surface;
 //1. getBoundaryVertices()
 //2. getBoundaryEdges()
 //3. getVertexPositionsandFaceLists()
+//4. shortestEdgePathOnBoundary()
 
 //
 //get a pair of vertex lists that are at the extremes of a panel (this probably needs user input eventually)
@@ -50,4 +59,24 @@ Vector2 projectOntoPlane(const Eigen::Vector3d &vec, const Eigen::Vector3d &norm
 //@return       pair of 2 matrices      pair(Eigen::MatrixXd V, Eigen::MatrixXi F)      V -> vertex positions, F -> face index list
 //
 std::pair<Eigen::MatrixXd, Eigen::MatrixXi> getVertexPositionsandFaceLists(VertexPositionGeometry& geometry);
+
+//get shortest edge path between two vertices by taking only boundary edges of the mesh 
+std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
+
+
+struct PatchBoundaryConditions{
+    //boundary vertices in the course direction
+    std::vector<Vertex> courseStartBoundaryVertices;
+    std::vector<Vertex> courseEndBoundaryVertices;
+    //boundary vertices in the wale direction
+    std::vector<Vertex> waleStartBoundaryVertices;
+    std::vector<Vertex> waleEndBoundaryVertices;
+
+    //boundary edges in the course direction
+    std::vector<Edge> courseStartBoundaryEdges;
+    std::vector<Edge> courseEndBoundaryEdges;
+    //boundary edges in the wale direction
+    std::vector<Edge> waleStartBoundaryEdges;
+    std::vector<Edge> waleEndBoundaryEdges;
+};
 

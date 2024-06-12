@@ -25,7 +25,7 @@ std::pair<std::vector<Vertex>, std::vector<Edge>> getAndRenderUserSpecifiedBound
 
     Vertex startVertex, endVertex;
     std::tie(startVertex, endVertex) = getAndRenderUserSpecifiedBoundaryVertices(geometry, psMeshes, timeVal);
-    std::vector<Halfedge> heList = shortestEdgePath(geometry, startVertex, endVertex);
+    std::vector<Halfedge> heList = shortestEdgePathOnBoundary(geometry, startVertex, endVertex);
     std::vector<Vector3> pointCloud;
     //add the first vertex 
     pointCloud.push_back(geometry.vertexPositions[heList[0].tailVertex()]);

@@ -7,6 +7,9 @@
 #include "polyscope/surface_mesh.h"
 #include "polyscope/point_cloud.h"
 
+//file includes
+#include "helpers.h"
+
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
