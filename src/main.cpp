@@ -95,7 +95,7 @@ void showStripePatterns() {
     // Extract isolines
     std::tie(isolineVerts, isolineEdges) = extractPolylinesFromStripePattern(
       *geometries[i], periodicFunc, zeroIndices, branchIndices, lineFieldWale, false);
-    //polyscope::registerCurveNetwork("wale stripe patterns_" + std::to_string(i), isolineVerts, isolineEdges);
+    polyscope::registerCurveNetwork("wale stripe patterns_" + std::to_string(i), isolineVerts, isolineEdges);
 
     //generate course stripe patterns using 1-form approach 
     std::vector<Edge> startEdges, endEdges;
