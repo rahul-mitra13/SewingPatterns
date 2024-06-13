@@ -88,14 +88,5 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& model);
 //@param[in]    faceGradients       FaceData<Vector3>       the gradients of the time functions we're using to solve for the matching 1-form
 //
 //@return       matchingOneForm     EdgeData<double>        The 1-form we're trying to match 
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3> faceGradients);   
-
-//compute time function using curved Hessian 
-//
-//@param[in]    geometry        VertexPositionGeometry          input geometry
-//@param[in]    zeroVertices    std::vector<Vertex>             vertices that take the value 0 as a boundary condition i.e., where knitting should start
-//@paramm[in]   oneVertices     std::vector<Vertex>             vertices that take the value 1 as a boundary condition i.e., where knitting should stop 
-//
-//@return       timeFunction    VertexData<double>              #V by 1 scalar function that represents the knitting time function
-VertexData<double> solveTimeFunctionUsingCurvedHessian(VertexPositionGeometry& geometry, std::vector<Vertex>& zeroVertices, std::vector<Vertex>& oneVertices);
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3> faceGradients); 
 

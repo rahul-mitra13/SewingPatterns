@@ -1,3 +1,6 @@
+//C++ includes 
+#include <optional>
+
 //geometry-central includes 
 #include "geometrycentral/surface/vertex_position_geometry.h"
 #include "geometrycentral/surface/mesh_graph_algorithms.h"

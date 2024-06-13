@@ -21,6 +21,8 @@
 #include "GUI_helpers.h"
 #include "stripe_patterns_helpers.h"
 
+#include <igl/readOBJ.h>
+
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
@@ -161,8 +163,12 @@ int main(int argc, char **argv) {
 
   polyscope::init();
 
+  Eigen::MatrixXd V;
+  Eigen::MatrixXi F;
+
   //populate the meshes/geometries vectors
   for (int i = 1; i < argc; i++){
+    igl::readOBJ(argv[i], V, F);
     std::tie(meshes[i - 1], geometries[i - 1]) = readManifoldSurfaceMesh(argv[i]);
     psMeshes[i - 1] = polyscope::registerSurfaceMesh(
       polyscope::guessNiceNameFromPath(argv[i]),
