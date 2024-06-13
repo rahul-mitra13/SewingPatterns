@@ -5,6 +5,7 @@
 #include "geometrycentral/surface/meshio.h"
 #include "geometrycentral/surface/vertex_position_geometry.h"
 #include "geometrycentral/utilities/utilities.h"
+#include "geometrycentral/surface/stripe_patterns.h"
 
 //libigl includes
 #include <igl/cotmatrix.h>

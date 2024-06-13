@@ -1,7 +1,6 @@
 #include "geometrycentral/surface/manifold_surface_mesh.h"
 #include "geometrycentral/surface/meshio.h"
 #include "geometrycentral/surface/vertex_position_geometry.h"
-#include "geometrycentral/surface/stripe_patterns.h"
 #include "geometrycentral/surface/direction_fields.h"
 
 
@@ -20,6 +19,7 @@
 //file includes
 #include "knitting_utils.h"
 #include "GUI_helpers.h"
+#include "stripe_patterns_helpers.h"
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;

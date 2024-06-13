@@ -49,7 +49,8 @@ if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STR
   #SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TRACE_INCLUDES}") # uncomment if you need to track down where something is getting included from
   SET(CMAKE_CXX_FLAGS_DEBUG          "${CMAKE_CXX_FLAGS_DEBUG} -g3")
   SET(CMAKE_CXX_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
-  SET(CMAKE_CXX_FLAGS_RELEASE        "-march=native -O3 -DNDEBUG")
+  SET(CMAKE_CXX_FLAGS_RELEASE        "-march=native -O3 -DNDEBUG") #for intel macs
+  #SET(CMAKE_CXX_FLAGS_RELEASE        "-march=armv8-a -O3 -DNDEBUG") #for apple silicon macs 
   SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   # using Visual Studio C++
@@ -110,7 +111,8 @@ add_executable(
         src/model.cpp
         src/knitting_utils.cpp
         src/helpers.cpp
-        src/GUI_helpers.cpp
+	src/GUI_helpers.cpp
+	src/stripe_patterns_helpers.cpp
 )
 
 # Include settings
