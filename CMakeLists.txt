@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0.0)
 
 project("SewingPatterns")
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 
 if(CXX)
   enable_language(CXX)
@@ -30,7 +30,7 @@ set( CMAKE_EXPORT_COMPILE_COMMANDS 1 ) # Emit a compile flags file to support co
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
   # using Clang (linux or apple) or GCC
   message("Using clang/gcc compiler flags")
-  SET(BASE_CXX_FLAGS "-std=c++14 -Wall -Wextra -g3")
+  SET(BASE_CXX_FLAGS "-std=c++17 -Wall -Wextra -g3")
   SET(DISABLED_WARNINGS " -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -Wno-missing-braces")
   SET(TRACE_INCLUDES " -H -Wno-error=unused-command-line-argument")
 
@@ -111,8 +111,8 @@ add_executable(
         src/model.cpp
         src/knitting_utils.cpp
         src/helpers.cpp
-	src/GUI_helpers.cpp
-	src/stripe_patterns_helpers.cpp
+	      src/GUI_helpers.cpp
+	      src/stripe_patterns_helpers.cpp
 )
 
 # Include settings
