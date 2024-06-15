@@ -3,9 +3,6 @@
 
 //get a pair of vertices where the shortest edge path between them specifies the boundary conditions
 std::pair<Vertex, Vertex> getAndRenderUserSpecifiedBoundaryVertices(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, int timeVal){
-    
-    polyscope::warning("Please select 2 boundary vertices for " + std::to_string(timeVal) + " boundary conditions");
-
     std::vector<Vector3> pointCloud(2);
     SurfaceMesh& mesh = geometry.mesh;
     Vertex v1 = mesh.vertex(psMesh.selectVertex()); 
@@ -67,3 +64,95 @@ std::pair<std::vector<Vertex>, std::vector<Edge>> getAndRenderUserSpecifiedBound
     return std::make_pair(vertices, edges);
 }
 
+PatchBoundaryConditions getAndRenderBoundaryInfoFromJson(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMeshes, const std::string& jsonFilePath){
+
+  SurfaceMesh& mesh = geometry.mesh;
+  PatchBoundaryConditions toReturn;
+
+  std::cout << "filename = " << jsonFilePath << std::endl;
+  std::ifstream jsonFile(jsonFilePath);
+  nlohmann::json data = nlohmann::json::parse(jsonFile);
+  std::vector<std::vector<int>> courseStartBoundary = data["boundaries"]["course"]["start"];
+  std::vector<std::vector<int>> courseEndBoundary = data["boundaries"]["course"]["end"];
+  std::vector<std::vector<int>> waleStartBoundary = data["boundaries"]["wale"]["start"];
+  std::vector<std::vector<int>> waleEndBoundary = data["boundaries"]["wale"]["end"];
+  
+  //handle course start case
+  std::vector<Vector3> courseStartVerticesPointCloud;
+  for (int i = 0; i < courseStartBoundary.size(); i++){
+    std::vector<Vertex> vertices;
+    std::vector<Edge> edges;
+    Vertex startVertex = mesh.vertex(courseStartBoundary[i][0]);
+    Vertex endVertex = mesh.vertex(courseStartBoundary[i][1]);
+    std::cout << "start Vertex = " << startVertex << std::endl;
+    std::cout << "end vertex = " << endVertex << std::endl;
+    std::tie(vertices, edges) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
+    for (Vertex v : vertices){
+     courseStartVerticesPointCloud.push_back(geometry.vertexPositions[v]);
+    }
+    toReturn.courseStartBoundaryVertices.insert(toReturn.courseStartBoundaryVertices.end(), vertices.begin(), vertices.end());
+    toReturn.courseStartBoundaryEdges.insert(toReturn.courseStartBoundaryEdges.end(), edges.begin(), edges.end());
+  }
+  auto courseStartPC = polyscope::registerPointCloud("course start vertices", courseStartVerticesPointCloud);
+  courseStartPC->setPointColor(polyscope::render::RGB_RED);
+
+  //handle course end case
+  std::vector<Vector3> courseEndVerticesPointCloud;
+  for (int i = 0; i < courseEndBoundary.size(); i++){
+    std::vector<Vertex> vertices;
+    std::vector<Edge> edges;
+    for (int j = 0; j < 2; j++){
+      Vertex startVertex = mesh.vertex(courseEndBoundary[i][0]);
+      Vertex endVertex = mesh.vertex(courseEndBoundary[i][1]);
+      std::tie(vertices, edges) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
+    }
+    for (Vertex v : vertices){
+     courseEndVerticesPointCloud.push_back(geometry.vertexPositions[v]);
+    }
+    toReturn.courseEndBoundaryVertices.insert(toReturn.courseEndBoundaryVertices.end(), vertices.begin(), vertices.end());
+    toReturn.courseEndBoundaryEdges.insert(toReturn.courseEndBoundaryEdges.end(), edges.begin(), edges.end());
+  }
+  auto courseEndPC = polyscope::registerPointCloud("course end vertices", courseEndVerticesPointCloud);
+  courseEndPC->setPointColor(polyscope::render::RGB_RED);
+
+  //handle wale start case
+  std::vector<Vector3> waleStartVerticesPointCloud;
+  for (int i = 0; i < waleStartBoundary.size(); i++){
+    std::vector<Vertex> vertices;
+    std::vector<Edge> edges;
+    for (int j = 0; j < 2; j++){
+      Vertex startVertex = mesh.vertex(waleStartBoundary[i][0]);
+      Vertex endVertex = mesh.vertex(waleStartBoundary[i][1]);
+      std::tie(vertices, edges) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
+    }
+    for (Vertex v : vertices){
+     waleStartVerticesPointCloud.push_back(geometry.vertexPositions[v]);
+    }
+    toReturn.waleStartBoundaryVertices.insert(toReturn.waleStartBoundaryVertices.end(), vertices.begin(), vertices.end());
+    toReturn.waleStartBoundaryEdges.insert(toReturn.waleStartBoundaryEdges.end(), edges.begin(), edges.end());
+  }
+  auto waleStartPC = polyscope::registerPointCloud("wale start vertices", waleStartVerticesPointCloud);
+  waleStartPC->setPointColor(polyscope::render::RGB_BLUE);
+
+  //handle wale end case
+  std::vector<Vector3> waleEndVerticesPointCloud;
+  for (int i = 0; i < waleEndBoundary.size(); i++){
+    std::vector<Vertex> vertices;
+    std::vector<Edge> edges;
+    for (int j = 0; j < 2; j++){
+      Vertex startVertex = mesh.vertex(waleEndBoundary[i][0]);
+      Vertex endVertex = mesh.vertex(waleEndBoundary[i][1]);
+      std::tie(vertices, edges) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
+    }
+    for (Vertex v : vertices){
+     waleEndVerticesPointCloud.push_back(geometry.vertexPositions[v]);
+    }
+    toReturn.waleEndBoundaryVertices.insert(toReturn.waleEndBoundaryVertices.end(), vertices.begin(), vertices.end());
+    toReturn.waleEndBoundaryEdges.insert(toReturn.waleEndBoundaryEdges.end(), edges.begin(), edges.end());
+  }
+  auto waleEndPC = polyscope::registerPointCloud("wale end vertices", waleEndVerticesPointCloud);
+  waleEndPC->setPointColor(polyscope::render::RGB_BLUE);
+
+  return toReturn;
+
+}

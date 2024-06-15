@@ -60,10 +60,18 @@ Vector2 projectOntoPlane(const Eigen::Vector3d &vec, const Eigen::Vector3d &norm
 //
 std::pair<Eigen::MatrixXd, Eigen::MatrixXi> getVertexPositionsandFaceLists(VertexPositionGeometry& geometry);
 
-//get shortest edge path between two vertices by taking only boundary edges of the mesh 
+//get shortest edge path between two vertices by taking only boundary edges of the mesh
+//
+//@param[in]    geom            VertexPositionGeometry      input geometry
+//@param[in]    startVert       Vertex                      start vertex on the boundary 
+//@param[in]    endVert         Vertex                      end vertex on the boundary
+//
+//@return       halfedge list   std::vector<Haledge>        returns a list of halfedges on the shortest boundary path between the two vertices    
 std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
 
+std::pair<std::vector<Vertex>, std::vector<Edge>> getVerticesAndEdgesInShortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
 
+//structure that stores boundary conditions for every patch 
 struct PatchBoundaryConditions{
     //boundary vertices in the course direction
     std::vector<Vertex> courseStartBoundaryVertices;

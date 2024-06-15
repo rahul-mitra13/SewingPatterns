@@ -1,3 +1,4 @@
+#pragma once
 //C++ includes 
 #include <optional>
 
@@ -12,6 +13,7 @@
 
 //file includes
 #include "helpers.h"
+#include "nlohmann/json.hpp"
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -19,6 +21,7 @@ using namespace geometrycentral::surface;
 //this file contains helpers we use for the GUI, picking vertices, boundary elements etc
 // 1. getAndRenderUserSpecifiedBoundaryVertices()
 // 2. getAndRenderUserSpecifiedBoundaryInfo()
+//3. getAndRenderBoundaryInfoFromJson()
 
 
 //get and render user specified boundary vertices. The path between these vertices defines the boundary conditions 
@@ -33,6 +36,9 @@ std::pair<Vertex, Vertex> getAndRenderUserSpecifiedBoundaryVertices(VertexPositi
 //
 //@param[in]    geometry                                    VertexPositionGeometry                                  input geometry
 //@param[in]    psMesh                                      polyscope::SurfaceMesh                                  polyscope surface mesh 
+//@param[in]    useJson                                     bool                                                    whether to use the json file or not
 //
 //@return       pair<list of vertices, list of edges>       std::pair<std::vector<Vertex>, std::vector<Edge>>       pair(vertices on the boundary, edge on the boundary)
 std::pair<std::vector<Vertex>, std::vector<Edge>> getAndRenderUserSpecifiedBoundaryInfo(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMeshes, int timeVal);
+
+PatchBoundaryConditions getAndRenderBoundaryInfoFromJson(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMeshes, const std::string& jsonFilePath);
