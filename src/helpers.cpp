@@ -180,13 +180,11 @@ std::pair<std::vector<Vertex>, std::vector<Edge>> getVerticesAndEdgesInShortestE
     SurfaceMesh& mesh = geom.mesh;
     std::vector<Vertex> vertices;
     std::vector<Edge> edges;
-    for (int j = 0; j < 2; j++){
-      std::vector<Halfedge> heList = shortestEdgePathOnBoundary(geom, startVert, endVert);
-      vertices.push_back(heList[0].tailVertex());
-      for (Halfedge he : heList){
+    std::vector<Halfedge> heList = shortestEdgePathOnBoundary(geom, startVert, endVert);
+    vertices.push_back(heList[0].tailVertex());
+    for (Halfedge he : heList){
         vertices.push_back(he.tipVertex());
         edges.push_back(he.edge());
-      }
     }
     return std::make_pair(vertices, edges);
 }

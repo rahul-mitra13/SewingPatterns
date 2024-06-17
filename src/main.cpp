@@ -52,8 +52,6 @@ void showBoundaryVertexSelectionUI(){
   for (int i = 0; i < numPatches; i++){
     if (parseUsingJSon){
       bdyConditions[i] = getAndRenderBoundaryInfoFromJson(*geometries[i], *psMeshes[i], jsonFilePath);
-      std::cout << "Size of course start vertices " << bdyConditions[i].courseStartBoundaryVertices.size() << std::endl;
-      std::cout << "Size of course end boundary vertices " << bdyConditions[i].courseEndBoundaryVertices.size() << std::endl;
     }
     else{
       //select course boundary conditions
@@ -77,6 +75,19 @@ void showStripePatterns() {
     psMeshes[i] -> addVertexScalarQuantity("time function_" + std::to_string(i), timeFunction);
     FaceData<Vector3> faceGrads = computeTimeFunctionFaceGrad(*geometries[i], timeFunction);
     psMeshes[i] -> addFaceVectorQuantity("face gradients_" + std::to_string(i), faceGrads);
+    std::vector<Edge> startEdges, endEdges;
+    //set up the optimization model 
+    Model model;
+    //the 1-form we're trying to match
+    EdgeData<double>  matchingOneForm;
+    //put all the boundary edges into a single vector 
+    std::vector<int> modelBdyEdges;
+    //put the edge terms we're trying to match in a vector
+    std::vector<double> modelMatchingTerms;
+    CornerData<double> stripeValuesSigma;
+    FaceData<int> stripeIndicesSigma;  
+    std::vector<Vector3> positions;
+    std::vector<std::array<int, 2>> edges;
 
     //Compute knoppel course stripe patterns
     /**
@@ -110,55 +121,43 @@ void showStripePatterns() {
     */
 
     //generate course stripe patterns using 1-form approach 
-    // std::vector<Edge> startEdges, endEdges;
-    // startEdges = bdyConditions[i].courseStartBoundaryEdges;
-    // endEdges = bdyConditions[i].courseEndBoundaryEdges;
-    // EdgeData<double>  matchingOneForm = computeMatchingOneForm(*geometries[i], 0, faceGrads);
-    // //set up the optimization model 
-    // Model model;
-    // //put all the boundary edges into a single vector 
-    // std::vector<int> modelBdyEdges;
-    // //put the edge terms we're trying to match in a vector
-    // std::vector<double> modelMatchingTerms;
+    startEdges = bdyConditions[i].courseStartBoundaryEdges;
+    endEdges = bdyConditions[i].courseEndBoundaryEdges;
+    matchingOneForm = computeMatchingOneForm(*geometries[i], 0, faceGrads);
+    for (Edge e : startEdges) modelBdyEdges.push_back(e.getIndex());
+    for (Edge e : endEdges) modelBdyEdges.push_back(e.getIndex());
+    for (Edge e : meshes[i]->edges()) modelMatchingTerms.push_back(matchingOneForm[e]);
+    model.setBdyEdges(modelBdyEdges);
+    model.setMatchingTerms(modelMatchingTerms);
+    model.setPeriod(period);
+    EdgeData<double> courseOneForm = computeOneForm(*geometries[i], model);
+    //compute course stripe patterns from 1-form
+    std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneForm(*geometries[i], courseOneForm, period);
+    std::tie(positions, edges) = generateIsoLines(*geometries[i], stripeValuesSigma, stripeIndicesSigma, period);
+    polyscope::registerCurveNetwork("course stripe patterns_" + std::to_string(i), positions, edges);
 
-    // for (Edge e : startEdges) modelBdyEdges.push_back(e.getIndex());
-    // for (Edge e : endEdges) modelBdyEdges.push_back(e.getIndex());
-    // for (Edge e : meshes[i]->edges()) modelMatchingTerms.push_back(matchingOneForm[e]);
-
-    // model.setBdyEdges(modelBdyEdges);
-    // model.setMatchingTerms(modelMatchingTerms);
-    // model.setPeriod(period);
-
-    // EdgeData<double> courseOneForm = computeOneForm(*geometries[i], model);
-
-    // CornerData<double> stripeValuesSigma;
-    // FaceData<int> stripeIndicesSigma;  
-    // std::vector<Vector3> positions;
-    // std::vector<std::array<int, 2>> edges;
-
-    // //compute course stripe patterns from 1-form
-    // std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneForm(*geometries[i], courseOneForm, period);
-    // std::tie(positions, edges) = generateIsoLines(*geometries[i], stripeValuesSigma, stripeIndicesSigma, period);
-    // polyscope::registerCurveNetwork("course stripe patterns_" + std::to_string(i), positions, edges);
+    //clear out course info before computing wale stripes
+    modelBdyEdges.clear();
+    modelMatchingTerms.clear();
 
     //generate wale stripe patterns using 1-form approach 
-    // startEdges = bdyConditions[i].waleStartBoundaryEdges;
-    // endEdges = bdyConditions[i].waleEndBoundaryEdges;
-    // matchingOneForm = computeMatchingOneForm(*geometries[i], 1, faceGrads);
-    // //set up the optimization model 
-    // for (Edge e : startEdges) modelBdyEdges.push_back(e.getIndex());
-    // for (Edge e : endEdges) modelBdyEdges.push_back(e.getIndex());
-    // for (Edge e : meshes[i]->edges()) modelMatchingTerms.push_back(matchingOneForm[e]);
+    startEdges = bdyConditions[i].waleStartBoundaryEdges;
+    endEdges = bdyConditions[i].waleEndBoundaryEdges;
+    matchingOneForm = computeMatchingOneForm(*geometries[i], 1, faceGrads);
+    //set up the optimization model 
+    for (Edge e : startEdges) modelBdyEdges.push_back(e.getIndex());
+    for (Edge e : endEdges) modelBdyEdges.push_back(e.getIndex());
+    for (Edge e : meshes[i]->edges()) modelMatchingTerms.push_back(matchingOneForm[e]);
 
-    // model.setBdyEdges(modelBdyEdges);
-    // model.setMatchingTerms(modelMatchingTerms);
-    // model.setPeriod(period);
+    model.setBdyEdges(modelBdyEdges);
+    model.setMatchingTerms(modelMatchingTerms);
+    model.setPeriod(period);
 
-    // EdgeData<double> waleOneForm = computeOneForm(*geometries[i], model);
-    // //compute stripe patterns from 1-form
-    // std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneForm(*geometries[i], waleOneForm, period);
-    // std::tie(positions, edges) = generateIsoLines(*geometries[i], stripeValuesSigma, stripeIndicesSigma, period);
-    // polyscope::registerCurveNetwork("wale stripe patterns_" + std::to_string(i), positions, edges);
+    EdgeData<double> waleOneForm = computeOneForm(*geometries[i], model);
+    //compute stripe patterns from 1-form
+    std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneForm(*geometries[i], waleOneForm, period);
+    std::tie(positions, edges) = generateIsoLines(*geometries[i], stripeValuesSigma, stripeIndicesSigma, period);
+    polyscope::registerCurveNetwork("wale stripe patterns_" + std::to_string(i), positions, edges);
   }
 }
 
@@ -188,14 +187,16 @@ int main(int argc, char **argv) {
   psMeshes.resize(numPatches);
   bdyConditions.resize(numPatches);
 
-  std::ifstream jsonFile(argv[1]);
-  jsonFilePath = argv[1];
-  nlohmann::json data = nlohmann::json::parse(jsonFile);
-  std::string path = data["path"];
-  std::vector<std::vector<int>> courseStartBoundary = data["boundaries"]["course"]["start"];
-  std::vector<std::vector<int>> courseEndBoundary = data["boundaries"]["course"]["end"];
-  std::vector<std::vector<int>> waleStartBoundary = data["boundaries"]["wale"]["start"];
-  std::vector<std::vector<int>> waleEndBoundary = data["boundaries"]["wale"]["end"];
+  // std::ifstream jsonFile(argv[1]);
+  // jsonFilePath = argv[1];
+  // nlohmann::json data = nlohmann::json::parse(jsonFile);
+  // std::string path = data["path"];
+  // std::vector<std::vector<int>> courseStartBoundary = data["boundaries"]["course"]["start"];
+  // std::vector<std::vector<int>> courseEndBoundary = data["boundaries"]["course"]["end"];
+  // std::vector<std::vector<int>> waleStartBoundary = data["boundaries"]["wale"]["start"];
+  // std::vector<std::vector<int>> waleEndBoundary = data["boundaries"]["wale"]["end"];
+
+  std::string path = argv[1];
 
   polyscope::init();
   // Disable the ground plane

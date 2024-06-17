@@ -84,8 +84,6 @@ PatchBoundaryConditions getAndRenderBoundaryInfoFromJson(VertexPositionGeometry&
     std::vector<Edge> edges;
     Vertex startVertex = mesh.vertex(courseStartBoundary[i][0]);
     Vertex endVertex = mesh.vertex(courseStartBoundary[i][1]);
-    std::cout << "start Vertex = " << startVertex << std::endl;
-    std::cout << "end vertex = " << endVertex << std::endl;
     std::tie(vertices, edges) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
     for (Vertex v : vertices){
      courseStartVerticesPointCloud.push_back(geometry.vertexPositions[v]);
