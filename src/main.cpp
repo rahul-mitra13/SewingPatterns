@@ -135,7 +135,7 @@ void showStripePatterns() {
     std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneForm(*geometries[i], courseOneForm, period);
     std::tie(positions, edges) = generateIsoLines(*geometries[i], stripeValuesSigma, stripeIndicesSigma, period);
     polyscope::registerCurveNetwork("course stripe patterns_" + std::to_string(i), positions, edges);
-
+    
     //clear out course info before computing wale stripes
     modelBdyEdges.clear();
     modelMatchingTerms.clear();
@@ -187,17 +187,11 @@ int main(int argc, char **argv) {
   psMeshes.resize(numPatches);
   bdyConditions.resize(numPatches);
 
-  // std::ifstream jsonFile(argv[1]);
-  // jsonFilePath = argv[1];
-  // nlohmann::json data = nlohmann::json::parse(jsonFile);
-  // std::string path = data["path"];
-  // std::vector<std::vector<int>> courseStartBoundary = data["boundaries"]["course"]["start"];
-  // std::vector<std::vector<int>> courseEndBoundary = data["boundaries"]["course"]["end"];
-  // std::vector<std::vector<int>> waleStartBoundary = data["boundaries"]["wale"]["start"];
-  // std::vector<std::vector<int>> waleEndBoundary = data["boundaries"]["wale"]["end"];
-
-  std::string path = argv[1];
-
+  std::ifstream jsonFile(argv[1]);
+  jsonFilePath = argv[1];
+  nlohmann::json data = nlohmann::json::parse(jsonFile);
+  std::string path = data["path"];
+  
   polyscope::init();
   // Disable the ground plane
   polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::None;
