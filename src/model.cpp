@@ -63,5 +63,15 @@ std::vector<double> Model::getMatchingTerms(){
 
 }
 
+void Model::clear(){
+    period = 0.0;
+    timeOut = 0.0;
+    edgePathConstraints.clear();
+    smoothFaces.clear();
+    singularFaces.clear();
+    bdyEdges.clear();
+    matchingTerms.clear();
+}
+
 
 

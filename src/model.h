@@ -68,4 +68,7 @@ class Model{
 
         //get matching energy
         std::vector<double> getMatchingTerms();
+
+        //clear the data in the class 
+        void clear();
 };
