@@ -52,7 +52,7 @@ VertexData<double> solveLaplace(VertexPositionGeometry& geometry, std::vector<Ve
     //set boundary conditions
     Eigen::VectorXd bc;
     Eigen::VectorXd Z(V.rows());
-
+    
     //set boundary values
     //setting the zero vertices
     for ( int i = 0 ; i < zero_vertices.size(); i++){
@@ -69,6 +69,8 @@ VertexData<double> solveLaplace(VertexPositionGeometry& geometry, std::vector<Ve
     Eigen::VectorXd Z_in = solver.solve(L_in_b*bc);
     // slice into solution
     igl::slice_into(Z_in,in,Z);
+
+    std::cout << "Z = " << Z << std::endl;
 
     VertexData<double> timeFunction(mesh);
 
@@ -284,6 +286,9 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
         // Create an empty model
         GRBModel model = GRBModel(env);
 
+        //set the timeout
+        model.getEnv().set(GRB_DoubleParam_TimeLimit, 120);
+
         //add variable 1-form variable sigma (per edge)
         std::vector<GRBVar> sigma;
 
@@ -307,7 +312,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
         }
 
         //second constraint - (d1*sigma) == period*k
-        for (int r = 0; r < d_one.outerSize(); ++r ) {
+        for (int r = 0; r < d_one.outerSize(); ++r) {
             GRBLinExpr lhs = 0;
             for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_one, r); it; ++it ) {
                 lhs += it.value() * sigma[it.col()];

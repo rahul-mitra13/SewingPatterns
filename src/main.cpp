@@ -37,7 +37,7 @@ std::vector<polyscope::SurfaceMesh *> psMeshes;
 std::vector<PatchBoundaryConditions> bdyConditions;
 //path to json file
 std::string jsonFilePath;
-bool parseUsingJSon = true;
+bool parseUsingJSon = false;
 
 
 // Striping frequency
@@ -58,8 +58,8 @@ void showBoundaryVertexSelectionUI(){
       std::tie(bdyConditions[i].courseStartBoundaryVertices, bdyConditions[i].courseStartBoundaryEdges) = getAndRenderUserSpecifiedBoundaryInfo(*geometries[i], *psMeshes[i], 0);
       std::tie(bdyConditions[i].courseEndBoundaryVertices, bdyConditions[i].courseEndBoundaryEdges) = getAndRenderUserSpecifiedBoundaryInfo(*geometries[i], *psMeshes[i], 1);
       //select wale boundary conditions
-      std::tie(bdyConditions[i].waleStartBoundaryVertices, bdyConditions[i].waleStartBoundaryEdges) = getAndRenderUserSpecifiedBoundaryInfo(*geometries[i], *psMeshes[i], 0);
-      std::tie(bdyConditions[i].waleEndBoundaryVertices, bdyConditions[i].waleEndBoundaryEdges) = getAndRenderUserSpecifiedBoundaryInfo(*geometries[i], *psMeshes[i], 1);
+      //std::tie(bdyConditions[i].waleStartBoundaryVertices, bdyConditions[i].waleStartBoundaryEdges) = getAndRenderUserSpecifiedBoundaryInfo(*geometries[i], *psMeshes[i], 0);
+      //std::tie(bdyConditions[i].waleEndBoundaryVertices, bdyConditions[i].waleEndBoundaryEdges) = getAndRenderUserSpecifiedBoundaryInfo(*geometries[i], *psMeshes[i], 1);
     }
   }
 }
@@ -71,6 +71,7 @@ void showStripePatterns() {
     std::vector<Vertex> zeroVertices, oneVertices;
     zeroVertices = bdyConditions[i].courseStartBoundaryVertices;
     oneVertices = bdyConditions[i].courseEndBoundaryVertices;
+    
     VertexData<double> timeFunction = solveLaplace(*geometries[i], zeroVertices, oneVertices);
     psMeshes[i] -> addVertexScalarQuantity("time function_" + std::to_string(i), timeFunction);
     FaceData<Vector3> faceGrads = computeTimeFunctionFaceGrad(*geometries[i], timeFunction);
@@ -90,7 +91,6 @@ void showStripePatterns() {
     std::vector<std::array<int, 2>> edges;
 
     //Compute knoppel course stripe patterns
-    /**
     VertexData<Vector3> courseVertexValuedField = computeVertexValuedField(*geometries[i], timeFunction, 0);
     VertexData<Vector2> lineFieldCourse = vertexDirectionField(*geometries[i], courseVertexValuedField);
     VertexData<double> frequencies(*meshes[i], constantFreq);
@@ -108,6 +108,7 @@ void showStripePatterns() {
       *geometries[i], periodicFunc, zeroIndices, branchIndices, lineFieldCourse, false);
     //polyscope::registerCurveNetwork("course stripe patterns_" + std::to_string(i), isolineVerts, isolineEdges);
 
+    /**
     //Compute wale stripe patterns using knoppel's method
     VertexData<Vector3> waleVertexValuedField = computeVertexValuedField(*geometries[i], timeFunction, PI/2);
     psMeshes[i] -> addVertexVectorQuantity("wale vertex valued field_" + std::to_string(i), waleVertexValuedField);
@@ -187,17 +188,19 @@ int main(int argc, char **argv) {
   psMeshes.resize(numPatches);
   bdyConditions.resize(numPatches);
 
-  std::ifstream jsonFile(argv[1]);
-  jsonFilePath = argv[1];
-  nlohmann::json data = nlohmann::json::parse(jsonFile);
-  std::string path = data["path"];
+  // std::ifstream jsonFile(argv[1]);
+  // jsonFilePath = argv[1];
+  // nlohmann::json data = nlohmann::json::parse(jsonFile);
+  // std::string path = data["path"];
+
+  //std::string path = argv[1];
   
   polyscope::init();
   // Disable the ground plane
   polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::None;
   //populate the meshes/geometries vectors
   for (int i = 1; i < argc; i++){
-    std::tie(meshes[i - 1], geometries[i - 1]) = readManifoldSurfaceMesh(path);
+    std::tie(meshes[i - 1], geometries[i - 1]) = readManifoldSurfaceMesh(argv[i]);
     psMeshes[i - 1] = polyscope::registerSurfaceMesh(
       polyscope::guessNiceNameFromPath(argv[i]),
       geometries[i - 1]->inputVertexPositions, meshes[i - 1]->getFaceVertexList(),
