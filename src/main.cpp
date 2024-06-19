@@ -37,7 +37,7 @@ std::vector<polyscope::SurfaceMesh *> psMeshes;
 std::vector<PatchBoundaryConditions> bdyConditions;
 //path to json file
 std::string jsonFilePath;
-bool parseUsingJSon = false;
+bool parseUsingJSon = true;
 
 
 // Striping frequency
@@ -67,7 +67,7 @@ void showBoundaryVertexSelectionUI(){
 //render stripe patterns over the surface
 void showStripePatterns() {
   
-  for (int i = 0; i < numPatches; i++){
+  for (int i = 0; i < meshes.size(); i++){
     std::vector<Vertex> zeroVertices, oneVertices;
     zeroVertices = bdyConditions[i].courseStartBoundaryVertices;
     oneVertices = bdyConditions[i].courseEndBoundaryVertices;
@@ -179,37 +179,33 @@ void callBacks() {
 }
 
 int main(int argc, char **argv) {
-
-  numPatches = argc - 1;
-
-  //resize vectors to account for all the input patches 
-  meshes.resize(numPatches);
-  geometries.resize(numPatches);
-  psMeshes.resize(numPatches);
-  bdyConditions.resize(numPatches);
-
-  // std::ifstream jsonFile(argv[1]);
-  // jsonFilePath = argv[1];
-  // nlohmann::json data = nlohmann::json::parse(jsonFile);
-  // std::string path = data["path"];
-
-  //std::string path = argv[1];
-  
   polyscope::init();
+  //std::string path = argv[1];
+  jsonFilePath = argv[1];
+  if (parseUsingJSon){
+    getAndRenderBoundaryInfoFromJson(jsonFilePath, meshes, geometries, bdyConditions);
+    psMeshes.resize(meshes.size());
+    for (int i = 0; i < geometries.size(); i++){
+      psMeshes[i] = polyscope::registerSurfaceMesh(
+        "mesh " + std::to_string(i),
+        geometries[i]->inputVertexPositions, meshes[i]->getFaceVertexList(),
+        polyscopePermutations(*meshes[i]));
+    }
+  }
+  else{
+    //populate the meshes/geometries vectors from the command line 
+    for (int i = 1; i < argc; i++){
+      std::tie(meshes[i - 1], geometries[i - 1]) = readManifoldSurfaceMesh(argv[i]);
+      psMeshes[i - 1] = polyscope::registerSurfaceMesh(
+        polyscope::guessNiceNameFromPath(argv[i]),
+        geometries[i - 1]->inputVertexPositions, meshes[i - 1]->getFaceVertexList(),
+        polyscopePermutations(*meshes[i - 1]));
+    }
+  }
   // Disable the ground plane
   polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::None;
-  //populate the meshes/geometries vectors
-  for (int i = 1; i < argc; i++){
-    std::tie(meshes[i - 1], geometries[i - 1]) = readManifoldSurfaceMesh(argv[i]);
-    psMeshes[i - 1] = polyscope::registerSurfaceMesh(
-      polyscope::guessNiceNameFromPath(argv[i]),
-      geometries[i - 1]->inputVertexPositions, meshes[i - 1]->getFaceVertexList(),
-      polyscopePermutations(*meshes[i - 1]));
-  }
-  
   // Set the callback function
   polyscope::state::userCallback = callBacks;
-
   polyscope::show();
 
   return EXIT_SUCCESS;

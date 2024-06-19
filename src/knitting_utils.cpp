@@ -69,9 +69,6 @@ VertexData<double> solveLaplace(VertexPositionGeometry& geometry, std::vector<Ve
     Eigen::VectorXd Z_in = solver.solve(L_in_b*bc);
     // slice into solution
     igl::slice_into(Z_in,in,Z);
-
-    std::cout << "Z = " << Z << std::endl;
-
     VertexData<double> timeFunction(mesh);
 
     for (Vertex v : mesh.vertices()){

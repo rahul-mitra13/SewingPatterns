@@ -69,7 +69,6 @@ PatchBoundaryConditions getAndRenderBoundaryInfoFromJson(VertexPositionGeometry&
   SurfaceMesh& mesh = geometry.mesh;
   PatchBoundaryConditions toReturn;
 
-  std::cout << "filename = " << jsonFilePath << std::endl;
   std::ifstream jsonFile(jsonFilePath);
   nlohmann::json data = nlohmann::json::parse(jsonFile);
   std::vector<std::vector<int>> courseStartBoundary = data["boundaries"]["course"]["start"];
@@ -153,4 +152,45 @@ PatchBoundaryConditions getAndRenderBoundaryInfoFromJson(VertexPositionGeometry&
 
   return toReturn;
 
+}
+
+void getAndRenderBoundaryInfoFromJson(const std::string& jsonFilePath, std::vector<std::unique_ptr<ManifoldSurfaceMesh>>& meshes,
+                                      std::vector<std::unique_ptr<VertexPositionGeometry>>& geometries,
+                                      std::vector<PatchBoundaryConditions>& bdyConditions){
+
+                                        
+  std::ifstream jsonFile(jsonFilePath);
+  nlohmann::json data = nlohmann::json::parse(jsonFile);
+  auto numPanels = data["panels"].size();
+  //resize everything 
+  meshes.resize(numPanels);
+  geometries.resize(numPanels);
+  bdyConditions.resize(numPanels);
+  for (int i = 0; i < numPanels; i++){
+    auto obj_path = data["panels"][std::to_string(i)]["obj"];
+    std::tie(meshes[i], geometries[i]) = readManifoldSurfaceMesh(obj_path);
+    auto courseStartBoundary = data["panels"][std::to_string(i)]["boundaries"]["course"]["start"];
+    auto courseEndBoundary = data["panels"][std::to_string(i)]["boundaries"]["course"]["end"];
+    std::cout << "size of course start boundary = " << courseStartBoundary.size() << std::endl;
+    std::cout << "size of course end boundary = " << courseEndBoundary.size() << std::endl;
+    //handle course constraints
+    for (int j = 0; j < courseStartBoundary.size(); j++){
+      Vertex v1 = meshes[i]->vertex(courseStartBoundary[j][0]);
+      Vertex v2 = meshes[i]->vertex(courseStartBoundary[j][1]);
+      std::vector<Vertex> vertices;
+      std::vector<Edge> edges;
+      std::tie(vertices, edges) = getVerticesAndEdgesInShortestEdgePathOnBoundary(*geometries[i], v1, v2);
+      bdyConditions[i].courseStartBoundaryVertices.insert(bdyConditions[i].courseStartBoundaryVertices.end(), vertices.begin(), vertices.end());
+      bdyConditions[i].courseStartBoundaryEdges.insert(bdyConditions[i].courseStartBoundaryEdges.end(), edges.begin(), edges.end());
+    }
+    for (int j = 0; j < courseEndBoundary.size(); j++){
+      Vertex v1 = meshes[i]->vertex(courseEndBoundary[j][0]);
+      Vertex v2 = meshes[i]->vertex(courseEndBoundary[j][1]);
+      std::vector<Vertex> vertices;
+      std::vector<Edge> edges;
+      std::tie(vertices, edges) = getVerticesAndEdgesInShortestEdgePathOnBoundary(*geometries[i], v1, v2);
+      bdyConditions[i].courseEndBoundaryVertices.insert(bdyConditions[i].courseEndBoundaryVertices.end(), vertices.begin(), vertices.end());
+      bdyConditions[i].courseEndBoundaryEdges.insert(bdyConditions[i].courseEndBoundaryEdges.end(), edges.begin(), edges.end());
+    }
+  }
 }

@@ -42,3 +42,7 @@ std::pair<Vertex, Vertex> getAndRenderUserSpecifiedBoundaryVertices(VertexPositi
 std::pair<std::vector<Vertex>, std::vector<Edge>> getAndRenderUserSpecifiedBoundaryInfo(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMeshes, int timeVal);
 
 PatchBoundaryConditions getAndRenderBoundaryInfoFromJson(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMeshes, const std::string& jsonFilePath);
+
+void getAndRenderBoundaryInfoFromJson(const std::string& jsonFilePath, std::vector<std::unique_ptr<ManifoldSurfaceMesh>>& meshes,
+                                      std::vector<std::unique_ptr<VertexPositionGeometry>>& geometries,
+                                      std::vector<PatchBoundaryConditions>& bdyConditions);
