@@ -171,8 +171,6 @@ void getAndRenderBoundaryInfoFromJson(const std::string& jsonFilePath, std::vect
     std::tie(meshes[i], geometries[i]) = readManifoldSurfaceMesh(obj_path);
     auto courseStartBoundary = data["panels"][std::to_string(i)]["boundaries"]["course"]["start"];
     auto courseEndBoundary = data["panels"][std::to_string(i)]["boundaries"]["course"]["end"];
-    std::cout << "size of course start boundary = " << courseStartBoundary.size() << std::endl;
-    std::cout << "size of course end boundary = " << courseEndBoundary.size() << std::endl;
     //handle course constraints
     for (int j = 0; j < courseStartBoundary.size(); j++){
       Vertex v1 = meshes[i]->vertex(courseStartBoundary[j][0]);
