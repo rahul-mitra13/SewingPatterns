@@ -37,7 +37,7 @@ std::vector<polyscope::SurfaceMesh *> psMeshes;
 std::vector<PatchBoundaryConditions> bdyConditions;
 //path to json file
 std::string jsonFilePath;
-bool parseUsingJSon = true;
+bool parseUsingJSon = false;
 
 
 // Striping frequency
@@ -195,11 +195,17 @@ int main(int argc, char **argv) {
   else{
     //populate the meshes/geometries vectors from the command line 
     for (int i = 1; i < argc; i++){
+      Eigen::MatrixXd V; 
+      Eigen::MatrixXi F; 
+      igl::readOBJ(argv[i], V, F);
       std::tie(meshes[i - 1], geometries[i - 1]) = readManifoldSurfaceMesh(argv[i]);
       psMeshes[i - 1] = polyscope::registerSurfaceMesh(
         polyscope::guessNiceNameFromPath(argv[i]),
         geometries[i - 1]->inputVertexPositions, meshes[i - 1]->getFaceVertexList(),
         polyscopePermutations(*meshes[i - 1]));
+      //polyscope::registerSurfaceMesh("Test", V, F);
+      //ManifoldSurfaceMesh *m = new ManifoldSurfaceMesh(F);
+      //VertexPositionGeometry *geom;
     }
   }
   // Disable the ground plane
