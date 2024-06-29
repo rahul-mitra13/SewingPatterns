@@ -93,8 +93,12 @@ add_subdirectory("deps/geometry-central") # wherever you put it
 #add_subdirectory("deps/libIGL")
 
 find_package(GUROBI REQUIRED)
+#find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+find_package(PythonInterp 3)
+find_package(PythonLibs 3)
 
 include_directories(${GUROBI_INCLUDE_DIRS})
+include_directories(${PYTHON_INCLUDE_DIRS})
 
 #Visual Studio compiler with static runtime libraries
 if(MSVC AND MT)
@@ -121,11 +125,15 @@ target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/de
 target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/polyscope/deps/args")
 #add json
 target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/polyscope/deps/json/include/")
+#add python 
+target_include_directories(SewingPatterns PRIVATE ${PYTHON_LIBRARIES})
 
 if(CXX)
   target_link_libraries(SewingPatterns optimized ${GUROBI_CXX_LIBRARY}
                         debug ${GUROBI_CXX_DEBUG_LIBRARY})
 endif()
+
+
 
 # Link settings
 target_link_libraries(SewingPatterns
