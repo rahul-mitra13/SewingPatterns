@@ -1,7 +1,11 @@
+//this is to appropriately parse the GarmentCode specification
+#include <Python.h>
+
 #include "geometrycentral/surface/manifold_surface_mesh.h"
 #include "geometrycentral/surface/meshio.h"
 #include "geometrycentral/surface/vertex_position_geometry.h"
 #include "geometrycentral/surface/direction_fields.h"
+#include "geometrycentral/surface/edge_length_geometry.h"
 
 
 
@@ -21,8 +25,6 @@
 #include "GUI_helpers.h"
 #include "stripe_patterns_helpers.h"
 
-#include <igl/readOBJ.h>
-
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
@@ -33,6 +35,11 @@ int numPatches;//number of patches
 std::vector<std::unique_ptr<ManifoldSurfaceMesh>> meshes;
 std::vector<std::unique_ptr<VertexPositionGeometry>> geometries;
 std::vector<polyscope::SurfaceMesh *> psMeshes;
+//build an edge length geometry for the panels stitched together 
+EdgeLengthGeometry * ELGeometry; 
+//vertex mappings from txt file (JUST CALL PYTHON HERE UGHHH)
+std::map<std::pair<std::string, int>, std::pair<std::string, int>> vertexMappings;
+
 //boundary conditions for each patch 
 std::vector<PatchBoundaryConditions> bdyConditions;
 //path to json file
@@ -193,20 +200,22 @@ int main(int argc, char **argv) {
     }
   }
   else{
-    //populate the meshes/geometries vectors from the command line 
-    for (int i = 1; i < argc; i++){
-      Eigen::MatrixXd V; 
-      Eigen::MatrixXi F; 
-      igl::readOBJ(argv[i], V, F);
+    //populate the meshes/geometries vectors from the command line (to argc - 1 because the last argument are the vertex mappings ugh)
+    for (int i = 1; i < argc - 1; i++){
+      //first resize all the the vectors (-2 because the last thing passed on the command line will be the vertex mappings)
+      //will eventually re-format this so this all happens in place here  
+      meshes.resize(argc - 2);
+      geometries.resize(argc - 2);
+      psMeshes.resize(argc - 2);
       std::tie(meshes[i - 1], geometries[i - 1]) = readManifoldSurfaceMesh(argv[i]);
       psMeshes[i - 1] = polyscope::registerSurfaceMesh(
-        polyscope::guessNiceNameFromPath(argv[i]),
-        geometries[i - 1]->inputVertexPositions, meshes[i - 1]->getFaceVertexList(),
-        polyscopePermutations(*meshes[i - 1]));
-      //polyscope::registerSurfaceMesh("Test", V, F);
-      //ManifoldSurfaceMesh *m = new ManifoldSurfaceMesh(F);
-      //VertexPositionGeometry *geom;
+       polyscope::guessNiceNameFromPath(argv[i]),
+       geometries[i - 1]->inputVertexPositions, meshes[i - 1]->getFaceVertexList(),
+       polyscopePermutations(*meshes[i - 1]));
     }
+    vertexMappings = buildVertexMappingMapFromFile(argv[argc - 1]);
+    //create an edge length geometry from all the panels stitched together 
+    //ELGeometry = makeEdgeLengthGeometry(meshes, geometries, vertexMappings);
   }
   // Disable the ground plane
   polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::None;

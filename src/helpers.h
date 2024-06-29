@@ -11,6 +11,7 @@
 //geometry central includes
 #include "geometrycentral/surface/meshio.h"
 #include "geometrycentral/surface/vertex_position_geometry.h"
+#include "geometrycentral/surface/edge_length_geometry.h"
 #include "geometrycentral/surface/mesh_graph_algorithms.h"
 
 using namespace geometrycentral;
@@ -69,7 +70,11 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXi> getVertexPositionsandFaceLists(Verte
 //@return       halfedge list   std::vector<Haledge>        returns a list of halfedges on the shortest boundary path between the two vertices    
 std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
 
+//get the shortest dijkstra edge path on the boundary
 std::pair<std::vector<Vertex>, std::vector<Edge>> getVerticesAndEdgesInShortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
+
+//build a vertex mapping map from an input txt file 
+std::map<std::pair<std::string, int>, std::pair<std::string, int>> buildVertexMappingMapFromFile(const std::string& filename);
 
 //structure that stores boundary conditions for every patch 
 struct PatchBoundaryConditions{

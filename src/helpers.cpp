@@ -175,7 +175,6 @@ std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, V
 }
 
 std::pair<std::vector<Vertex>, std::vector<Edge>> getVerticesAndEdgesInShortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert){
-    
     // Gather values
     SurfaceMesh& mesh = geom.mesh;
     std::vector<Vertex> vertices;
@@ -187,4 +186,40 @@ std::pair<std::vector<Vertex>, std::vector<Edge>> getVerticesAndEdgesInShortestE
         edges.push_back(he.edge());
     }
     return std::make_pair(vertices, edges);
+}
+
+//this builds a mapping
+//panel1name -> pair(panel2name, (vertex from panel1 -> vertex from panel 2))
+std::map<std::pair<std::string, int>, std::pair<std::string, int>> buildVertexMappingMapFromFile(const std::string& filename){
+    
+    std::map<std::pair<std::string, int>, std::pair<std::string, int>> vertexMappings;
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Could not open the file!" << std::endl;
+        return vertexMappings;
+    }
+    std::string line;
+    while (std::getline(file, line)) {
+        // Remove parentheses
+        line.erase(std::remove(line.begin(), line.end(), '('), line.end());
+        line.erase(std::remove(line.begin(), line.end(), ')'), line.end());
+
+        std::stringstream ss(line);
+        std::string item;
+        std::vector<std::string> parsedLine;
+        while (std::getline(ss, item, ',')) {
+            parsedLine.push_back(item);
+        }
+        vertexMappings.insert({std::make_pair(parsedLine[0], std::stoi(parsedLine[1])), std::make_pair(parsedLine[2], std::stoi(parsedLine[3]))});
+    }
+    return vertexMappings;
+}
+
+//build an edge length geometry from input meshes with mappings between them 
+EdgeLengthGeometry * makeEdgeLengthGeometry(std::vector<std::unique_ptr<ManifoldSurfaceMesh>>& meshes, 
+                                                std::map<std::pair<std::string, int>, std::pair<std::string, int>>& vertexMappings){
+    int numPanels = meshes.size();
+    for (int i = 0; i < numPanels; i++){
+        std::vector<std::vector<size_t>> faceList = meshes[i] -> getFaceVertexList();
+    }
 }
