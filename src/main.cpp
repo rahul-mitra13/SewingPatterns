@@ -79,44 +79,40 @@ void showBoundaryVertexSelectionUI(){
 //render stripe patterns over the surface
 void showStripePatterns(){ 
 
-  //just using the y-coordinate for now
-  VertexData<double> timeFunction(*globalMesh);
-  globalGeometry->requireVertexPositions();
-  for (Vertex v : globalMesh -> vertices()){
-    timeFunction[v] = globalGeometry->vertexPositions[v][1];
+  for (int i = 0; i < meshes.size(); i++){
+    VertexData<double> timeFunction(*meshes[i]);
+    for (Vertex v : meshes[i] -> vertices()){
+      timeFunction[v] = geometries[i]->vertexPositions[v][1];
+    }
+    psMeshes[i]->addVertexScalarQuantity("Y coord time function " + std::to_string(i), timeFunction);
+    VertexData<Vector3> courseVertexValuedField = computeVertexValuedField(*geometries[i], timeFunction, 0);
+    //VertexData<Vector2> lineFieldCourse = vertexDirectionField(*geometries[i], courseVertexValuedField);
+    VertexData<Vector2> lineFieldCourse = computeSmoothestBoundaryAlignedVertexDirectionField(*geometries[i], 2);
+    geometries[i]->requireVertexTangentBasis();
+    VertexData<Vector3> vBasisX(*meshes[i]);
+    VertexData<Vector3> vBasisY(*meshes[i]);
+    for(Vertex v : meshes[i]->vertices()) {
+      vBasisX[v] = geometries[i]->vertexTangentBasis[v][0];
+      vBasisY[v] = geometries[i]->vertexTangentBasis[v][1];
+    }
+    psMeshes[i]->
+    addVertexTangentVectorQuantity("vertex tangent vectors_" + std::to_string(i), lineFieldCourse, vBasisX, vBasisY);
+    psMeshes[i]->addVertexVectorQuantity("vertex ambient vectors_" + std::to_string(i), courseVertexValuedField);
+    VertexData<double> frequencies(*meshes[i], constantFreq);
+    CornerData<double> periodicFunc;
+    FaceData<int> zeroIndices;
+    FaceData<int> branchIndices;
+    std::tie(periodicFunc, zeroIndices, branchIndices) =
+        computeStripePattern(*geometries[i], frequencies, lineFieldCourse);
+    // Extract isolines
+    std::vector<Vector3> isolineVerts;
+    std::vector<std::array<size_t, 2>> isolineEdges;
+    std::tie(isolineVerts, isolineEdges) = extractPolylinesFromStripePattern(
+      *geometries[i], periodicFunc, zeroIndices, branchIndices, lineFieldCourse, false);
+    polyscope::registerCurveNetwork("course stripe patterns_" + std::to_string(i), isolineVerts, isolineEdges);
   }
-  globalPSMesh->addVertexScalarQuantity("Y coord ", timeFunction);
-  FaceData<Vector3> faceGrads = computeTimeFunctionFaceGrad(*globalGeometry, timeFunction);
-  VertexData<Vector3> courseVertexValuedField = computeVertexValuedField(*globalGeometry, timeFunction, 0);
-  VertexData<Vector2> lineFieldCourse = vertexDirectionField(*globalGeometry, courseVertexValuedField);
   
-  globalGeometry->requireVertexTangentBasis();
-  VertexData<Vector3> vBasisX(*globalMesh);
-  VertexData<Vector3> vBasisY(*globalMesh);
-  for(Vertex v : globalMesh->vertices()) {
-    vBasisX[v] = globalGeometry->vertexTangentBasis[v][0];
-    vBasisY[v] = globalGeometry->vertexTangentBasis[v][1];
-  }
-
-  globalPSMesh->addFaceVectorQuantity("Face gradients", faceGrads);
-  globalPSMesh->
-    addVertexTangentVectorQuantity("great vectors", lineFieldCourse, vBasisX, vBasisY);
-
-  VertexData<double> frequencies(*globalMesh, constantFreq);
-  CornerData<double> periodicFunc;
-  FaceData<int> zeroIndices;
-  FaceData<int> branchIndices;
-  std::tie(periodicFunc, zeroIndices, branchIndices) =
-        computeStripePattern(*globalGeometry, frequencies, lineFieldCourse);
-  // Extract isolines
-  std::vector<Vector3> isolineVerts;
-  std::vector<std::array<size_t, 2>> isolineEdges;
-  std::tie(isolineVerts, isolineEdges) = extractPolylinesFromStripePattern(
-      *globalGeometry, periodicFunc, zeroIndices, branchIndices, lineFieldCourse, false);
-  polyscope::registerCurveNetwork("course stripe patterns_", isolineVerts, isolineEdges);
-  
-  
-  /**
+/**
   for (int i = 0; i < meshes.size(); i++){
     std::vector<Vertex> zeroVertices, oneVertices;
     zeroVertices = bdyConditions[i].courseStartBoundaryVertices;
@@ -211,6 +207,7 @@ void showStripePatterns(){
     polyscope::registerCurveNetwork("wale stripe patterns_" + std::to_string(i), positions, edges);    
   }
   */
+  
 }
 
 // A user-defined callback, for creating control panels (etc)
@@ -245,19 +242,27 @@ int main(int argc, char **argv) {
   }
   else{
     // first resize all the the vectors (-2 because the last thing passed on the command line will be the vertex mappings)
-    // will eventually re-format this so this all happens in place here  
-    // meshes.resize(argc - 2);
-    // geometries.resize(argc - 2);
-    // psMeshes.resize(argc - 2);
-    // //populate the meshes/geometries vectors from the command line (to argc - 1 because the last argument are the vertex mappings ugh)
-    // for (int i = 1; i < argc - 1; i++){
-    //   std::tie(meshes[i - 1], geometries[i - 1]) = readManifoldSurfaceMesh(argv[i]);
-    //   psMeshes[i - 1] = polyscope::registerSurfaceMesh(
-    //    polyscope::guessNiceNameFromPath(argv[i]),
-    //    geometries[i - 1]->inputVertexPositions, meshes[i - 1]->getFaceVertexList(),
-    //    polyscopePermutations(*meshes[i - 1]));
-    // }
-    // //insert into our panel mappings map 
+    //will eventually re-format this so this all happens in place here  
+    meshes.resize(argc - 2);
+    geometries.resize(argc - 2);
+    psMeshes.resize(argc - 2);
+    numPatches = argc - 2;
+    //populate the meshes/geometries vectors from the command line (to argc - 1 because the last argument are the vertex mappings ugh)
+    for (int i = 1; i < argc - 1; i++){
+      std::tie(meshes[i - 1], geometries[i - 1]) = readManifoldSurfaceMesh(argv[i]);
+      psMeshes[i - 1] = polyscope::registerSurfaceMesh(
+       polyscope::guessNiceNameFromPath(argv[i]),
+       geometries[i - 1]->inputVertexPositions, meshes[i - 1]->getFaceVertexList(),
+       polyscopePermutations(*meshes[i - 1]));
+    }
+
+    for (int i = 0; i < numPatches; i++){
+      std::cout << "Is mesh " << i << " manifold? " << meshes[i] -> isManifold() << std::endl;
+      std::cout << "Is mesh " << i << " oriented? " << meshes[i] -> isOriented() << std::endl;
+      std::cout << "Is mesh " << i << " triangular? " << meshes[i] -> isTriangular() << std::endl;
+      std::cout << "Number of connected components of mesh " << i << ": " << meshes[i] -> nConnectedComponents() << std::endl;
+    }
+    //insert into our panel mappings map 
     // for (int i = 1; i < argc - 1; i++){
     //   panelMappings[argv[i]] = std::move(geometries[i - 1]);
     // }
@@ -266,8 +271,8 @@ int main(int argc, char **argv) {
     // //build vertex mappings from passed input
     // vertexMappings = buildVertexMappingMapFromFile(argv[argc - 1]);
 
-    std::tie(globalMesh, globalGeometry) = readManifoldSurfaceMesh(argv[1]);
-    globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(argv[1]), globalGeometry->inputVertexPositions, globalMesh->getFaceVertexList());
+    // std::tie(globalMesh, globalGeometry) = readManifoldSurfaceMesh(argv[1]);
+    // globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(argv[1]), globalGeometry->inputVertexPositions, globalMesh->getFaceVertexList());
   }
 
   // Disable the ground plane
