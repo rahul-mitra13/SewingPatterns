@@ -215,11 +215,15 @@ std::map<std::pair<std::string, int>, std::pair<std::string, int>> buildVertexMa
     return vertexMappings;
 }
 
-//build an edge length geometry from input meshes with mappings between them 
-EdgeLengthGeometry * makeEdgeLengthGeometry(std::vector<std::unique_ptr<ManifoldSurfaceMesh>>& meshes, 
-                                                std::map<std::pair<std::string, int>, std::pair<std::string, int>>& vertexMappings){
-    int numPanels = meshes.size();
-    for (int i = 0; i < numPanels; i++){
-        std::vector<std::vector<size_t>> faceList = meshes[i] -> getFaceVertexList();
+//build the global cotan Laplacian for all the panels while accounting for the mapped stitches across panels
+void buildGlobalCotanLaplacian(std::map<std::string, std::unique_ptr<VertexPositionGeometry>>& panelMappings, std::map<std::pair<std::string, int>, 
+                                std::pair<std::string, int>>& vertexMappings, Eigen::SparseMatrix<double>& L){
+    
+   int numVertices = 0; 
+   for (const auto &panelMapping : panelMappings) {
+        SurfaceMesh& mesh = panelMapping.second->mesh;
+        numVertices += mesh.nVertices();
     }
+    //firs resize the Laplacian
+    L.resize(numVertices, numVertices);
 }

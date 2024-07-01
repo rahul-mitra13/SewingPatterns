@@ -7,6 +7,11 @@
 #include <queue>
 #include <utility>
 #include <vector>
+#include <map>
+
+//Eigen includes
+#include <Eigen/Sparse>
+
 
 //geometry central includes
 #include "geometrycentral/surface/meshio.h"
@@ -71,7 +76,18 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXi> getVertexPositionsandFaceLists(Verte
 std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
 
 //get the shortest dijkstra edge path on the boundary
+//
+//@parma[in]     geom               VertexPositionGeometry                          input geometry 
+//@param[in]     startVert          Vertex                                          start vertex on the boundary 
+//@param[in]     endVert            Vertex                                          end vertex on the boundary 
+//
+//@return        pair               std::pair<vector<Vertex>, vector<Edge>>         returns a list of vertices and edges on the boundary between the two vertices
 std::pair<std::vector<Vertex>, std::vector<Edge>> getVerticesAndEdgesInShortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
+
+//build the global cotan Laplacian for all the panels while accounting for the mapped stitches across panels
+void buildGlobalCotanLaplacian(std::map<std::string, std::unique_ptr<VertexPositionGeometry>>& panelMappings, std::map<std::pair<std::string, int>, 
+                                std::pair<std::string, int>>& vertexMappings, Eigen::SparseMatrix<double>& L);
+
 
 //build a vertex mapping map from an input txt file 
 std::map<std::pair<std::string, int>, std::pair<std::string, int>> buildVertexMappingMapFromFile(const std::string& filename);
