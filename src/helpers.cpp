@@ -190,7 +190,7 @@ std::pair<std::vector<Vertex>, std::vector<Edge>> getVerticesAndEdgesInShortestE
 
 //this builds a mapping
 //panel1name -> pair(panel2name, (vertex from panel1 -> vertex from panel 2))
-std::map<std::pair<std::string, int>, std::pair<std::string, int>> buildVertexMappingMapFromFile(const std::string& filename){
+std::map<std::pair<std::string, int>, std::pair<std::string, int>> buildLocalVertexMappingMapFromFile(const std::string& filename){
     
     std::map<std::pair<std::string, int>, std::pair<std::string, int>> vertexMappings;
     std::ifstream file(filename);
@@ -215,15 +215,47 @@ std::map<std::pair<std::string, int>, std::pair<std::string, int>> buildVertexMa
     return vertexMappings;
 }
 
-//build the global cotan Laplacian for all the panels while accounting for the mapped stitches across panels
-void buildGlobalCotanLaplacian(std::map<std::string, std::unique_ptr<VertexPositionGeometry>>& panelMappings, std::map<std::pair<std::string, int>, 
-                                std::pair<std::string, int>>& vertexMappings, Eigen::SparseMatrix<double>& L){
+//this builds a mapping of stitched together vertices
+//(vertex1 -> vertex2)
+std::map<int, int> buildGlobalVertexMappingFromFile(const std::string& filename){
     
-   int numVertices = 0; 
-   for (const auto &panelMapping : panelMappings) {
-        SurfaceMesh& mesh = panelMapping.second->mesh;
-        numVertices += mesh.nVertices();
+    std::map<int, int> vertexMappings;
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Could not open the file!" << std::endl;
+        return vertexMappings;
     }
+    std::string line;
+    while (std::getline(file, line)) {
+        // Remove parentheses
+        line.erase(std::remove(line.begin(), line.end(), '('), line.end());
+        line.erase(std::remove(line.begin(), line.end(), ')'), line.end());
+
+        std::stringstream ss(line);
+        std::string item;
+        std::vector<std::string> parsedLine;
+        while (std::getline(ss, item, ',')) {
+            parsedLine.push_back(item);
+        }
+        vertexMappings.insert({std::stoi(parsedLine[0]), std::stoi(parsedLine[1])});
+    }
+
+    return vertexMappings;
+
+}
+
+//build the global cotan Laplacian for all the panels while accounting for the mapped stitches across panels
+//reads the local mappings
+void buildGlobalCotanLaplacian(IntrinsicGeometryInterface& geometry, std::map<int, int>& vertexMappings, Eigen::SparseMatrix<double>& L){
+    
+    SurfaceMesh& mesh = geometry.mesh;
+    int numVertices = 0; 
     //firs resize the Laplacian
     L.resize(numVertices, numVertices);
+    geometry.requireCotanLaplacian();
+    L = geometry.cotanLaplacian;
+    
+    //need to update contribution for mapped vertices
+    //I think it's as simple as grabbing L value from mapped vertex and adding the two L values together
+    //also updating L value for both vertices
 }

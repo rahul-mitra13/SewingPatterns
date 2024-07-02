@@ -85,12 +85,16 @@ std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, V
 std::pair<std::vector<Vertex>, std::vector<Edge>> getVerticesAndEdgesInShortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
 
 //build the global cotan Laplacian for all the panels while accounting for the mapped stitches across panels
-void buildGlobalCotanLaplacian(std::map<std::string, std::unique_ptr<VertexPositionGeometry>>& panelMappings, std::map<std::pair<std::string, int>, 
-                                std::pair<std::string, int>>& vertexMappings, Eigen::SparseMatrix<double>& L);
+void buildGlobalCotanLaplacian(IntrinsicGeometryInterface& geometry, std::map<int, int>& vertexMappings, Eigen::SparseMatrix<double>& L);
 
 
 //build a vertex mapping map from an input txt file 
-std::map<std::pair<std::string, int>, std::pair<std::string, int>> buildVertexMappingMapFromFile(const std::string& filename);
+//reads the local mappings
+std::map<std::pair<std::string, int>, std::pair<std::string, int>> buildLocalVertexMappingMapFromFile(const std::string& filename);
+
+//this builds a mapping of stitched together vertices
+//(vertex1 -> vertex2)
+std::map<int, int> buildGlobalVertexMappingFromFile(const std::string& filename);
 
 //structure that stores boundary conditions for every patch 
 struct PatchBoundaryConditions{
