@@ -8,10 +8,10 @@
 #include <utility>
 #include <vector>
 #include <map>
+#include <set>
 
 //Eigen includes
 #include <Eigen/Sparse>
-
 
 //geometry central includes
 #include "geometrycentral/surface/meshio.h"
@@ -85,7 +85,7 @@ std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, V
 std::pair<std::vector<Vertex>, std::vector<Edge>> getVerticesAndEdgesInShortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
 
 //build the global cotan Laplacian for all the panels while accounting for the mapped stitches across panels
-void buildGlobalCotanLaplacian(IntrinsicGeometryInterface& geometry, std::map<int, int>& vertexMappings, Eigen::SparseMatrix<double>& L);
+VertexData<double> buildGlobalCotanLaplacian(VertexPositionGeometry& geometry, std::map<int, int>& vertexMappings, Eigen::SparseMatrix<double>& L);
 
 
 //build a vertex mapping map from an input txt file 

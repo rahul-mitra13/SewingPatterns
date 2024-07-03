@@ -238,7 +238,8 @@ int main(int argc, char **argv) {
     globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(argv[1]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
     vertexMappings = buildGlobalVertexMappingFromFile(argv[2]);
     Eigen::SparseMatrix<double> L;
-    buildGlobalCotanLaplacian(*globalGeometry, vertexMappings, L);
+    VertexData<double> testFunction = buildGlobalCotanLaplacian(*globalGeometry, vertexMappings, L);
+    globalPSMesh -> addVertexScalarQuantity("test time function ", testFunction);
   }
 
   // Disable the ground plane

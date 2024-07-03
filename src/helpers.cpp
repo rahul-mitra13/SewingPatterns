@@ -246,16 +246,121 @@ std::map<int, int> buildGlobalVertexMappingFromFile(const std::string& filename)
 
 //build the global cotan Laplacian for all the panels while accounting for the mapped stitches across panels
 //reads the local mappings
-void buildGlobalCotanLaplacian(IntrinsicGeometryInterface& geometry, std::map<int, int>& vertexMappings, Eigen::SparseMatrix<double>& L){
+VertexData<double> buildGlobalCotanLaplacian(VertexPositionGeometry& geometry, std::map<int, int>& vertexMappings, Eigen::SparseMatrix<double>& L){
     
     SurfaceMesh& mesh = geometry.mesh;
-    int numVertices = 0; 
-    //firs resize the Laplacian
-    L.resize(numVertices, numVertices);
-    geometry.requireCotanLaplacian();
-    L = geometry.cotanLaplacian;
-    
-    //need to update contribution for mapped vertices
-    //I think it's as simple as grabbing L value from mapped vertex and adding the two L values together
-    //also updating L value for both vertices
+    int numVertices = mesh.nVertices(); 
+    int numStitchedVertices = vertexMappings.size();
+    std::cout << "num vertices in the orignal mesh = " << numVertices << std::endl;
+    std::cout << "num stitched together vertices " << numStitchedVertices << std::endl;
+
+    //first resize the Laplacian
+    L.resize(numVertices - numStitchedVertices, numVertices - numStitchedVertices);
+    //require the cotan edge weights 
+    geometry.requireEdgeCotanWeights();
+
+    //store mappings between index in the original mesh and index in the Laplacian matrix
+    std::map<int, int> originalIndexToLaplacianMatrixIndex;
+    //store mappings between index in the Laplacian matrix to index in the orignal mesh 
+    std::map<int, int> laplacianMatrixIndexToOriginalIndex;
+    //number of "unique vertices" i.e., only consider one vertex per stitch
+    int numUniqueVertices = 0;
+    std::vector<int> seenVertices;
+    for (Vertex v : mesh.vertices()){
+        size_t iV = v.getIndex();
+        if (vertexMappings.find(iV) != vertexMappings.end()){
+            seenVertices.push_back(iV);
+            seenVertices.push_back(vertexMappings.at(iV));
+
+            //emulating bi-directional mapping here
+            originalIndexToLaplacianMatrixIndex.insert({iV, numUniqueVertices});
+            originalIndexToLaplacianMatrixIndex.insert({vertexMappings.at(iV), numUniqueVertices});
+            laplacianMatrixIndexToOriginalIndex.insert({numUniqueVertices, iV});
+            numUniqueVertices++;
+        }
+        else if (originalIndexToLaplacianMatrixIndex.find(iV) == originalIndexToLaplacianMatrixIndex.end()){//we've never seen this index before
+            originalIndexToLaplacianMatrixIndex.insert({iV, numUniqueVertices});
+            laplacianMatrixIndexToOriginalIndex.insert({numUniqueVertices, iV});
+            numUniqueVertices++;
+        }  
+    }
+
+    for (auto entry : originalIndexToLaplacianMatrixIndex){
+        std::cout << "vertex " << entry.first << " in the original mesh mapped to vertex " << entry.second << " in the laplacian matrix " << std::endl;
+    }
+
+    std::vector<Eigen::Triplet<double>> tripletList;
+
+    //keep a set of indices you've already populated in the Laplacian 
+    std::set<int> setIndices;//set of vertex indices we've already set in the laplacian
+
+    for (Vertex v : mesh.vertices()){
+        if (std::find(setIndices.begin(), setIndices.end(), originalIndexToLaplacianMatrixIndex.at(v.getIndex())) != setIndices.end()) continue;//we've handled this already
+        double L_diag = 0.0;//diagonal entries of L
+        //iterate over the one-ring of the vertex 
+        for (Halfedge he : v.outgoingHalfedges()){
+            //off diagonal entries 
+            tripletList.emplace_back(originalIndexToLaplacianMatrixIndex.at(v.getIndex()), originalIndexToLaplacianMatrixIndex.at(he.tipVertex().getIndex()),
+            -geometry.edgeCotanWeights[he.edge()]);
+            setIndices.insert(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
+
+            if (vertexMappings.find(v.getIndex()) != vertexMappings.end()){//handle off diagonal entry for stitched vertex
+                Vertex mappedVertex = mesh.vertex(vertexMappings.at(v.getIndex()));
+                //iterate over the 1-ring of the mapped vertex 
+                for (Halfedge mappedVertexHalfedge : mappedVertex.outgoingHalfedges()){
+                    tripletList.emplace_back(originalIndexToLaplacianMatrixIndex.at(v.getIndex()), 
+                                        originalIndexToLaplacianMatrixIndex.at(mappedVertexHalfedge.tipVertex().getIndex()),
+                                        -geometry.edgeCotanWeights[mappedVertexHalfedge.edge()]);
+                    setIndices.insert(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
+                }
+            }
+
+            //handle the diagonal entry case
+            L_diag += geometry.edgeCotanWeights[he.edge()];
+            if (vertexMappings.find(v.getIndex()) != vertexMappings.end()){//handle diagonal entry for stitched vertex
+                Vertex mappedVertex = mesh.vertex(vertexMappings.at(v.getIndex()));
+                //iterate over the 1-ring of the mapped vertex 
+                for (Halfedge mappedVertexHalfedge : mappedVertex.outgoingHalfedges()){
+                    L_diag += geometry.edgeCotanWeights[mappedVertexHalfedge.edge()];
+                }
+            }
+        }
+        tripletList.emplace_back(originalIndexToLaplacianMatrixIndex.at(v.getIndex()), originalIndexToLaplacianMatrixIndex.at(v.getIndex()), L_diag);
+        setIndices.insert(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
+    }
+
+    L.setFromTriplets(tripletList.begin(), tripletList.end());
+
+    //force boundary conditions here
+    Eigen::VectorXd b = Eigen::VectorXd::Zero(numUniqueVertices);
+    b(0) = 0.0;
+    b(15) = 1.0;
+    L.row(0) *= 0;
+    L.row(15) *= 0;
+    L.coeffRef(0, 0) = 1.0;
+    L.coeffRef(15, 15) = 1.0;
+    std::cout << "L = " << L << std::endl;
+
+    Eigen::SparseLU<SparseMatrix<double>> solver;
+    solver.compute(L);
+    if (solver.info() != Eigen::Success) {
+        std::cerr << "Decomposition failed" << std::endl;
+    }
+    Eigen::VectorXd u = solver.solve(b);
+    if (solver.info() != Eigen::Success) {
+        std::cerr << "Solving failed" << std::endl;
+    }
+    std::cout << "u = " << u << std::endl;
+
+    VertexData<double> testFunction(mesh);
+    for (Vertex v : mesh.vertices()){
+        testFunction[v] = u(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
+    }
+
+    Eigen::VectorXd constFunc = Eigen::VectorXd(numUniqueVertices);
+    constFunc.setOnes();
+    std::cout << "L * constFunc = " << L * constFunc << std::endl;
+
+    return testFunction;
+
 }
