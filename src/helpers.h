@@ -19,6 +19,11 @@
 #include "geometrycentral/surface/edge_length_geometry.h"
 #include "geometrycentral/surface/mesh_graph_algorithms.h"
 
+//polyscope includes
+#include "polyscope/polyscope.h"
+#include "polyscope/surface_mesh.h"
+#include "polyscope/curve_network.h"
+
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
@@ -27,6 +32,13 @@ using namespace geometrycentral::surface;
 //2. getBoundaryEdges()
 //3. getVertexPositionsandFaceLists()
 //4. shortestEdgePathOnBoundary()
+
+//global boundary conditions
+struct globalBoundaryConditions{
+    std::vector<Vertex> courseStartBoundaryVertices;
+    std::vector<Vertex> courseEndBoundaryVertices;
+};
+
 
 //
 //get a pair of vertex lists that are at the extremes of a panel (this probably needs user input eventually)
@@ -85,16 +97,39 @@ std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, V
 std::pair<std::vector<Vertex>, std::vector<Edge>> getVerticesAndEdgesInShortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
 
 //build the global cotan Laplacian for all the panels while accounting for the mapped stitches across panels
-VertexData<double> buildGlobalCotanLaplacian(VertexPositionGeometry& geometry, std::map<int, int>& vertexMappings, Eigen::SparseMatrix<double>& L);
+//
+//@param[in]    geometry        VertexPositionGeometry      input geometry
+//@param[in]    vertexMappings  std::map<int, int>          map that stores global vertex mappings 
+//@param[out]   L               Eigen::SparseMatrix<double> the global cotan laplacian for all the panels
+VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::map<int, int>& vertexMappings, globalBoundaryConditions& boundaryConditions);
+
+//compute time function using a vector of pairs of vertex mappings instead of the map because we miss stitches then 
+VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::vector<std::pair<int,int>>& vertexMappingsPairs);
 
 
-//build a vertex mapping map from an input txt file 
-//reads the local mappings
+//build a vertex mapping map from an input txt file (for a "local" mapping across different models)
+//
+//@param[in]    filename    const std::string&                                                  name of the file that stores the mappings 
+//@return       map         std::map<std::pair<std::string, int>, std::pair<std::string, int>>  this is a map (panel1name, panel1Vertex -> panel2name, panel2Vertex)
 std::map<std::pair<std::string, int>, std::pair<std::string, int>> buildLocalVertexMappingMapFromFile(const std::string& filename);
 
-//this builds a mapping of stitched together vertices
-//(vertex1 -> vertex2)
+//builds a map of stitched together vertices 
+//
+//@param[in]    filename    const std::string&  name of the file that stores vertex mappings
+//
+//@return       std::map         std::map<int, int>  stores vertex mappings for stitched vertices
 std::map<int, int> buildGlobalVertexMappingFromFile(const std::string& filename);
+
+//read this as a vector of pairs because you miss vertex mappings if you try to do this with a map
+std::vector<std::pair<int, int>> buildPairOfStitchedVerticesFromFile(const std::string& filename);
+
+//renders "stitched" together vertices from the 2D panels 
+//
+//@param[in]    geometry        VertexPositionGeometry  input geometry
+//@param[in]    vertexMappings  std::map<int, int>      map that stores global vertex mappings 
+//
+//@return       none                                    but has a side effect where it calls polyscope to render stitches
+void renderStitchedVertices(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs);
 
 //structure that stores boundary conditions for every patch 
 struct PatchBoundaryConditions{
@@ -112,4 +147,3 @@ struct PatchBoundaryConditions{
     std::vector<Edge> waleStartBoundaryEdges;
     std::vector<Edge> waleEndBoundaryEdges;
 };
-

@@ -244,18 +244,42 @@ std::map<int, int> buildGlobalVertexMappingFromFile(const std::string& filename)
 
 }
 
+//returns a vector of pairs of vertex mappings
+//(vertex1, vertex2)
+std::vector<std::pair<int, int>> buildPairOfStitchedVerticesFromFile(const std::string& filename){
+
+    std::vector<std::pair<int, int>> vertexMappings;
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Could not open the file!" << std::endl;
+        return vertexMappings;
+    }
+    std::string line;
+    while (std::getline(file, line)) {
+        // Remove parentheses
+        line.erase(std::remove(line.begin(), line.end(), '('), line.end());
+        line.erase(std::remove(line.begin(), line.end(), ')'), line.end());
+
+        std::stringstream ss(line);
+        std::string item;
+        std::vector<std::string> parsedLine;
+        while (std::getline(ss, item, ',')) {
+            parsedLine.push_back(item);
+        }
+        vertexMappings.push_back(std::make_pair(std::stoi(parsedLine[0]), std::stoi(parsedLine[1])));
+    }
+
+    return vertexMappings;
+}
+
 //build the global cotan Laplacian for all the panels while accounting for the mapped stitches across panels
 //reads the local mappings
-VertexData<double> buildGlobalCotanLaplacian(VertexPositionGeometry& geometry, std::map<int, int>& vertexMappings, Eigen::SparseMatrix<double>& L){
+VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::map<int, int>& vertexMappings, globalBoundaryConditions& bdyConditions){
     
     SurfaceMesh& mesh = geometry.mesh;
     int numVertices = mesh.nVertices(); 
     int numStitchedVertices = vertexMappings.size();
-    std::cout << "num vertices in the orignal mesh = " << numVertices << std::endl;
-    std::cout << "num stitched together vertices " << numStitchedVertices << std::endl;
-
-    //first resize the Laplacian
-    L.resize(numVertices - numStitchedVertices, numVertices - numStitchedVertices);
+    Eigen::SparseMatrix<double> L(numVertices - numStitchedVertices, numVertices - numStitchedVertices);
     //require the cotan edge weights 
     geometry.requireEdgeCotanWeights();
 
@@ -284,11 +308,6 @@ VertexData<double> buildGlobalCotanLaplacian(VertexPositionGeometry& geometry, s
             numUniqueVertices++;
         }  
     }
-
-    for (auto entry : originalIndexToLaplacianMatrixIndex){
-        std::cout << "vertex " << entry.first << " in the original mesh mapped to vertex " << entry.second << " in the laplacian matrix " << std::endl;
-    }
-
     std::vector<Eigen::Triplet<double>> tripletList;
 
     //keep a set of indices you've already populated in the Laplacian 
@@ -331,16 +350,25 @@ VertexData<double> buildGlobalCotanLaplacian(VertexPositionGeometry& geometry, s
 
     L.setFromTriplets(tripletList.begin(), tripletList.end());
 
-    //force boundary conditions here
+    //force boundary conditions
     Eigen::VectorXd b = Eigen::VectorXd::Zero(numUniqueVertices);
-    b(0) = 0.0;
-    b(15) = 1.0;
-    L.row(0) *= 0;
-    L.row(15) *= 0;
-    L.coeffRef(0, 0) = 1.0;
-    L.coeffRef(15, 15) = 1.0;
-    std::cout << "L = " << L << std::endl;
+    std::cout << bdyConditions.courseStartBoundaryVertices.size() << std::endl;
+    std::cout << bdyConditions.courseEndBoundaryVertices.size() << std::endl;
 
+    for (Vertex v : bdyConditions.courseStartBoundaryVertices){
+        int updatedIndex = originalIndexToLaplacianMatrixIndex.at(v.getIndex());
+        L.row(updatedIndex) *= 0.0;
+        L.coeffRef(updatedIndex, updatedIndex) = 1.0;
+        b(updatedIndex) = 0.0;
+    }
+
+    for (Vertex v : bdyConditions.courseEndBoundaryVertices){
+        int updatedIndex = originalIndexToLaplacianMatrixIndex.at(v.getIndex());
+        L.row(updatedIndex) *= 0.0;
+        L.coeffRef(updatedIndex, updatedIndex) = 1.0;
+        b(updatedIndex) = 1.0;
+    }
+    
     Eigen::SparseLU<SparseMatrix<double>> solver;
     solver.compute(L);
     if (solver.info() != Eigen::Success) {
@@ -350,17 +378,87 @@ VertexData<double> buildGlobalCotanLaplacian(VertexPositionGeometry& geometry, s
     if (solver.info() != Eigen::Success) {
         std::cerr << "Solving failed" << std::endl;
     }
-    std::cout << "u = " << u << std::endl;
-
+    
     VertexData<double> testFunction(mesh);
     for (Vertex v : mesh.vertices()){
         testFunction[v] = u(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
     }
 
-    Eigen::VectorXd constFunc = Eigen::VectorXd(numUniqueVertices);
-    constFunc.setOnes();
-    std::cout << "L * constFunc = " << L * constFunc << std::endl;
-
     return testFunction;
+}
 
+//compute time function using a vector of pairs of vertex mappings instead of the map because we miss stitches then 
+VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::vector<std::pair<int,int>>& vertexMappingsPairs){
+
+    SurfaceMesh& mesh = geometry.mesh;
+    VertexData<double> timeFunction(mesh);
+    int numVertices = mesh.nVertices(); 
+    int numStitchedVertices = vertexMappingsPairs.size();
+    Eigen::SparseMatrix<double> L(numVertices - numStitchedVertices, numVertices - numStitchedVertices);
+    //require the cotan edge weights 
+    geometry.requireEdgeCotanWeights();
+    //store mappings between index in the original mesh and index in the Laplacian matrix
+    std::map<int, int> originalIndexToLaplacianMatrixIndex;
+    //store mappings between index in the Laplacian matrix to index in the orignal mesh 
+    std::map<int, int> laplacianMatrixIndexToOriginalIndex;
+    //all the pairs that have been seen so far
+    std::vector<std::pair<int, int>> seenPairs;
+    //number of "unique vertices" i.e., only consider one vertex per stitch
+    int numUniqueVertices = 0;
+    for (Vertex v : mesh.vertices()){
+        size_t iV = v.getIndex();
+        bool isMappedVertex = false;
+        std::pair<int, int> pairing;
+        //search for mapping
+        for (auto p : vertexMappingsPairs){
+            if ((p.first == iV) && (std::find(seenPairs.begin(), seenPairs.end(), p) == seenPairs.end())){//this vertex has a mapping and we have not seen this pair before
+                isMappedVertex = true;
+                seenPairs.push_back(p);
+                pairing = p;
+                break;
+            }
+        }
+        if (isMappedVertex){
+            //emulating a bidirectional map
+            originalIndexToLaplacianMatrixIndex.insert({iV, numUniqueVertices});
+            originalIndexToLaplacianMatrixIndex.insert({pairing.second, numUniqueVertices});
+            laplacianMatrixIndexToOriginalIndex.insert({numUniqueVertices, iV});
+            numUniqueVertices++;
+        }
+        else if (originalIndexToLaplacianMatrixIndex.find(iV) == originalIndexToLaplacianMatrixIndex.end()){//we've never seen this index before
+            originalIndexToLaplacianMatrixIndex.insert({iV, numUniqueVertices});
+            laplacianMatrixIndexToOriginalIndex.insert({numUniqueVertices, iV});
+            numUniqueVertices++;
+        }
+    }
+    std::cout << "Number of vertices " << numVertices << std::endl;
+    std::cout << "Number of stitches " << numStitchedVertices << std::endl;
+    std::cout << "Number of unique vertices " << numUniqueVertices << std::endl;
+
+    for (auto entry : originalIndexToLaplacianMatrixIndex){
+        std::cout << entry.first << " mapped to " << entry.second << std::endl;
+    }
+
+    return timeFunction;
+
+}
+
+
+//render the stitched together vertices in polyscope
+void renderStitchedVertices(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs){
+
+    SurfaceMesh& mesh = geometry.mesh;
+
+    std::vector<Vector3> nodes;
+    std::vector<std::array<int, 2>> edges;
+    int index = 0;
+    for (auto entry: vertexMappingsPairs){
+        nodes.push_back(geometry.vertexPositions[mesh.vertex(entry.first)]);
+        nodes.push_back(geometry.vertexPositions[mesh.vertex(entry.second)]);
+        std::array<int, 2> edge = {index, index + 1};
+        edges.push_back(edge);
+        index += 2;
+    }
+    auto stitches = polyscope::registerCurveNetwork("stitched vertices", nodes, edges);
+    stitches->setRadius(0.001);
 }

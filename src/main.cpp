@@ -6,8 +6,6 @@
 #include "geometrycentral/surface/vertex_position_geometry.h"
 #include "geometrycentral/surface/direction_fields.h"
 #include "geometrycentral/surface/edge_length_geometry.h"
-#include "geometrycentral/surface/boundary_first_flattening.h"
-#include "geometrycentral/surface/vector_heat_method.h"
 
 
 
@@ -40,6 +38,7 @@ std::vector<polyscope::SurfaceMesh *> psMeshes;
 
 //vertex mappings from txt file (JUST CALL PYTHON HERE UGHHH)
 std::map<int, int> vertexMappings;
+std::vector<std::pair<int, int>> vertexMappingsPairs;
 //also build a map that stores panel name to geometry (can infer the mesh from the geometry)
 //std::map<std::string, std::unique_ptr<VertexPositionGeometry>> panelMappings;
 
@@ -82,29 +81,19 @@ void showBoundaryVertexSelectionUI(){
 
 //render stripe patterns over the surface
 void showStripePatterns(){ 
-  VertexData<Vector2> lineFieldCourse = computeSmoothestVertexDirectionField(*globalGeometry, 1);
-  globalGeometry->requireVertexTangentBasis();
-    VertexData<Vector3> vBasisX(*globalMesh);
-    VertexData<Vector3> vBasisY(*globalMesh);
-    for(Vertex v : globalMesh->vertices()) {
-      vBasisX[v] = globalGeometry->vertexTangentBasis[v][0];
-      vBasisY[v] = globalGeometry->vertexTangentBasis[v][1];
-    }
-    globalPSMesh ->
-    addVertexTangentVectorQuantity("vertex tangent vectors", lineFieldCourse, vBasisX, vBasisY);
-    VertexData<double> frequencies(*globalMesh, constantFreq);
-    CornerData<double> periodicFunc;
-    FaceData<int> zeroIndices;
-    FaceData<int> branchIndices;
-    std::tie(periodicFunc, zeroIndices, branchIndices) =
-        computeStripePattern(*globalGeometry, frequencies, lineFieldCourse);
-    //Extract isolines
-    std::vector<Vector3> isolineVerts;
-    std::vector<std::array<size_t, 2>> isolineEdges;
-    std::tie(isolineVerts, isolineEdges) = extractPolylinesFromStripePattern(
-      *globalGeometry, periodicFunc, zeroIndices, branchIndices, lineFieldCourse, false);
-    polyscope::registerCurveNetwork("course stripe patterns", isolineVerts, isolineEdges);
+
+  std::vector<int> zeroVertices = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67};
+  std::vector<int> oneVertices = {27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85};
+  globalBoundaryConditions boundaryConditions;
+  for (int index : zeroVertices){
+    boundaryConditions.courseStartBoundaryVertices.push_back(globalMesh->vertex(index));
+  }
+  for (int index : oneVertices){
+    boundaryConditions.courseEndBoundaryVertices.push_back(globalMesh->vertex(index));
+  }
   
+  VertexData<double> timeFunction = computeTimeFunction(*globalGeometry, vertexMappings, boundaryConditions);
+  globalPSMesh->addVertexScalarQuantity("time function", timeFunction);
 /**
   for (int i = 0; i < meshes.size(); i++){
     std::vector<Vertex> zeroVertices, oneVertices;
@@ -231,15 +220,26 @@ int main(int argc, char **argv) {
   else{
     //run sanity checks (mostly doing this because stripes are failing)
     std::tie(globalMesh, globalGeometry) = readManifoldSurfaceMesh(argv[1]);
-    std::cout << "Is mesh manifold? " << globalMesh -> isManifold() << std::endl;
-    std::cout << "Is mesh oriented? " << globalMesh -> isOriented() << std::endl;
-    std::cout << "Is mesh triangular? " << globalMesh -> isTriangular() << std::endl;
-    std::cout << "Number of connected components of mesh " << globalMesh -> nConnectedComponents() << std::endl;
+    if (!(globalMesh -> isManifold())){
+      std::cout << "Error: Mesh is not manifold" << std::endl;
+      throw std::exception();
+    }
+    if (!(globalMesh -> isOriented())){
+      std::cout << "Error: Meshing is not oriented" << std::endl;
+      throw std::exception();
+    }
+    if (!(globalMesh -> isTriangular())){
+      std::cout << "Error: Mesh is not triangular" << std::endl;
+      throw std::exception();
+    }
+
     globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(argv[1]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
     vertexMappings = buildGlobalVertexMappingFromFile(argv[2]);
-    Eigen::SparseMatrix<double> L;
-    VertexData<double> testFunction = buildGlobalCotanLaplacian(*globalGeometry, vertexMappings, L);
-    globalPSMesh -> addVertexScalarQuantity("test time function ", testFunction);
+    vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(argv[2]);
+    renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
+
+    VertexData<double> timeFunction = computeTimeFunction(*globalGeometry, vertexMappingsPairs);
+
   }
 
   // Disable the ground plane
