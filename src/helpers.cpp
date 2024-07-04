@@ -501,8 +501,6 @@ VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::ve
     Eigen::VectorXd constFunc(L.rows());
     constFunc.setOnes();
 
-    std::cout << "Lu = " << L * constFunc << std::endl;
-
     Eigen::VectorXd b = Eigen::VectorXd::Zero(L.rows());
     L.row(7) *= 0;
     L.coeffRef(7, 7) = 1.0;
@@ -522,9 +520,9 @@ VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::ve
         std::cerr << "Solving failed" << std::endl;
     }
     
-    VertexData<double> testFunction(mesh);
     for (Vertex v : mesh.vertices()){
-        testFunction[v] = u(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
+        timeFunction[v] = u(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
+        std::cout << "timeFunction[v] " << timeFunction[v] << std::endl; 
     }
     return timeFunction;
 

@@ -240,6 +240,8 @@ int main(int argc, char **argv) {
 
     VertexData<double> timeFunction = computeTimeFunction(*globalGeometry, vertexMappingsPairs);
 
+    globalPSMesh->addVertexScalarQuantity("global time function", timeFunction);
+
   }
 
   // Disable the ground plane
