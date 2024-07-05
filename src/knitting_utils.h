@@ -29,22 +29,14 @@
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
-//this is a utility file that will handle basic mesh processing tasks such as 
-//1. solveLaplace()
-//2. computeTimeFunctionGrad()
-//3. computeVertexValuedField()
-//4. vertexDirectionField()
-//5. computeOneForm()
 
+//compute time function using a vector of pairs of vertex mappings instead of the map because we miss stitches then 
 //
-//solve Laplace equation over an input mesh 
+//@param[in]    geometry        VertexPositionGeometry                  input geometry
+//@param[in]    vertexMappings  std::vector<std::pair<int,int>>         map that stores global vertex mappings 
 //
-//@param[in]    geometry        VertexPositionGeometry          input geometry
-//@param[in]    zeroVertices    std::vector<Vertex>             vertices that take the value 0 as a boundary condition i.e., where knitting should start
-//@paramm[in]   oneVertices     std::vector<Vertex>             vertices that take the value 1 as a boundary condition i.e., where knitting should stop 
-//
-//@return       timeFunction    VertexData<double>              #V by 1 scalar function that represents the knitting time function
-VertexData<double> solveLaplace(VertexPositionGeometry& geometry, std::vector<Vertex>& zeroVertices, std::vector<Vertex>& oneVertices);
+//@return       timeFunction    VertexData<double>                      the global time function computed over the entire mesh
+VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::vector<std::pair<int,int>>& vertexMappingsPairs, globalBoundaryConditions& boundaryConditions);
 
 
 //compute the per face gradient of some function defined as a scalar over vertices

@@ -37,8 +37,8 @@ std::vector<std::unique_ptr<VertexPositionGeometry>> geometries;
 std::vector<polyscope::SurfaceMesh *> psMeshes;
 
 //vertex mappings from txt file (JUST CALL PYTHON HERE UGHHH)
-std::map<int, int> vertexMappings;
 std::vector<std::pair<int, int>> vertexMappingsPairs;
+std::vector<std::pair<int, int>> edgeMappingPairs;
 //also build a map that stores panel name to geometry (can infer the mesh from the geometry)
 //std::map<std::string, std::unique_ptr<VertexPositionGeometry>> panelMappings;
 
@@ -82,8 +82,31 @@ void showBoundaryVertexSelectionUI(){
 //render stripe patterns over the surface
 void showStripePatterns(){ 
 
-  std::vector<int> zeroVertices = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67};
-  std::vector<int> oneVertices = {27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85};
+  //pants
+  std::vector<int> zeroVertices = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+                                  99, 100, 101, 102, 103, 104, 105, 106, 107, 108,
+                                  148, 149, 150, 151, 152, 153, 154, 156, 157,
+                                  49, 50, 51, 52, 53, 54, 55, 56, 57, 58};
+  std::vector<int> oneVertices = {27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
+                                  117, 118, 119, 120, 121, 122, 123, 124, 125, 126,
+                                  175, 176, 177, 178, 179, 180, 181, 182, 183, 184,
+                                  67, 68, 69, 70, 71, 72, 73, 74, 75, 76};
+
+  //jumpsuit 
+  // std::vector<int> zeroVertices = {232, 233, 234, 235, 236, 237, 238, 239, 240, 241,
+  //                                 346, 347, 348, 349, 350, 351, 352, 353, 354, 355,
+  //                                 404, 405, 406, 407, 408, 409, 410, 411, 412, 413,
+  //                                 288, 289, 290, 291, 292, 293, 294, 295, 296, 297};
+  // std::vector<int> oneVertices = {172, 173, 174, 175, 176, 177, 178, 179, 180, 181,
+  //                                 145, 146, 147, 148, 149, 150, 151, 152, 153, 154};
+
+  //jacket
+  // std::vector<int> zeroVertices = {86, 87, 88, 89, 90, 91, 92, 93, 94,
+  //                                 151, 152, 153, 154, 155, 156, 157, 158, 159, 160,
+  //                                 1, 2, 3, 4, 5, 6, 7, 8};
+  // std::vector<int> oneVertices = {113, 114, 115, 116, 117, 118, 119, 120, 121, 122,
+  //                                 178, 179, 180, 181, 182, 183, 184, 185, 186, 187};
+
   globalBoundaryConditions boundaryConditions;
   for (int index : zeroVertices){
     boundaryConditions.courseStartBoundaryVertices.push_back(globalMesh->vertex(index));
@@ -92,8 +115,12 @@ void showStripePatterns(){
     boundaryConditions.courseEndBoundaryVertices.push_back(globalMesh->vertex(index));
   }
   
-  VertexData<double> timeFunction = computeTimeFunction(*globalGeometry, vertexMappings, boundaryConditions);
+  VertexData<double> timeFunction = computeTimeFunction(*globalGeometry, vertexMappingsPairs, boundaryConditions);
   globalPSMesh->addVertexScalarQuantity("time function", timeFunction);
+
+  FaceData<Vector3> timeFunctionGradient = computeTimeFunctionFaceGrad(*globalGeometry, timeFunction);
+  globalPSMesh -> addFaceVectorQuantity("gradient", timeFunctionGradient);
+
 /**
   for (int i = 0; i < meshes.size(); i++){
     std::vector<Vertex> zeroVertices, oneVertices;
@@ -234,14 +261,12 @@ int main(int argc, char **argv) {
     }
 
     globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(argv[1]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
-    vertexMappings = buildGlobalVertexMappingFromFile(argv[2]);
     vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(argv[2]);
+    edgeMappingPairs = buildPairOfStitchedEdges(*globalGeometry, vertexMappingsPairs);
+    FaceData<double> matchedTriangle(*globalMesh);
+    int index = 0;
+    std::cout << "Number of edge pairs: " << edgeMappingPairs.size() << std::endl;
     renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
-
-    VertexData<double> timeFunction = computeTimeFunction(*globalGeometry, vertexMappingsPairs);
-
-    globalPSMesh->addVertexScalarQuantity("global time function", timeFunction);
-
   }
 
   // Disable the ground plane

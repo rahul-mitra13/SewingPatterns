@@ -57,8 +57,6 @@ std::pair<std::vector<Vertex>, std::vector<Vertex>> getBoundaryVertices(VertexPo
 //@return       pair of 2 edge lists    pair<vector<Edge, vector<Edge>>     pair of edge lists that represent the edges at the extremes 
 std::pair<std::vector<Edge>, std::vector<Edge>> getBoundaryEdges(VertexPositionGeometry& geometry, int axis);
 
-
-
 //
 // Project a vector onto a given plane.
 //
@@ -96,16 +94,6 @@ std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, V
 //@return        pair               std::pair<vector<Vertex>, vector<Edge>>         returns a list of vertices and edges on the boundary between the two vertices
 std::pair<std::vector<Vertex>, std::vector<Edge>> getVerticesAndEdgesInShortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
 
-//build the global cotan Laplacian for all the panels while accounting for the mapped stitches across panels
-//
-//@param[in]    geometry        VertexPositionGeometry      input geometry
-//@param[in]    vertexMappings  std::map<int, int>          map that stores global vertex mappings 
-//@param[out]   L               Eigen::SparseMatrix<double> the global cotan laplacian for all the panels
-VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::map<int, int>& vertexMappings, globalBoundaryConditions& boundaryConditions);
-
-//compute time function using a vector of pairs of vertex mappings instead of the map because we miss stitches then 
-VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::vector<std::pair<int,int>>& vertexMappingsPairs);
-
 
 //build a vertex mapping map from an input txt file (for a "local" mapping across different models)
 //
@@ -113,15 +101,11 @@ VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::ve
 //@return       map         std::map<std::pair<std::string, int>, std::pair<std::string, int>>  this is a map (panel1name, panel1Vertex -> panel2name, panel2Vertex)
 std::map<std::pair<std::string, int>, std::pair<std::string, int>> buildLocalVertexMappingMapFromFile(const std::string& filename);
 
-//builds a map of stitched together vertices 
-//
-//@param[in]    filename    const std::string&  name of the file that stores vertex mappings
-//
-//@return       std::map         std::map<int, int>  stores vertex mappings for stitched vertices
-std::map<int, int> buildGlobalVertexMappingFromFile(const std::string& filename);
-
-//read this as a vector of pairs because you miss vertex mappings if you try to do this with a map
+//builds a vector of "stitched together" vertices
 std::vector<std::pair<int, int>> buildPairOfStitchedVerticesFromFile(const std::string& filename);
+
+//builds a vector of "stitched together" edges from a vector of "stitched" together vertices 
+std::vector<std::pair<int, int>> buildPairOfStitchedEdges(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs);
 
 //renders "stitched" together vertices from the 2D panels 
 //

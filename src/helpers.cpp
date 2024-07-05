@@ -272,263 +272,6 @@ std::vector<std::pair<int, int>> buildPairOfStitchedVerticesFromFile(const std::
     return vertexMappings;
 }
 
-//build the global cotan Laplacian for all the panels while accounting for the mapped stitches across panels
-//reads the local mappings
-VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::map<int, int>& vertexMappings, globalBoundaryConditions& bdyConditions){
-    
-    SurfaceMesh& mesh = geometry.mesh;
-    int numVertices = mesh.nVertices(); 
-    int numStitchedVertices = vertexMappings.size();
-    Eigen::SparseMatrix<double> L(numVertices - numStitchedVertices, numVertices - numStitchedVertices);
-    //require the cotan edge weights 
-    geometry.requireEdgeCotanWeights();
-
-    //store mappings between index in the original mesh and index in the Laplacian matrix
-    std::map<int, int> originalIndexToLaplacianMatrixIndex;
-    //store mappings between index in the Laplacian matrix to index in the orignal mesh 
-    std::map<int, int> laplacianMatrixIndexToOriginalIndex;
-    //number of "unique vertices" i.e., only consider one vertex per stitch
-    int numUniqueVertices = 0;
-    std::vector<int> seenVertices;
-    for (Vertex v : mesh.vertices()){
-        size_t iV = v.getIndex();
-        if (vertexMappings.find(iV) != vertexMappings.end()){
-            seenVertices.push_back(iV);
-            seenVertices.push_back(vertexMappings.at(iV));
-
-            //emulating bi-directional mapping here
-            originalIndexToLaplacianMatrixIndex.insert({iV, numUniqueVertices});
-            originalIndexToLaplacianMatrixIndex.insert({vertexMappings.at(iV), numUniqueVertices});
-            laplacianMatrixIndexToOriginalIndex.insert({numUniqueVertices, iV});
-            numUniqueVertices++;
-        }
-        else if (originalIndexToLaplacianMatrixIndex.find(iV) == originalIndexToLaplacianMatrixIndex.end()){//we've never seen this index before
-            originalIndexToLaplacianMatrixIndex.insert({iV, numUniqueVertices});
-            laplacianMatrixIndexToOriginalIndex.insert({numUniqueVertices, iV});
-            numUniqueVertices++;
-        }  
-    }
-    std::vector<Eigen::Triplet<double>> tripletList;
-
-    //keep a set of indices you've already populated in the Laplacian 
-    std::set<int> setIndices;//set of vertex indices we've already set in the laplacian
-
-    for (Vertex v : mesh.vertices()){
-        if (std::find(setIndices.begin(), setIndices.end(), originalIndexToLaplacianMatrixIndex.at(v.getIndex())) != setIndices.end()) continue;//we've handled this already
-        double L_diag = 0.0;//diagonal entries of L
-        //iterate over the one-ring of the vertex 
-        for (Halfedge he : v.outgoingHalfedges()){
-            //off diagonal entries 
-            tripletList.emplace_back(originalIndexToLaplacianMatrixIndex.at(v.getIndex()), originalIndexToLaplacianMatrixIndex.at(he.tipVertex().getIndex()),
-            -geometry.edgeCotanWeights[he.edge()]);
-            setIndices.insert(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
-
-            if (vertexMappings.find(v.getIndex()) != vertexMappings.end()){//handle off diagonal entry for stitched vertex
-                Vertex mappedVertex = mesh.vertex(vertexMappings.at(v.getIndex()));
-                //iterate over the 1-ring of the mapped vertex 
-                for (Halfedge mappedVertexHalfedge : mappedVertex.outgoingHalfedges()){
-                    tripletList.emplace_back(originalIndexToLaplacianMatrixIndex.at(v.getIndex()), 
-                                        originalIndexToLaplacianMatrixIndex.at(mappedVertexHalfedge.tipVertex().getIndex()),
-                                        -geometry.edgeCotanWeights[mappedVertexHalfedge.edge()]);
-                    setIndices.insert(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
-                }
-            }
-
-            //handle the diagonal entry case
-            L_diag += geometry.edgeCotanWeights[he.edge()];
-            if (vertexMappings.find(v.getIndex()) != vertexMappings.end()){//handle diagonal entry for stitched vertex
-                Vertex mappedVertex = mesh.vertex(vertexMappings.at(v.getIndex()));
-                //iterate over the 1-ring of the mapped vertex 
-                for (Halfedge mappedVertexHalfedge : mappedVertex.outgoingHalfedges()){
-                    L_diag += geometry.edgeCotanWeights[mappedVertexHalfedge.edge()];
-                }
-            }
-        }
-        tripletList.emplace_back(originalIndexToLaplacianMatrixIndex.at(v.getIndex()), originalIndexToLaplacianMatrixIndex.at(v.getIndex()), L_diag);
-        setIndices.insert(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
-    }
-
-    L.setFromTriplets(tripletList.begin(), tripletList.end());
-
-    //force boundary conditions
-    Eigen::VectorXd b = Eigen::VectorXd::Zero(numUniqueVertices);
-    
-    for (Vertex v : bdyConditions.courseStartBoundaryVertices){
-        int updatedIndex = originalIndexToLaplacianMatrixIndex.at(v.getIndex());
-        L.row(updatedIndex) *= 0.0;
-        L.coeffRef(updatedIndex, updatedIndex) = 1.0;
-        b(updatedIndex) = 0.0;
-    }
-
-    for (Vertex v : bdyConditions.courseEndBoundaryVertices){
-        int updatedIndex = originalIndexToLaplacianMatrixIndex.at(v.getIndex());
-        L.row(updatedIndex) *= 0.0;
-        L.coeffRef(updatedIndex, updatedIndex) = 1.0;
-        b(updatedIndex) = 1.0;
-    }
-    
-    Eigen::SparseLU<SparseMatrix<double>> solver;
-    solver.compute(L);
-    if (solver.info() != Eigen::Success) {
-        std::cerr << "Decomposition failed" << std::endl;
-    }
-    Eigen::VectorXd u = solver.solve(b);
-    if (solver.info() != Eigen::Success) {
-        std::cerr << "Solving failed" << std::endl;
-    }
-    
-    VertexData<double> testFunction(mesh);
-    for (Vertex v : mesh.vertices()){
-        testFunction[v] = u(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
-    }
-
-    return testFunction;
-}
-
-//compute time function using a vector of pairs of vertex mappings instead of the map because we miss stitches then 
-VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::vector<std::pair<int,int>>& vertexMappingsPairs){
-
-    SurfaceMesh& mesh = geometry.mesh;
-    VertexData<double> timeFunction(mesh);
-    int numVertices = mesh.nVertices(); 
-    int numStitches = vertexMappingsPairs.size();
-    //require the cotan edge weights 
-    geometry.requireEdgeCotanWeights();
-    //store mappings between index in the original mesh and index in the Laplacian matrix
-    std::map<int, int> originalIndexToLaplacianMatrixIndex;
-    //store mappings between index in the Laplacian matrix to index in the orignal mesh 
-    std::map<int, int> laplacianMatrixIndexToOriginalIndex;
-    //all the pairs that have been seen so far
-    std::vector<std::pair<int, int>> seenPairs;
-    //number of "unique vertices" i.e., only consider one vertex per stitch
-    int numUniqueVertices = 0;
-   
-    for (Vertex v : mesh.vertices()){
-        size_t iV = v.getIndex();
-        //iterate over the mappings 
-        for (auto p : vertexMappingsPairs){
-            if (p.first == iV || p.second == iV){
-                if (originalIndexToLaplacianMatrixIndex.find(p.first) == originalIndexToLaplacianMatrixIndex.end()
-                && originalIndexToLaplacianMatrixIndex.find(p.second) == originalIndexToLaplacianMatrixIndex.end()){
-                    originalIndexToLaplacianMatrixIndex.insert({p.first, numUniqueVertices});
-                    originalIndexToLaplacianMatrixIndex.insert({p.second, numUniqueVertices});
-                    numUniqueVertices++;
-                }
-                if (originalIndexToLaplacianMatrixIndex.find(p.first) != originalIndexToLaplacianMatrixIndex.end()&&
-                    originalIndexToLaplacianMatrixIndex.find(p.second) == originalIndexToLaplacianMatrixIndex.end()){
-                    originalIndexToLaplacianMatrixIndex.insert({p.second, originalIndexToLaplacianMatrixIndex.at(p.first)});
-                }
-                if (originalIndexToLaplacianMatrixIndex.find(p.second) != originalIndexToLaplacianMatrixIndex.end() &&
-                    originalIndexToLaplacianMatrixIndex.find(p.first) == originalIndexToLaplacianMatrixIndex.end()){
-                    originalIndexToLaplacianMatrixIndex.insert({p.first, originalIndexToLaplacianMatrixIndex.at(p.second)});
-                }
-            }
-        }
-        if (originalIndexToLaplacianMatrixIndex.find(iV) == originalIndexToLaplacianMatrixIndex.end()){
-            originalIndexToLaplacianMatrixIndex.insert({iV, numUniqueVertices});
-            numUniqueVertices++;
-        }
-    }
-
-    for (auto entry : originalIndexToLaplacianMatrixIndex){
-        std::cout << "vertex " << entry.first << " mapped to " << entry.second << std::endl;
-    }
-    Eigen::SparseMatrix<double> L(originalIndexToLaplacianMatrixIndex.size(), originalIndexToLaplacianMatrixIndex.size());
-
-    std::vector<Eigen::Triplet<double>> tripletList;
-    //keep a set of indices you've already populated in the Laplacian 
-    std::set<int> setIndices;//set of vertex indices we've already set in the laplacian
-
-    for (Vertex v : mesh.vertices()){
-        if (std::find(setIndices.begin(), setIndices.end(), originalIndexToLaplacianMatrixIndex.at(v.getIndex())) != setIndices.end()) continue;//we've handled this already
-        double L_diag = 0.0;
-        //iterate over the 1-ring of the vertex 
-        //iterate over the one-ring of the vertex 
-        for (Halfedge he : v.outgoingHalfedges()){
-            //off diagonal entries 
-            tripletList.emplace_back(originalIndexToLaplacianMatrixIndex.at(v.getIndex()), originalIndexToLaplacianMatrixIndex.at(he.tipVertex().getIndex()),
-            -geometry.edgeCotanWeights[he.edge()]);
-            setIndices.insert(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
-
-            for (auto p : vertexMappingsPairs){
-                if (p.first == v.getIndex()){//grab the contributes from the second in the pair
-                    Vertex mappedVertex = mesh.vertex(p.second);
-                    //iterate over the 1-ring of the mapped vertex 
-                    for (Halfedge mappedVertexHalfedge : mappedVertex.outgoingHalfedges()){
-                        tripletList.emplace_back(originalIndexToLaplacianMatrixIndex.at(v.getIndex()), 
-                                        originalIndexToLaplacianMatrixIndex.at(mappedVertexHalfedge.tipVertex().getIndex()),
-                                        -geometry.edgeCotanWeights[mappedVertexHalfedge.edge()]);
-                        setIndices.insert(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
-                    }
-                }
-                if (p.second == v.getIndex()){
-                    Vertex mappedVertex = mesh.vertex(p.first);
-                    //iterate over the 1-ring of the mapped vertex 
-                    for (Halfedge mappedVertexHalfedge : mappedVertex.outgoingHalfedges()){
-                        tripletList.emplace_back(originalIndexToLaplacianMatrixIndex.at(v.getIndex()), 
-                                        originalIndexToLaplacianMatrixIndex.at(mappedVertexHalfedge.tipVertex().getIndex()),
-                                        -geometry.edgeCotanWeights[mappedVertexHalfedge.edge()]);
-                        setIndices.insert(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
-                    }
-                }
-            }
-            //handle the diagonal entries 
-            //handle the diagonal entry case
-            L_diag += geometry.edgeCotanWeights[he.edge()];
-            for (auto p : vertexMappingsPairs){
-                if (p.first == v.getIndex()){
-                    Vertex mappedVertex = mesh.vertex(p.second);
-                    //iterate over the 1-ring of the mapped vertex 
-                    for (Halfedge mappedVertexHalfedge : mappedVertex.outgoingHalfedges()){
-                        L_diag += geometry.edgeCotanWeights[mappedVertexHalfedge.edge()];
-                    }
-                }
-                if (p.second == v.getIndex()){
-                    Vertex mappedVertex = mesh.vertex(p.first);
-                    //iterate over the 1-ring of the mapped vertex 
-                    for (Halfedge mappedVertexHalfedge : mappedVertex.outgoingHalfedges()){
-                        L_diag += geometry.edgeCotanWeights[mappedVertexHalfedge.edge()];
-                    }
-                }
-            }
-        }
-        tripletList.emplace_back(originalIndexToLaplacianMatrixIndex.at(v.getIndex()), originalIndexToLaplacianMatrixIndex.at(v.getIndex()), L_diag);
-        setIndices.insert(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
-    }
-
-    L.setFromTriplets(tripletList.begin(), tripletList.end());
-
-    Eigen::VectorXd constFunc(L.rows());
-    constFunc.setOnes();
-
-    Eigen::VectorXd b = Eigen::VectorXd::Zero(L.rows());
-    L.row(7) *= 0;
-    L.coeffRef(7, 7) = 1.0;
-    b(7) = 0.0;
-
-    L.row(151) *= 0;
-    L.coeffRef(151, 151) = 1.0;
-    b(151) = 1.0;
-
-    Eigen::SparseQR<SparseMatrix<double>, Eigen::COLAMDOrdering<int>> solver;
-    solver.compute(L);
-    if (solver.info() != Eigen::Success) {
-        std::cerr << "Decomposition failed" << std::endl;
-    }
-    Eigen::VectorXd u = solver.solve(b);
-    if (solver.info() != Eigen::Success) {
-        std::cerr << "Solving failed" << std::endl;
-    }
-    
-    for (Vertex v : mesh.vertices()){
-        timeFunction[v] = u(originalIndexToLaplacianMatrixIndex.at(v.getIndex()));
-        std::cout << "timeFunction[v] " << timeFunction[v] << std::endl; 
-    }
-    return timeFunction;
-
-}
-
-
 //render the stitched together vertices in polyscope
 void renderStitchedVertices(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs){
 
@@ -546,4 +289,31 @@ void renderStitchedVertices(VertexPositionGeometry& geometry, std::vector<std::p
     }
     auto stitches = polyscope::registerCurveNetwork("stitched vertices", nodes, edges);
     stitches->setRadius(0.001);
+}
+
+//builds a vector of "stitched together" edges from a vector of "stitched" together vertices 
+std::vector<std::pair<int, int>> buildPairOfStitchedEdges(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs){
+    
+    SurfaceMesh& mesh = geometry.mesh;
+    std::vector<std::pair<int, int>> mappedEdges;
+    int ctr = 0;
+
+    //this is so inefficient and is going to suck for larger meshes
+    for (std::pair<int, int> p : vertexMappingsPairs){
+        Vertex v1 = mesh.vertex(p.first);
+        Vertex v2 = mesh.vertex(p.second);
+        //iterate over the outgoing halfedges of v1 
+        for (Halfedge v1he : v1.outgoingHalfedges()){
+            //iterate over the outgoing halfedges of v2
+            for (Halfedge v2he : v2.outgoingHalfedges()){
+                if ((std::find(vertexMappingsPairs.begin(), vertexMappingsPairs.end(), std::make_pair(v1he.tipVertex().getIndex(), v2he.tipVertex().getIndex()))
+                != vertexMappingsPairs.end()) || (std::find(vertexMappingsPairs.begin(), vertexMappingsPairs.end(), std::make_pair(v2he.tipVertex().getIndex(), v1he.tipVertex().getIndex()))
+                != vertexMappingsPairs.end()))
+                mappedEdges.push_back(std::make_pair(v1he.edge().getIndex(), v2he.edge().getIndex()));
+                ctr++;
+                break;
+            }
+        }
+    }
+    return mappedEdges;
 }
