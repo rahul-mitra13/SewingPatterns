@@ -444,17 +444,73 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
         }
       	//handle edges on the boundary
       	else{
-      		if (edge.halfedge().orientation()){
-                d0_f_avg[edge] = dot(faceGradients[edge.halfedge().face()], geometry.vertexPositions[edge.halfedge().tipVertex()] - 
+      		d0_f_avg[edge] = dot(faceGradients[edge.halfedge().face()], geometry.vertexPositions[edge.halfedge().tipVertex()] - 
                                                                                 geometry.vertexPositions[edge.halfedge().tailVertex()]);
-            }
-      		else{//should never actually hit this case
-                d0_f_avg[edge] = dot(faceGradients[edge.halfedge().face()], geometry.vertexPositions[edge.halfedge().tailVertex()] - 
-                                                                                geometry.vertexPositions[edge.halfedge().tipVertex()]);
-      		}
       	}
     }
 
     return d0_f_avg;
+}
+
+//comput matching 1-form while taking into account "stitched together" edges
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3> faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs){
+
+    SurfaceMesh& mesh = geometry.mesh;
+    geometry.requireFaceNormals();
+    EdgeData<double> omega(mesh);
+    //if we're computing the matching 1-form in the wale direction, rotate all the gradients 
+    if (direction == 1){
+        for (Face f : mesh.faces()){
+            faceGradients[f] = faceGradients[f].rotateAround(geometry.faceNormals[f], PI/2);
+        }
+    }
+
+    int numStitchedEdges = 0;
+    //create a map from the mapped edges
+    std::map<int, int> edgeMap;
+    for (std::pair<int, int> pair : edgeMappingsPairs){
+        edgeMap.insert({pair.first, pair.second});
+    }
+
+    //edges which we've handles already
+    std::map<int, bool> seenEdges;
+    for (Edge e : mesh.edges()){
+        seenEdges.insert({e.getIndex(), false});
+    }
+
+    for (Edge e : mesh.edges()){
+        if (seenEdges[e.getIndex()]) continue;
+        if (e.halfedge().twin().isInterior()){//found an interior halfedge
+            //normalize the face gradients first
+            faceGradients[e.halfedge().face()] = faceGradients[e.halfedge().face()].normalize();
+            faceGradients[e.halfedge().twin().face()] = faceGradients[e.halfedge().twin().face()].normalize();
+            omega[e] = 0.5 * dot((faceGradients[e.halfedge().face()] + faceGradients[e.halfedge().twin().face()]),
+                                    geometry.vertexPositions[e.halfedge().tipVertex()] - geometry.vertexPositions[e.halfedge().tailVertex()]);
+            seenEdges[e.getIndex()] = true;
+        }
+        else{//found a boundary halfedge
+            if (edgeMap.find(e.getIndex()) != edgeMap.end()){//found a stitched together edge
+                numStitchedEdges++;
+                Vector3 faceGradients1 = faceGradients[e.halfedge().face()].normalize();
+                Vector3 faceGradients2 = faceGradients[mesh.edge(edgeMap.at(e.getIndex())).halfedge().face()].normalize();
+                //take the average direction vector? 
+                Vector3 e1 = geometry.vertexPositions[e.halfedge().tipVertex()] - geometry.vertexPositions[e.halfedge().tailVertex()];
+                Vector3 e2 = geometry.vertexPositions[mesh.edge(edgeMap.at(e.getIndex())).halfedge().tipVertex()] 
+                                            - geometry.vertexPositions[mesh.edge(edgeMap.at(e.getIndex())).halfedge().tailVertex()];
+                Vector3 avgVector = (e1 + e2)/2.;
+                omega[e] = 0.5 * dot((faceGradients1 + faceGradients2), avgVector);
+                omega[mesh.edge(edgeMap.at(e.getIndex()))] = 0.5 * dot((faceGradients1 + faceGradients2), avgVector);
+                seenEdges[e.getIndex()] = true;
+                seenEdges[edgeMap.at(e.getIndex())] = true;
+            }
+            else{//found a boundary edge that's not stitched to anything
+                faceGradients[e.halfedge().face()] = faceGradients[e.halfedge().face()].normalize();
+                omega[e] = dot(faceGradients[e.halfedge().face()], geometry.vertexPositions[e.halfedge().tipVertex()] - 
+                                                                                geometry.vertexPositions[e.halfedge().tailVertex()]);
+                seenEdges[e.getIndex()] = true;
+            }
+        }
+    }
+    return omega;
 }
 

@@ -38,7 +38,7 @@ std::vector<polyscope::SurfaceMesh *> psMeshes;
 
 //vertex mappings from txt file (JUST CALL PYTHON HERE UGHHH)
 std::vector<std::pair<int, int>> vertexMappingsPairs;
-std::vector<std::pair<int, int>> edgeMappingPairs;
+std::vector<std::pair<int, int>> edgeMappingsPairs;
 //also build a map that stores panel name to geometry (can infer the mesh from the geometry)
 //std::map<std::string, std::unique_ptr<VertexPositionGeometry>> panelMappings;
 
@@ -85,7 +85,7 @@ void showStripePatterns(){
   //pants
   std::vector<int> zeroVertices = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
                                   99, 100, 101, 102, 103, 104, 105, 106, 107, 108,
-                                  148, 149, 150, 151, 152, 153, 154, 156, 157,
+                                  148, 149, 150, 151, 152, 153, 154, 155, 156, 157,
                                   49, 50, 51, 52, 53, 54, 55, 56, 57, 58};
   std::vector<int> oneVertices = {27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
                                   117, 118, 119, 120, 121, 122, 123, 124, 125, 126,
@@ -108,6 +108,7 @@ void showStripePatterns(){
   //                                 178, 179, 180, 181, 182, 183, 184, 185, 186, 187};
 
   globalBoundaryConditions boundaryConditions;
+  
   for (int index : zeroVertices){
     boundaryConditions.courseStartBoundaryVertices.push_back(globalMesh->vertex(index));
   }
@@ -120,6 +121,26 @@ void showStripePatterns(){
 
   FaceData<Vector3> timeFunctionGradient = computeTimeFunctionFaceGrad(*globalGeometry, timeFunction);
   globalPSMesh -> addFaceVectorQuantity("gradient", timeFunctionGradient);
+
+  //EdgeData<double> omega = computeMatchingOneForm(*globalGeometry, 0, timeFunctionGradient);
+  EdgeData<double> omega = computeMatchingOneForm(*globalGeometry, 0, timeFunctionGradient, edgeMappingsPairs);
+  std::vector<size_t> perm;
+  //set up 1-form viz 
+  std::vector<bool> orientations;
+  for (Edge e : globalMesh->edges()){
+    if (e.halfedge().tailVertex().getIndex() < e.halfedge().tipVertex().getIndex()){
+      perm.push_back(e.getIndex());
+      orientations.push_back(true);
+    }
+    else{
+      perm.push_back(e.getIndex());
+      orientations.push_back(false);
+    }
+  }
+  globalPSMesh -> setEdgePermutation(perm);
+  globalPSMesh -> addOneFormTangentVectorQuantity("omega", omega, orientations);
+
+  std::vector<int> courseStartEdges = creatEdgeListFromVertexList(*globalGeometry, zeroVertices);
 
 /**
   for (int i = 0; i < meshes.size(); i++){
@@ -262,10 +283,9 @@ int main(int argc, char **argv) {
 
     globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(argv[1]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
     vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(argv[2]);
-    edgeMappingPairs = buildPairOfStitchedEdges(*globalGeometry, vertexMappingsPairs);
+    edgeMappingsPairs = buildPairOfStitchedEdges(*globalGeometry, vertexMappingsPairs);
     FaceData<double> matchedTriangle(*globalMesh);
     int index = 0;
-    std::cout << "Number of edge pairs: " << edgeMappingPairs.size() << std::endl;
     renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
   }
 

@@ -82,3 +82,6 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& model);
 //@return       matchingOneForm     EdgeData<double>        The 1-form we're trying to match 
 EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3> faceGradients); 
 
+//comput matching 1-form while taking into account "stitched together" edges
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3> faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs);
+

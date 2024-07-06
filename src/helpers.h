@@ -107,6 +107,9 @@ std::vector<std::pair<int, int>> buildPairOfStitchedVerticesFromFile(const std::
 //builds a vector of "stitched together" edges from a vector of "stitched" together vertices 
 std::vector<std::pair<int, int>> buildPairOfStitchedEdges(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs);
 
+//takes in a vector of vertex indices and returns a list of edge indices making up that vertex list
+std::vector<int> creatEdgeListFromVertexList(VertexPositionGeometry& geometry, std::vector<int>& vertexList);
+
 //renders "stitched" together vertices from the 2D panels 
 //
 //@param[in]    geometry        VertexPositionGeometry  input geometry

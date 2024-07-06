@@ -317,3 +317,18 @@ std::vector<std::pair<int, int>> buildPairOfStitchedEdges(VertexPositionGeometry
     }
     return mappedEdges;
 }
+
+std::vector<int> creatEdgeListFromVertexList(VertexPositionGeometry& geometry, std::vector<int>& vertexList){
+
+    SurfaceMesh& mesh = geometry.mesh;
+    std::vector<int> edgeList;
+
+    for (Edge e : mesh.edges()){
+        if (std::find(vertexList.begin(), vertexList.end(), e.halfedge().tailVertex().getIndex()) != vertexList.end() && 
+        std::find(vertexList.begin(), vertexList.end(), e.halfedge().tipVertex().getIndex()) != vertexList.end()){
+            edgeList.push_back(e.getIndex());
+        }
+    }
+
+    return edgeList;
+}
