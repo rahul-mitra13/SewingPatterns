@@ -36,6 +36,12 @@ void Model::setMatchingTerms(std::vector<double> matchingTerms){
 
 }
 
+void Model::setEdgeMappingsPairs(std::vector<std::pair<int, int>> edgeMappingsPairs){
+
+    this->edgeMappingsPairs = edgeMappingsPairs;
+
+}
+
 double Model::getPeriod(){
 
     return this->period;
@@ -63,6 +69,11 @@ std::vector<double> Model::getMatchingTerms(){
 
 }
 
+std::vector<std::pair<int, int>> Model::getEdgeMappingsPairs(){
+
+    return this->edgeMappingsPairs;
+}
+
 void Model::clear(){
     period = 0.0;
     timeOut = 0.0;
@@ -71,6 +82,7 @@ void Model::clear(){
     singularFaces.clear();
     bdyEdges.clear();
     matchingTerms.clear();
+    edgeMappingsPairs.clear();
 }
 
 

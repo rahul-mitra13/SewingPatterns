@@ -19,8 +19,11 @@ class Model{
         //singular face indices
         std::vector<int> singularFaces;
 
-        //boundary edges for a single patch 
+        //boundary edges where we set the value of sigma to 0
         std::vector<int> bdyEdges;
+
+        //edge pairs where the value of sigma should agree 
+        std::vector<std::pair<int, int>> edgeMappingsPairs;
 
         //these are the values we'll try to match using a quadratic minimization 
         std::vector<double> matchingTerms;
@@ -48,6 +51,9 @@ class Model{
         //set matching terms 
         void setMatchingTerms(std::vector<double> matchingTerms);
 
+        //set edge mappings 
+        void setEdgeMappingsPairs(std::vector<std::pair<int, int>> edgeMappingsPairs);
+
         //get edge path constraints 
         std::vector<std::pair<std::vector<double>, double>> getEdgePathConstraints();
 
@@ -68,6 +74,9 @@ class Model{
 
         //get matching energy
         std::vector<double> getMatchingTerms();
+
+        //get pair of mapped edges 
+        std::vector<std::pair<int, int>> getEdgeMappingsPairs();
 
         //clear the data in the class 
         void clear();
