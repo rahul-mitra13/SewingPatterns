@@ -1,6 +1,7 @@
 #include "stripe_patterns_helpers.h"
 
-std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& geometry, EdgeData<double> sigma, float period){
+std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, 
+                                                                            std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>> edgeMappingsPairs){
   
   SurfaceMesh& mesh = geometry.mesh;
 
@@ -17,6 +18,14 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
   	}
   }
 
+  //update the 1-form for edges that are "stitched together"
+  // for (std::pair<int, int> p : edgeMappingsPairs){
+  //   Edge e1 = mesh.edge(p.first);
+  //   Edge e2 = mesh.edge(p.second);
+  //   sigma_halfedges[e2.halfedge().twin()] = sigma_halfedges[e1.halfedge()];
+  //   sigma_halfedges[e2.halfedge()] = sigma_halfedges[e1.halfedge().twin()];
+  // }
+
   //integrate up the sigma values now onto vertices
   VertexData<double> sigma_mod(mesh); 
   VertexData<bool> visited(mesh, false);
@@ -25,8 +34,12 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
   for (Vertex v : mesh.vertices()){
     //start integrating from a boundary vertex
     if (v.isBoundary()){
-      startVertex = v;
-      break;
+      for (std::pair<int, int> p : vertexMappingsPairs){//ensure you're not starting at a stitched vertex (probably don't need this)
+        if (v.getIndex() != p.first && v.getIndex() != p.second){
+          startVertex = v;
+          break;
+        }
+      }
     }
   }
 
@@ -49,6 +62,47 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
     }
     while( h != vi.halfedge());
   }
+
+  // std::queue<Vertex> Q;
+  // Q.push(startVertex);
+  // sigma_mod[startVertex] = 0.0;
+  // visited[startVertex] = true;
+  // while(!Q.empty()){
+  //   Vertex vi = Q.front(); Q.pop();
+  //   std::cout << "index of vi " << vi.getIndex() << std::endl;
+  //   Halfedge h = vi.halfedge();
+  //   do{
+  //     Vertex vj = h.twin().vertex();
+  //     if (!visited[vj]){
+  //       sigma_mod[vj] = fmod(sigma_mod[vi] + sigma_halfedges[h], period);
+  //       visited[vj] = true;
+  //       Q.push(vj);
+  //     }
+  //     h = h.twin().next();
+  //   }
+  //   while( h != vi.halfedge());
+  //   for (std::pair<int, int> p : vertexMappingsPairs){
+  //     if (vi.getIndex() == p.first){
+  //       Vertex vj = mesh.vertex(p.second);//jump to "stitched" vertex
+  //       Halfedge h = vj.halfedge();
+  //       do{
+  //         Vertex vk = h.twin().vertex();
+  //         if (!visited[vk]){
+  //           sigma_mod[vk] = fmod(sigma_mod[vj] + sigma_halfedges[h], period);
+  //           visited[vk] = true;
+  //           Q.push(vk);
+  //         }
+  //         h = h.twin().next();
+  //       }
+  //       while (h != vj.halfedge());
+  //     }
+  //   }
+  // }
+
+  // for (Vertex v : mesh.vertices()){
+  //   std::cout << "sigma_mod at vertex " << v << " " << sigma_mod[v] << std::endl;
+  // }
+
   
   //assign texture coordinates
   CornerData<double> textureCoordinates(mesh);
@@ -263,4 +317,184 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
   }
 
   return std::tie(points, edges);
+}
+
+
+//integrate the 1-form but use an intrinsic geometry representation to handle the stitched edges 
+std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneFormELG(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, 
+                                            std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>> edgeMappingsPairs){
+        
+  SurfaceMesh& mesh = geometry.mesh;
+  //store a map from the original index to index in the edge length geometry
+  std::map<int, int> originalIndexToELGIndex;
+  //number of "unique vertices" i.e., only consider one vertex per stitch
+  int numUniqueVertices = 0;
+   
+  for (Vertex v : mesh.vertices()){
+    size_t iV = v.getIndex();
+    //iterate over the mappings 
+    for (auto p : vertexMappingsPairs){
+      if (p.first == iV || p.second == iV){
+        if (originalIndexToELGIndex.find(p.first) == originalIndexToELGIndex.end()
+        && originalIndexToELGIndex.find(p.second) == originalIndexToELGIndex.end()){
+          originalIndexToELGIndex.insert({p.first, numUniqueVertices});
+          originalIndexToELGIndex.insert({p.second, numUniqueVertices});
+          numUniqueVertices++;
+        }
+        if (originalIndexToELGIndex.find(p.first) != originalIndexToELGIndex.end()&&
+          originalIndexToELGIndex.find(p.second) == originalIndexToELGIndex.end()){
+          originalIndexToELGIndex.insert({p.second, originalIndexToELGIndex.at(p.first)});
+        }
+        if (originalIndexToELGIndex.find(p.second) != originalIndexToELGIndex.end() &&
+          originalIndexToELGIndex.find(p.first) == originalIndexToELGIndex.end()){
+          originalIndexToELGIndex.insert({p.first, originalIndexToELGIndex.at(p.second)});
+        }
+      }
+    }
+    if (originalIndexToELGIndex.find(iV) == originalIndexToELGIndex.end()){
+        originalIndexToELGIndex.insert({iV, numUniqueVertices});
+        numUniqueVertices++;
+    }
+  }
+
+  std::vector<std::vector<size_t>> polygons;
+  geometry.requireEdgeLengths();
+  for (Face f : mesh.faces()){
+    if (f.isBoundaryLoop()) continue;
+    std::vector<size_t> currPolygon;
+    int i = originalIndexToELGIndex[f.halfedge().tailVertex().getIndex()];
+    int j = originalIndexToELGIndex[f.halfedge().next().tailVertex().getIndex()];
+    int k = originalIndexToELGIndex[f.halfedge().next().next().tailVertex().getIndex()];
+    currPolygon.push_back(i);
+    currPolygon.push_back(j);
+    currPolygon.push_back(k);
+    polygons.emplace_back(currPolygon);
+  }
+  //for some reason this is not manifold and has duplicate edges? 
+  SurfaceMesh * gluedMesh = new SurfaceMesh(polygons);
+  std::cout << "Number of edges in the original mesh " << mesh.nEdges() << std::endl;
+  std::cout << "Number of edges in the ELG mesh " << gluedMesh -> nEdges() << std::endl;
+  std::cout << "Number of boundaries in glued mesh " << gluedMesh-> nBoundaryLoops() << std::endl;
+  std::cout << "Number of faces in the original mesh " << mesh.nFaces() << std::endl;
+  std::cout << "Number of faces in the glued mesh " << gluedMesh -> nFaces() << std::endl;
+  std::cout << "Number of corners in the original mesh " << mesh.nCorners() << std::endl;
+  std::cout << "Number of corners in the glued mesh " << gluedMesh -> nCorners() << std::endl;
+  std::cout << "Number of halfedges in the original mesh " << mesh.nHalfedges() << std::endl;
+  std::cout << "Number of halfedges in the glued mesh " << gluedMesh -> nHalfedges() << std::endl;
+
+  EdgeData<double> sigma_edges(*gluedMesh);
+  for (Edge e1 : mesh.edges()){
+    double sigmaFromOriginalMesh = sigma[e1];
+    for (Edge e2 : gluedMesh -> edges()){
+      //find the corresponding edge in the glued mesh
+      if (e2.halfedge().tailVertex().getIndex() == originalIndexToELGIndex[e1.halfedge().tailVertex().getIndex()]
+      && e2.halfedge().tipVertex().getIndex() == originalIndexToELGIndex[e1.halfedge().tipVertex().getIndex()]){
+        sigma_edges[e2] = sigmaFromOriginalMesh;
+      }
+    }
+  }
+
+  //store the sigma values per halfedge
+  HalfedgeData<double> sigma_halfedges(*gluedMesh);
+  
+  //assign halfedge sigma values taking orientation into account
+  for (Halfedge he : gluedMesh -> halfedges()){
+  	if (he.orientation()){
+  		sigma_halfedges[he] = sigma_edges[he.edge()];
+  	}
+  	else{
+  		sigma_halfedges[he] = -1.0 * sigma_edges[he.edge()];
+  	}
+  }
+
+  //integrate up the sigma values now onto vertices
+  VertexData<double> sigma_mod(*gluedMesh); 
+  VertexData<bool> visited(*gluedMesh, false);
+  Vertex startVertex;
+  for (Vertex v : gluedMesh -> vertices()){
+    if (v.isBoundary()){
+      startVertex = v;
+      break;
+    }
+  }
+  //now integrate the 1-form on the glued mesh
+  std::queue<Vertex> Q;
+  Q.push(startVertex);
+  // Floating point thing for knit graph
+  sigma_mod[startVertex] = 0.0 + 1e-16;
+  visited[startVertex] = true;
+  while(!Q.empty()){
+    Vertex vi = Q.front(); Q.pop();
+    Halfedge h = vi.halfedge();
+    do{
+      Vertex vj = h.twin().vertex();
+      if (!visited[vj]){
+        sigma_mod[vj] = fmod(sigma_mod[vi] + sigma_halfedges[h], period);
+        visited[vj] = true;
+        Q.push(vj);
+      }
+      h = h.twin().next();
+    }
+    while( h != vi.halfedge());
+  }
+
+  HalfedgeData<double> sigmaHalfedgesOriginalMesh(mesh);
+  VertexData<double> sigmaModOriginalMesh(mesh);
+
+  //first copy over the sigma mod values;
+  for (Vertex v : mesh.vertices()){
+    sigmaModOriginalMesh[v] = sigma_mod[gluedMesh->vertex(originalIndexToELGIndex[v.getIndex()])];
+  }
+  //then assign values to the halfedges
+  for (Halfedge he : mesh.halfedges()){
+    if (he.orientation()){
+  		sigmaHalfedgesOriginalMesh[he] = sigma[he.edge()];
+  	}
+  	else{
+  		sigmaHalfedgesOriginalMesh[he] = -1.0 * sigma[he.edge()];
+  	}
+  }
+
+  //update the 1-form for edges that are "stitched together"
+  //not convinced I need to do this. In essence just trying to make the values same across edges that are stitched together
+  for (std::pair<int, int> p : edgeMappingsPairs){
+    Edge e1 = mesh.edge(p.first);
+    Edge e2 = mesh.edge(p.second);
+    sigmaHalfedgesOriginalMesh[e2.halfedge().twin()] = sigmaHalfedgesOriginalMesh[e1.halfedge()];
+    sigmaHalfedgesOriginalMesh[e2.halfedge()] = sigmaHalfedgesOriginalMesh[e1.halfedge().twin()];
+  }
+
+  //assign texture coordinates
+  CornerData<double> textureCoordinates(mesh);
+  FaceData<int> paramIndices(mesh);
+
+  for (Face f : mesh.faces()){
+
+    //skip boundary faces
+    if (f.isBoundaryLoop()) continue;
+    
+    //grab the halfedges
+    Halfedge hij = f.halfedge();
+    Halfedge hjk = hij.next();
+    Halfedge hki = hjk.next();
+
+    //grab the sigmas
+    double sigma_ij = sigmaHalfedgesOriginalMesh[hij];
+    double sigma_jk = sigmaHalfedgesOriginalMesh[hjk];
+    double sigma_ki = sigmaHalfedgesOriginalMesh[hki];
+
+    //compute alpha values at triangle corners
+    double alphaI = sigmaModOriginalMesh[f.halfedge().vertex()];
+    double alphaJ = alphaI + sigma_ij;
+    double alphaK = alphaJ + sigma_jk;
+    double alphaL = alphaK + sigma_ki;
+
+    // store the coordinates
+    textureCoordinates[hij.corner()] = alphaI;
+    textureCoordinates[hjk.corner()] = alphaJ;
+    textureCoordinates[hki.corner()] = alphaK;
+    paramIndices[f] = std::round((alphaL - alphaI) / (period));
+
+  }  
+  return std::tie(textureCoordinates, paramIndices);
 }

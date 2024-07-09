@@ -124,6 +124,7 @@ void showStripePatterns(){
 
   //EdgeData<double> omega = computeMatchingOneForm(*globalGeometry, 0, timeFunctionGradient);
   EdgeData<double> omega = computeMatchingOneForm(*globalGeometry, 0, timeFunctionGradient, edgeMappingsPairs);
+
   std::vector<size_t> perm;
   //set up 1-form viz 
   std::vector<bool> orientations;
@@ -137,107 +138,50 @@ void showStripePatterns(){
       orientations.push_back(false);
     }
   }
+  //now update the orientations to handle "stitched together edges" which actually represent a single edge 
+  //just flip the orientations to make the viz sensible
+  for (std::pair<int, int> pair : edgeMappingsPairs){
+    //orientations[pair.second] = !orientations[pair.first];
+    Vector3 e1 = globalGeometry->vertexPositions[globalMesh->edge(pair.first).halfedge().tipVertex()]
+                  - globalGeometry->vertexPositions[globalMesh->edge(pair.first).halfedge().tailVertex()];
+    Vector3 e2 =  globalGeometry->vertexPositions[globalMesh->edge(pair.second).halfedge().tipVertex()]
+                  - globalGeometry->vertexPositions[globalMesh->edge(pair.second).halfedge().tailVertex()];
+    if (dot(e1, e2) < 0) orientations[pair.second] = !orientations[pair.first];
+  }
   globalPSMesh -> setEdgePermutation(perm);
   globalPSMesh -> addOneFormTangentVectorQuantity("omega", omega, orientations);
 
   std::vector<int> courseStartEdges = creatEdgeListFromVertexList(*globalGeometry, zeroVertices);
+  std::vector<int> courseEndEdges = creatEdgeListFromVertexList(*globalGeometry, oneVertices);
 
-/**
-  for (int i = 0; i < meshes.size(); i++){
-    std::vector<Vertex> zeroVertices, oneVertices;
-    zeroVertices = bdyConditions[i].courseStartBoundaryVertices;
-    oneVertices = bdyConditions[i].courseEndBoundaryVertices;
-    
-    VertexData<double> timeFunction = solveLaplace(*geometries[i], zeroVertices, oneVertices);
-    psMeshes[i] -> addVertexScalarQuantity("time function_" + std::to_string(i), timeFunction);
-    FaceData<Vector3> faceGrads = computeTimeFunctionFaceGrad(*geometries[i], timeFunction);
-    psMeshes[i] -> addFaceVectorQuantity("face gradients_" + std::to_string(i), faceGrads);
-    std::vector<Edge> startEdges, endEdges;
-    //set up the optimization model 
-    Model model;
-    //the 1-form we're trying to match
-    EdgeData<double>  matchingOneForm;
-    //put all the boundary edges into a single vector 
-    std::vector<int> modelBdyEdges;
-    //put the edge terms we're trying to match in a vector
-    std::vector<double> modelMatchingTerms;
-    CornerData<double> stripeValuesSigma;
-    FaceData<int> stripeIndicesSigma;  
-    std::vector<Vector3> positions;
-    std::vector<std::array<int, 2>> edges;
-
-    //Compute knoppel course stripe patterns
-    VertexData<Vector3> courseVertexValuedField = computeVertexValuedField(*geometries[i], timeFunction, 0);
-    VertexData<Vector2> lineFieldCourse = vertexDirectionField(*geometries[i], courseVertexValuedField);
-    VertexData<double> frequencies(*meshes[i], constantFreq);
-    CornerData<double> periodicFunc;
-    FaceData<int> zeroIndices;
-    FaceData<int> branchIndices;
-    std::tie(periodicFunc, zeroIndices, branchIndices) =
-        computeStripePattern(*geometries[i], frequencies, lineFieldCourse);
-    psMeshes[i] -> addFaceScalarQuantity("direction field singularities_" + std::to_string(i), branchIndices);
-    psMeshes[i] -> addFaceScalarQuantity("stripe singular faces_" + std::to_string(i), zeroIndices);
-    // Extract isolines
-    std::vector<Vector3> isolineVerts;
-    std::vector<std::array<size_t, 2>> isolineEdges;
-    std::tie(isolineVerts, isolineEdges) = extractPolylinesFromStripePattern(
-      *geometries[i], periodicFunc, zeroIndices, branchIndices, lineFieldCourse, false);
-    //polyscope::registerCurveNetwork("course stripe patterns_" + std::to_string(i), isolineVerts, isolineEdges);
-
-    
-    //Compute wale stripe patterns using knoppel's method
-    VertexData<Vector3> waleVertexValuedField = computeVertexValuedField(*geometries[i], timeFunction, PI/2);
-    psMeshes[i] -> addVertexVectorQuantity("wale vertex valued field_" + std::to_string(i), waleVertexValuedField);
-    VertexData<Vector2> lineFieldWale = vertexDirectionField(*geometries[i], waleVertexValuedField);
-    std::tie(periodicFunc, zeroIndices, branchIndices) =
-      computeStripePattern(*geometries[i], frequencies, lineFieldWale);
-    // Extract isolines
-    std::tie(isolineVerts, isolineEdges) = extractPolylinesFromStripePattern(
-      *geometries[i], periodicFunc, zeroIndices, branchIndices, lineFieldWale, false);
-    polyscope::registerCurveNetwork("wale stripe patterns_" + std::to_string(i), isolineVerts, isolineEdges);
-    
-    
-    //generate course stripe patterns using 1-form approach 
-    startEdges = bdyConditions[i].courseStartBoundaryEdges;
-    endEdges = bdyConditions[i].courseEndBoundaryEdges;
-    matchingOneForm = computeMatchingOneForm(*geometries[i], 0, faceGrads);
-    for (Edge e : startEdges) modelBdyEdges.push_back(e.getIndex());
-    for (Edge e : endEdges) modelBdyEdges.push_back(e.getIndex());
-    for (Edge e : meshes[i]->edges()) modelMatchingTerms.push_back(matchingOneForm[e]);
-    model.setBdyEdges(modelBdyEdges);
-    model.setMatchingTerms(modelMatchingTerms);
-    model.setPeriod(period);
-    EdgeData<double> courseOneForm = computeOneForm(*geometries[i], model);
-    //compute course stripe patterns from 1-form
-    std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneForm(*geometries[i], courseOneForm, period);
-    std::tie(positions, edges) = generateIsoLines(*geometries[i], stripeValuesSigma, stripeIndicesSigma, period);
-    polyscope::registerCurveNetwork("course stripe patterns_" + std::to_string(i), positions, edges);
-    
-    //clear out course info before computing wale stripes
-    modelBdyEdges.clear();
-    modelMatchingTerms.clear();
-
-    //generate wale stripe patterns using 1-form approach 
-    startEdges = bdyConditions[i].waleStartBoundaryEdges;
-    endEdges = bdyConditions[i].waleEndBoundaryEdges;
-    matchingOneForm = computeMatchingOneForm(*geometries[i], 1, faceGrads);
-    //set up the optimization model 
-    for (Edge e : startEdges) modelBdyEdges.push_back(e.getIndex());
-    for (Edge e : endEdges) modelBdyEdges.push_back(e.getIndex());
-    for (Edge e : meshes[i]->edges()) modelMatchingTerms.push_back(matchingOneForm[e]);
-
-    model.setBdyEdges(modelBdyEdges);
-    model.setMatchingTerms(modelMatchingTerms);
-    model.setPeriod(period);
-
-    EdgeData<double> waleOneForm = computeOneForm(*geometries[i], model);
-    //compute stripe patterns from 1-form
-    std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneForm(*geometries[i], waleOneForm, period);
-    std::tie(positions, edges) = generateIsoLines(*geometries[i], stripeValuesSigma, stripeIndicesSigma, period);
-    polyscope::registerCurveNetwork("wale stripe patterns_" + std::to_string(i), positions, edges);    
+  std::vector<int> bdyEdges;
+  std::merge(courseStartEdges.begin(), courseStartEdges.end(),
+           courseEndEdges.begin(), courseEndEdges.end(),
+           std::back_inserter(bdyEdges));
+  //set up the optimization model
+  Model model;
+  float period = 10;
+  model.setBdyEdges(bdyEdges);
+  model.setPeriod(period);
+  std::vector<double> modelMatchingTerms; 
+  for (Edge e : globalMesh -> edges()){
+    modelMatchingTerms.push_back(omega[e]);
   }
-*/
-  
+  model.setMatchingTerms(modelMatchingTerms);
+  model.setEdgeMappingsPairs(edgeMappingsPairs);
+  EdgeData<double> sigma = computeOneForm(*globalGeometry, model, *globalPSMesh);
+  globalPSMesh -> addOneFormTangentVectorQuantity("sigma", sigma, orientations);
+
+  CornerData<double> stripeValuesSigma;
+  FaceData<int> stripeIndicesSigma;
+  std::vector<Vector3> positions;
+  std::vector<std::array<int, 2>> edges;
+  //std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneForm(*globalGeometry, sigma, period, vertexMappingsPairs, edgeMappingsPairs);
+  std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneFormELG(*globalGeometry, sigma, period, vertexMappingsPairs, edgeMappingsPairs);
+  std::tie(positions, edges) = generateIsoLines(*globalGeometry, stripeValuesSigma, stripeIndicesSigma, period);
+  //globalPSMesh -> addCornerScalarQuantity("tex coords", stripeValuesSigma);
+  polyscope::registerCurveNetwork("course stripe patterns", positions, edges);
+
 }
 
 // A user-defined callback, for creating control panels (etc)

@@ -5,6 +5,7 @@
 #include "geometrycentral/surface/vertex_position_geometry.h"
 #include "geometrycentral/utilities/utilities.h"
 #include "geometrycentral/surface/stripe_patterns.h"
+#include "geometrycentral/surface/edge_length_geometry.h"
 
 #include <vector>
 #include <queue>
@@ -24,7 +25,11 @@ struct PolyLinePoint{
   double isoval;//the isoval (modulo P of this point)
 };
 
-std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& geometry, EdgeData<double> sigma, float period);
+std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, 
+                                            std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>> edgeMappingsPairs);
+
+std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneFormELG(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, 
+                                            std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>> edgeMappingsPairs);
 
 //returns a vector per face that stores all the isovalues (modulo period) passing through this face
 FaceData<std::vector<double>> getFaceIsoValues(IntrinsicGeometryInterface& geometry,
