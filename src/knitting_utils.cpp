@@ -328,7 +328,7 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
 }
 
 //compute a 1-form over the mesh given an input optimization problem 
-EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel){
+EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel, polyscope::SurfaceMesh& psMesh){
 
     SurfaceMesh& mesh = geometry.mesh;
     geometry.requireDECOperators();
@@ -337,9 +337,11 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     d_one = geometry.d1;
 
     EdgeData<double> oneForm(mesh);
+    FaceData<double> integratedOneForm(mesh);
 
     std::vector<double> omega = gbModel.getMatchingTerms();
     std::vector<int> bdyEdges = gbModel.getBdyEdges();
+    std::vector<std::pair<int, int>> edgeMappingsPairs = gbModel.getEdgeMappingsPairs();
     double period = gbModel.getPeriod();
 
     try {
@@ -352,7 +354,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
         GRBModel model = GRBModel(env);
 
         //set the timeout
-        model.getEnv().set(GRB_DoubleParam_TimeLimit, 120);
+        model.getEnv().set(GRB_DoubleParam_TimeLimit, 45);
 
         //add variable 1-form variable sigma (per edge)
         std::vector<GRBVar> sigma;
@@ -386,6 +388,13 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
             //model.addConstr(lhs == period * k[r], "Integral Constraint");
         }
 
+        //third constraint - sigma across stiched edges should be equal 
+        for (int i = 0; i < edgeMappingsPairs.size(); i++){
+            int iEdge1 = edgeMappingsPairs[i].first;
+            int iEdge2 = edgeMappingsPairs[i].second;
+            model.addConstr(sigma[iEdge1] == sigma[iEdge2], "Stitched Edge Constraint");
+        }
+
         //trying to match energies
         GRBQuadExpr diff1_sum = 0;
 
@@ -404,6 +413,10 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
         for (Edge e : mesh.edges()){
             oneForm[e] = sigma[e.getIndex()].get(GRB_DoubleAttr_X);
         }
+        //put the singular faces into a face vector 
+        for (Face f : mesh.faces()){
+            integratedOneForm[f] = k[f.getIndex()].get(GRB_DoubleAttr_X);
+        }
     }
     catch(GRBException e) {
         std::cout << "Error code = " << e.getErrorCode() << std::endl;
@@ -412,6 +425,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
         std::cout << "Exception during optimization" << std::endl;
     }
 
+    psMesh.addFaceScalarQuantity("Integrated 1-form value", integratedOneForm);
     return oneForm;
 }
 
@@ -498,8 +512,10 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
                 Vector3 e2 = geometry.vertexPositions[mesh.edge(edgeMap.at(e.getIndex())).halfedge().tipVertex()] 
                                             - geometry.vertexPositions[mesh.edge(edgeMap.at(e.getIndex())).halfedge().tailVertex()];
                 Vector3 avgVector = (e1 + e2)/2.;
-                omega[e] = 0.5 * dot((faceGradients1 + faceGradients2), avgVector);
-                omega[mesh.edge(edgeMap.at(e.getIndex()))] = 0.5 * dot((faceGradients1 + faceGradients2), avgVector);
+                //just pick the original edge as the "canonical" direction in the global mesh
+                //I'm not really sure the polyscope Whitney interpolation scheme is the best way to visualize these
+                omega[e] = 0.5 * dot((faceGradients1 + faceGradients2), e1);
+                omega[mesh.edge(edgeMap.at(e.getIndex()))] = 0.5 * dot((faceGradients1 + faceGradients2), e1);
                 seenEdges[e.getIndex()] = true;
                 seenEdges[edgeMap.at(e.getIndex())] = true;
             }

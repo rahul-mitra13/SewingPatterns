@@ -37,22 +37,22 @@ class Model{
         void setTimeOut(double timeOut);
 
         //set edge path constraints
-        void setEdgePathConstraints(std::vector<std::pair<std::vector<double>, double>> edgePathConstraints);
+        void setEdgePathConstraints(std::vector<std::pair<std::vector<double>, double>>& edgePathConstraints);
 
         //set singular face indices 
-        void setSingularFaceIndices(std::vector<int> singularFaces);
+        void setSingularFaceIndices(std::vector<int>& singularFaces);
 
         //set smooth face indices 
-        void setSmoothFaceIndices(std::vector<int> smoothFaces);
+        void setSmoothFaceIndices(std::vector<int>& smoothFaces);
 
         //set course boundary edges
-        void setBdyEdges(std::vector<int> bdyEdges);
+        void setBdyEdges(std::vector<int>& bdyEdges);
 
         //set matching terms 
-        void setMatchingTerms(std::vector<double> matchingTerms);
+        void setMatchingTerms(std::vector<double>& matchingTerms);
 
         //set edge mappings 
-        void setEdgeMappingsPairs(std::vector<std::pair<int, int>> edgeMappingsPairs);
+        void setEdgeMappingsPairs(std::vector<std::pair<int, int>>& edgeMappingsPairs);
 
         //get edge path constraints 
         std::vector<std::pair<std::vector<double>, double>> getEdgePathConstraints();

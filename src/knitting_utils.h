@@ -67,11 +67,12 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
 
 //compute a 1-form that will be used to generate the stripes over the quad patches 
 //
-//@param[in]    geometry    VertexPositionGeometry  input geometry 
-//@param[in]    model       Model                   The gurobi model we're interested in solving
+//@param[in]    geometry            VertexPositionGeometry              input geometry 
+//@param[in]    model               Model                               The gurobi model we're interested in solving
+//@param[in]    edgeMappingPairs    std::vector<std::pair<int, int>>    vector of pairs where each pair representes "stitched together" edge indices   
 //
 //@return       oneForm     EdgeData<double>        The course 1-form used to specify the stripes
-EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& model);
+EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& model, polyscope::SurfaceMesh& psMesh);
 
 //compute \omega i.e., the 1-form we're trying to match over each edge 
 //
