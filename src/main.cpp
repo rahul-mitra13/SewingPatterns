@@ -144,12 +144,7 @@ void showStripePatterns(){
   //now update the orientations to handle "stitched together edges" which actually represent a single edge 
   //just flip the orientations to make the viz sensible
   for (std::pair<int, int> pair : edgeMappingsPairs){
-    //orientations[pair.second] = !orientations[pair.first];
-    Vector3 e1 = globalGeometry->vertexPositions[globalMesh->edge(pair.first).halfedge().tipVertex()]
-                  - globalGeometry->vertexPositions[globalMesh->edge(pair.first).halfedge().tailVertex()];
-    Vector3 e2 =  globalGeometry->vertexPositions[globalMesh->edge(pair.second).halfedge().tipVertex()]
-                  - globalGeometry->vertexPositions[globalMesh->edge(pair.second).halfedge().tailVertex()];
-    if (dot(e1, e2) < 0) orientations[pair.second] = !orientations[pair.second];
+    orientations[pair.second] = !orientations[pair.second];
   }
   globalPSMesh -> setEdgePermutation(perm);
   globalPSMesh -> addOneFormTangentVectorQuantity("omega course", omega_course, orientations);
@@ -161,7 +156,7 @@ void showStripePatterns(){
   std::merge(courseStartEdges.begin(), courseStartEdges.end(),
            courseEndEdges.begin(), courseEndEdges.end(),
            std::back_inserter(bdyEdges));
-  //set up the optimization model
+  //set up the optimization model for the course direction
   Model model;
   float period = 10;
   model.setBdyEdges(bdyEdges);
@@ -183,20 +178,24 @@ void showStripePatterns(){
   std::tie(positions, edges) = generateIsoLines(*globalGeometry, stripeValuesSigma, stripeIndicesSigma, period);
   polyscope::registerCurveNetwork("course stripe patterns", positions, edges);
 
-
-  // EdgeData<double> omega_wale = computeMatchingOneForm(*globalGeometry, 1, timeFunctionGradient, edgeMappingsPairs);
-  // globalPSMesh -> addOneFormTangentVectorQuantity("omega wale", omega_wale, orientations);
-  // //clear the model before setting up the wale stripes
-  // model.clear();
-  // modelMatchingTerms.clear();
-  // model.setPeriod(period);
-  // for (Edge e : globalMesh -> edges()){
-  //   modelMatchingTerms.push_back(omega_wale[e]);
-  // }
-  // model.setMatchingTerms(modelMatchingTerms);
-  // model.setEdgeMappingsPairs(edgeMappingsPairs);
-  // EdgeData<double> sigma_wale = computeOneForm(*globalGeometry, model, *globalPSMesh);
-  // globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigma_wale, orientations);
+  //set up the optimization model for the wale direction 
+  Model modelWale;
+  modelWale.setPeriod(0.1);
+  std::vector<double> modelMatchingTermsWale;
+  EdgeData<double> omega_wale = computeMatchingOneForm(*globalGeometry, 1, timeFunctionGradient, edgeMappingsPairs);
+  for (Edge e : globalMesh -> edges()){
+    modelMatchingTermsWale.push_back(omega_wale[e]);
+  }
+  modelWale.setMatchingTerms(modelMatchingTermsWale);
+  modelWale.setEdgeMappingsPairs(edgeMappingsPairs);
+  EdgeData<double> sigma_wale = computeOneForm(*globalGeometry, modelWale, *globalPSMesh);
+  CornerData<double> stripeValuesSigmaWale;
+  FaceData<int> stripeIndicesSigmaWale;
+  std::vector<Vector3> positionsWale;
+  std::vector<std::array<int, 2>> edgesWale;
+  std::tie(stripeValuesSigmaWale, stripeIndicesSigmaWale) = computeStripeValuesFromOneFormGluedMesh(*globalGeometry, sigma_wale, period, vertexMappingsPairs, edgeMappingsPairs);
+  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, stripeValuesSigmaWale, stripeIndicesSigmaWale, period);
+  polyscope::registerCurveNetwork("wale stripe patterns", positionsWale, edgesWale);
 
 }
 

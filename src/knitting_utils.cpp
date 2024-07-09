@@ -406,7 +406,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
         for (int i = 0; i < edgeMappingsPairs.size(); i++){
             int iEdge1 = edgeMappingsPairs[i].first;
             int iEdge2 = edgeMappingsPairs[i].second;
-            model.addConstr(sigma[iEdge1] == sigma[iEdge2], "Stitched Edge Constraint");
+            model.addConstr(sigma[iEdge2] == sigma[iEdge1], "Stitched Edge Constraint");
         }
 
         //trying to match energies
