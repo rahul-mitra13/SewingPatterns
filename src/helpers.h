@@ -118,6 +118,12 @@ std::vector<int> creatEdgeListFromVertexList(VertexPositionGeometry& geometry, s
 //@return       none                                    but has a side effect where it calls polyscope to render stitches
 void renderStitchedVertices(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs);
 
+//create a new "glued surface mesh"
+//create a mapping from original index to "glued" index (vertex and edges)
+//also populate edge lengths of glued mesh
+SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& originalMeshVertexIndexToGluedMeshIndex,
+                                        std::map<int, int>& originalMeshEdgeIndexToGluedMeshIndex, std::vector<double>& gluedMeshEdgeLengths);
+
 //structure that stores boundary conditions for every patch 
 struct PatchBoundaryConditions{
     //boundary vertices in the course direction

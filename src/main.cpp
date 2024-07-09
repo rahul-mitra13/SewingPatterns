@@ -44,7 +44,11 @@ std::vector<std::pair<int, int>> edgeMappingsPairs;
 
 std::unique_ptr<ManifoldSurfaceMesh> globalMesh;
 std::unique_ptr<VertexPositionGeometry> globalGeometry;
-polyscope::SurfaceMesh * globalPSMesh;
+polyscope::SurfaceMesh *globalPSMesh;
+SurfaceMesh *gluedMesh;//represents the glued mesh of all the panel 
+std::map<int, int> originalMeshVertexIndexToGluedMeshIndex;
+std::map<int, int> originalMeshEdgeIndexToGluedMeshIndex;
+std::vector<double> gluedMeshEdgeLengths;
 
 //boundary conditions for each patch 
 std::vector<PatchBoundaryConditions> bdyConditions;
@@ -228,9 +232,11 @@ int main(int argc, char **argv) {
     globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(argv[1]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
     vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(argv[2]);
     edgeMappingsPairs = buildPairOfStitchedEdges(*globalGeometry, vertexMappingsPairs);
-    FaceData<double> matchedTriangle(*globalMesh);
-    int index = 0;
+    //render the stitched vertices
     renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
+    //make a glued mesh
+    gluedMesh = createGluedSurfaceMesh(*globalGeometry, vertexMappingsPairs, originalMeshVertexIndexToGluedMeshIndex,
+                                        originalMeshEdgeIndexToGluedMeshIndex, gluedMeshEdgeLengths);
   }
 
   // Disable the ground plane

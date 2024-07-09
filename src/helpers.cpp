@@ -332,3 +332,61 @@ std::vector<int> creatEdgeListFromVertexList(VertexPositionGeometry& geometry, s
 
     return edgeList;
 }
+
+SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& originalMeshVertexIndexToGluedMeshIndex,
+                                        std::map<int, int>& originalMeshEdgeIndexToGluedMeshIndex, std::vector<double>& gluedMeshEdgeLengths){
+    SurfaceMesh& mesh = geometry.mesh;
+    //find original index to glued mesh index for vertices
+    int numUniqueVertices = 0;
+    for (Vertex v : mesh.vertices()){
+        size_t iV = v.getIndex();
+        //iterate over the mappings 
+        for (auto p : vertexMappingsPairs){
+            if (p.first == iV || p.second == iV){
+                if (originalMeshVertexIndexToGluedMeshIndex.find(p.first) == originalMeshVertexIndexToGluedMeshIndex.end()
+                && originalMeshVertexIndexToGluedMeshIndex.find(p.second) == originalMeshVertexIndexToGluedMeshIndex.end()){
+                    originalMeshVertexIndexToGluedMeshIndex.insert({p.first, numUniqueVertices});
+                    originalMeshVertexIndexToGluedMeshIndex.insert({p.second, numUniqueVertices});
+                    numUniqueVertices++;
+                }
+                if (originalMeshVertexIndexToGluedMeshIndex.find(p.first) != originalMeshVertexIndexToGluedMeshIndex.end()&&
+                    originalMeshVertexIndexToGluedMeshIndex.find(p.second) == originalMeshVertexIndexToGluedMeshIndex.end()){
+                    originalMeshVertexIndexToGluedMeshIndex.insert({p.second, originalMeshVertexIndexToGluedMeshIndex.at(p.first)});
+                }
+                if (originalMeshVertexIndexToGluedMeshIndex.find(p.second) != originalMeshVertexIndexToGluedMeshIndex.end() &&
+                    originalMeshVertexIndexToGluedMeshIndex.find(p.first) == originalMeshVertexIndexToGluedMeshIndex.end()){
+                    originalMeshVertexIndexToGluedMeshIndex.insert({p.first, originalMeshVertexIndexToGluedMeshIndex.at(p.second)});
+                }
+            }
+        }
+        if (originalMeshVertexIndexToGluedMeshIndex.find(iV) == originalMeshVertexIndexToGluedMeshIndex.end()){
+            originalMeshVertexIndexToGluedMeshIndex.insert({iV, numUniqueVertices});
+            numUniqueVertices++;
+        }
+    }
+    std::vector<std::vector<size_t>> polygons;
+    geometry.requireEdgeLengths();
+    for (Face f : mesh.faces()){
+        if (f.isBoundaryLoop()) continue;
+        std::vector<size_t> currPolygon;
+        int i = originalMeshVertexIndexToGluedMeshIndex[f.halfedge().tailVertex().getIndex()];
+        int j = originalMeshVertexIndexToGluedMeshIndex[f.halfedge().next().tailVertex().getIndex()];
+        int k = originalMeshVertexIndexToGluedMeshIndex[f.halfedge().next().next().tailVertex().getIndex()];
+        // int i = f.halfedge().tailVertex().getIndex();
+        // int j = f.halfedge().next().tailVertex().getIndex();
+        // int k = f.halfedge().next().next().tailVertex().getIndex();
+        currPolygon.push_back(i);
+        currPolygon.push_back(j);
+        currPolygon.push_back(k);
+        polygons.emplace_back(currPolygon);
+    }
+    //for some reason this is not manifold and has duplicate edges? 
+    SurfaceMesh * gluedMesh = new SurfaceMesh(polygons);
+    std::cout << "isOriented? " << gluedMesh->isOriented() << std::endl;
+    std::cout << "isEdgeManifold? " << gluedMesh->isEdgeManifold() << std::endl;
+    std::cout << "isManifold? " << gluedMesh->isManifold() << std::endl;
+
+    std::cout << "Number of boundary loops in the original mesh " << mesh.nBoundaryLoops() << std::endl;
+    std::cout << "Number of boundary loops in the glued mesh " << gluedMesh->nBoundaryLoops() << std::endl;
+    return gluedMesh;
+}
