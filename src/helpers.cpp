@@ -382,11 +382,5 @@ SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vect
     }
     //for some reason this is not manifold and has duplicate edges? 
     SurfaceMesh * gluedMesh = new SurfaceMesh(polygons);
-    std::cout << "isOriented? " << gluedMesh->isOriented() << std::endl;
-    std::cout << "isEdgeManifold? " << gluedMesh->isEdgeManifold() << std::endl;
-    std::cout << "isManifold? " << gluedMesh->isManifold() << std::endl;
-
-    std::cout << "Number of boundary loops in the original mesh " << mesh.nBoundaryLoops() << std::endl;
-    std::cout << "Number of boundary loops in the glued mesh " << gluedMesh->nBoundaryLoops() << std::endl;
     return gluedMesh;
 }
