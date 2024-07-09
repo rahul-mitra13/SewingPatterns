@@ -19,12 +19,17 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
   }
 
   //update the 1-form for edges that are "stitched together"
-  // for (std::pair<int, int> p : edgeMappingsPairs){
-  //   Edge e1 = mesh.edge(p.first);
-  //   Edge e2 = mesh.edge(p.second);
-  //   sigma_halfedges[e2.halfedge().twin()] = sigma_halfedges[e1.halfedge()];
-  //   sigma_halfedges[e2.halfedge()] = sigma_halfedges[e1.halfedge().twin()];
-  // }
+  for (std::pair<int, int> p : edgeMappingsPairs){
+    for (Halfedge he : mesh.halfedges()){
+      Edge e2 = mesh.edge(p.second);
+      sigma_halfedges[e2.halfedge()] = -sigma_halfedges[e2.halfedge()];
+      sigma_halfedges[e2.halfedge().twin()] = -sigma_halfedges[e2.halfedge().twin()];
+    }
+    Edge e1 = mesh.edge(p.first);
+    Edge e2 = mesh.edge(p.second);
+    sigma_halfedges[e2.halfedge().twin()] = sigma_halfedges[e1.halfedge()];
+    sigma_halfedges[e2.halfedge()] = sigma_halfedges[e1.halfedge().twin()];
+  }
 
   //integrate up the sigma values now onto vertices
   VertexData<double> sigma_mod(mesh); 
@@ -43,33 +48,14 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
     }
   }
 
-  std::queue<Vertex> Q;
-  Q.push(startVertex);
-  // Floating point thing for knit graph
-  sigma_mod[startVertex] = 0.0 + 1e-16;
-  visited[startVertex] = true;
-  while(!Q.empty()){
-    Vertex vi = Q.front(); Q.pop();
-    Halfedge h = vi.halfedge();
-    do{
-      Vertex vj = h.twin().vertex();
-      if (!visited[vj]){
-        sigma_mod[vj] = fmod(sigma_mod[vi] + sigma_halfedges[h], period);
-        visited[vj] = true;
-        Q.push(vj);
-      }
-      h = h.twin().next();
-    }
-    while( h != vi.halfedge());
-  }
-
+  // this is the standard BFS
   // std::queue<Vertex> Q;
   // Q.push(startVertex);
-  // sigma_mod[startVertex] = 0.0;
+  // // Floating point thing for knit graph
+  // sigma_mod[startVertex] = 0.0 + 1e-16;
   // visited[startVertex] = true;
   // while(!Q.empty()){
   //   Vertex vi = Q.front(); Q.pop();
-  //   std::cout << "index of vi " << vi.getIndex() << std::endl;
   //   Halfedge h = vi.halfedge();
   //   do{
   //     Vertex vj = h.twin().vertex();
@@ -81,27 +67,43 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
   //     h = h.twin().next();
   //   }
   //   while( h != vi.halfedge());
-  //   for (std::pair<int, int> p : vertexMappingsPairs){
-  //     if (vi.getIndex() == p.first){
-  //       Vertex vj = mesh.vertex(p.second);//jump to "stitched" vertex
-  //       Halfedge h = vj.halfedge();
-  //       do{
-  //         Vertex vk = h.twin().vertex();
-  //         if (!visited[vk]){
-  //           sigma_mod[vk] = fmod(sigma_mod[vj] + sigma_halfedges[h], period);
-  //           visited[vk] = true;
-  //           Q.push(vk);
-  //         }
-  //         h = h.twin().next();
-  //       }
-  //       while (h != vj.halfedge());
-  //     }
-  //   }
   // }
 
-  // for (Vertex v : mesh.vertices()){
-  //   std::cout << "sigma_mod at vertex " << v << " " << sigma_mod[v] << std::endl;
-  // }
+  std::queue<Vertex> Q;
+  Q.push(startVertex);
+  sigma_mod[startVertex] = 0.0;
+  visited[startVertex] = true;
+  while(!Q.empty()){
+    Vertex vi = Q.front(); Q.pop();
+    std::cout << "index of vi " << vi.getIndex() << std::endl;
+    Halfedge h = vi.halfedge();
+    do{
+      Vertex vj = h.twin().vertex();
+      if (!visited[vj]){
+        sigma_mod[vj] = fmod(sigma_mod[vi] + sigma_halfedges[h], period);
+        visited[vj] = true;
+        Q.push(vj);
+      }
+      h = h.twin().next();
+    }
+    while( h != vi.halfedge());
+    for (std::pair<int, int> p : vertexMappingsPairs){
+      if (vi.getIndex() == p.first){
+        Vertex vj = mesh.vertex(p.second);//jump to "stitched" vertex
+        Halfedge h = vj.halfedge();
+        do{
+          Vertex vk = h.twin().vertex();
+          if (!visited[vk]){
+            sigma_mod[vk] = fmod(sigma_mod[vj] + sigma_halfedges[h], period);
+            visited[vk] = true;
+            Q.push(vk);
+          }
+          h = h.twin().next();
+        }
+        while (h != vj.halfedge());
+      }
+    }
+  }
 
   
   //assign texture coordinates
@@ -321,7 +323,7 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
 
 
 //integrate the 1-form but use an intrinsic geometry representation to handle the stitched edges 
-std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneFormELG(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, 
+std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneFormGluedMesh(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, 
                                             std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>> edgeMappingsPairs){
         
   SurfaceMesh& mesh = geometry.mesh;
@@ -372,16 +374,6 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneFormELG(
   }
   //for some reason this is not manifold and has duplicate edges? 
   SurfaceMesh * gluedMesh = new SurfaceMesh(polygons);
-  std::cout << "Number of edges in the original mesh " << mesh.nEdges() << std::endl;
-  std::cout << "Number of edges in the ELG mesh " << gluedMesh -> nEdges() << std::endl;
-  std::cout << "Number of boundaries in glued mesh " << gluedMesh-> nBoundaryLoops() << std::endl;
-  std::cout << "Number of faces in the original mesh " << mesh.nFaces() << std::endl;
-  std::cout << "Number of faces in the glued mesh " << gluedMesh -> nFaces() << std::endl;
-  std::cout << "Number of corners in the original mesh " << mesh.nCorners() << std::endl;
-  std::cout << "Number of corners in the glued mesh " << gluedMesh -> nCorners() << std::endl;
-  std::cout << "Number of halfedges in the original mesh " << mesh.nHalfedges() << std::endl;
-  std::cout << "Number of halfedges in the glued mesh " << gluedMesh -> nHalfedges() << std::endl;
-
   EdgeData<double> sigma_edges(*gluedMesh);
   for (Edge e1 : mesh.edges()){
     double sigmaFromOriginalMesh = sigma[e1];

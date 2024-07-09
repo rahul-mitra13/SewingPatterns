@@ -28,7 +28,7 @@ struct PolyLinePoint{
 std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, 
                                             std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>> edgeMappingsPairs);
 
-std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneFormELG(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, 
+std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneFormGluedMesh(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, 
                                             std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>> edgeMappingsPairs);
 
 //returns a vector per face that stores all the isovalues (modulo period) passing through this face

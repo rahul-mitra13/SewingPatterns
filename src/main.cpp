@@ -126,8 +126,7 @@ void showStripePatterns(){
   FaceData<Vector3> timeFunctionGradient = computeTimeFunctionFaceGrad(*globalGeometry, timeFunction);
   globalPSMesh -> addFaceVectorQuantity("gradient", timeFunctionGradient);
 
-  //EdgeData<double> omega = computeMatchingOneForm(*globalGeometry, 0, timeFunctionGradient);
-  EdgeData<double> omega = computeMatchingOneForm(*globalGeometry, 0, timeFunctionGradient, edgeMappingsPairs);
+  EdgeData<double> omega_course = computeMatchingOneForm(*globalGeometry, 0, timeFunctionGradient, edgeMappingsPairs);
 
   std::vector<size_t> perm;
   //set up 1-form viz 
@@ -150,10 +149,10 @@ void showStripePatterns(){
                   - globalGeometry->vertexPositions[globalMesh->edge(pair.first).halfedge().tailVertex()];
     Vector3 e2 =  globalGeometry->vertexPositions[globalMesh->edge(pair.second).halfedge().tipVertex()]
                   - globalGeometry->vertexPositions[globalMesh->edge(pair.second).halfedge().tailVertex()];
-    if (dot(e1, e2) < 0) orientations[pair.second] = !orientations[pair.first];
+    if (dot(e1, e2) < 0) orientations[pair.second] = !orientations[pair.second];
   }
   globalPSMesh -> setEdgePermutation(perm);
-  globalPSMesh -> addOneFormTangentVectorQuantity("omega", omega, orientations);
+  globalPSMesh -> addOneFormTangentVectorQuantity("omega course", omega_course, orientations);
 
   std::vector<int> courseStartEdges = creatEdgeListFromVertexList(*globalGeometry, zeroVertices);
   std::vector<int> courseEndEdges = creatEdgeListFromVertexList(*globalGeometry, oneVertices);
@@ -169,22 +168,35 @@ void showStripePatterns(){
   model.setPeriod(period);
   std::vector<double> modelMatchingTerms; 
   for (Edge e : globalMesh -> edges()){
-    modelMatchingTerms.push_back(omega[e]);
+    modelMatchingTerms.push_back(omega_course[e]);
   }
   model.setMatchingTerms(modelMatchingTerms);
   model.setEdgeMappingsPairs(edgeMappingsPairs);
-  EdgeData<double> sigma = computeOneForm(*globalGeometry, model, *globalPSMesh);
-  globalPSMesh -> addOneFormTangentVectorQuantity("sigma", sigma, orientations);
+  EdgeData<double> sigma_course = computeOneForm(*globalGeometry, model, *globalPSMesh);
+  globalPSMesh -> addOneFormTangentVectorQuantity("sigma course", sigma_course, orientations);
 
   CornerData<double> stripeValuesSigma;
   FaceData<int> stripeIndicesSigma;
   std::vector<Vector3> positions;
   std::vector<std::array<int, 2>> edges;
-  //std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneForm(*globalGeometry, sigma, period, vertexMappingsPairs, edgeMappingsPairs);
-  std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneFormELG(*globalGeometry, sigma, period, vertexMappingsPairs, edgeMappingsPairs);
+  std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneFormGluedMesh(*globalGeometry, sigma_course, period, vertexMappingsPairs, edgeMappingsPairs);
   std::tie(positions, edges) = generateIsoLines(*globalGeometry, stripeValuesSigma, stripeIndicesSigma, period);
-  //globalPSMesh -> addCornerScalarQuantity("tex coords", stripeValuesSigma);
   polyscope::registerCurveNetwork("course stripe patterns", positions, edges);
+
+
+  // EdgeData<double> omega_wale = computeMatchingOneForm(*globalGeometry, 1, timeFunctionGradient, edgeMappingsPairs);
+  // globalPSMesh -> addOneFormTangentVectorQuantity("omega wale", omega_wale, orientations);
+  // //clear the model before setting up the wale stripes
+  // model.clear();
+  // modelMatchingTerms.clear();
+  // model.setPeriod(period);
+  // for (Edge e : globalMesh -> edges()){
+  //   modelMatchingTerms.push_back(omega_wale[e]);
+  // }
+  // model.setMatchingTerms(modelMatchingTerms);
+  // model.setEdgeMappingsPairs(edgeMappingsPairs);
+  // EdgeData<double> sigma_wale = computeOneForm(*globalGeometry, model, *globalPSMesh);
+  // globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigma_wale, orientations);
 
 }
 
@@ -234,9 +246,6 @@ int main(int argc, char **argv) {
     edgeMappingsPairs = buildPairOfStitchedEdges(*globalGeometry, vertexMappingsPairs);
     //render the stitched vertices
     renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
-    //make a glued mesh
-    gluedMesh = createGluedSurfaceMesh(*globalGeometry, vertexMappingsPairs, originalMeshVertexIndexToGluedMeshIndex,
-                                        originalMeshEdgeIndexToGluedMeshIndex, gluedMeshEdgeLengths);
   }
 
   // Disable the ground plane

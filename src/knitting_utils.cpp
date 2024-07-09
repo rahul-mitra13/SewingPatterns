@@ -335,6 +335,9 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
 
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one;
     d_one = geometry.d1;
+    //convert d_one to column major for easy updates of columns 
+    Eigen::SparseMatrix<double, Eigen::ColMajor> d_oneColMajor;
+    d_oneColMajor = d_one;
 
     EdgeData<double> oneForm(mesh);
     FaceData<double> integratedOneForm(mesh);
@@ -344,6 +347,17 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     std::vector<std::pair<int, int>> edgeMappingsPairs = gbModel.getEdgeMappingsPairs();
     double period = gbModel.getPeriod();
 
+    //invert the signs to account for "stitched together" panels
+    for (std::pair<int, int> p : edgeMappingsPairs){
+        int iE2 = p.second;
+        for (Eigen::SparseMatrix<double, Eigen::ColMajor>::InnerIterator it(d_oneColMajor, iE2); it; ++it){
+            it.valueRef() = -it.value();
+        }
+    }
+
+    //convert it back to row major format 
+    d_one = d_oneColMajor;
+    
     try {
         // Create an environment
         GRBEnv env = GRBEnv(true);
