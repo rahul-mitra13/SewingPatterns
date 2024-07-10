@@ -25,6 +25,8 @@ struct PolyLinePoint{
   double isoval;//the isoval (modulo P of this point)
 };
 
+std::vector<Halfedge> vertexHalfedges(IntrinsicGeometryInterface& geometry, SurfaceMesh& gluedMesh, Vertex& v, std::map<int, int>& indexMap);
+
 std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, 
                                             std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>> edgeMappingsPairs);
 

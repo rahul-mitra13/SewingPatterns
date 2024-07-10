@@ -372,7 +372,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
         GRBModel model = GRBModel(env);
 
         //set the timeout
-        model.getEnv().set(GRB_DoubleParam_TimeLimit, 45);
+        model.getEnv().set(GRB_DoubleParam_TimeLimit, 60);
 
         //add variable 1-form variable sigma (per edge)
         std::vector<GRBVar> sigma;

@@ -46,63 +46,68 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
     }
   }
 
-  // this is the standard BFS
-  // std::queue<Vertex> Q;
-  // Q.push(startVertex);
-  // // Floating point thing for knit graph
-  // sigma_mod[startVertex] = 0.0 + 1e-16;
-  // visited[startVertex] = true;
-  // while(!Q.empty()){
-  //   Vertex vi = Q.front(); Q.pop();
-  //   Halfedge h = vi.halfedge();
-  //   do{
-  //     Vertex vj = h.twin().vertex();
-  //     if (!visited[vj]){
-  //       sigma_mod[vj] = fmod(sigma_mod[vi] + sigma_halfedges[h], period);
-  //       visited[vj] = true;
-  //       Q.push(vj);
-  //     }
-  //     h = h.twin().next();
-  //   }
-  //   while( h != vi.halfedge());
-  // }
-
+  //store a map from the original index to index in the glued mesh
+  std::map<int, int> indexMap;
+  //number of "unique vertices" i.e., only consider one vertex per stitch
+  int numUniqueVertices = 0;
+  for (Vertex v : mesh.vertices()){
+    size_t iV = v.getIndex();
+    //iterate over the mappings 
+    for (auto p : vertexMappingsPairs){
+      if (p.first == iV || p.second == iV){
+        if (indexMap.find(p.first) == indexMap.end()
+        && indexMap.find(p.second) == indexMap.end()){
+          indexMap.insert({p.first, numUniqueVertices});
+          indexMap.insert({p.second, numUniqueVertices});
+          numUniqueVertices++;
+        }
+        if (indexMap.find(p.first) != indexMap.end()&&
+          indexMap.find(p.second) == indexMap.end()){
+          indexMap.insert({p.second, indexMap.at(p.first)});
+        }
+        if (indexMap.find(p.second) != indexMap.end() &&
+          indexMap.find(p.first) == indexMap.end()){
+          indexMap.insert({p.first, indexMap.at(p.second)});
+        }
+      }
+    }
+    if (indexMap.find(iV) == indexMap.end()){
+        indexMap.insert({iV, numUniqueVertices});
+        numUniqueVertices++;
+    }
+  }
+  //make a glued mesh (should probably do this once)
+  std::vector<std::vector<size_t>> polygons;
+  geometry.requireEdgeLengths();
+  for (Face f : mesh.faces()){
+    if (f.isBoundaryLoop()) continue;
+    std::vector<size_t> currPolygon;
+    int i = indexMap[f.halfedge().tailVertex().getIndex()];
+    int j = indexMap[f.halfedge().next().tailVertex().getIndex()];
+    int k = indexMap[f.halfedge().next().next().tailVertex().getIndex()];
+    currPolygon.push_back(i);
+    currPolygon.push_back(j);
+    currPolygon.push_back(k);
+    polygons.emplace_back(currPolygon);
+  }
+  //for some reason this is not manifold and has duplicate edges? 
+  SurfaceMesh * gluedMesh = new SurfaceMesh(polygons);
+  //perform BFS on the global connected mesh
   std::queue<Vertex> Q;
   Q.push(startVertex);
   sigma_mod[startVertex] = 0.0;
   visited[startVertex] = true;
   while(!Q.empty()){
     Vertex vi = Q.front(); Q.pop();
-    Halfedge h = vi.halfedge();
-    do{
-      Vertex vj = h.twin().vertex();
+    for (Halfedge he : vertexHalfedges(geometry, *gluedMesh, vi, indexMap)){
+      Vertex vj = he.twin().vertex();
       if (!visited[vj]){
-        sigma_mod[vj] = fmod(sigma_mod[vi] + sigma_halfedges[h], period);
+        sigma_mod[vj] = fmod(sigma_mod[vi] + sigma_halfedges[he], period);
         visited[vj] = true;
         Q.push(vj);
       }
-      h = h.twin().next();
-    }
-    while( h != vi.halfedge());
-    for (std::pair<int, int> p : vertexMappingsPairs){
-      if (vi.getIndex() == p.first){
-        Vertex vj = mesh.vertex(p.second);//jump to "stitched" vertex
-        Halfedge h = vj.halfedge();
-        do{
-          Vertex vk = h.twin().vertex();
-          if (!visited[vk]){
-            sigma_mod[vk] = fmod(sigma_mod[vj] + sigma_halfedges[h], period);
-            visited[vk] = true;
-            Q.push(vk);
-          }
-          h = h.twin().next();
-        }
-        while (h != vj.halfedge());
-      }
     }
   }
-
-  
   //assign texture coordinates
   CornerData<double> textureCoordinates(mesh);
   FaceData<int> paramIndices(mesh);
@@ -371,6 +376,37 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneFormGlue
   }
   //for some reason this is not manifold and has duplicate edges? 
   SurfaceMesh * gluedMesh = new SurfaceMesh(polygons);
+  std::vector<std::pair<int, int>> halfedges;
+  for (Halfedge he : gluedMesh -> halfedges()){
+    if (std::find(halfedges.begin(), halfedges.end(), std::make_pair(he.tailVertex().getIndex(), he.tipVertex().getIndex())) != halfedges.end()){
+      std::cout << "Found a duplicate halfedge between vertices " << he.tailVertex().getIndex() << " and " << he.tipVertex().getIndex() << std::endl;
+      halfedges.push_back(std::make_pair(he.tailVertex().getIndex(), he.tipVertex().getIndex()));
+    }
+  }
+
+  //test some stuff here 
+  //apparently "stitching" front back leads to duplicate faces?
+  // std::vector<std::vector<size_t>> polygonsTest = {{0, 3, 4},
+  //                                                  {0, 4, 1},
+  //                                                  {1, 4, 5},
+  //                                                  {1, 5, 2},
+  //                                                  {3, 6, 7},
+  //                                                  {3, 7, 4},
+  //                                                  {4, 7, 8},
+  //                                                  {4, 8, 5},
+  //                                                  {0, 3, 10},
+  //                                                  {0, 10, 9},
+  //                                                  {9, 10, 5},
+  //                                                  {9, 5, 2},
+  //                                                  {3, 6, 11},
+  //                                                  {3, 11, 10},
+  //                                                  {10, 11, 2},
+  //                                                  {10, 8, 5}
+  //                                                 };
+  // ManifoldSurfaceMesh * testMesh = new ManifoldSurfaceMesh(polygonsTest);
+  // std::cout << "Is test mesh oriented? " << testMesh->isOriented() << std::endl;
+  // std::cout << "Is test mesh manifold? " << testMesh->isManifold() << std::endl;
+
   EdgeData<double> sigma_edges(*gluedMesh);
   for (Edge e1 : mesh.edges()){
     double sigmaFromOriginalMesh = sigma[e1];
@@ -412,7 +448,7 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneFormGlue
   //for instance, on the pants model the stripes in the course direction only looks reasonable if you start 
   //integrating from a specific boundary component, namely the one with vertex 0 for some reason
   //I'm not sure why
-  startVertex = gluedMesh -> vertex(originalIndexToELGIndex[0]);
+  startVertex = gluedMesh -> vertex(originalIndexToELGIndex[54]);
   // for (Vertex v : mesh.vertices()){
   //   if (gluedMesh->vertex(originalIndexToELGIndex[v.getIndex()]).isBoundary()){
   //     std::cout << "Boundary vertex from original mesh to glued mesh " << v << std::endl;
@@ -499,4 +535,27 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneFormGlue
 
   }  
   return std::tie(textureCoordinates, paramIndices);
+}
+
+//outgoing halfedges of a vertex in the "stiched" global mesh
+std::vector<Halfedge> vertexHalfedges(IntrinsicGeometryInterface& geometry, SurfaceMesh& gluedMesh, Vertex& v, std::map<int, int>& indexMap){
+  
+  SurfaceMesh& mesh = geometry.mesh;
+  std::vector<Halfedge> halfedges;
+  std::vector<Halfedge> gluedMeshHalfedges;
+  Vertex gluedMeshVertex = gluedMesh.vertex(indexMap[v.getIndex()]);
+  for (Halfedge he : gluedMeshVertex.outgoingHalfedges()){
+    gluedMeshHalfedges.push_back(he);
+  }
+  //find the corresponding halfedges in the original mesh
+  for (Halfedge he : mesh.halfedges()){
+    for (Halfedge heGlued : gluedMeshHalfedges){
+      if (indexMap[he.tailVertex().getIndex()] == heGlued.tailVertex().getIndex() && indexMap[he.tipVertex().getIndex()] == 
+          heGlued.tipVertex().getIndex()){
+            halfedges.push_back(he);
+        }
+    }
+  }
+
+  return halfedges;
 }
