@@ -347,6 +347,10 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     std::vector<std::pair<int, int>> edgeMappingsPairs = gbModel.getEdgeMappingsPairs();
     double period = gbModel.getPeriod();
 
+    std::cout << "period of the model: " << period << std::endl;
+    std::cout << "size of bdy edges " << bdyEdges.size() << std::endl;
+    std::cout << "size of edge mapping pairs " << edgeMappingsPairs.size() << std::endl;
+
     //invert the signs to account for "stitched together" panels
     for (std::pair<int, int> p : edgeMappingsPairs){
         int iE2 = p.second;

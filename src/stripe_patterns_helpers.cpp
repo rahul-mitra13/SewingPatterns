@@ -19,16 +19,14 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
   }
 
   //update the 1-form for edges that are "stitched together"
+  //update the stitched together edges to account for correct orientation
   for (std::pair<int, int> p : edgeMappingsPairs){
-    for (Halfedge he : mesh.halfedges()){
-      Edge e2 = mesh.edge(p.second);
-      sigma_halfedges[e2.halfedge()] = -sigma_halfedges[e2.halfedge()];
-      sigma_halfedges[e2.halfedge().twin()] = -sigma_halfedges[e2.halfedge().twin()];
-    }
-    Edge e1 = mesh.edge(p.first);
     Edge e2 = mesh.edge(p.second);
-    sigma_halfedges[e2.halfedge().twin()] = sigma_halfedges[e1.halfedge()];
-    sigma_halfedges[e2.halfedge()] = sigma_halfedges[e1.halfedge().twin()];
+    for (Halfedge he : mesh.halfedges()){
+      if (he.edge().getIndex() == e2.getIndex()){
+        sigma_halfedges[he] = -1.0 * sigma_halfedges[he];
+      }
+    }
   }
 
   //integrate up the sigma values now onto vertices
@@ -75,7 +73,6 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
   visited[startVertex] = true;
   while(!Q.empty()){
     Vertex vi = Q.front(); Q.pop();
-    std::cout << "index of vi " << vi.getIndex() << std::endl;
     Halfedge h = vi.halfedge();
     do{
       Vertex vj = h.twin().vertex();
@@ -402,18 +399,31 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneFormGlue
   //integrate up the sigma values now onto vertices
   VertexData<double> sigma_mod(*gluedMesh); 
   VertexData<bool> visited(*gluedMesh, false);
+  int numBdyVertices = 0;
   Vertex startVertex;
   for (Vertex v : gluedMesh -> vertices()){
     if (v.isBoundary()){
       startVertex = v;
+      //numBdyVertices++;
       break;
     }
   }
+  //where you start the integration apparently matters a lot
+  //for instance, on the pants model the stripes in the course direction only looks reasonable if you start 
+  //integrating from a specific boundary component, namely the one with vertex 0 for some reason
+  //I'm not sure why
+  startVertex = gluedMesh -> vertex(originalIndexToELGIndex[0]);
+  // for (Vertex v : mesh.vertices()){
+  //   if (gluedMesh->vertex(originalIndexToELGIndex[v.getIndex()]).isBoundary()){
+  //     std::cout << "Boundary vertex from original mesh to glued mesh " << v << std::endl;
+  //   }
+  // }
+  // std::cout << "Number of boundary vertices in the glued mesh " << numBdyVertices << std::endl;
   //now integrate the 1-form on the glued mesh
   std::queue<Vertex> Q;
   Q.push(startVertex);
   // Floating point thing for knit graph
-  sigma_mod[startVertex] = 0.0 + 1e-16;
+  sigma_mod[startVertex] = 0.0;
   visited[startVertex] = true;
   while(!Q.empty()){
     Vertex vi = Q.front(); Q.pop();
@@ -446,14 +456,14 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneFormGlue
   		sigmaHalfedgesOriginalMesh[he] = -1.0 * sigma[he.edge()];
   	}
   }
-
-  //update the 1-form for edges that are "stitched together"
-  //not convinced I need to do this. In essence just trying to make the values same across edges that are stitched together
+  //update the stitched together edges to account for correct orientation
   for (std::pair<int, int> p : edgeMappingsPairs){
-    Edge e1 = mesh.edge(p.first);
     Edge e2 = mesh.edge(p.second);
-    sigmaHalfedgesOriginalMesh[e2.halfedge().twin()] = sigmaHalfedgesOriginalMesh[e1.halfedge()];
-    sigmaHalfedgesOriginalMesh[e2.halfedge()] = sigmaHalfedgesOriginalMesh[e1.halfedge().twin()];
+    for (Halfedge he : mesh.halfedges()){
+      if (he.edge().getIndex() == e2.getIndex()){
+        sigmaHalfedgesOriginalMesh[he] = -1.0 * sigmaHalfedgesOriginalMesh[he];
+      }
+    }
   }
 
   //assign texture coordinates

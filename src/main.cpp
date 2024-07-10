@@ -156,6 +156,7 @@ void showStripePatterns(){
   std::merge(courseStartEdges.begin(), courseStartEdges.end(),
            courseEndEdges.begin(), courseEndEdges.end(),
            std::back_inserter(bdyEdges));
+  
   //set up the optimization model for the course direction
   Model model;
   float period = 10;
@@ -177,18 +178,28 @@ void showStripePatterns(){
   std::tie(stripeValuesSigma, stripeIndicesSigma) = computeStripeValuesFromOneFormGluedMesh(*globalGeometry, sigma_course, period, vertexMappingsPairs, edgeMappingsPairs);
   std::tie(positions, edges) = generateIsoLines(*globalGeometry, stripeValuesSigma, stripeIndicesSigma, period);
   polyscope::registerCurveNetwork("course stripe patterns", positions, edges);
+  
 
   //set up the optimization model for the wale direction 
   Model modelWale;
-  modelWale.setPeriod(0.1);
+  modelWale.setPeriod(period);
+  std::vector<int> bdyEdgesWale = {314, 319, 301, 306, 387, 305, 332, 396, 328,
+                                  363, 362, 375, 373, 368, 349, 350, 360, 391, 
+                                  393, 400, 399, 401, 389, 394, 379, 385, 
+                                  142, 146, 127, 131, 115, 105, 175, 110, 99,
+                                  177, 179, 166, 181, 183, 130, 199, 193, 147, 
+                                  84, 94, 77, 87, 79, 98, 4, 92, 91};
   std::vector<double> modelMatchingTermsWale;
   EdgeData<double> omega_wale = computeMatchingOneForm(*globalGeometry, 1, timeFunctionGradient, edgeMappingsPairs);
   for (Edge e : globalMesh -> edges()){
     modelMatchingTermsWale.push_back(omega_wale[e]);
   }
+  globalPSMesh -> addOneFormTangentVectorQuantity("omega wale", omega_wale, orientations);
   modelWale.setMatchingTerms(modelMatchingTermsWale);
+  modelWale.setBdyEdges(bdyEdgesWale);
   modelWale.setEdgeMappingsPairs(edgeMappingsPairs);
   EdgeData<double> sigma_wale = computeOneForm(*globalGeometry, modelWale, *globalPSMesh);
+  globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigma_wale, orientations);
   CornerData<double> stripeValuesSigmaWale;
   FaceData<int> stripeIndicesSigmaWale;
   std::vector<Vector3> positionsWale;
