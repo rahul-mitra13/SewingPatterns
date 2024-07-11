@@ -1,7 +1,8 @@
 #include "stripe_patterns_helpers.h"
 
 std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, 
-                                                                            std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>> edgeMappingsPairs){
+                                                                            std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>> edgeMappingsPairs,
+                                                                            polyscope::SurfaceMesh& globalPSMesh){
   
   SurfaceMesh& mesh = geometry.mesh;
 
@@ -92,6 +93,8 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
   }
   //for some reason this is not manifold and has duplicate edges? 
   SurfaceMesh * gluedMesh = new SurfaceMesh(polygons);
+  //start at a boundary vertex if you want stripes to align perfectly with the boundary
+  startVertex = mesh.vertex(0);
   //perform BFS on the global connected mesh
   std::queue<Vertex> Q;
   Q.push(startVertex);
@@ -105,9 +108,22 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
         sigma_mod[vj] = fmod(sigma_mod[vi] + sigma_halfedges[he], period);
         visited[vj] = true;
         Q.push(vj);
+        // for (std::pair<int, int> p : vertexMappingsPairs){
+        //   if (p.first == vj.getIndex() || p.second == vj.getIndex()){//this is a stitched together vertex
+        //     for (Vertex v1 : mesh.vertices()){
+        //       if (indexMap[vj.getIndex()] == indexMap[v1.getIndex()]){
+        //         sigma_mod[v1] = sigma_mod[vj];
+        //         visited[v1] = true;
+        //         Q.push(v1);
+        //       }
+        //     }
+        //   }
+        // }
       }
     }
   }
+
+  globalPSMesh.addVertexScalarQuantity("sigma_mod", sigma_mod);
   //assign texture coordinates
   CornerData<double> textureCoordinates(mesh);
   FaceData<int> paramIndices(mesh);
@@ -448,7 +464,7 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneFormGlue
   //for instance, on the pants model the stripes in the course direction only looks reasonable if you start 
   //integrating from a specific boundary component, namely the one with vertex 0 for some reason
   //I'm not sure why
-  startVertex = gluedMesh -> vertex(originalIndexToELGIndex[54]);
+  startVertex = gluedMesh -> vertex(originalIndexToELGIndex[0]);
   // for (Vertex v : mesh.vertices()){
   //   if (gluedMesh->vertex(originalIndexToELGIndex[v.getIndex()]).isBoundary()){
   //     std::cout << "Boundary vertex from original mesh to glued mesh " << v << std::endl;

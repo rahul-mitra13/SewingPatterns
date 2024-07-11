@@ -493,7 +493,7 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
     //if we're computing the matching 1-form in the wale direction, rotate all the gradients 
     if (direction == 1){
         for (Face f : mesh.faces()){
-            faceGradients[f] = faceGradients[f].rotateAround(geometry.faceNormals[f], PI/2);
+            faceGradients[f] = faceGradients[f].rotateAround(geometry.faceNormals[f], PI/2.);
         }
     }
 

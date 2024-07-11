@@ -7,6 +7,8 @@
 #include "geometrycentral/surface/stripe_patterns.h"
 #include "geometrycentral/surface/edge_length_geometry.h"
 
+#include "polyscope/surface_mesh.h"
+
 #include <vector>
 #include <queue>
 
@@ -28,7 +30,8 @@ struct PolyLinePoint{
 std::vector<Halfedge> vertexHalfedges(IntrinsicGeometryInterface& geometry, SurfaceMesh& gluedMesh, Vertex& v, std::map<int, int>& indexMap);
 
 std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, 
-                                            std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>> edgeMappingsPairs);
+                                            std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>> edgeMappingsPairs,
+                                            polyscope::SurfaceMesh& globalPSMesh);
 
 std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneFormGluedMesh(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, 
                                             std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>> edgeMappingsPairs);
