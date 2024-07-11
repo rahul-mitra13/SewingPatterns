@@ -348,8 +348,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     std::vector<int> bdyEdges = gbModel.getBdyEdges();
     std::vector<std::pair<int, int>> edgeMappingsPairs = gbModel.getEdgeMappingsPairs();
     double period = gbModel.getPeriod();
-
-   
+    std::vector<std::vector<double>> waleBdyPathConstraints = gbModel.getWaleBdyPathConstraints();
 
     //invert the signs to account for "stitched together" panels in d0
     for (std::pair<int, int> p : edgeMappingsPairs){
@@ -361,7 +360,6 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
 
     //invert the signs to account for "stitched together" panels
     for (std::pair<int, int> p : edgeMappingsPairs){
-        std::cout << "edge " << p.first << " mapped to " << " edge " << p.second << std::endl;
         int iE2 = p.second;
         for (Eigen::SparseMatrix<double, Eigen::ColMajor>::InnerIterator it(d_oneColMajor, iE2); it; ++it){
             it.valueRef() = -it.value();
@@ -438,6 +436,13 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
             k.push_back(k_i);//decision variables
         }
 
+        //add boundary integral variable for wale direction stripes 
+        std::vector<GRBVar> waleBdyIntegerConstraints;
+        for (size_t i = 0; i < waleBdyPathConstraints.size(); i++){
+            GRBVar k_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_INTEGER);
+            waleBdyIntegerConstraints.push_back(k_i);
+        }
+
         //first constraint - sigma at boundary edges should be 0
         for (int bdy_edge_index : bdyEdges){
             model.addConstr(sigma[bdy_edge_index] == 0.0, "Boundary Constraint");
@@ -458,6 +463,15 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
             int iEdge1 = edgeMappingsPairs[i].first;
             int iEdge2 = edgeMappingsPairs[i].second;
             model.addConstr(sigma[iEdge2] == sigma[iEdge1], "Stitched Edge Constraint");
+        }
+
+        //fourth contraint - boundary integral in the wale direction
+        for (int i = 0; i < waleBdyPathConstraints.size(); i++){
+            GRBLinExpr pathIntegral = 0;
+            for (int j = 0; j < mesh.nEdges(); j++){
+                pathIntegral += waleBdyPathConstraints[i][j] * sigma[j];
+            }
+            model.addConstr(pathIntegral == period * waleBdyIntegerConstraints[i]);
         }
 
         //trying to match energies

@@ -22,6 +22,9 @@ class Model{
         //boundary edges where we set the value of sigma to 0
         std::vector<int> bdyEdges;
 
+        //boundary loops such that the value of the integral along the boundary = kP (wale direction constraint) along the wale direction
+        std::vector<std::vector<double>> waleBdyPathConstraints;
+
         //edge pairs where the value of sigma should agree 
         std::vector<std::pair<int, int>> edgeMappingsPairs;
 
@@ -54,6 +57,9 @@ class Model{
         //set edge mappings 
         void setEdgeMappingsPairs(std::vector<std::pair<int, int>>& edgeMappingsPairs);
 
+        //set wale path constraints 
+        void setWaleBdyPathConstraints(std::vector<std::vector<double>> waleBdyPathConstraints);
+
         //get edge path constraints 
         std::vector<std::pair<std::vector<double>, double>> getEdgePathConstraints();
 
@@ -77,6 +83,9 @@ class Model{
 
         //get pair of mapped edges 
         std::vector<std::pair<int, int>> getEdgeMappingsPairs();
+
+        //get wale path constraints
+        std::vector<std::vector<double>> getWaleBdyPathConstraints();
 
         //clear the data in the class 
         void clear();

@@ -110,6 +110,9 @@ std::vector<std::pair<int, int>> buildPairOfStitchedEdges(VertexPositionGeometry
 //takes in a vector of vertex indices and returns a list of edge indices making up that vertex list
 std::vector<int> creatEdgeListFromVertexList(VertexPositionGeometry& geometry, std::vector<int>& vertexList);
 
+//takes in a vector of vertex indices in order and returns edge weights corresponoding to those vertices
+std::vector<double> createEdgeWeightsFromVertexList(VertexPositionGeometry& geometry, std::vector<int>& vertexList);
+
 //renders "stitched" together vertices from the 2D panels 
 //
 //@param[in]    geometry        VertexPositionGeometry  input geometry

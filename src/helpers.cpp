@@ -333,6 +333,25 @@ std::vector<int> creatEdgeListFromVertexList(VertexPositionGeometry& geometry, s
     return edgeList;
 }
 
+std::vector<double> createEdgeWeightsFromVertexList(VertexPositionGeometry& geometry, std::vector<int>& vertexList){
+
+    SurfaceMesh& mesh = geometry.mesh;
+    std::vector<double> edgeWeights(mesh.nEdges(), 0.0);
+    for (int i = 0; i < vertexList.size(); i++){
+        int v1 = vertexList[i];
+        int v2 = vertexList[(i + 1) % vertexList.size()];
+        for (Halfedge he : mesh.halfedges()){
+            if (he.tailVertex().getIndex() == v1 && he.tipVertex().getIndex() == v2){
+                if (he.orientation()) edgeWeights[he.edge().getIndex()] = 1.0;
+                else edgeWeights[he.edge().getIndex()] = -1.0;
+                break;
+            }
+        }
+    }
+
+    return edgeWeights;
+}
+
 SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& originalMeshVertexIndexToGluedMeshIndex,
                                         std::map<int, int>& originalMeshEdgeIndexToGluedMeshIndex, std::vector<double>& gluedMeshEdgeLengths){
     SurfaceMesh& mesh = geometry.mesh;
@@ -372,9 +391,6 @@ SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vect
         int i = originalMeshVertexIndexToGluedMeshIndex[f.halfedge().tailVertex().getIndex()];
         int j = originalMeshVertexIndexToGluedMeshIndex[f.halfedge().next().tailVertex().getIndex()];
         int k = originalMeshVertexIndexToGluedMeshIndex[f.halfedge().next().next().tailVertex().getIndex()];
-        // int i = f.halfedge().tailVertex().getIndex();
-        // int j = f.halfedge().next().tailVertex().getIndex();
-        // int k = f.halfedge().next().next().tailVertex().getIndex();
         currPolygon.push_back(i);
         currPolygon.push_back(j);
         currPolygon.push_back(k);

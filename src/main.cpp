@@ -182,12 +182,15 @@ void showStripePatterns(){
 
   //set up the optimization model for the wale direction 
   Model modelWale;
-  std::vector<int> waleBdyEdges = {281, 252, 277, 279, 278, 265, 283, 298, 247,
-                                  201, 271, 204, 208, 217, 222, 231, 246, 236,
-                                  238, 228, 250, 268, 255, 264, 241, 260, 261, 
-                                  68, 67, 74, 75, 71, 52, 59, 63, 90,
-                                  14, 9, 2, 6, 24, 86, 46, 34, 29, 
-                                  163, 161, 155, 138, 164, 113, 144, 150, 141};
+  std::vector<std::vector<double>> waleBdyPathConstraints;
+  std::vector<std::vector<int>> course0Vertices = {{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+                                      {99, 100, 101, 102, 103, 104, 105, 106, 107, 108},
+                                      {148, 149, 150, 151, 152, 153, 154, 155, 156, 157},
+                                      {49, 50, 51, 52, 53, 54, 55, 56, 57, 58}};
+  for (int i = 0; i < course0Vertices.size(); i++){
+    std::vector<double> weights = createEdgeWeightsFromVertexList(*globalGeometry, course0Vertices[i]);
+    waleBdyPathConstraints.push_back(weights);
+  }
   modelWale.setPeriod(period);
   std::vector<double> modelMatchingTermsWale;
   EdgeData<double> omega_wale = computeMatchingOneForm(*globalGeometry, 1, timeFunctionGradient, edgeMappingsPairs);
@@ -197,6 +200,7 @@ void showStripePatterns(){
   globalPSMesh -> addOneFormTangentVectorQuantity("omega wale", omega_wale, orientations);
   modelWale.setMatchingTerms(modelMatchingTermsWale);
   modelWale.setEdgeMappingsPairs(edgeMappingsPairs);
+  modelWale.setWaleBdyPathConstraints(waleBdyPathConstraints);
   EdgeData<double> sigma_wale = computeOneForm(*globalGeometry, modelWale, *globalPSMesh);
   globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigma_wale, orientations);
   CornerData<double> stripeValuesSigmaWale;

@@ -42,6 +42,12 @@ void Model::setEdgeMappingsPairs(std::vector<std::pair<int, int>>& edgeMappingsP
 
 }
 
+void Model::setWaleBdyPathConstraints(std::vector<std::vector<double>> waleBdyPathConstraints){
+
+    this->waleBdyPathConstraints = waleBdyPathConstraints;
+
+}
+
 double Model::getPeriod(){
 
     return this->period;
@@ -72,6 +78,12 @@ std::vector<double> Model::getMatchingTerms(){
 std::vector<std::pair<int, int>> Model::getEdgeMappingsPairs(){
 
     return this->edgeMappingsPairs;
+}
+
+std::vector<std::vector<double>> Model::getWaleBdyPathConstraints(){
+
+    return this->waleBdyPathConstraints;
+
 }
 
 void Model::clear(){
