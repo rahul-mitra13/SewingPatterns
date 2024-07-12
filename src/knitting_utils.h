@@ -72,7 +72,7 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
 //@param[in]    edgeMappingPairs    std::vector<std::pair<int, int>>    vector of pairs where each pair representes "stitched together" edge indices   
 //
 //@return       oneForm     EdgeData<double>        The course 1-form used to specify the stripes
-EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& model, polyscope::SurfaceMesh& psMesh);
+EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& model);
 
 //compute \omega i.e., the 1-form we're trying to match over each edge 
 //

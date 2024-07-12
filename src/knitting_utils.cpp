@@ -114,15 +114,15 @@ VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::ve
     //force boundary conditions
     Eigen::VectorXd b = Eigen::VectorXd::Zero(numUniqueVertices);
     
-    for (Vertex v : boundaryConditions.courseStartBoundaryVertices){
-        int updatedIndex = originalIndexToLaplacianMatrixIndex.at(v.getIndex());
+    for (int v : boundaryConditions.courseStartBoundaryVertices){
+        int updatedIndex = originalIndexToLaplacianMatrixIndex.at(v);
         L.row(updatedIndex) *= 0.0;
         L.coeffRef(updatedIndex, updatedIndex) = 1.0;
         b(updatedIndex) = 0.0;
     }
 
-    for (Vertex v : boundaryConditions.courseEndBoundaryVertices){
-        int updatedIndex = originalIndexToLaplacianMatrixIndex.at(v.getIndex());
+    for (int v : boundaryConditions.courseEndBoundaryVertices){
+        int updatedIndex = originalIndexToLaplacianMatrixIndex.at(v);
         L.row(updatedIndex) *= 0.0;
         L.coeffRef(updatedIndex, updatedIndex) = 1.0;
         b(updatedIndex) = 1.0;
@@ -328,7 +328,7 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
 }
 
 //compute a 1-form over the mesh given an input optimization problem 
-EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel, polyscope::SurfaceMesh& psMesh){
+EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel){
 
     SurfaceMesh& mesh = geometry.mesh;
     geometry.requireDECOperators();
@@ -503,8 +503,6 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     } catch(...) {
         std::cout << "Exception during optimization" << std::endl;
     }
-
-    psMesh.addFaceScalarQuantity("Integrated 1-form value", integratedOneForm);
     return oneForm;
 }
 
