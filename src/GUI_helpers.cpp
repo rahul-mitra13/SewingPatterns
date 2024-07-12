@@ -1,6 +1,6 @@
 #include "GUI_helpers.h"
 
-
+/**
 //get a pair of vertices where the shortest edge path between them specifies the boundary conditions
 std::pair<Vertex, Vertex> getAndRenderUserSpecifiedBoundaryVertices(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, int timeVal){
     std::vector<Vector3> pointCloud(2);
@@ -191,4 +191,48 @@ void getAndRenderBoundaryInfoFromJson(const std::string& jsonFilePath, std::vect
       bdyConditions[i].courseEndBoundaryEdges.insert(bdyConditions[i].courseEndBoundaryEdges.end(), edges.begin(), edges.end());
     }
   }
+}
+*/
+
+globalBoundaryConditions parseJson(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, nlohmann::json& data){
+  
+  SurfaceMesh& mesh = geometry.mesh;
+  globalBoundaryConditions toReturn;
+  
+  std::vector<std::vector<size_t>> courseStart = data["boundaries"]["course"]["start"];
+  std::vector<std::vector<size_t>> courseEnd = data["boundaries"]["course"]["end"];
+
+  for (int i = 0; i < courseStart.size(); i++){
+    Vertex startVertex = mesh.vertex(courseStart[i][0]);
+    Vertex endVertex = mesh.vertex(courseStart[i][1]);
+    std::vector<double> weights;
+    std::vector<Vertex> vertices;
+    std::vector<Edge> edges;
+    std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
+    for (Vertex v : vertices){
+      toReturn.courseStartBoundaryVertices.push_back(v.getIndex());
+    }
+    for (Edge e : edges){
+      toReturn.courseBdyEdges.push_back(e.getIndex());
+    }
+    toReturn.waleBdyPathConstraints.push_back(weights);
+  }
+
+  for (int i = 0; i < courseEnd.size(); i++){
+    Vertex startVertex = mesh.vertex(courseEnd[i][0]);
+    Vertex endVertex = mesh.vertex(courseEnd[i][1]);
+    std::vector<double> weights;
+    std::vector<Vertex> vertices;
+    std::vector<Edge> edges;
+    std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
+    for (Vertex v : vertices){
+      toReturn.courseStartBoundaryVertices.push_back(v.getIndex());
+    }
+    for (Edge e : edges){
+      toReturn.courseBdyEdges.push_back(e.getIndex());
+    }
+    toReturn.waleBdyPathConstraints.push_back(weights);
+  }
+
+  return toReturn;
 }

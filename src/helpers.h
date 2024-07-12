@@ -35,8 +35,11 @@ using namespace geometrycentral::surface;
 
 //global boundary conditions
 struct globalBoundaryConditions{
-    std::vector<Vertex> courseStartBoundaryVertices;
-    std::vector<Vertex> courseEndBoundaryVertices;
+    std::vector<int> courseStartBoundaryVertices;//vertices where t = 0
+    std::vector<int> courseEndBoundaryVertices;//vertices where t = 1
+
+    std::vector<int> courseBdyEdges;//boundary edges in the course direction where sigma = 0
+    std::vector<std::vector<double>> waleBdyPathConstraints;//vector of vectors (each of size nEdges()) where each entry stores the weight of the edge in an integration
 };
 
 
@@ -87,12 +90,12 @@ std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, V
 
 //get the shortest dijkstra edge path on the boundary
 //
-//@parma[in]     geom               VertexPositionGeometry                          input geometry 
-//@param[in]     startVert          Vertex                                          start vertex on the boundary 
-//@param[in]     endVert            Vertex                                          end vertex on the boundary 
+//@parma[in]     geom               VertexPositionGeometry                                          input geometry 
+//@param[in]     startVert          Vertex                                                          start vertex on the boundary 
+//@param[in]     endVert            Vertex                                                          end vertex on the boundary 
 //
-//@return        pair               std::pair<vector<Vertex>, vector<Edge>>         returns a list of vertices and edges on the boundary between the two vertices
-std::pair<std::vector<Vertex>, std::vector<Edge>> getVerticesAndEdgesInShortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
+//@return        tuple              std::tuple<vector<Vertex>, vector<Edge>, vector<double>>        returns a list of vertices and edges on the boundary between the two vertices and edge weights on this he path
+std::tuple<std::vector<Vertex>, std::vector<Edge>, std::vector<double>> getVerticesAndEdgesInShortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
 
 
 //build a vertex mapping map from an input txt file (for a "local" mapping across different models)

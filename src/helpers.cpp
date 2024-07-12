@@ -174,18 +174,21 @@ std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, V
   return std::vector<Halfedge>();
 }
 
-std::pair<std::vector<Vertex>, std::vector<Edge>> getVerticesAndEdgesInShortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert){
+std::tuple<std::vector<Vertex>, std::vector<Edge>, std::vector<double>> getVerticesAndEdgesInShortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert){
     // Gather values
     SurfaceMesh& mesh = geom.mesh;
     std::vector<Vertex> vertices;
     std::vector<Edge> edges;
+    std::vector<double> weights(mesh.nEdges(), 0.0);
     std::vector<Halfedge> heList = shortestEdgePathOnBoundary(geom, startVert, endVert);
     vertices.push_back(heList[0].tailVertex());
     for (Halfedge he : heList){
         vertices.push_back(he.tipVertex());
         edges.push_back(he.edge());
+        if (he.orientation()) weights[he.edge().getIndex()] = 1.0;
+        else weights[he.edge().getIndex()] = -1.0;
     }
-    return std::make_pair(vertices, edges);
+    return std::make_tuple(vertices, edges, weights);
 }
 
 //this builds a mapping
