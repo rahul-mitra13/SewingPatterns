@@ -168,7 +168,6 @@ std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, V
     // Enqueue neighbors
     enqueueVertexNeighbors(currVert, currDist);
   }
-
   // Didn't find path
   geom.unrequireEdgeLengths();
   return std::vector<Halfedge>();
@@ -299,8 +298,7 @@ std::vector<std::pair<int, int>> buildPairOfStitchedEdges(VertexPositionGeometry
     
     SurfaceMesh& mesh = geometry.mesh;
     std::vector<std::pair<int, int>> mappedEdges;
-    int ctr = 0;
-
+    
     //this is so inefficient and is going to suck for larger meshes
     for (std::pair<int, int> p : vertexMappingsPairs){
         Vertex v1 = mesh.vertex(p.first);
@@ -313,7 +311,6 @@ std::vector<std::pair<int, int>> buildPairOfStitchedEdges(VertexPositionGeometry
                 != vertexMappingsPairs.end()) || (std::find(vertexMappingsPairs.begin(), vertexMappingsPairs.end(), std::make_pair(v2he.tipVertex().getIndex(), v1he.tipVertex().getIndex()))
                 != vertexMappingsPairs.end()))
                 mappedEdges.push_back(std::make_pair(v1he.edge().getIndex(), v2he.edge().getIndex()));
-                ctr++;
                 break;
             }
         }
@@ -356,7 +353,7 @@ std::vector<double> createEdgeWeightsFromVertexList(VertexPositionGeometry& geom
 }
 
 SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& originalMeshVertexIndexToGluedMeshIndex,
-                                        std::map<int, int>& originalMeshEdgeIndexToGluedMeshIndex, std::vector<double>& gluedMeshEdgeLengths){
+                                    std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
     SurfaceMesh& mesh = geometry.mesh;
     //find original index to glued mesh index for vertices
     int numUniqueVertices = 0;
@@ -401,5 +398,77 @@ SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vect
     }
     //for some reason this is not manifold and has duplicate edges? 
     SurfaceMesh * gluedMesh = new SurfaceMesh(polygons);
+    
+    //create a map (vertex in original mesh -> outgoing halfedges in the glued mesh)
+    //used in the integration of the 1-form 
+    //this is still so slow ugh
+    for (Vertex v : mesh.vertices()){
+        gluedOneRingMap[v.getIndex()] = std::vector<Halfedge>{};
+        std::vector<Halfedge> halfedges;
+        std::vector<Halfedge> gluedMeshHalfedges;
+        Vertex gluedMeshVertex = gluedMesh->vertex(originalMeshVertexIndexToGluedMeshIndex[v.getIndex()]);
+        for (Halfedge he : gluedMeshVertex.outgoingHalfedges()){
+            gluedMeshHalfedges.push_back(he);
+        }
+        //find the corresponding halfedges in the original mesh
+        for (Halfedge he : mesh.halfedges()){
+            for (Halfedge heGlued : gluedMeshHalfedges){
+                if (originalMeshVertexIndexToGluedMeshIndex[he.tailVertex().getIndex()] == heGlued.tailVertex().getIndex() && originalMeshVertexIndexToGluedMeshIndex[he.tipVertex().getIndex()] == 
+                heGlued.tipVertex().getIndex()){
+                gluedOneRingMap[v.getIndex()].push_back(he);
+                break;
+                }
+            }
+        }
+    }
+
     return gluedMesh;
+}
+
+globalBoundaryConditions parseJson(VertexPositionGeometry& geometry, nlohmann::json& data){
+  
+  SurfaceMesh& mesh = geometry.mesh;
+  globalBoundaryConditions toReturn;
+  
+  std::vector<std::vector<size_t>> courseStart = data["boundaries"]["course"]["start"];
+  std::vector<std::vector<size_t>> courseEnd = data["boundaries"]["course"]["end"];
+  std::vector<Vector3> courseStartVertices; 
+  std::vector<Vector3> courseEndVertices;
+  //parse course start boundary conditions
+  for (int i = 0; i < courseStart.size(); i++){
+    Vertex startVertex = mesh.vertex(courseStart[i][0]);
+    Vertex endVertex = mesh.vertex(courseStart[i][1]);
+    std::vector<double> weights;
+    std::vector<Vertex> vertices;
+    std::vector<Edge> edges;
+    std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
+    for (Vertex v : vertices){
+      toReturn.courseStartBoundaryVertices.push_back(v.getIndex());
+      courseStartVertices.push_back(geometry.vertexPositions[v]);
+    }
+    for (Edge e : edges){
+      toReturn.courseBdyEdges.push_back(e.getIndex());
+    }
+    toReturn.waleBdyPathConstraints.push_back(weights);
+  }
+  //parse course end boundary conditions
+  for (int i = 0; i < courseEnd.size(); i++){
+    Vertex startVertex = mesh.vertex(courseEnd[i][0]);
+    Vertex endVertex = mesh.vertex(courseEnd[i][1]);
+    std::vector<double> weights;
+    std::vector<Vertex> vertices;
+    std::vector<Edge> edges;
+    std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
+    for (Vertex v : vertices){
+      toReturn.courseEndBoundaryVertices.push_back(v.getIndex());
+      courseEndVertices.push_back(geometry.vertexPositions[v]);
+    }
+    for (Edge e : edges){
+      toReturn.courseBdyEdges.push_back(e.getIndex());
+    }
+    toReturn.waleBdyPathConstraints.push_back(weights);
+  }
+  polyscope::registerPointCloud("course start vertices", courseStartVertices);
+  polyscope::registerPointCloud("course end vertices", courseEndVertices);
+  return toReturn;
 }

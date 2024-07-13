@@ -19,10 +19,14 @@
 #include "geometrycentral/surface/edge_length_geometry.h"
 #include "geometrycentral/surface/mesh_graph_algorithms.h"
 
+//json include
+#include "nlohmann/json.hpp"
+
 //polyscope includes
 #include "polyscope/polyscope.h"
 #include "polyscope/surface_mesh.h"
 #include "polyscope/curve_network.h"
+#include "polyscope/point_cloud.h"
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -39,7 +43,7 @@ struct globalBoundaryConditions{
     std::vector<int> courseEndBoundaryVertices;//vertices where t = 1
 
     std::vector<int> courseBdyEdges;//boundary edges in the course direction where sigma = 0
-    std::vector<std::vector<double>> waleBdyPathConstraints;//vector of vectors (each of size nEdges()) where each entry stores the weight of the edge in an integration
+    std::vector<std::vector<double>> waleBdyPathConstraints;//vector of vectors (each of size nEdges()) where each entry stores the weight of the edge in the integration with \sigma
 };
 
 
@@ -124,25 +128,11 @@ std::vector<double> createEdgeWeightsFromVertexList(VertexPositionGeometry& geom
 //@return       none                                    but has a side effect where it calls polyscope to render stitches
 void renderStitchedVertices(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs);
 
+//parse json file and render boundary conditions
+globalBoundaryConditions parseJson(VertexPositionGeometry& geometry, nlohmann::json& data);
+
 //create a new "glued surface mesh"
 //create a mapping from original index to "glued" index (vertex and edges)
 //also populate edge lengths of glued mesh
-SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& originalMeshVertexIndexToGluedMeshIndex,
-                                        std::map<int, int>& originalMeshEdgeIndexToGluedMeshIndex, std::vector<double>& gluedMeshEdgeLengths);
-
-//structure that stores boundary conditions for every patch 
-struct PatchBoundaryConditions{
-    //boundary vertices in the course direction
-    std::vector<Vertex> courseStartBoundaryVertices;
-    std::vector<Vertex> courseEndBoundaryVertices;
-    //boundary vertices in the wale direction
-    std::vector<Vertex> waleStartBoundaryVertices;
-    std::vector<Vertex> waleEndBoundaryVertices;
-
-    //boundary edges in the course direction
-    std::vector<Edge> courseStartBoundaryEdges;
-    std::vector<Edge> courseEndBoundaryEdges;
-    //boundary edges in the wale direction
-    std::vector<Edge> waleStartBoundaryEdges;
-    std::vector<Edge> waleEndBoundaryEdges;
-};
+SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& originalMeshVertexIndexToGluedMeshIndex, 
+                                    std::map<int, std::vector<Halfedge>>& gluedOneRingMap);

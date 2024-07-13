@@ -27,11 +27,9 @@ struct PolyLinePoint{
   double isoval;//the isoval (modulo P of this point)
 };
 
-//gives all the outgoing halfeges in the 1-ring of a vertex in the global mesh setting
-std::vector<Halfedge> vertexHalfedges(IntrinsicGeometryInterface& geometry, SurfaceMesh& gluedMesh, Vertex& v, std::map<int, int>& indexMap);
-
-std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, 
-                                            std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>> edgeMappingsPairs);
+std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, SurfaceMesh& gluedMesh, std::map<int, int>& indexMap, 
+                                                                            std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>>& edgeMappingsPairs, 
+                                                                            std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
 
 //returns a vector per face that stores all the isovalues (modulo period) passing through this face
 FaceData<std::vector<double>> getFaceIsoValues(IntrinsicGeometryInterface& geometry,

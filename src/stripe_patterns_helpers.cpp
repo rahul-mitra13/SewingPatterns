@@ -1,7 +1,8 @@
 #include "stripe_patterns_helpers.h"
 
-std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, 
-                                                                            std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>> edgeMappingsPairs){
+std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, SurfaceMesh& gluedMesh, std::map<int, int>& indexMap, 
+                                                                            std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>>& edgeMappingsPairs,
+                                                                            std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
   
   SurfaceMesh& mesh = geometry.mesh;
 
@@ -45,63 +46,16 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
       }
     }
   }
-
-  //store a map from the original index to index in the glued mesh
-  std::map<int, int> indexMap;
-  //number of "unique vertices" i.e., only consider one vertex per stitch
-  int numUniqueVertices = 0;
-  for (Vertex v : mesh.vertices()){
-    size_t iV = v.getIndex();
-    //iterate over the mappings 
-    for (auto p : vertexMappingsPairs){
-      if (p.first == iV || p.second == iV){
-        if (indexMap.find(p.first) == indexMap.end()
-        && indexMap.find(p.second) == indexMap.end()){
-          indexMap.insert({p.first, numUniqueVertices});
-          indexMap.insert({p.second, numUniqueVertices});
-          numUniqueVertices++;
-        }
-        if (indexMap.find(p.first) != indexMap.end()&&
-          indexMap.find(p.second) == indexMap.end()){
-          indexMap.insert({p.second, indexMap.at(p.first)});
-        }
-        if (indexMap.find(p.second) != indexMap.end() &&
-          indexMap.find(p.first) == indexMap.end()){
-          indexMap.insert({p.first, indexMap.at(p.second)});
-        }
-      }
-    }
-    if (indexMap.find(iV) == indexMap.end()){
-        indexMap.insert({iV, numUniqueVertices});
-        numUniqueVertices++;
-    }
-  }
-  //make a glued mesh (should probably do this once)
-  std::vector<std::vector<size_t>> polygons;
-  geometry.requireEdgeLengths();
-  for (Face f : mesh.faces()){
-    if (f.isBoundaryLoop()) continue;
-    std::vector<size_t> currPolygon;
-    int i = indexMap[f.halfedge().tailVertex().getIndex()];
-    int j = indexMap[f.halfedge().next().tailVertex().getIndex()];
-    int k = indexMap[f.halfedge().next().next().tailVertex().getIndex()];
-    currPolygon.push_back(i);
-    currPolygon.push_back(j);
-    currPolygon.push_back(k);
-    polygons.emplace_back(currPolygon);
-  }
-  //for some reason this is not manifold and has duplicate edges? 
-  SurfaceMesh * gluedMesh = new SurfaceMesh(polygons);
   //start at a boundary vertex if you want stripes to align perfectly with the boundary
   //perform BFS on the global connected mesh
-  startVertex = mesh.vertex(0);
+  //startVertex = mesh.vertex(0);
   std::queue<Vertex> Q;
   Q.push(startVertex);
   sigma_mod[startVertex] = 0.0;
   visited[startVertex] = true;
   while(!Q.empty()){
     Vertex vi = Q.front(); Q.pop();
-    for (Halfedge he : vertexHalfedges(geometry, *gluedMesh, vi, indexMap)){
+    for (Halfedge he : gluedOneRingMap[vi.getIndex()]){
       Vertex vj = he.twin().vertex();
       if (!visited[vj]){
         sigma_mod[vj] = fmod(sigma_mod[vi] + sigma_halfedges[he], period);
@@ -324,27 +278,4 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
   }
 
   return std::tie(points, edges);
-}
-
-//outgoing halfedges of a vertex in the "stiched" global mesh
-std::vector<Halfedge> vertexHalfedges(IntrinsicGeometryInterface& geometry, SurfaceMesh& gluedMesh, Vertex& v, std::map<int, int>& indexMap){
-  
-  SurfaceMesh& mesh = geometry.mesh;
-  std::vector<Halfedge> halfedges;
-  std::vector<Halfedge> gluedMeshHalfedges;
-  Vertex gluedMeshVertex = gluedMesh.vertex(indexMap[v.getIndex()]);
-  for (Halfedge he : gluedMeshVertex.outgoingHalfedges()){
-    gluedMeshHalfedges.push_back(he);
-  }
-  //find the corresponding halfedges in the original mesh
-  for (Halfedge he : mesh.halfedges()){
-    for (Halfedge heGlued : gluedMeshHalfedges){
-      if (indexMap[he.tailVertex().getIndex()] == heGlued.tailVertex().getIndex() && indexMap[he.tipVertex().getIndex()] == 
-          heGlued.tipVertex().getIndex()){
-            halfedges.push_back(he);
-        }
-    }
-  }
-
-  return halfedges;
 }
