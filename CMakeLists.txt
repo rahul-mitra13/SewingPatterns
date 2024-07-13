@@ -115,7 +115,6 @@ add_executable(
         src/model.cpp
         src/knitting_utils.cpp
         src/helpers.cpp
-	      src/GUI_helpers.cpp
 	      src/stripe_patterns_helpers.cpp
 )
 
