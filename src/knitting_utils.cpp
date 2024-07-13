@@ -174,9 +174,7 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, 
     for (Face f : mesh.faces()){
         faceGradients[f] = Vector3{GU(f.getIndex(), 0), GU(f.getIndex(), 1), GU(f.getIndex(), 2)};
     }
-
     return faceGradients;
-
 }
 
 //compute a vector (in ambient space) per vertex that is aligned with the gradient of a scalar field
@@ -368,45 +366,6 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
 
     //convert it back to row major format 
     d_one = d_oneColMajor;
-    //std::cout << "d1 * d0: " << d_one * d_zero << std::endl;
-
-    //some testing code for sparse matrix updates 
-    // Eigen::SparseMatrix<double, Eigen::RowMajor> d0test(6, 6);
-    // d0test.coeffRef(0, 0) = 1;
-    // d0test.coeffRef(0, 1) = -1;
-    // d0test.coeffRef(1, 1) = 1;
-    // d0test.coeffRef(1, 2) = -1;
-    // d0test.coeffRef(2, 0) = 1;
-    // d0test.coeffRef(2, 2) = -1;
-    // d0test.coeffRef(3, 3) = 1;
-    // d0test.coeffRef(3, 4) = -1;
-    // d0test.coeffRef(4, 4) = 1;
-    // d0test.coeffRef(4, 5) = -1;
-    // d0test.coeffRef(5, 3) = -1;
-    // d0test.coeffRef(5, 5) = 1;
-    // Eigen::SparseMatrix<double, Eigen::RowMajor> d1test(2, 6);
-    // d1test.coeffRef(0, 0) = -1;
-    // d1test.coeffRef(0, 1) = -1;
-    // d1test.coeffRef(0, 2) = 1;
-    // d1test.coeffRef(1, 3) = -1;
-    // d1test.coeffRef(1, 4) = -1;
-    // d1test.coeffRef(1, 5) = -1;
-    // std::cout << "d0test: " << d0test << std::endl;
-    // std::cout << "d1test: " << d1test << std::endl;
-    // Eigen::SparseMatrix<double, Eigen::ColMajor> d1testColMajor;
-    // d1testColMajor = d1test;
-    // for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d0test, 3); it; ++it){
-    //     it.valueRef() = -it.value();
-    // }
-
-    // for (Eigen::SparseMatrix<double, Eigen::ColMajor>::InnerIterator it(d1testColMajor, 3); it; ++it){
-    //     it.valueRef() = -it.value();
-    // }
-    // d1test = d1testColMajor;
-    // std::cout << "d0test after update: " << d0test << std::endl;
-    // std::cout << "d1test after update: " << d1test << std::endl;
-    // std::cout << "test result: " << d1test * d0test << std::endl;
-    
     try {
         // Create an environment
         GRBEnv env = GRBEnv(true);
