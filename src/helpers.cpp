@@ -357,6 +357,9 @@ SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vect
     SurfaceMesh& mesh = geometry.mesh;
     //find original index to glued mesh index for vertices
     int numUniqueVertices = 0;
+    //store another map from glued mesh index to original mesh index 
+    std::map<int, int> gluedMeshVertexIndexToOriginalMeshIndex;
+
     for (Vertex v : mesh.vertices()){
         size_t iV = v.getIndex();
         //iterate over the mappings 
@@ -366,6 +369,9 @@ SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vect
                 && originalMeshVertexIndexToGluedMeshIndex.find(p.second) == originalMeshVertexIndexToGluedMeshIndex.end()){
                     originalMeshVertexIndexToGluedMeshIndex.insert({p.first, numUniqueVertices});
                     originalMeshVertexIndexToGluedMeshIndex.insert({p.second, numUniqueVertices});
+                    //put in the other other map 
+                    gluedMeshVertexIndexToOriginalMeshIndex.insert({numUniqueVertices, p.first});
+                    
                     numUniqueVertices++;
                 }
                 if (originalMeshVertexIndexToGluedMeshIndex.find(p.first) != originalMeshVertexIndexToGluedMeshIndex.end()&&
@@ -380,6 +386,9 @@ SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vect
         }
         if (originalMeshVertexIndexToGluedMeshIndex.find(iV) == originalMeshVertexIndexToGluedMeshIndex.end()){
             originalMeshVertexIndexToGluedMeshIndex.insert({iV, numUniqueVertices});
+            //put it in the other map 
+            gluedMeshVertexIndexToOriginalMeshIndex.insert({numUniqueVertices, iV});
+
             numUniqueVertices++;
         }
     }
@@ -398,7 +407,6 @@ SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vect
     }
     //for some reason this is not manifold and has duplicate edges? 
     SurfaceMesh * gluedMesh = new SurfaceMesh(polygons);
-    
     //create a map (vertex in original mesh -> outgoing halfedges in the glued mesh)
     //used in the integration of the 1-form 
     //this is still so slow ugh
@@ -421,6 +429,11 @@ SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vect
             }
         }
     }
+    //set edge lengths in the glued mesh 
+    std::vector<double> edgeLengths(gluedMesh -> nEdges());
+    geometry.requireEdgeLengths();
+    std::cout << "Number of vertices in the original mesh: " << mesh.nVertices() << std::endl;
+    std::cout << "Number of vertices in the glued mesh: " << gluedMesh -> nVertices() << std::endl;
 
     return gluedMesh;
 }

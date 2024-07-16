@@ -98,7 +98,7 @@ std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, V
 //@param[in]     startVert          Vertex                                                          start vertex on the boundary 
 //@param[in]     endVert            Vertex                                                          end vertex on the boundary 
 //
-//@return        tuple              std::tuple<vector<Vertex>, vector<Edge>, vector<double>>        returns a list of vertices and edges on the boundary between the two vertices and edge weights on this he path
+//@return        tuple              std::tuple<vector<Vertex>, vector<Edge>, vector<double>>        returns a tuple of vertices and edges on the boundary between the two vertices and edge weights on this he path
 std::tuple<std::vector<Vertex>, std::vector<Edge>, std::vector<double>> getVerticesAndEdgesInShortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
 
 
