@@ -48,7 +48,7 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
   }
   //start at a boundary vertex if you want stripes to align perfectly with the boundary
   //perform BFS on the global connected mesh
-  startVertex = mesh.vertex(776);
+  startVertex = mesh.vertex(0);
   std::queue<Vertex> Q;
   Q.push(startVertex);
   sigma_mod[startVertex] = 0.0;

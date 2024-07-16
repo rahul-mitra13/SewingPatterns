@@ -432,9 +432,6 @@ SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vect
     //set edge lengths in the glued mesh 
     std::vector<double> edgeLengths(gluedMesh -> nEdges());
     geometry.requireEdgeLengths();
-    std::cout << "Number of vertices in the original mesh: " << mesh.nVertices() << std::endl;
-    std::cout << "Number of vertices in the glued mesh: " << gluedMesh -> nVertices() << std::endl;
-
     return gluedMesh;
 }
 

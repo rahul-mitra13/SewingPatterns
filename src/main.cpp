@@ -61,7 +61,7 @@ void showStripePatterns(){
   // std::vector<int> oneVertices = {113, 114, 115, 116, 117, 118, 119, 120, 121, 122,
   //                                 178, 179, 180, 181, 182, 183, 184, 185, 186, 187};
 
-  VertexData<double> timeFunction = computeTimeFunction(*globalGeometry, vertexMappingsPairs, globalBdyConditions);
+  VertexData<double> timeFunction = computeTimeFunction(*globalGeometry, vertexMappingsPairs, globalBdyConditions, indexMap);
   globalPSMesh->addVertexScalarQuantity("time function", timeFunction);
   FaceData<Vector3> timeFunctionGradient = computeTimeFunctionFaceGrad(*globalGeometry, timeFunction);
   globalPSMesh -> addFaceVectorQuantity("gradient", timeFunctionGradient);
@@ -86,8 +86,8 @@ void showStripePatterns(){
   std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, sigmaCourse, period, *gluedMesh, indexMap, 
                                                                   vertexMappingsPairs, edgeMappingsPairs, gluedOneRingMap);
   std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
-  polyscope::registerCurveNetwork("course stripe patterns", positionsCourse, edgesCourse);
-  
+  auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns", positionsCourse, edgesCourse);
+  courseStripes -> setRadius(0.002);
 
   //set up the optimization model for the wale direction 
   Model modelWale;
@@ -103,6 +103,8 @@ void showStripePatterns(){
   modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
   EdgeData<double> sigmaWale = computeOneForm(*globalGeometry, modelWale);
   globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigmaWale, orientations);
+  //view sigma as an edge scalar
+  //globalPSMesh -> addEdgeScalarQuantity("sigma wale", sigmaWale);
   CornerData<double> stripeValuesSigmaWale;
   FaceData<int> stripeIndicesSigmaWale;
   std::vector<Vector3> positionsWale;
@@ -110,8 +112,8 @@ void showStripePatterns(){
   std::tie(stripeValuesSigmaWale, stripeIndicesSigmaWale) = computeStripeValuesFromOneForm(*globalGeometry, sigmaWale, period, *gluedMesh, indexMap, 
                                                               vertexMappingsPairs, edgeMappingsPairs, gluedOneRingMap);
   std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, stripeValuesSigmaWale, stripeIndicesSigmaWale, period);
-  polyscope::registerCurveNetwork("wale stripe patterns", positionsWale, edgesWale);
-
+  auto waleStripes = polyscope::registerCurveNetwork("wale stripe patterns", positionsWale, edgesWale);
+  waleStripes -> setRadius(0.002);
 }
 
 // A user-defined callback, for creating control panels (etc)

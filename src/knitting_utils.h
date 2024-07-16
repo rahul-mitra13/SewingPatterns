@@ -36,7 +36,7 @@ using namespace geometrycentral::surface;
 //@param[in]    vertexMappings  std::vector<std::pair<int,int>>         map that stores global vertex mappings 
 //
 //@return       timeFunction    VertexData<double>                      the global time function computed over the entire mesh
-VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::vector<std::pair<int,int>>& vertexMappingsPairs, globalBoundaryConditions& boundaryConditions);
+VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::vector<std::pair<int,int>>& vertexMappingsPairs,  globalBoundaryConditions& boundaryConditions, std::map<int, int>& indexMap);
 
 
 //compute the per face gradient of some function defined as a scalar over vertices
