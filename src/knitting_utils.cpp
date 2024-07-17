@@ -322,6 +322,8 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     double period = gbModel.getPeriod();
     std::vector<std::vector<double>> waleBdyPathConstraints = gbModel.getWaleBdyPathConstraints();
 
+    std::cout << "Size of bdy edges: " << bdyEdges.size() << std::endl;
+    std::cout << "Size of wale boundary path constraints: " << waleBdyPathConstraints.size() << std::endl;
     //invert the signs to account for "stitched together" panels in d0
     for (std::pair<int, int> p : edgeMappingsPairs){
         int iE2 = p.second;
@@ -351,6 +353,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
 
         //set the timeout
         model.getEnv().set(GRB_DoubleParam_TimeLimit, 60);
+        model.getEnv().set(GRB_IntParam_OutputFlag, 0);
 
         //add variable 1-form variable sigma (per edge)
         std::vector<GRBVar> sigma;

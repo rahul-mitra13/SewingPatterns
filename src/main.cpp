@@ -97,14 +97,15 @@ void showStripePatterns(){
   for (Edge e : globalMesh -> edges()){
     modelMatchingTermsWale.push_back(omegaWale[e]);
   }
-  globalPSMesh -> addOneFormTangentVectorQuantity("omega wale", omegaWale, orientations);
+  //globalPSMesh -> addOneFormTangentVectorQuantity("omega wale", omegaWale, orientations);
+  globalPSMesh -> addEdgeScalarQuantity("omega wale", omegaWale);
   modelWale.setMatchingTerms(modelMatchingTermsWale);
   modelWale.setEdgeMappingsPairs(edgeMappingsPairs);
   modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
   EdgeData<double> sigmaWale = computeOneForm(*globalGeometry, modelWale);
-  globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigmaWale, orientations);
+  //globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigmaWale, orientations);
   //view sigma as an edge scalar
-  //globalPSMesh -> addEdgeScalarQuantity("sigma wale", sigmaWale);
+  globalPSMesh -> addEdgeScalarQuantity("sigma wale", sigmaWale);
   CornerData<double> stripeValuesSigmaWale;
   FaceData<int> stripeIndicesSigmaWale;
   std::vector<Vector3> positionsWale;
