@@ -406,7 +406,10 @@ SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vect
         polygons.emplace_back(currPolygon);
     }
     //for some reason this is not manifold and has duplicate edges? 
-    SurfaceMesh * gluedMesh = new SurfaceMesh(polygons);
+    ManifoldSurfaceMesh * gluedMesh = new ManifoldSurfaceMesh(polygons);
+    //set edge lengths in the glued mesh 
+    EdgeData<double> edgeLengths(*gluedMesh);
+    geometry.requireEdgeLengths();
     //create a map (vertex in original mesh -> outgoing halfedges in the glued mesh)
     //used in the integration of the 1-form 
     //this is still so slow ugh
@@ -429,9 +432,23 @@ SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vect
             }
         }
     }
-    //set edge lengths in the glued mesh 
-    std::vector<double> edgeLengths(gluedMesh -> nEdges());
-    geometry.requireEdgeLengths();
+
+    for (Edge e1 : gluedMesh -> edges()){
+        int v1 = e1.halfedge().tailVertex().getIndex();
+        int v2 = e1.halfedge().tipVertex().getIndex();
+        //find the corresponding edge in the original mesh 
+        for (Edge e2 : mesh.edges()){
+            if (originalMeshVertexIndexToGluedMeshIndex[e2.halfedge().tailVertex().getIndex()] == v1 &&
+                    originalMeshVertexIndexToGluedMeshIndex[e2.halfedge().tipVertex().getIndex()] == v2){
+                        edgeLengths[e1] = geometry.edgeLengths[e2];
+            
+            }
+        }
+    }
+
+    EdgeLengthGeometry * ELG = new EdgeLengthGeometry(*gluedMesh, edgeLengths);
+    VertexData<Vector2> lineField = computeSmoothestVertexDirectionField(*ELG);
+
     return gluedMesh;
 }
 

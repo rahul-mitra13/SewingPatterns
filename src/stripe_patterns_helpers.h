@@ -27,6 +27,7 @@ struct PolyLinePoint{
   double isoval;//the isoval (modulo P of this point)
 };
 
+//computes the stripes texture coordinates from the passed 1-form
 std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, SurfaceMesh& gluedMesh, std::map<int, int>& indexMap, 
                                                                             std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>>& edgeMappingsPairs, 
                                                                             std::map<int, std::vector<Halfedge>>& gluedOneRingMap);

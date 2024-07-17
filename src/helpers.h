@@ -18,6 +18,7 @@
 #include "geometrycentral/surface/vertex_position_geometry.h"
 #include "geometrycentral/surface/edge_length_geometry.h"
 #include "geometrycentral/surface/mesh_graph_algorithms.h"
+#include "geometrycentral/surface/direction_fields.h"
 
 //json include
 #include "nlohmann/json.hpp"
@@ -109,15 +110,34 @@ std::tuple<std::vector<Vertex>, std::vector<Edge>, std::vector<double>> getVerti
 std::map<std::pair<std::string, int>, std::pair<std::string, int>> buildLocalVertexMappingMapFromFile(const std::string& filename);
 
 //builds a vector of "stitched together" vertices
+//
+//@param[in]    filename    const std::string&                  this is the name of the file that stores the vertex mappings in the global sense 
+//
+//@return       map         std::vector<std::pair<int, int>>    returns a vector of pairs where each pair is a vertex mapping 
 std::vector<std::pair<int, int>> buildPairOfStitchedVerticesFromFile(const std::string& filename);
 
 //builds a vector of "stitched together" edges from a vector of "stitched" together vertices 
+//
+//@param[in]    geometry                VertexPositionGeometry                  input geometry 
+//@param[in]    vertexMappingsPairs     std::vector<std::pair<int, int>>        a vector of vertex mappings pairs
+//
+//@return       vector                  std::vector<std::pair<int, int>>        vector of pairs where each pair denotes edges stitched together
 std::vector<std::pair<int, int>> buildPairOfStitchedEdges(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs);
 
 //takes in a vector of vertex indices and returns a list of edge indices making up that vertex list
+//
+//@param[in]    geometry            VertexPositionGeometry      input geometry 
+//@param[in]    vertexList          std::vector<int>            index of vertices we want to create the edge list from 
+//
+//@return       edgeList            std::vector<int>            vector of edge indices that are the edges in the vertex list 
 std::vector<int> creatEdgeListFromVertexList(VertexPositionGeometry& geometry, std::vector<int>& vertexList);
 
 //takes in a vector of vertex indices in order and returns edge weights corresponoding to those vertices
+//
+//@param[in]    geometry        VertexPositionGeometry      input geometry 
+//@param[in]    vertexList      std::vector<int>            list of vertices in the edge path
+//
+//@return       weights         std::vector<double>         a vector of length nEdges that stores the edge weights of the path that the ordered vertices specify
 std::vector<double> createEdgeWeightsFromVertexList(VertexPositionGeometry& geometry, std::vector<int>& vertexList);
 
 //renders "stitched" together vertices from the 2D panels 
