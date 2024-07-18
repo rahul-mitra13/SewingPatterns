@@ -44,6 +44,7 @@ struct globalBoundaryConditions{
     std::vector<int> courseEndBoundaryVertices;//vertices where t = 1
 
     std::vector<int> courseBdyEdges;//boundary edges in the course direction where sigma = 0
+    std::vector<int> waleBdyEdges;//boundary edges in the wale direction where sigma = 0
     std::vector<std::vector<double>> waleBdyPathConstraints;//vector of vectors (each of size nEdges()) where each entry stores the weight of the edge in the integration with \sigma
 };
 
@@ -151,8 +152,8 @@ void renderStitchedVertices(VertexPositionGeometry& geometry, std::vector<std::p
 //parse json file and render boundary conditions
 globalBoundaryConditions parseJson(VertexPositionGeometry& geometry, nlohmann::json& data);
 
-//create a new "glued surface mesh"
+//create a new "glued" edge length geometry
 //create a mapping from original index to "glued" index (vertex and edges)
 //also populate edge lengths of glued mesh
-SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& originalMeshVertexIndexToGluedMeshIndex, 
+EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& originalMeshVertexIndexToGluedMeshIndex, 
                                     std::map<int, std::vector<Halfedge>>& gluedOneRingMap);

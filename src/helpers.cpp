@@ -352,7 +352,7 @@ std::vector<double> createEdgeWeightsFromVertexList(VertexPositionGeometry& geom
     return edgeWeights;
 }
 
-SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& originalMeshVertexIndexToGluedMeshIndex,
+EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& originalMeshVertexIndexToGluedMeshIndex,
                                     std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
     SurfaceMesh& mesh = geometry.mesh;
     //find original index to glued mesh index for vertices
@@ -405,7 +405,6 @@ SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vect
         currPolygon.push_back(k);
         polygons.emplace_back(currPolygon);
     }
-    //for some reason this is not manifold and has duplicate edges? 
     ManifoldSurfaceMesh * gluedMesh = new ManifoldSurfaceMesh(polygons);
     //set edge lengths in the glued mesh 
     EdgeData<double> edgeLengths(*gluedMesh);
@@ -433,23 +432,34 @@ SurfaceMesh * createGluedSurfaceMesh(VertexPositionGeometry& geometry, std::vect
         }
     }
 
-    for (Edge e1 : gluedMesh -> edges()){
-        int v1 = e1.halfedge().tailVertex().getIndex();
-        int v2 = e1.halfedge().tipVertex().getIndex();
-        //find the corresponding edge in the original mesh 
-        for (Edge e2 : mesh.edges()){
-            if (originalMeshVertexIndexToGluedMeshIndex[e2.halfedge().tailVertex().getIndex()] == v1 &&
-                    originalMeshVertexIndexToGluedMeshIndex[e2.halfedge().tipVertex().getIndex()] == v2){
-                        edgeLengths[e1] = geometry.edgeLengths[e2];
-            
-            }
-        }
-    }
+    // to create an edge length geometry
+    // for (Edge e1 : gluedMesh -> edges()){
+    //     int v1 = e1.halfedge().tailVertex().getIndex();
+    //     int v2 = e1.halfedge().tipVertex().getIndex();
+    //     //find the corresponding edge in the original mesh 
+    //     for (Edge e2 : mesh.edges()){
+    //         if (originalMeshVertexIndexToGluedMeshIndex[e2.halfedge().tailVertex().getIndex()] == v1 &&
+    //                 originalMeshVertexIndexToGluedMeshIndex[e2.halfedge().tipVertex().getIndex()] == v2){
+    //             edgeLengths[e1] = geometry.edgeLengths[e2];
+    //             break;
+    //         }
+    //     }
+    // }
+
+    std::cout << "Number of faces in the original mesh " << mesh.nFaces() << std::endl;
+    std::cout << "Number of faces in the glued mesh " << gluedMesh -> nFaces() << std::endl;
+    std::cout << "Number of edges in the original mesh " << mesh.nEdges() << std::endl;
+    std::cout << "Number of edges in the glued mesh " << gluedMesh -> nEdges() << std::endl;
+    std::cout << "Number of boundaries in the original mesh " << mesh.nBoundaryLoops() << std::endl;
+    std::cout << "Number of boundaries in the glued mesh " << gluedMesh -> nBoundaryLoops() << std::endl;
 
     EdgeLengthGeometry * ELG = new EdgeLengthGeometry(*gluedMesh, edgeLengths);
-    VertexData<Vector2> lineField = computeSmoothestVertexDirectionField(*ELG);
+    // VertexData<Vector2> lineField = computeSmoothestVertexDirectionField(*ELG);
 
-    return gluedMesh;
+    Eigen::SparseMatrix<double, Eigen::RowMajor> d_not = ELG->d0;
+    Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = ELG->d1;
+
+    return ELG;
 }
 
 globalBoundaryConditions parseJson(VertexPositionGeometry& geometry, nlohmann::json& data){
@@ -457,10 +467,10 @@ globalBoundaryConditions parseJson(VertexPositionGeometry& geometry, nlohmann::j
   SurfaceMesh& mesh = geometry.mesh;
   globalBoundaryConditions toReturn;
   
+  //course conditions 
   std::vector<std::vector<size_t>> courseStart = data["boundaries"]["course"]["start"];
   std::vector<std::vector<size_t>> courseEnd = data["boundaries"]["course"]["end"];
-  std::vector<Vector3> courseStartVertices; 
-  std::vector<Vector3> courseEndVertices;
+  std::vector<Vector3> courseBdyVertices; 
   //parse course start boundary conditions
   for (int i = 0; i < courseStart.size(); i++){
     Vertex startVertex = mesh.vertex(courseStart[i][0]);
@@ -471,12 +481,11 @@ globalBoundaryConditions parseJson(VertexPositionGeometry& geometry, nlohmann::j
     std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
     for (Vertex v : vertices){
       toReturn.courseStartBoundaryVertices.push_back(v.getIndex());
-      courseStartVertices.push_back(geometry.vertexPositions[v]);
+      courseBdyVertices.push_back(geometry.vertexPositions[v]);
     }
     for (Edge e : edges){
       toReturn.courseBdyEdges.push_back(e.getIndex());
     }
-    toReturn.waleBdyPathConstraints.push_back(weights);
   }
   //parse course end boundary conditions
   for (int i = 0; i < courseEnd.size(); i++){
@@ -488,14 +497,51 @@ globalBoundaryConditions parseJson(VertexPositionGeometry& geometry, nlohmann::j
     std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
     for (Vertex v : vertices){
       toReturn.courseEndBoundaryVertices.push_back(v.getIndex());
-      courseEndVertices.push_back(geometry.vertexPositions[v]);
+      courseBdyVertices.push_back(geometry.vertexPositions[v]);
     }
     for (Edge e : edges){
       toReturn.courseBdyEdges.push_back(e.getIndex());
     }
-    toReturn.waleBdyPathConstraints.push_back(weights);
   }
-  polyscope::registerPointCloud("course start vertices", courseStartVertices);
-  polyscope::registerPointCloud("course end vertices", courseEndVertices);
+
+  //wale conditions
+  //edge alignment constraints
+  std::vector<Vector3> waleAlignmentVertices; 
+  std::vector<Vector3> waleIntegralConstraints;
+  std::vector<std::vector<size_t>> waleAlignment = data["boundaries"]["wale"]["alignment"];
+  //parse wale alignment boundary conditions 
+  for (int i = 0; i < waleAlignment.size(); i++){
+    Vertex startVertex = mesh.vertex(waleAlignment[i][0]);
+    Vertex endVertex = mesh.vertex(waleAlignment[i][1]);
+    std::vector<double> weights;
+    std::vector<Vertex> vertices; 
+    std::vector<Edge> edges; 
+    std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
+    for (Vertex v : vertices){
+        waleAlignmentVertices.push_back(geometry.vertexPositions[v]);
+    }
+    for (Edge e : edges){
+        toReturn.waleBdyEdges.push_back(e.getIndex());
+    }
+  }
+  //wale integral constraints 
+  std::vector<std::vector<size_t>> waleIntegral = data["boundaries"]["wale"]["integral"];
+  //parse wale integral boundary conditions
+  for (int i = 0; i < waleIntegral.size(); i++){
+    Vertex startVertex = mesh.vertex(waleIntegral[i][0]);
+    Vertex endVertex = mesh.vertex(waleIntegral[i][1]);
+    std::vector<double> weights;
+    std::vector<Vertex> vertices; 
+    std::vector<Edge> edges;
+    std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
+    toReturn.waleBdyPathConstraints.push_back(weights); 
+    for (Vertex v : vertices){
+        waleIntegralConstraints.push_back(geometry.vertexPositions[v]);
+    }
+  }
+
+  polyscope::registerPointCloud("course boundary vertices", courseBdyVertices);
+  polyscope::registerPointCloud("wale edge alignment vertices", waleAlignmentVertices);
+  polyscope::registerPointCloud("wale integral constraint vertices", waleIntegralConstraints);
   return toReturn;
 }
