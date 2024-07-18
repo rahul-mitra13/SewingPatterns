@@ -72,7 +72,7 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
 //@param[in]    edgeMappingPairs    std::vector<std::pair<int, int>>    vector of pairs where each pair representes "stitched together" edge indices   
 //
 //@return       oneForm     EdgeData<double>        The course 1-form used to specify the stripes
-EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& model);
+EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel, polyscope::SurfaceMesh& globalPSMesh);
 
 //compute \omega i.e., the 1-form we're trying to match over each edge 
 //
@@ -81,7 +81,10 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& model);
 //@param[in]    faceGradients       FaceData<Vector3>       the gradients of the time functions we're using to solve for the matching 1-form
 //
 //@return       matchingOneForm     EdgeData<double>        The 1-form we're trying to match 
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3> faceGradients); 
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3> faceGradients);
+
+//compute \omega i.e., the 1-form we're trying to match over each edge in the glued Geometry mesh
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, int direction, FaceData<Vector3> faceGradients);
 
 //compute matching 1-form while taking into account "stitched together" edges
 //same parameters and return type as the function above 

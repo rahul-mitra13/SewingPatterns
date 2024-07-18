@@ -276,7 +276,7 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
 
     for (Vertex v : mesh.vertices()){
         double alpha = angularCoordinate[v.halfedge()]; 
-        std::complex<double> r(cos (2.0 * alpha), sin(1.0 * alpha));
+        std::complex<double> r(cos (2.0 * alpha), sin(2.0 * alpha));
         int i = v.getIndex();
         Vector3 n = geometry.vertexNormals[v];
         Vector3 e = geometry.vertexPositions[v.halfedge().tipVertex()] - geometry.vertexPositions[v.halfedge().tailVertex()];
@@ -300,7 +300,7 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
 }
 
 //compute a 1-form over the mesh given an input optimization problem 
-EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel){
+EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel, polyscope::SurfaceMesh& globalPSMesh){
 
     SurfaceMesh& mesh = geometry.mesh;
     geometry.requireDECOperators();
@@ -315,6 +315,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
 
     EdgeData<double> oneForm(mesh);
     FaceData<double> integratedOneForm(mesh);
+    EdgeData<double> difference(mesh);
 
     std::vector<double> omega = gbModel.getMatchingTerms();
     std::vector<int> bdyEdges = gbModel.getBdyEdges();
@@ -432,6 +433,13 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
         for (Face f : mesh.faces()){
             integratedOneForm[f] = k[f.getIndex()].get(GRB_DoubleAttr_X);
         }
+
+        //put the difference into a mesh for viz purposes 
+        for (Edge e : mesh.edges()){
+            difference[e] = (sigma[e.getIndex()].get(GRB_DoubleAttr_X) - omega[e.getIndex()]) * (sigma[e.getIndex()].get(GRB_DoubleAttr_X) - omega[e.getIndex()]);
+        }
+
+        globalPSMesh.addEdgeScalarQuantity("difference", difference);
     }
     catch(GRBException e) {
         std::cout << "Error code = " << e.getErrorCode() << std::endl;

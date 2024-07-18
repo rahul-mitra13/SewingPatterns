@@ -34,8 +34,8 @@ std::vector<std::pair<int, int>> edgeMappingsPairs;
 std::map<int, int> indexMap;
 //one-ring map for vertices in the glued mesh for performance 
 std::map<int, std::vector<Halfedge>> gluedOneRingMap;
-//build a glued mesh to make our life a little easier for some procedure 
-SurfaceMesh * gluedMesh;
+//build a glued edge length geoemtry to make our life a little easier for some procedures
+EdgeLengthGeometry * gluedELG;
 
 std::unique_ptr<ManifoldSurfaceMesh> globalMesh;
 std::unique_ptr<VertexPositionGeometry> globalGeometry;
@@ -77,32 +77,33 @@ void showStripePatterns(){
   }
   modelCourse.setMatchingTerms(modelMatchingTermsCourse);
   modelCourse.setEdgeMappingsPairs(edgeMappingsPairs);
-  EdgeData<double> sigmaCourse = computeOneForm(*globalGeometry, modelCourse);
+  EdgeData<double> sigmaCourse = computeOneForm(*globalGeometry, modelCourse, *globalPSMesh);
   globalPSMesh -> addOneFormTangentVectorQuantity("sigma course", sigmaCourse, orientations);
   CornerData<double> stripeValuesSigmaCourse;
   FaceData<int> stripeIndicesSigmaCourse;
   std::vector<Vector3> positionsCourse;
   std::vector<std::array<int, 2>> edgesCourse;
-  std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, sigmaCourse, period, *gluedMesh, indexMap, 
+  std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, sigmaCourse, period, gluedELG->mesh, indexMap, 
                                                                   vertexMappingsPairs, edgeMappingsPairs, gluedOneRingMap);
   std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
   auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns", positionsCourse, edgesCourse);
-  courseStripes -> setRadius(0.002);
+  courseStripes -> setRadius(0.004);
 
   //set up the optimization model for the wale direction 
   Model modelWale;
   modelWale.setPeriod(period);
+  modelWale.setBdyEdges(globalBdyConditions.waleBdyEdges);
   std::vector<double> modelMatchingTermsWale;
   EdgeData<double> omegaWale = computeMatchingOneForm(*globalGeometry, 1, timeFunctionGradient, edgeMappingsPairs);
   for (Edge e : globalMesh -> edges()){
     modelMatchingTermsWale.push_back(omegaWale[e]);
   }
-  //globalPSMesh -> addOneFormTangentVectorQuantity("omega wale", omegaWale, orientations);
+  globalPSMesh -> addOneFormTangentVectorQuantity("omega wale", omegaWale, orientations);
   globalPSMesh -> addEdgeScalarQuantity("omega wale", omegaWale);
   modelWale.setMatchingTerms(modelMatchingTermsWale);
   modelWale.setEdgeMappingsPairs(edgeMappingsPairs);
   modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
-  EdgeData<double> sigmaWale = computeOneForm(*globalGeometry, modelWale);
+  EdgeData<double> sigmaWale = computeOneForm(*globalGeometry, modelWale, *globalPSMesh);
   //globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigmaWale, orientations);
   //view sigma as an edge scalar
   globalPSMesh -> addEdgeScalarQuantity("sigma wale", sigmaWale);
@@ -110,11 +111,11 @@ void showStripePatterns(){
   FaceData<int> stripeIndicesSigmaWale;
   std::vector<Vector3> positionsWale;
   std::vector<std::array<int, 2>> edgesWale;
-  std::tie(stripeValuesSigmaWale, stripeIndicesSigmaWale) = computeStripeValuesFromOneForm(*globalGeometry, sigmaWale, period, *gluedMesh, indexMap, 
+  std::tie(stripeValuesSigmaWale, stripeIndicesSigmaWale) = computeStripeValuesFromOneForm(*globalGeometry, sigmaWale, period, gluedELG->mesh, indexMap, 
                                                               vertexMappingsPairs, edgeMappingsPairs, gluedOneRingMap);
   std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, stripeValuesSigmaWale, stripeIndicesSigmaWale, period);
   auto waleStripes = polyscope::registerCurveNetwork("wale stripe patterns", positionsWale, edgesWale);
-  waleStripes -> setRadius(0.002);
+  waleStripes -> setRadius(0.004);
 }
 
 // A user-defined callback, for creating control panels (etc)
@@ -167,7 +168,7 @@ int main(int argc, char **argv) {
   }
   globalPSMesh -> setEdgePermutation(perm);
   globalBdyConditions = parseJson(*globalGeometry, data);
-  gluedMesh = createGluedSurfaceMesh(*globalGeometry, vertexMappingsPairs, indexMap, gluedOneRingMap);
+  gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, indexMap, gluedOneRingMap);
   //render the stitched vertices
   renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
   // Disable the ground plane
