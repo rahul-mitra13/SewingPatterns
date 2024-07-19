@@ -32,12 +32,6 @@
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
-//this file contains even more auxilliary functions used for experimentation, accessing basic mesh data etc
-//1. getBoundaryVertices()
-//2. getBoundaryEdges()
-//3. getVertexPositionsandFaceLists()
-//4. shortestEdgePathOnBoundary()
-
 //global boundary conditions
 struct globalBoundaryConditions{
     std::vector<int> courseStartBoundaryVertices;//vertices where t = 0
@@ -79,7 +73,7 @@ Vector2 projectOntoPlane(const Eigen::Vector3d &vec, const Eigen::Vector3d &norm
 
 // Get vertex positions and face lists from an input geometry.
 //
-// @param[in]   geometry                VertexPositionGeometry                          input geometry  
+// @param[in]   geometry                IntrinsicGeometryInterface                      input geometry  
 //
 //@return       pair of 2 matrices      pair(Eigen::MatrixXd V, Eigen::MatrixXi F)      V -> vertex positions, F -> face index list
 //

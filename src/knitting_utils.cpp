@@ -323,8 +323,6 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     double period = gbModel.getPeriod();
     std::vector<std::vector<double>> waleBdyPathConstraints = gbModel.getWaleBdyPathConstraints();
 
-    std::cout << "Size of bdy edges: " << bdyEdges.size() << std::endl;
-    std::cout << "Size of wale boundary path constraints: " << waleBdyPathConstraints.size() << std::endl;
     //invert the signs to account for "stitched together" panels in d0
     for (std::pair<int, int> p : edgeMappingsPairs){
         int iE2 = p.second;
@@ -461,7 +459,7 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
     //if we're computing the matching 1-form in the wale direction, rotate all the gradients 
     if (direction == 1){
         for (Face f : mesh.faces()){
-            faceGradients[f] = faceGradients[f].rotateAround(geometry.faceNormals[f], PI/2);
+            faceGradients[f] = faceGradients[f].rotateAround(geometry.faceNormals[f], PI/10);
         }
     }
 
@@ -496,6 +494,8 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
     //if we're computing the matching 1-form in the wale direction, rotate all the gradients 
     if (direction == 1){
         for (Face f : mesh.faces()){
+            //first normalize the gradients? 
+            faceGradients[f] = faceGradients[f].normalize();
             faceGradients[f] = faceGradients[f].rotateAround(geometry.faceNormals[f], PI/2.);
         }
     }

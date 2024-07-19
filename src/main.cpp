@@ -23,6 +23,7 @@
 //file includes
 #include "knitting_utils.h"
 #include "stripe_patterns_helpers.h"
+#include "iterative_assignment.h"
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -51,16 +52,8 @@ float period = 10;
 std::vector<size_t> perm;
 std::vector<bool> orientations;
 
-
 //render stripe patterns over the surface
 void showStripePatterns(){ 
-  //jacket
-  // std::vector<int> zeroVertices = {86, 87, 88, 89, 90, 91, 92, 93, 94,
-  //                                 151, 152, 153, 154, 155, 156, 157, 158, 159, 160,
-  //                                 1, 2, 3, 4, 5, 6, 7, 8};
-  // std::vector<int> oneVertices = {113, 114, 115, 116, 117, 118, 119, 120, 121, 122,
-  //                                 178, 179, 180, 181, 182, 183, 184, 185, 186, 187};
-
   VertexData<double> timeFunction = computeTimeFunction(*globalGeometry, vertexMappingsPairs, globalBdyConditions, indexMap);
   globalPSMesh->addVertexScalarQuantity("time function", timeFunction);
   FaceData<Vector3> timeFunctionGradient = computeTimeFunctionFaceGrad(*globalGeometry, timeFunction);
@@ -116,6 +109,10 @@ void showStripePatterns(){
   std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, stripeValuesSigmaWale, stripeIndicesSigmaWale, period);
   auto waleStripes = polyscope::registerCurveNetwork("wale stripe patterns", positionsWale, edgesWale);
   waleStripes -> setRadius(0.004);
+
+  FaceData<int> singPositions(*globalMesh);
+  singPositions = getGreedySingularityPositions(*globalGeometry, *globalPSMesh, timeFunction, omegaCourse, period, edgeMappingsPairs, globalBdyConditions);
+  globalPSMesh -> addFaceScalarQuantity("Greedily placed singular faces", singPositions);
 }
 
 // A user-defined callback, for creating control panels (etc)

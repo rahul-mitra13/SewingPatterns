@@ -8,6 +8,7 @@
 #include "geometrycentral/surface/stripe_patterns.h"
 
 //libigl includes
+//I guess we'll just put all the libigl includes here for now 
 #include <igl/cotmatrix.h>
 #include <igl/colon.h>
 #include <igl/setdiff.h>
@@ -18,6 +19,7 @@
 #include <igl/average_onto_vertices.h>
 #include <igl/hessian_energy.h>
 #include <igl/curved_hessian_energy.h>
+#include <igl/isolines.h>
 
 //helper files
 #include "helpers.h"

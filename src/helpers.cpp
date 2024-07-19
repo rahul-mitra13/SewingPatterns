@@ -81,7 +81,7 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXi> getVertexPositionsandFaceLists(Verte
     SurfaceMesh& mesh = geometry.mesh;
     Eigen::MatrixXd V(mesh.nVertices(), 3);
     Eigen::MatrixXi F(mesh.nFaces(), 3);
-
+    
     for (Vertex v : mesh.vertices()){
         Vector3 pos = geometry.vertexPositions[v];
         V(v.getIndex(), 0) = pos.x;
