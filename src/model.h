@@ -19,6 +19,9 @@ class Model{
         //singular face indices
         std::vector<int> singularFaces;
 
+        //specify all face indices (both smooth and singular)
+        std::vector<int> faceIndices;
+
         //boundary edges where we set the value of sigma to 0
         std::vector<int> bdyEdges;
 
@@ -48,6 +51,9 @@ class Model{
         //set smooth face indices 
         void setSmoothFaceIndices(std::vector<int>& smoothFaces);
 
+        //set all face indices
+        void setFaceIndices(std::vector<int>& faceIndices);
+
         //set course boundary edges
         void setBdyEdges(std::vector<int>& bdyEdges);
 
@@ -58,7 +64,7 @@ class Model{
         void setEdgeMappingsPairs(std::vector<std::pair<int, int>>& edgeMappingsPairs);
 
         //set wale path constraints 
-        void setWaleBdyPathConstraints(std::vector<std::vector<double>> waleBdyPathConstraints);
+        void setWaleBdyPathConstraints(std::vector<std::vector<double>>& waleBdyPathConstraints);
 
         //get edge path constraints 
         std::vector<std::pair<std::vector<double>, double>> getEdgePathConstraints();
@@ -70,11 +76,14 @@ class Model{
         double getTimeOut();
 
         //get smooth faces
-        double getSmoothFaces();
+        std::vector<int> getSmoothFaces();
 
         //get singular faces
-        double getSingularFaces();
+        std::vector<int> getSingularFaces();
 
+        //get all face indices
+        std::vector<int> getFaceIndices();
+        
         //get course boundary edges 
         std::vector<int> getBdyEdges();
 

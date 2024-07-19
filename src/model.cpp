@@ -25,6 +25,12 @@ void Model::setSmoothFaceIndices(std::vector<int>& smoothFaces){
     this->smoothFaces = smoothFaces;
 }
 
+void Model::setFaceIndices(std::vector<int>& faceIndices){
+
+    this->faceIndices = faceIndices;
+
+}
+
 void Model::setBdyEdges(std::vector<int>& bdyEdges){
 
     this->bdyEdges = bdyEdges;
@@ -42,7 +48,7 @@ void Model::setEdgeMappingsPairs(std::vector<std::pair<int, int>>& edgeMappingsP
 
 }
 
-void Model::setWaleBdyPathConstraints(std::vector<std::vector<double>> waleBdyPathConstraints){
+void Model::setWaleBdyPathConstraints(std::vector<std::vector<double>>& waleBdyPathConstraints){
 
     this->waleBdyPathConstraints = waleBdyPathConstraints;
 
@@ -56,6 +62,23 @@ double Model::getPeriod(){
 double Model::getTimeOut(){
 
     return this->timeOut;
+}
+
+std::vector<int> Model::getSmoothFaces(){
+
+    return this->smoothFaces;
+}
+
+std::vector<int> Model::getSingularFaces(){
+
+    return this->singularFaces;
+
+}
+
+std::vector<int> Model::getFaceIndices(){
+
+    return this->faceIndices;
+
 }
 
 std::vector<std::pair<std::vector<double>, double>> Model::getEdgePathConstraints(){
@@ -95,6 +118,7 @@ void Model::clear(){
     bdyEdges.clear();
     matchingTerms.clear();
     edgeMappingsPairs.clear();
+    waleBdyPathConstraints.clear();
 }
 
 
