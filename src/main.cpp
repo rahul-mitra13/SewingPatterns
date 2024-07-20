@@ -33,6 +33,8 @@ std::vector<std::pair<int, int>> vertexMappingsPairs;
 std::vector<std::pair<int, int>> edgeMappingsPairs;
 //build an index map from vertices in the original mesh to vertices in the glued mesh 
 std::map<int, int> indexMap;
+//build a map from edges in the orignal mesh to edges in the glued mesh 
+std::map<int, int> edgeMap;
 //one-ring map for vertices in the glued mesh for performance 
 std::map<int, std::vector<Halfedge>> gluedOneRingMap;
 //build a glued edge length geoemtry to make our life a little easier for some procedures
@@ -58,7 +60,7 @@ void showStripePatterns(){
   globalPSMesh->addVertexScalarQuantity("time function", timeFunction);
   FaceData<Vector3> timeFunctionGradient = computeTimeFunctionFaceGrad(*globalGeometry, timeFunction);
   globalPSMesh -> addFaceVectorQuantity("gradient", timeFunctionGradient);
-  EdgeData<double> omegaCourse = computeMatchingOneForm(*globalGeometry, 0, timeFunctionGradient, edgeMappingsPairs);
+  EdgeData<double> omegaCourse = computeMatchingOneForm(*globalGeometry, *globalPSMesh, 0, timeFunctionGradient, edgeMappingsPairs);
   globalPSMesh -> addOneFormTangentVectorQuantity("omega course", omegaCourse, orientations);
   //set up the optimization model for the course direction
   Model modelCourse;
@@ -87,19 +89,19 @@ void showStripePatterns(){
   modelWale.setPeriod(period);
   modelWale.setBdyEdges(globalBdyConditions.waleBdyEdges);
   std::vector<double> modelMatchingTermsWale;
-  EdgeData<double> omegaWale = computeMatchingOneForm(*globalGeometry, 1, timeFunctionGradient, edgeMappingsPairs);
+  EdgeData<double> omegaWale = computeMatchingOneForm(*globalGeometry, *globalPSMesh, 1, timeFunctionGradient, edgeMappingsPairs);
   for (Edge e : globalMesh -> edges()){
     modelMatchingTermsWale.push_back(omegaWale[e]);
   }
   globalPSMesh -> addOneFormTangentVectorQuantity("omega wale", omegaWale, orientations);
-  globalPSMesh -> addEdgeScalarQuantity("omega wale", omegaWale);
+  // globalPSMesh -> addEdgeScalarQuantity("omega wale", omegaWale);
   modelWale.setMatchingTerms(modelMatchingTermsWale);
   modelWale.setEdgeMappingsPairs(edgeMappingsPairs);
   modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
   EdgeData<double> sigmaWale = computeOneForm(*globalGeometry, modelWale, *globalPSMesh);
-  //globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigmaWale, orientations);
+  globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigmaWale, orientations);
   //view sigma as an edge scalar
-  globalPSMesh -> addEdgeScalarQuantity("sigma wale", sigmaWale);
+  // globalPSMesh -> addEdgeScalarQuantity("sigma wale", sigmaWale);
   CornerData<double> stripeValuesSigmaWale;
   FaceData<int> stripeIndicesSigmaWale;
   std::vector<Vector3> positionsWale;
@@ -110,9 +112,9 @@ void showStripePatterns(){
   auto waleStripes = polyscope::registerCurveNetwork("wale stripe patterns", positionsWale, edgesWale);
   waleStripes -> setRadius(0.004);
 
-  FaceData<int> singPositions(*globalMesh);
-  singPositions = getGreedySingularityPositions(*globalGeometry, *globalPSMesh, timeFunction, omegaCourse, period, edgeMappingsPairs, globalBdyConditions);
-  globalPSMesh -> addFaceScalarQuantity("Greedily placed singular faces", singPositions);
+  // FaceData<int> singPositions(*globalMesh);
+  // singPositions = getGreedySingularityPositions(*globalGeometry, *globalPSMesh, timeFunction, omegaCourse, period, edgeMappingsPairs, globalBdyConditions);
+  // globalPSMesh -> addFaceScalarQuantity("greedy singularities", singPositions);
 }
 
 // A user-defined callback, for creating control panels (etc)
@@ -165,7 +167,7 @@ int main(int argc, char **argv) {
   }
   globalPSMesh -> setEdgePermutation(perm);
   globalBdyConditions = parseJson(*globalGeometry, data);
-  gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, indexMap, gluedOneRingMap);
+  gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, indexMap, edgeMap, gluedOneRingMap);
   //render the stitched vertices
   renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
   // Disable the ground plane

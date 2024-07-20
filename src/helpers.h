@@ -150,4 +150,4 @@ globalBoundaryConditions parseJson(VertexPositionGeometry& geometry, nlohmann::j
 //create a mapping from original index to "glued" index (vertex and edges)
 //also populate edge lengths of glued mesh
 EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& originalMeshVertexIndexToGluedMeshIndex, 
-                                    std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
+                                    std::map<int, int>& originalMeshEdgeIndexToGluedMeshIndex, std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
