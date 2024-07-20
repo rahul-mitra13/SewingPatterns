@@ -249,7 +249,7 @@ Eigen::VectorXd computeIterativeOneForm(VertexPositionGeometry& geometry, polysc
 
     FaceData<Vector3> gradients = computeOneFormGrad(geometry, oneForm);
     psMesh.addFaceVectorQuantity("Iterative gradients", gradients); 
-    EdgeData<double> matchingEnergy = computeMatchingOneForm(geometry, 0, gradients, edgeMappingsPairs);
+    EdgeData<double> matchingEnergy = computeMatchingOneForm(geometry, psMesh, 0, gradients, edgeMappingsPairs);
     
     for (Edge e : mesh.edges()){
         toReturn(e.getIndex()) = matchingEnergy[e];

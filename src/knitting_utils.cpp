@@ -309,6 +309,8 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_zero;
     d_zero = geometry.d0;
     d_one = geometry.d1;
+    Eigen::SparseMatrix<double> prodTest = d_one * d_zero; 
+    
     //convert d_one to column major for easy updates of columns 
     Eigen::SparseMatrix<double, Eigen::ColMajor> d_oneColMajor;
     d_oneColMajor = d_one;
@@ -330,7 +332,6 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
             it.valueRef() = -it.value();
         }
     }
-
     //invert the signs to account for "stitched together" panels
     for (std::pair<int, int> p : edgeMappingsPairs){
         int iE2 = p.second;
@@ -338,9 +339,16 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
             it.valueRef() = -it.value();
         }
     }
-
     //convert it back to row major format 
     d_one = d_oneColMajor;
+    Eigen::VectorXd constFunc(mesh.nVertices());
+    constFunc.setOnes();
+    Eigen::SparseMatrix<double> prod = d_one * d_zero;
+    //sanity check for construction of derivatives 
+    std::cout<< "the number of nonzeros with comparison: \n"
+    << (Eigen::Map<Eigen::VectorXd> (prod.valuePtr(), prod.nonZeros()).array() != 0).count()
+    << std::endl;
+    
     try {
         // Create an environment
         GRBEnv env = GRBEnv(true);
@@ -459,7 +467,7 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
     //if we're computing the matching 1-form in the wale direction, rotate all the gradients 
     if (direction == 1){
         for (Face f : mesh.faces()){
-            faceGradients[f] = faceGradients[f].rotateAround(geometry.faceNormals[f], PI/10);
+            faceGradients[f] = faceGradients[f].rotateAround(geometry.faceNormals[f], PI/2.);
         }
     }
 
@@ -486,7 +494,7 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
 }
 
 //comput matching 1-form while taking into account "stitched together" edges
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3> faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs){
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, int direction, FaceData<Vector3> faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs){
 
     SurfaceMesh& mesh = geometry.mesh;
     geometry.requireFaceNormals();
@@ -498,8 +506,9 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
             faceGradients[f] = faceGradients[f].normalize();
             faceGradients[f] = faceGradients[f].rotateAround(geometry.faceNormals[f], PI/2.);
         }
+        //psMesh.addFaceVectorQuantity("rotated gradient", faceGradients);
+        //std::cout << "Computing machine 1-form for wale direction " << std::endl;
     }
-
     int numStitchedEdges = 0;
     //create a map from the mapped edges
     std::map<int, int> edgeMap;
@@ -536,7 +545,7 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
                 //just pick the original edge as the "canonical" direction in the global mesh
                 //I'm not really sure the polyscope Whitney interpolation scheme is the best way to visualize these
                 omega[e] = 0.5 * dot((faceGradients1 + faceGradients2), e1);
-                omega[mesh.edge(edgeMap.at(e.getIndex()))] = 0.5 * dot((faceGradients1 + faceGradients2), e1);
+                omega[mesh.edge(edgeMap.at(e.getIndex()))] = 0.5 * dot((faceGradients1 + (faceGradients2)), e1);
                 seenEdges[e.getIndex()] = true;
                 seenEdges[edgeMap.at(e.getIndex())] = true;
             }
