@@ -309,7 +309,6 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_zero;
     d_zero = geometry.d0;
     d_one = geometry.d1;
-    Eigen::SparseMatrix<double> prodTest = d_one * d_zero; 
     
     //convert d_one to column major for easy updates of columns 
     Eigen::SparseMatrix<double, Eigen::ColMajor> d_oneColMajor;
@@ -456,6 +455,166 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     return oneForm;
 }
 
+EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& globalPSMesh){
+
+    SurfaceMesh& globalMesh = geometry.mesh; 
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
+
+    EdgeData<double> oneForm(globalMesh);
+    FaceData<double> integratedOneForm(globalMesh);
+    EdgeData<double> difference(globalMesh);
+    //this information exists in the global geometry setting 
+    std::vector<double> omegaGlobal = gbModel.getMatchingTerms();
+    //omega is information in the glued mesh setting
+    std::vector<double> omega(gluedMesh.nEdges());
+    //convert it to the glued mesh setting 
+    for (const std::pair<int, int> &p : edgeMap){
+        omega[p.second] = omegaGlobal[p.first];
+    }
+    //these are global edge mappings
+    std::vector<std::pair<int, int>> edgeMappingsPairs = gbModel.getEdgeMappingsPairs();
+    //these are boundary edges in the global mesh setting 
+    std::vector<int> bdyEdgesGlobal = gbModel.getBdyEdges();
+    //convert it to the glued mesh setting 
+    std::vector<int> bdyEdges; 
+    //convert it to the glued mesh setting 
+    for (int index : bdyEdgesGlobal){
+        bdyEdges.push_back(edgeMap[index]);
+    }
+    double period = gbModel.getPeriod();
+    //come back to these loop constraints later
+    std::vector<std::vector<double>> waleBdyPathConstraints = gbModel.getWaleBdyPathConstraints();
+    //differential operators on the glued mesh
+    Eigen::SparseMatrix<double, Eigen::RowMajor> d_zero(gluedMesh.nEdges(), gluedMesh.nVertices());
+    Eigen::SparseMatrix<double, Eigen::RowMajor> d_one(gluedMesh.nFaces(), gluedMesh.nEdges());
+    //d_zero = gluedGeometry.d0;
+    //d_one = gluedGeometry.d1;
+    //build d0
+    for (Edge e : gluedMesh.edges()){
+        int indexSource = e.halfedge().tailVertex().getIndex();//-1
+        int indexTarget = e.halfedge().tipVertex().getIndex();//+1
+        d_zero.coeffRef(e.getIndex(), indexSource) = -1;
+        d_zero.coeffRef(e.getIndex(), indexTarget) = +1;
+    }
+    //build d1
+    for (Face f : gluedMesh.faces()){
+        for (Halfedge he : f.adjacentHalfedges()){
+            if (he.orientation()){
+                d_one.coeffRef(f.getIndex(), he.edge().getIndex()) = +1;
+            }
+            else{
+                d_one.coeffRef(f.getIndex(), he.edge().getIndex()) = -1;
+            }
+        }
+    }
+    std::cout<< "the number of nonzeros with comparison: \n"
+    << (Eigen::Map<Eigen::VectorXd> (d_one.valuePtr(), d_one.nonZeros()).array() != 0).count()
+    << std::endl;
+
+
+    try {
+        // Create an environment
+        GRBEnv env = GRBEnv(true);
+        env.set("LogFile", "1-form computation.log");
+        env.start();
+
+        // Create an empty model
+        GRBModel model = GRBModel(env);
+
+        //set the timeout
+        model.getEnv().set(GRB_DoubleParam_TimeLimit, 60);
+        //model.getEnv().set(GRB_IntParam_OutputFlag, 0);
+
+        //add variable 1-form variable sigma (per edge)
+        std::vector<GRBVar> sigma;
+
+        for (size_t i = 0; i < gluedMesh.nEdges(); i++){
+            GRBVar sigma_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS);
+            //add gurobi vars
+            sigma.push_back(sigma_i);//decision variables
+        }
+
+        //add variable for integral of 1-form over each face
+        std::vector<GRBVar> k;
+        //add integer variable k (per face) (not including faces represented as boundaries)
+        for (size_t i = 0; i < gluedMesh.nFaces(); i++){
+            GRBVar k_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_INTEGER);
+            k.push_back(k_i);//decision variables
+        }
+
+        //add boundary integral variable for wale direction stripes 
+        std::vector<GRBVar> waleBdyIntegerConstraints;
+        for (size_t i = 0; i < waleBdyPathConstraints.size(); i++){
+            GRBVar k_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_INTEGER);
+            waleBdyIntegerConstraints.push_back(k_i);
+        }
+
+        //first constraint - sigma at boundary edges should be 0
+        for (int bdy_edge_index : bdyEdges){
+            model.addConstr(sigma[bdy_edge_index] == 0.0, "Boundary Constraint");
+        }
+        
+        //second constraint - (d1*sigma) == kP, P is period of optimization, k \in \mathbb{Z}
+        for (int r = 0; r < d_one.outerSize(); ++r) {
+            GRBLinExpr lhs = 0;
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_one, r); it; ++it ) {
+                lhs += it.value() * sigma[it.col()];
+            }
+            model.addConstr(lhs == 0, "Integral Constraint");
+            //model.addConstr(lhs == period * k[r], "Integral Constraint");
+        }
+
+        //third constraint - boundary integral in the wale direction
+        for (int i = 0; i < waleBdyPathConstraints.size(); i++){
+            GRBLinExpr pathIntegral = 0;
+            for (int j = 0; j < gluedMesh.nEdges(); j++){
+                pathIntegral += waleBdyPathConstraints[i][j] * sigma[j];
+            }
+            model.addConstr(pathIntegral == period * waleBdyIntegerConstraints[i]);
+        }
+
+        //trying to match energies
+        GRBQuadExpr diff1_sum = 0;
+
+        for (int i = 0; i < gluedMesh.nEdges(); i++){
+            diff1_sum += (sigma[i] - omega[i]) * (sigma[i] - omega[i]);
+        }
+
+
+        GRBQuadExpr obj = diff1_sum;
+
+        model.setObjective(obj);
+        model.optimize(); 
+        std::cout << "Obj: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
+    
+        //put the computed one-form into an edge vector
+        for (Edge e : globalMesh.edges()){
+            oneForm[e] = sigma[edgeMap[e.getIndex()]].get(GRB_DoubleAttr_X);
+            //std::cout << "one form at edge " << e << " is " << oneForm[e] << std::endl;
+        }
+        //put the singular faces into a face vector 
+        for (Face f : globalMesh.faces()){
+            integratedOneForm[f] = k[f.getIndex()].get(GRB_DoubleAttr_X);
+            //std::cout << "integrated one form at face " << f << " is " << integratedOneForm[f] << std::endl;
+        }
+
+        //put the difference into an edge vector for viz purposes 
+        for (Edge e : globalMesh.edges()){
+            difference[e] = (sigma[edgeMap[e.getIndex()]].get(GRB_DoubleAttr_X) - omega[edgeMap[e.getIndex()]]) * (sigma[edgeMap[e.getIndex()]].get(GRB_DoubleAttr_X) - omega[edgeMap[e.getIndex()]]);
+            //std::cout << "difference at edge " << e << ": " << difference[e] << std::endl;
+        }
+
+        globalPSMesh.addEdgeScalarQuantity("difference", difference);
+    }
+    catch(GRBException e) {
+        std::cout << "Error code = " << e.getErrorCode() << std::endl;
+        std::cout << e.getMessage() << std::endl;
+    } catch(...) {
+        std::cout << "Exception during optimization" << std::endl;
+    }
+    return oneForm;
+}
+
 //compute \omega that is the 1-form we're trying to match over each edge 
 EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3> faceGradients){
     
@@ -556,6 +715,20 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polysc
                 seenEdges[e.getIndex()] = true;
             }
         }
+    }
+    return omega;
+}
+
+//compute matching 1-form in the glued edge length geometry setting 
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& globalMatchingOneForm, std::map<int, int>& edgeMap){
+
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    EdgeData<double> omega(gluedMesh);
+
+    for (const std::pair<int, int> &p : edgeMap){
+        std::cout << globalMatchingOneForm[globalMesh.edge(p.first)] << std::endl;
+        omega[gluedMesh.edge(p.second)] = globalMatchingOneForm[globalMesh.edge(p.first)];
     }
     return omega;
 }

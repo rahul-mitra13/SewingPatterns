@@ -76,21 +76,26 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
 //@return       oneForm     EdgeData<double>        The course 1-form used to specify the stripes
 EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel, polyscope::SurfaceMesh& globalPSMesh);
 
+//compute a 1-form that will be used to generate the stripes over the pathces 
+//overload from the function above
+//it does the optimization in the glued mesh setting 
+EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh);
+
 //compute \omega i.e., the 1-form we're trying to match over each edge 
 //
 //@param[in]    geometry            VertexPositionGeometry  input geometry
 //@param[in]    direction           int                     integer representing the direction for omega that we're attempting to generate (0 -> course, 1 -> wale)
-//@param[in]    faceGradients       FaceData<Vector3>       the gradients of the time functions we're using to solve for the matching 1-form
+//@param[in]    faceGradients       FaceData<Vector3>       the gradients of the time function we're using to solve for the matching 1-form
 //
 //@return       matchingOneForm     EdgeData<double>        The 1-form we're trying to match 
 EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3> faceGradients);
 
-//compute \omega i.e., the 1-form we're trying to match over each edge in the glued Geometry mesh
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, int direction, FaceData<Vector3> faceGradients);
-
 //compute matching 1-form while taking into account "stitched together" edges
 //same parameters and return type as the function above 
-//addition parameter 
+//additional parameter 
 //@param[in]    edgeMappingsPairs       std::vector<std::pair<int, int>>    vector of pairs where each pair stores edges that are stitched together
 EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, int direction, FaceData<Vector3> faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs);
+
+//compute \omega i.e., the 1-form we're trying to match over each edge in the glued Geometry mesh
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& globalMatchingOneForm, std::map<int, int>& edgeMap);
 
