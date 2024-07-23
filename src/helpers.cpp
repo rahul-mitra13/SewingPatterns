@@ -432,18 +432,15 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
         }
     }
 
-    //build a map from edges in the original mesh to edges in the glued mesh
-    std::map<int, int> edgeMap; 
-    // to create an edge length geometry
-    for (Edge e1 : gluedMesh -> edges()){
-        int v1 = e1.halfedge().tailVertex().getIndex();
-        int v2 = e1.halfedge().tipVertex().getIndex();
-        //find the corresponding edge in the original mesh 
-        for (Edge e2 : mesh.edges()){
-            if (originalMeshVertexIndexToGluedMeshIndex[e2.halfedge().tailVertex().getIndex()] == v1 &&
-                    originalMeshVertexIndexToGluedMeshIndex[e2.halfedge().tipVertex().getIndex()] == v2){
-                edgeLengths[e1] = geometry.edgeLengths[e2];
-                edgeMap.insert({e2.getIndex(), e1.getIndex()});
+    //build a map from edges in the original mesh to edges in the glued mesh 
+    for (Halfedge he1 : mesh.halfedges()){
+        int v1 = originalMeshVertexIndexToGluedMeshIndex[he1.tailVertex().getIndex()];
+        int v2 = originalMeshVertexIndexToGluedMeshIndex[he1.tipVertex().getIndex()];
+        //find the corresponding edge in the glued mesh 
+        for (Halfedge he2 : gluedMesh->halfedges()){
+            if (he2.tailVertex().getIndex() == v1 && he2.tipVertex().getIndex() == v2){
+                originalMeshEdgeIndexToGluedMeshIndex.insert({he1.edge().getIndex(), he2.edge().getIndex()});
+                edgeLengths[he2.edge()] = geometry.edgeLengths[he1.edge()];
                 break;
             }
         }
@@ -451,15 +448,16 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
 
     std::cout << "Number of faces in the original mesh " << mesh.nFaces() << std::endl;
     std::cout << "Number of faces in the glued mesh " << gluedMesh -> nFaces() << std::endl;
+    std::cout << "Number of vertices in the original mesh " << mesh.nVertices() << std::endl;
+    std::cout << "Number of vertices in the glued mesh " << gluedMesh -> nVertices() << std::endl;
     std::cout << "Number of edges in the original mesh " << mesh.nEdges() << std::endl;
     std::cout << "Number of edges in the glued mesh " << gluedMesh -> nEdges() << std::endl;
     std::cout << "Number of boundaries in the original mesh " << mesh.nBoundaryLoops() << std::endl;
     std::cout << "Number of boundaries in the glued mesh " << gluedMesh -> nBoundaryLoops() << std::endl;
+    std::cout << "Number of connected components in the original mesh " << mesh.nConnectedComponents() << std::endl;
+    std::cout << "Number of connected components ih the glued mesh " << gluedMesh -> nConnectedComponents() << std::endl;
 
     EdgeLengthGeometry * ELG = new EdgeLengthGeometry(*gluedMesh, edgeLengths);
-    Eigen::SparseMatrix<double, Eigen::RowMajor> d_not = ELG->d0;
-    Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = ELG->d1;
-
     return ELG;
 }
 

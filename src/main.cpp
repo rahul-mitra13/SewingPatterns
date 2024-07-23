@@ -28,8 +28,9 @@
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
-//vertex mappings from txt file (JUST CALL PYTHON HERE UGHHH)
+//vertex mappings from txt file (between panels)
 std::vector<std::pair<int, int>> vertexMappingsPairs;
+//edge mappings from txt file
 std::vector<std::pair<int, int>> edgeMappingsPairs;
 //build an index map from vertices in the original mesh to vertices in the glued mesh 
 std::map<int, int> indexMap;
@@ -38,7 +39,7 @@ std::map<int, int> edgeMap;
 //one-ring map for vertices in the glued mesh for performance 
 std::map<int, std::vector<Halfedge>> gluedOneRingMap;
 //build a glued edge length geoemtry to make our life a little easier for some procedures
-EdgeLengthGeometry * gluedELG;
+EdgeLengthGeometry *gluedELG;
 
 std::unique_ptr<ManifoldSurfaceMesh> globalMesh;
 std::unique_ptr<VertexPositionGeometry> globalGeometry;
@@ -62,6 +63,7 @@ void showStripePatterns(){
   globalPSMesh -> addFaceVectorQuantity("gradient", timeFunctionGradient);
   EdgeData<double> omegaCourse = computeMatchingOneForm(*globalGeometry, *globalPSMesh, 0, timeFunctionGradient, edgeMappingsPairs);
   globalPSMesh -> addOneFormTangentVectorQuantity("omega course", omegaCourse, orientations);
+  
   //set up the optimization model for the course direction
   Model modelCourse;
   modelCourse.setBdyEdges(globalBdyConditions.courseBdyEdges);
@@ -72,17 +74,20 @@ void showStripePatterns(){
   }
   modelCourse.setMatchingTerms(modelMatchingTermsCourse);
   modelCourse.setEdgeMappingsPairs(edgeMappingsPairs);
-  EdgeData<double> sigmaCourse = computeOneForm(*globalGeometry, modelCourse, *globalPSMesh);
-  globalPSMesh -> addOneFormTangentVectorQuantity("sigma course", sigmaCourse, orientations);
+  //sigma course over the glued edge length geometry
+  EdgeData<double> sigmaCourseELG(*globalMesh);
+  sigmaCourseELG = computeOneForm(*globalGeometry, *gluedELG, modelCourse, edgeMap, *globalPSMesh);
+  globalPSMesh -> addOneFormTangentVectorQuantity("sigma course", sigmaCourseELG, orientations);
   CornerData<double> stripeValuesSigmaCourse;
   FaceData<int> stripeIndicesSigmaCourse;
   std::vector<Vector3> positionsCourse;
   std::vector<std::array<int, 2>> edgesCourse;
-  std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, sigmaCourse, period, gluedELG->mesh, indexMap, 
+  std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, sigmaCourseELG, period, gluedELG->mesh, indexMap, 
                                                                   vertexMappingsPairs, edgeMappingsPairs, gluedOneRingMap);
   std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
   auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns", positionsCourse, edgesCourse);
   courseStripes -> setRadius(0.004);
+  
 
   //set up the optimization model for the wale direction 
   Model modelWale;
@@ -111,10 +116,12 @@ void showStripePatterns(){
   std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, stripeValuesSigmaWale, stripeIndicesSigmaWale, period);
   auto waleStripes = polyscope::registerCurveNetwork("wale stripe patterns", positionsWale, edgesWale);
   waleStripes -> setRadius(0.004);
-
-  // FaceData<int> singPositions(*globalMesh);
-  // singPositions = getGreedySingularityPositions(*globalGeometry, *globalPSMesh, timeFunction, omegaCourse, period, edgeMappingsPairs, globalBdyConditions);
-  // globalPSMesh -> addFaceScalarQuantity("greedy singularities", singPositions);
+ 
+  //for greedily placing singularities 
+  FaceData<int> singPositions(*globalMesh);
+  singPositions = getGreedySingularityPositions(*globalGeometry, *globalPSMesh, timeFunction, omegaCourse, period, edgeMappingsPairs, globalBdyConditions);
+  globalPSMesh -> addFaceScalarQuantity("greedy singularities", singPositions);
+  
 }
 
 // A user-defined callback, for creating control panels (etc)
