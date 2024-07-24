@@ -118,9 +118,9 @@ void showStripePatterns(){
   waleStripes -> setRadius(0.004);
  
   //for greedily placing singularities 
-  FaceData<int> singPositions(*globalMesh);
-  singPositions = getGreedySingularityPositions(*globalGeometry, *globalPSMesh, timeFunction, omegaCourse, period, edgeMappingsPairs, globalBdyConditions);
-  globalPSMesh -> addFaceScalarQuantity("greedy singularities", singPositions);
+  // FaceData<int> singPositions(*globalMesh);
+  // singPositions = getGreedySingularityPositions(*globalGeometry, *globalPSMesh, timeFunction, omegaCourse, period, edgeMappingsPairs, globalBdyConditions);
+  // globalPSMesh -> addFaceScalarQuantity("greedy singularities", singPositions);
   
 }
 
