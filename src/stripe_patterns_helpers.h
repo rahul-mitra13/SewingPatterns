@@ -27,8 +27,12 @@ struct PolyLinePoint{
   double isoval;//the isoval (modulo P of this point)
 };
 
+//do the integration in the glued mesh setting itself
+//this is helpful because we do not need to pass around edge maps and vertex maps
+std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& sigma, float period);
+
 //computes the stripes texture coordinates from the passed 1-form
-std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, SurfaceMesh& gluedMesh, std::map<int, int>& indexMap, 
+std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& geometry, EdgeData<double>& sigma, float period, SurfaceMesh& gluedMesh, 
                                                                             std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>>& edgeMappingsPairs, 
                                                                             std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
 

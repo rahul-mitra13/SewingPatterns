@@ -487,8 +487,6 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, EdgeLengthGeom
     //differential operators on the glued mesh
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_zero(gluedMesh.nEdges(), gluedMesh.nVertices());
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one(gluedMesh.nFaces(), gluedMesh.nEdges());
-    //d_zero = gluedGeometry.d0;
-    //d_one = gluedGeometry.d1;
     //build d0
     for (Edge e : gluedMesh.edges()){
         int indexSource = e.halfedge().tailVertex().getIndex();//-1
@@ -507,11 +505,6 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, EdgeLengthGeom
             }
         }
     }
-    std::cout<< "the number of nonzeros with comparison: \n"
-    << (Eigen::Map<Eigen::VectorXd> (d_one.valuePtr(), d_one.nonZeros()).array() != 0).count()
-    << std::endl;
-
-
     try {
         // Create an environment
         GRBEnv env = GRBEnv(true);
@@ -590,18 +583,18 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, EdgeLengthGeom
         //put the computed one-form into an edge vector
         for (Edge e : globalMesh.edges()){
             oneForm[e] = sigma[edgeMap[e.getIndex()]].get(GRB_DoubleAttr_X);
-            //std::cout << "one form at edge " << e << " is " << oneForm[e] << std::endl;
         }
+        // for (Edge e : gluedMesh.edges()){
+        //     oneForm[e] = sigma[e.getIndex()].get(GRB_DoubleAttr_X);
+        // }
         //put the singular faces into a face vector 
         for (Face f : globalMesh.faces()){
             integratedOneForm[f] = k[f.getIndex()].get(GRB_DoubleAttr_X);
-            //std::cout << "integrated one form at face " << f << " is " << integratedOneForm[f] << std::endl;
         }
 
         //put the difference into an edge vector for viz purposes 
         for (Edge e : globalMesh.edges()){
             difference[e] = (sigma[edgeMap[e.getIndex()]].get(GRB_DoubleAttr_X) - omega[edgeMap[e.getIndex()]]) * (sigma[edgeMap[e.getIndex()]].get(GRB_DoubleAttr_X) - omega[edgeMap[e.getIndex()]]);
-            //std::cout << "difference at edge " << e << ": " << difference[e] << std::endl;
         }
 
         globalPSMesh.addEdgeScalarQuantity("difference", difference);

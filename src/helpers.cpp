@@ -452,6 +452,8 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
     std::cout << "Number of vertices in the glued mesh " << gluedMesh -> nVertices() << std::endl;
     std::cout << "Number of edges in the original mesh " << mesh.nEdges() << std::endl;
     std::cout << "Number of edges in the glued mesh " << gluedMesh -> nEdges() << std::endl;
+    std::cout << "Number of corners in the original mesh " << mesh.nCorners() << std::endl;
+    std::cout << "Number of corners in the glued mesh " << gluedMesh -> nCorners() << std::endl;
     std::cout << "Number of boundaries in the original mesh " << mesh.nBoundaryLoops() << std::endl;
     std::cout << "Number of boundaries in the glued mesh " << gluedMesh -> nBoundaryLoops() << std::endl;
     std::cout << "Number of connected components in the original mesh " << mesh.nConnectedComponents() << std::endl;

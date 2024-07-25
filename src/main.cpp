@@ -75,15 +75,15 @@ void showStripePatterns(){
   modelCourse.setMatchingTerms(modelMatchingTermsCourse);
   modelCourse.setEdgeMappingsPairs(edgeMappingsPairs);
   //sigma course over the glued edge length geometry
-  EdgeData<double> sigmaCourseELG(*globalMesh);
-  sigmaCourseELG = computeOneForm(*globalGeometry, *gluedELG, modelCourse, edgeMap, *globalPSMesh);
-  globalPSMesh -> addOneFormTangentVectorQuantity("sigma course", sigmaCourseELG, orientations);
+  EdgeData<double> sigmaCourseELG = computeOneForm(*globalGeometry, *gluedELG, modelCourse, edgeMap, *globalPSMesh);
+  //globalPSMesh -> addOneFormTangentVectorQuantity("sigma course", sigmaCourseELG, orientations);
   CornerData<double> stripeValuesSigmaCourse;
   FaceData<int> stripeIndicesSigmaCourse;
   std::vector<Vector3> positionsCourse;
   std::vector<std::array<int, 2>> edgesCourse;
-  std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, sigmaCourseELG, period, gluedELG->mesh, indexMap, 
+  std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, sigmaCourseELG, period, gluedELG->mesh, 
                                                                   vertexMappingsPairs, edgeMappingsPairs, gluedOneRingMap);
+  //std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, *gluedELG, sigmaCourseELG, period);
   std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
   auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns", positionsCourse, edgesCourse);
   courseStripes -> setRadius(0.004);
@@ -111,16 +111,16 @@ void showStripePatterns(){
   FaceData<int> stripeIndicesSigmaWale;
   std::vector<Vector3> positionsWale;
   std::vector<std::array<int, 2>> edgesWale;
-  std::tie(stripeValuesSigmaWale, stripeIndicesSigmaWale) = computeStripeValuesFromOneForm(*globalGeometry, sigmaWale, period, gluedELG->mesh, indexMap, 
+  std::tie(stripeValuesSigmaWale, stripeIndicesSigmaWale) = computeStripeValuesFromOneForm(*globalGeometry, sigmaWale, period, gluedELG->mesh, 
                                                               vertexMappingsPairs, edgeMappingsPairs, gluedOneRingMap);
   std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, stripeValuesSigmaWale, stripeIndicesSigmaWale, period);
   auto waleStripes = polyscope::registerCurveNetwork("wale stripe patterns", positionsWale, edgesWale);
   waleStripes -> setRadius(0.004);
  
   //for greedily placing singularities 
-  // FaceData<int> singPositions(*globalMesh);
-  // singPositions = getGreedySingularityPositions(*globalGeometry, *globalPSMesh, timeFunction, omegaCourse, period, edgeMappingsPairs, globalBdyConditions);
-  // globalPSMesh -> addFaceScalarQuantity("greedy singularities", singPositions);
+  //FaceData<int> singPositions(*globalMesh);
+  //singPositions = getGreedySingularityPositions(*globalGeometry, *globalPSMesh, timeFunction, omegaCourse, period, edgeMappingsPairs, globalBdyConditions);
+  //globalPSMesh -> addFaceScalarQuantity("greedy singularities", singPositions);
   
 }
 
