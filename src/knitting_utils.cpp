@@ -489,45 +489,27 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     return oneForm;
 }
 
-EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& globalPSMesh){
+EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbModel){
 
-    SurfaceMesh& globalMesh = geometry.mesh; 
     SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
 
-    EdgeData<double> oneForm(globalMesh);
-    FaceData<double> integratedOneForm(globalMesh);
-    EdgeData<double> difference(globalMesh);
-    //this information exists in the global geometry setting 
-    std::vector<double> omegaGlobal = gbModel.getMatchingTerms();
-    //omega is information in the glued mesh setting
-    std::vector<double> omega(gluedMesh.nEdges());
-    //convert it to the glued mesh setting 
-    for (const std::pair<int, int> &p : edgeMap){
-        omega[p.second] = omegaGlobal[p.first];
-    }
-    //these are global edge mappings
-    std::vector<std::pair<int, int>> edgeMappingsPairs = gbModel.getEdgeMappingsPairs();
-    //these are boundary edges in the global mesh setting 
-    std::vector<int> bdyEdgesGlobal = gbModel.getBdyEdges();
-    //convert it to the glued mesh setting 
-    std::vector<int> bdyEdges; 
-    //convert it to the glued mesh setting 
-    for (int index : bdyEdgesGlobal){
-        bdyEdges.push_back(edgeMap[index]);
-    }
+    EdgeData<double> oneForm(gluedMesh);
+    std::vector<double> omega = gbModel.getMatchingTerms();
+    std::vector<int> bdyEdges = gbModel.getBdyEdges();
     double period = gbModel.getPeriod();
+
     //come back to these loop constraints later
     std::vector<std::vector<double>> waleBdyPathConstraints = gbModel.getWaleBdyPathConstraints();
     //differential operators on the glued mesh
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_zero(gluedMesh.nEdges(), gluedMesh.nVertices());
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one(gluedMesh.nFaces(), gluedMesh.nEdges());
-    //build d0
-    for (Edge e : gluedMesh.edges()){
-        int indexSource = e.halfedge().tailVertex().getIndex();//-1
-        int indexTarget = e.halfedge().tipVertex().getIndex();//+1
-        d_zero.coeffRef(e.getIndex(), indexSource) = -1;
-        d_zero.coeffRef(e.getIndex(), indexTarget) = +1;
-    }
+    // //build d0
+    // for (Edge e : gluedMesh.edges()){
+    //     int indexSource = e.halfedge().tailVertex().getIndex();//-1
+    //     int indexTarget = e.halfedge().tipVertex().getIndex();//+1
+    //     d_zero.coeffRef(e.getIndex(), indexSource) = -1;
+    //     d_zero.coeffRef(e.getIndex(), indexTarget) = +1;
+    // }
     //build d1
     for (Face f : gluedMesh.faces()){
         for (Halfedge he : f.adjacentHalfedges()){
@@ -615,23 +597,9 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, EdgeLengthGeom
         std::cout << "Obj: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
     
         //put the computed one-form into an edge vector
-        for (Edge e : globalMesh.edges()){
-            oneForm[e] = sigma[edgeMap[e.getIndex()]].get(GRB_DoubleAttr_X);
+        for (Edge e : gluedMesh.edges()){
+            oneForm[e] = sigma[e.getIndex()].get(GRB_DoubleAttr_X);
         }
-        // for (Edge e : gluedMesh.edges()){
-        //     oneForm[e] = sigma[e.getIndex()].get(GRB_DoubleAttr_X);
-        // }
-        //put the singular faces into a face vector 
-        for (Face f : globalMesh.faces()){
-            integratedOneForm[f] = k[f.getIndex()].get(GRB_DoubleAttr_X);
-        }
-
-        //put the difference into an edge vector for viz purposes 
-        for (Edge e : globalMesh.edges()){
-            difference[e] = (sigma[edgeMap[e.getIndex()]].get(GRB_DoubleAttr_X) - omega[edgeMap[e.getIndex()]]) * (sigma[edgeMap[e.getIndex()]].get(GRB_DoubleAttr_X) - omega[edgeMap[e.getIndex()]]);
-        }
-
-        globalPSMesh.addEdgeScalarQuantity("difference", difference);
     }
     catch(GRBException e) {
         std::cout << "Error code = " << e.getErrorCode() << std::endl;
@@ -745,16 +713,3 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polysc
     }
     return omega;
 }
-
-//compute matching 1-form in the glued edge length geometry setting 
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& globalMatchingOneForm, std::map<int, int>& edgeMap){
-
-    SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
-    SurfaceMesh& globalMesh = globalGeometry.mesh;
-    EdgeData<double> omega(gluedMesh);
-    for (const std::pair<int, int> &p : edgeMap){
-        omega[gluedMesh.edge(p.second)] = globalMatchingOneForm[globalMesh.edge(p.first)];
-    }
-    return omega;
-}
-

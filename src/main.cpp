@@ -76,7 +76,7 @@ void showStripePatterns(){
   modelCourse.setEdgeMappingsPairs(edgeMappingsPairs);
   //sigma course over the glued edge length geometry
   EdgeData<double> sigmaCourseELG(gluedELG -> mesh);
-  sigmaCourseELG = computeOneForm(*globalGeometry, *gluedELG, modelCourse, edgeMap, *globalPSMesh);
+  sigmaCourseELG = computeOneForm(*globalGeometry, modelCourse, *globalPSMesh);
   //globalPSMesh -> addOneFormTangentVectorQuantity("sigma course", sigmaCourseELG, orientations);
   CornerData<double> stripeValuesSigmaCourse;
   FaceData<int> stripeIndicesSigmaCourse;
@@ -130,9 +130,39 @@ void showStripePatterns(){
 void processGluedMeshStripes(){
   
   //time function on the glued mesh 
-  VertexData<double> timeFunction = computeTimeFunction(*gluedELG, globalBdyConditions);
-  globalPSMesh -> addVertexScalarQuantity("glued time function", convertVertexFunction(*globalGeometry, *gluedELG, timeFunction, vertexMap));
-  
+  VertexData<double> timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
+  //time function on the global mesh 
+  VertexData<double> timeFunctionGlobal = convertGluedToGlobalVertexFunction(*globalGeometry, *gluedELG, timeFunctionGlued, vertexMap);
+  globalPSMesh -> addVertexScalarQuantity("time function", timeFunctionGlobal);
+  //gradient on the glued/global mesh
+  //note that faces have a 1-to-1 mapping from global to glued setting
+  FaceData<Vector3> timeFunctionGradientGlobal = computeTimeFunctionFaceGrad(*globalGeometry, timeFunctionGlobal);
+  globalPSMesh -> addFaceVectorQuantity("gradient", timeFunctionGradientGlobal);
+  //compute matching one form on the global mesh 
+  EdgeData<double> omegaCourseGlobal = computeMatchingOneForm(*globalGeometry, *globalPSMesh, 0, timeFunctionGradientGlobal, edgeMappingsPairs); 
+  //matching one form on the glued mesh 
+  EdgeData<double> omegaCourseGlued = convertGlobalToGluedEdgeFunction(*globalGeometry, *gluedELG, omegaCourseGlobal, edgeMap);
+  //set up the course optimization 
+  Model modelCourse; 
+  modelCourse.setPeriod(period);
+  modelCourse.setBdyEdges(globalBdyConditions.courseBdyEdges);
+  std::vector<double> modelMatchingTermsCourse; 
+  for (Edge e : (gluedELG -> mesh).edges()){
+    modelMatchingTermsCourse.push_back(omegaCourseGlued[e]);
+  }
+  modelCourse.setMatchingTerms(modelMatchingTermsCourse);
+  //sigma in the glued mesh setting 
+  EdgeData<double> sigmaCourseGlued = computeOneForm(*gluedELG, modelCourse);
+  //global data
+  CornerData<double> stripeValuesSigmaCourse;
+  //global data
+  FaceData<int> stripeIndicesSigmaCourse;
+  std::vector<Vector3> positionsCourse;
+  std::vector<std::array<int, 2>> edgesCourse;
+  std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, *gluedELG, sigmaCourseGlued, period);
+  std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
+  auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns", positionsCourse, edgesCourse);
+  courseStripes -> setRadius(0.004);
 }
 
 // A user-defined callback, for creating control panels (etc)
@@ -192,9 +222,9 @@ int main(int argc, char **argv) {
   gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, vertexMap, edgeMap, gluedOneRingMap);
   //read in the global boundary conditions from the json file
   //processes boundary conditions in the global mesh setting
-  globalBdyConditions = parseJson(*globalGeometry, data);
+  //globalBdyConditions = parseJson(*globalGeometry, data);
   //process boundary conditions in the glued mesh setting 
-  //globalBdyConditions = parseJson(*gluedELG, data, vertexMap, edgeMap);
+  globalBdyConditions = parseJson(*gluedELG, data, vertexMap, edgeMap);
   //render the stitched vertices
   renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
   // Disable the ground plane

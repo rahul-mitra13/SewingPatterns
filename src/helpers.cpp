@@ -410,27 +410,26 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
     EdgeData<double> edgeLengths(*gluedMesh);
     geometry.requireEdgeLengths();
     //create a map (vertex in original mesh -> outgoing halfedges in the glued mesh)
-    //used in the integration of the 1-form 
-    //this is still so slow ugh
-    for (Vertex v : mesh.vertices()){
-        gluedOneRingMap[v.getIndex()] = std::vector<Halfedge>{};
-        std::vector<Halfedge> halfedges;
-        std::vector<Halfedge> gluedMeshHalfedges;
-        Vertex gluedMeshVertex = gluedMesh->vertex(originalMeshVertexIndexToGluedMeshIndex[v.getIndex()]);
-        for (Halfedge he : gluedMeshVertex.outgoingHalfedges()){
-            gluedMeshHalfedges.push_back(he);
-        }
-        //find the corresponding halfedges in the original mesh
-        for (Halfedge he : mesh.halfedges()){
-            for (Halfedge heGlued : gluedMeshHalfedges){
-                if (originalMeshVertexIndexToGluedMeshIndex[he.tailVertex().getIndex()] == heGlued.tailVertex().getIndex() && originalMeshVertexIndexToGluedMeshIndex[he.tipVertex().getIndex()] == 
-                heGlued.tipVertex().getIndex()){
-                gluedOneRingMap[v.getIndex()].push_back(he);
-                break;
-                }
-            }
-        }
-    }
+    //don't need this really slow bit if you're carrying out the intergration in the glued mesh setting
+    // for (Vertex v : mesh.vertices()){
+    //     gluedOneRingMap[v.getIndex()] = std::vector<Halfedge>{};
+    //     std::vector<Halfedge> halfedges;
+    //     std::vector<Halfedge> gluedMeshHalfedges;
+    //     Vertex gluedMeshVertex = gluedMesh->vertex(originalMeshVertexIndexToGluedMeshIndex[v.getIndex()]);
+    //     for (Halfedge he : gluedMeshVertex.outgoingHalfedges()){
+    //         gluedMeshHalfedges.push_back(he);
+    //     }
+    //     //find the corresponding halfedges in the original mesh
+    //     for (Halfedge he : mesh.halfedges()){
+    //         for (Halfedge heGlued : gluedMeshHalfedges){
+    //             if (originalMeshVertexIndexToGluedMeshIndex[he.tailVertex().getIndex()] == heGlued.tailVertex().getIndex() && originalMeshVertexIndexToGluedMeshIndex[he.tipVertex().getIndex()] == 
+    //             heGlued.tipVertex().getIndex()){
+    //             gluedOneRingMap[v.getIndex()].push_back(he);
+    //             break;
+    //             }
+    //         }
+    //     }
+    // }
 
     //build a map from edges in the original mesh to edges in the glued mesh 
     for (Halfedge he1 : mesh.halfedges()){
@@ -555,10 +554,7 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
     globalBoundaryConditions toReturn;
 
     //course conditions 
-    std::vector<std::vector<size_t>> courseStart = data["boundaries"]["course"]["start"];
-    std::vector<std::vector<size_t>> courseEnd = data["boundaries"]["course"]["end"];
     bool courseUseBdyLoops = data["boundaries"]["course"]["useBoundaryLoops"];
-
     //first handle course boundary conditions
     if (courseUseBdyLoops){//just use the boundary loops of the glued mesh to specify the boundary conditions 
         std::vector<int> startVertices = data["boundaries"]["course"]["startVertices"];
@@ -648,7 +644,7 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
 }
 
 //convert a function defined on the vertices of the glued mesh to a function defined on the vertices of the global mesh 
-VertexData<double> convertVertexFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& func, std::map<int, int>& vertexMap){
+VertexData<double> convertGluedToGlobalVertexFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& func, std::map<int, int>& vertexMap){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh; 
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
@@ -662,7 +658,7 @@ VertexData<double> convertVertexFunction(VertexPositionGeometry& globalGeometry,
 }
 
 //convert function defined on the edges of the glued mesh to a function defined on the edges of the global mesh 
-EdgeData<double> convertEdgeFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& func, std::map<int, int>& edgeMap){
+EdgeData<double> convertGluedToGlobalEdgeFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& func, std::map<int, int>& edgeMap){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh; 
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
@@ -673,4 +669,17 @@ EdgeData<double> convertEdgeFunction(VertexPositionGeometry& globalGeometry, Edg
     }
 
     return globalEdgeFunction; 
+}
+
+//convert function defined on the edges of the global mesh to a function defined on the edges of the glued mesh 
+EdgeData<double> convertGlobalToGluedEdgeFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& func, std::map<int, int>& edgeMap){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh; 
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    EdgeData<double> gluedEdgeFunction(gluedMesh);
+    for (Edge e : globalMesh.edges()){
+        gluedEdgeFunction[edgeMap[e.getIndex()]] = func[e];
+    }
+
+    return gluedEdgeFunction;
 }

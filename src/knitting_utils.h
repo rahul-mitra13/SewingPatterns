@@ -82,7 +82,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
 //compute a 1-form that will be used to generate the stripes over the pathces 
 //overload from the function above
 //it does the optimization in the glued mesh setting 
-EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh);
+EdgeData<double> computeOneForm(EdgeLengthGeometry& geometry, Model& gbModel);
 
 //compute \omega i.e., the 1-form we're trying to match over each edge 
 //
@@ -98,7 +98,4 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
 //additional parameter 
 //@param[in]    edgeMappingsPairs       std::vector<std::pair<int, int>>    vector of pairs where each pair stores edges that are stitched together
 EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, int direction, FaceData<Vector3> faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs);
-
-//compute \omega i.e., the 1-form we're trying to match over each edge in the glued Geometry mesh
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& globalMatchingOneForm, std::map<int, int>& edgeMap);
 

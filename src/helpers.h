@@ -162,7 +162,10 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
 //probably going to be a little slow but semantically I think this is the best thing to do
 
 //convert a function defined on the vertices of the glued mesh to a function defined on the vertices of the global mesh 
-VertexData<double> convertVertexFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& func, std::map<int, int>& vertexMap);
+VertexData<double> convertGluedToGlobalVertexFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& func, std::map<int, int>& vertexMap);
 
 //convert function defined on the edges of the glued mesh to a function defined on the edges of the global mesh 
-EdgeData<double> convertEdgeFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& func, std::map<int, int>& edgeMap);
+EdgeData<double> convertGluedToGlobalEdgeFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& func, std::map<int, int>& edgeMap);
+
+//convert function defined on the edges of the global mesh to a function defined on the edges of the glued mesh 
+EdgeData<double> convertGlobalToGluedEdgeFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& func, std::map<int, int>& edgeMap);
