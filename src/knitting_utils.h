@@ -40,6 +40,9 @@ using namespace geometrycentral::surface;
 //@return       timeFunction    VertexData<double>                      the global time function computed over the entire mesh
 VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::vector<std::pair<int,int>>& vertexMappingsPairs,  globalBoundaryConditions& boundaryConditions, std::map<int, int>& indexMap);
 
+//compute time function directly in the glued mesh setting 
+VertexData<double> computeTimeFunction(EdgeLengthGeometry& gluedGeometry, globalBoundaryConditions& bdyConditions);
+
 
 //compute the per face gradient of some function defined as a scalar over vertices
 //

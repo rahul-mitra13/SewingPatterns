@@ -101,7 +101,7 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXi> getVertexPositionsandFaceLists(Verte
 }
 
 //get shortest edge path between two vertices by taking only boundary edges of the mesh 
-std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert){
+std::vector<Halfedge> shortestEdgePathOnBoundary(IntrinsicGeometryInterface& geom, Vertex startVert, Vertex endVert){
 
     // Early out for empty case
   if (startVert == endVert) {
@@ -145,7 +145,7 @@ std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, V
 
     Vertex currVert = currIncomingHalfedge.twin().vertex();
     if (vertexDiscovered(currVert)) continue;
-    if (!(currVert).isBoundary()) continue;//also consider boundary vertices on this path
+    if (!(currVert).isBoundary()) continue;//also consider only boundary vertices on this path
     // Accept the neighbor
     incomingHalfedge[currVert] = currIncomingHalfedge;
 
@@ -173,7 +173,7 @@ std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, V
   return std::vector<Halfedge>();
 }
 
-std::tuple<std::vector<Vertex>, std::vector<Edge>, std::vector<double>> getVerticesAndEdgesInShortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert){
+std::tuple<std::vector<Vertex>, std::vector<Edge>, std::vector<double>> getVerticesAndEdgesInShortestEdgePathOnBoundary(IntrinsicGeometryInterface& geom, Vertex startVert, Vertex endVert){
     // Gather values
     SurfaceMesh& mesh = geom.mesh;
     std::vector<Vertex> vertices;
@@ -445,7 +445,6 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
             }
         }
     }
-
     std::cout << "Number of faces in the original mesh " << mesh.nFaces() << std::endl;
     std::cout << "Number of faces in the glued mesh " << gluedMesh -> nFaces() << std::endl;
     std::cout << "Number of vertices in the original mesh " << mesh.nVertices() << std::endl;
@@ -454,8 +453,8 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
     std::cout << "Number of edges in the glued mesh " << gluedMesh -> nEdges() << std::endl;
     std::cout << "Number of corners in the original mesh " << mesh.nCorners() << std::endl;
     std::cout << "Number of corners in the glued mesh " << gluedMesh -> nCorners() << std::endl;
-    std::cout << "Number of boundaries in the original mesh " << mesh.nBoundaryLoops() << std::endl;
-    std::cout << "Number of boundaries in the glued mesh " << gluedMesh -> nBoundaryLoops() << std::endl;
+    std::cout << "Number of boundary loops in the original mesh " << mesh.nBoundaryLoops() << std::endl;
+    std::cout << "Number of boundary loops in the glued mesh " << gluedMesh -> nBoundaryLoops() << std::endl;
     std::cout << "Number of connected components in the original mesh " << mesh.nConnectedComponents() << std::endl;
     std::cout << "Number of connected components ih the glued mesh " << gluedMesh -> nConnectedComponents() << std::endl;
 
@@ -463,6 +462,7 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
     return ELG;
 }
 
+//parse the global boundary conditions on the global mesh 
 globalBoundaryConditions parseJson(VertexPositionGeometry& geometry, nlohmann::json& data){
   
   SurfaceMesh& mesh = geometry.mesh;
@@ -545,4 +545,132 @@ globalBoundaryConditions parseJson(VertexPositionGeometry& geometry, nlohmann::j
   polyscope::registerPointCloud("wale edge alignment vertices", waleAlignmentVertices);
   polyscope::registerPointCloud("wale integral constraint vertices", waleIntegralConstraints);
   return toReturn;
+}
+
+//parse the global boundary conditions in the glued mesh setting
+//returns the boundary conditions on the glued together mesh  
+globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nlohmann::json& data, std::map<int,int>& vertexMap, std::map<int, int>& edgeMap){
+
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    globalBoundaryConditions toReturn;
+
+    //course conditions 
+    std::vector<std::vector<size_t>> courseStart = data["boundaries"]["course"]["start"];
+    std::vector<std::vector<size_t>> courseEnd = data["boundaries"]["course"]["end"];
+    bool courseUseBdyLoops = data["boundaries"]["course"]["useBoundaryLoops"];
+
+    //first handle course boundary conditions
+    if (courseUseBdyLoops){//just use the boundary loops of the glued mesh to specify the boundary conditions 
+        std::vector<int> startVertices = data["boundaries"]["course"]["startVertices"];
+        std::vector<int> endVertices = data["boundaries"]["course"]["endVertices"];
+        //knitting start conditions
+        for (int i = 0; i < startVertices.size(); i++){
+            //grab the boundary face
+            BoundaryLoop bLoop = gluedMesh.vertex(vertexMap[startVertices[i]]).halfedge().twin().face().asBoundaryLoop();
+            for (Vertex v : bLoop.adjacentVertices()){
+                toReturn.courseStartBoundaryVertices.push_back(v.getIndex());
+            }
+            for (Edge e : bLoop.adjacentEdges()){
+                toReturn.courseBdyEdges.push_back(e.getIndex());
+            }
+        }
+        //knitting end conditions
+        for (int i = 0; i < endVertices.size(); i++){
+            //grab the boundary face 
+            BoundaryLoop bLoop = gluedMesh.vertex(vertexMap[endVertices[i]]).halfedge().twin().face().asBoundaryLoop();
+            for (Vertex v : bLoop.adjacentVertices()){
+                toReturn.courseEndBoundaryVertices.push_back(v.getIndex());
+            }
+            for (Edge e : bLoop.adjacentEdges()){
+                toReturn.courseBdyEdges.push_back(e.getIndex());
+            }
+        }
+    }
+    else{//can't use boundary loops for both knitting start and knitting end  
+        std::vector<std::vector<int>> startVertices = data["boundaries"]["course"]["startVertices"];
+        std::vector<std::vector<int>> endVertices = data["boundaries"]["course"]["endVertices"];
+        //knitting start conditions
+        for (int i = 0; i < startVertices.size(); i++){
+            if (startVertices[i].size() == 1){//this is just a vertex on a boundary loop, do the same as above 
+                BoundaryLoop bLoop = gluedMesh.vertex(vertexMap[startVertices[i][0]]).halfedge().twin().face().asBoundaryLoop();
+                for (Vertex v : bLoop.adjacentVertices()){
+                    toReturn.courseStartBoundaryVertices.push_back(v.getIndex());
+                }
+                for (Edge e : bLoop.adjacentEdges()){
+                    toReturn.courseBdyEdges.push_back(e.getIndex());
+                }
+            }
+            else{//two vertices specify a path on the boundary 
+                Vertex startVertex = gluedMesh.vertex(vertexMap[startVertices[i][0]]);
+                Vertex endVertex = gluedMesh.vertex(vertexMap[startVertices[i][1]]);
+                std::vector<double> weights;
+                std::vector<Vertex> vertices;
+                std::vector<Edge> edges;
+                std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePathOnBoundary(gluedGeometry, startVertex, endVertex);
+                for (Vertex v : vertices){
+                    toReturn.courseStartBoundaryVertices.push_back(v.getIndex());
+                }
+                for (Edge e : edges){
+                    toReturn.courseBdyEdges.push_back(e.getIndex());
+                }
+            }
+        }
+
+        //knitting end conditions 
+        for (int i = 0; i < endVertices.size(); i++){
+            if (endVertices[i].size() == 1){//this is just a vertex on a boundary loop, do the same as above 
+                BoundaryLoop bLoop = gluedMesh.vertex(vertexMap[endVertices[i][0]]).halfedge().twin().face().asBoundaryLoop();
+                for (Vertex v : bLoop.adjacentVertices()){
+                    toReturn.courseEndBoundaryVertices.push_back(v.getIndex());
+                }
+                for (Edge e : bLoop.adjacentEdges()){
+                    toReturn.courseBdyEdges.push_back(e.getIndex());
+                }
+            }
+            else{//two vertices specify a path on the boundary 
+                Vertex startVertex = gluedMesh.vertex(vertexMap[endVertices[i][0]]);
+                Vertex endVertex = gluedMesh.vertex(vertexMap[endVertices[i][1]]);
+                std::vector<double> weights;
+                std::vector<Vertex> vertices;
+                std::vector<Edge> edges;
+                std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePathOnBoundary(gluedGeometry, startVertex, endVertex);
+                for (Vertex v : vertices){
+                    toReturn.courseEndBoundaryVertices.push_back(v.getIndex());
+                }
+                for (Edge e : edges){
+                    toReturn.courseBdyEdges.push_back(e.getIndex());
+                }
+            }
+        }
+    }
+
+    return toReturn;
+}
+
+//convert a function defined on the vertices of the glued mesh to a function defined on the vertices of the global mesh 
+VertexData<double> convertVertexFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& func, std::map<int, int>& vertexMap){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh; 
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    VertexData<double> globalVertexFunction(globalMesh);
+
+    for (Vertex v : globalMesh.vertices()){
+        globalVertexFunction[v] = func[gluedMesh.vertex(vertexMap[v.getIndex()])];
+    }
+
+    return globalVertexFunction; 
+}
+
+//convert function defined on the edges of the glued mesh to a function defined on the edges of the global mesh 
+EdgeData<double> convertEdgeFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& func, std::map<int, int>& edgeMap){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh; 
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    EdgeData<double> globalEdgeFunction(globalMesh);
+
+    for (Edge e : globalMesh.edges()){
+        globalEdgeFunction[e] = func[gluedMesh.edge(edgeMap[e.getIndex()])];
+    }
+
+    return globalEdgeFunction; 
 }

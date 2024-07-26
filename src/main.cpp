@@ -33,8 +33,8 @@ std::vector<std::pair<int, int>> vertexMappingsPairs;
 //edge mappings from txt file
 std::vector<std::pair<int, int>> edgeMappingsPairs;
 //build an index map from vertices in the original mesh to vertices in the glued mesh 
-std::map<int, int> indexMap;
-//build a map from edges in the orignal mesh to edges in the glued mesh 
+std::map<int, int> vertexMap;
+//build a map from edges in the orignal mesh to edges in the glued
 std::map<int, int> edgeMap;
 //one-ring map for vertices in the glued mesh for performance 
 std::map<int, std::vector<Halfedge>> gluedOneRingMap;
@@ -57,7 +57,7 @@ std::vector<bool> orientations;
 
 //render stripe patterns over the surface
 void showStripePatterns(){ 
-  VertexData<double> timeFunction = computeTimeFunction(*globalGeometry, vertexMappingsPairs, globalBdyConditions, indexMap);
+  VertexData<double> timeFunction = computeTimeFunction(*globalGeometry, vertexMappingsPairs, globalBdyConditions, vertexMap);
   globalPSMesh->addVertexScalarQuantity("time function", timeFunction);
   FaceData<Vector3> timeFunctionGradient = computeTimeFunctionFaceGrad(*globalGeometry, timeFunction);
   globalPSMesh -> addFaceVectorQuantity("gradient", timeFunctionGradient);
@@ -75,7 +75,8 @@ void showStripePatterns(){
   modelCourse.setMatchingTerms(modelMatchingTermsCourse);
   modelCourse.setEdgeMappingsPairs(edgeMappingsPairs);
   //sigma course over the glued edge length geometry
-  EdgeData<double> sigmaCourseELG = computeOneForm(*globalGeometry, *gluedELG, modelCourse, edgeMap, *globalPSMesh);
+  EdgeData<double> sigmaCourseELG(gluedELG -> mesh);
+  sigmaCourseELG = computeOneForm(*globalGeometry, *gluedELG, modelCourse, edgeMap, *globalPSMesh);
   //globalPSMesh -> addOneFormTangentVectorQuantity("sigma course", sigmaCourseELG, orientations);
   CornerData<double> stripeValuesSigmaCourse;
   FaceData<int> stripeIndicesSigmaCourse;
@@ -103,7 +104,8 @@ void showStripePatterns(){
   modelWale.setMatchingTerms(modelMatchingTermsWale);
   modelWale.setEdgeMappingsPairs(edgeMappingsPairs);
   modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
-  EdgeData<double> sigmaWale = computeOneForm(*globalGeometry, modelWale, *globalPSMesh);
+  EdgeData<double> sigmaWale(*globalMesh);
+  sigmaWale = computeOneForm(*globalGeometry, modelWale, *globalPSMesh);
   globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigmaWale, orientations);
   //view sigma as an edge scalar
   // globalPSMesh -> addEdgeScalarQuantity("sigma wale", sigmaWale);
@@ -124,6 +126,15 @@ void showStripePatterns(){
   
 }
 
+//here we will do as much processing as possible directly on the glued together mesh 
+void processGluedMeshStripes(){
+  
+  //time function on the glued mesh 
+  VertexData<double> timeFunction = computeTimeFunction(*gluedELG, globalBdyConditions);
+  globalPSMesh -> addVertexScalarQuantity("glued time function", convertVertexFunction(*globalGeometry, *gluedELG, timeFunction, vertexMap));
+  
+}
+
 // A user-defined callback, for creating control panels (etc)
 // Use ImGUI commands to build whatever you want here, see
 // https://github.com/ocornut/imgui/blob/master/imgui.h
@@ -132,6 +143,10 @@ void callBacks() {
   ImGui::InputFloat("1-form period", &period);
   if (ImGui::Button("Show Stripe Patterns")){
     showStripePatterns();
+  }
+
+  if (ImGui::Button("Process Glued Mesh")){
+    processGluedMeshStripes();
   }
 }
 
@@ -173,8 +188,13 @@ int main(int argc, char **argv) {
     orientations[pair.second] = !orientations[pair.second];
   }
   globalPSMesh -> setEdgePermutation(perm);
+  //create the glued edge length geometry
+  gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, vertexMap, edgeMap, gluedOneRingMap);
+  //read in the global boundary conditions from the json file
+  //processes boundary conditions in the global mesh setting
   globalBdyConditions = parseJson(*globalGeometry, data);
-  gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, indexMap, edgeMap, gluedOneRingMap);
+  //process boundary conditions in the glued mesh setting 
+  //globalBdyConditions = parseJson(*gluedELG, data, vertexMap, edgeMap);
   //render the stitched vertices
   renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
   // Disable the ground plane

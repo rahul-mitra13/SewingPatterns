@@ -86,7 +86,8 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXi> getVertexPositionsandFaceLists(Verte
 //@param[in]    endVert         Vertex                      end vertex on the boundary
 //
 //@return       halfedge list   std::vector<Haledge>        returns a list of halfedges on the shortest boundary path between the two vertices    
-std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
+std::vector<Halfedge> shortestEdgePathOnBoundary(IntrinsicGeometryInterface& geom, Vertex startVert, Vertex endVert);
+
 
 //get the shortest dijkstra edge path on the boundary
 //
@@ -95,7 +96,7 @@ std::vector<Halfedge> shortestEdgePathOnBoundary(VertexPositionGeometry& geom, V
 //@param[in]     endVert            Vertex                                                          end vertex on the boundary 
 //
 //@return        tuple              std::tuple<vector<Vertex>, vector<Edge>, vector<double>>        returns a tuple of vertices and edges on the boundary between the two vertices and edge weights on this he path
-std::tuple<std::vector<Vertex>, std::vector<Edge>, std::vector<double>> getVerticesAndEdgesInShortestEdgePathOnBoundary(VertexPositionGeometry& geom, Vertex startVert, Vertex endVert);
+std::tuple<std::vector<Vertex>, std::vector<Edge>, std::vector<double>> getVerticesAndEdgesInShortestEdgePathOnBoundary(IntrinsicGeometryInterface& geom, Vertex startVert, Vertex endVert);
 
 
 //build a vertex mapping map from an input txt file (for a "local" mapping across different models)
@@ -146,8 +147,22 @@ void renderStitchedVertices(VertexPositionGeometry& geometry, std::vector<std::p
 //parse json file and render boundary conditions
 globalBoundaryConditions parseJson(VertexPositionGeometry& geometry, nlohmann::json& data);
 
+//parse the global boundary conditions in the glued together mesh 
+globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nlohmann::json& data, std::map<int,int>& vertexMap, std::map<int, int>& edgeMap);
+
 //create a new "glued" edge length geometry
 //create a mapping from original index to "glued" index (vertex and edges)
 //also populate edge lengths of glued mesh
 EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& originalMeshVertexIndexToGluedMeshIndex, 
                                     std::map<int, int>& originalMeshEdgeIndexToGluedMeshIndex, std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
+
+
+//some utility functions for converting values defined on the glued mesh to values defined on the global mesh 
+//used for viz and other routines possibly?
+//probably going to be a little slow but semantically I think this is the best thing to do
+
+//convert a function defined on the vertices of the glued mesh to a function defined on the vertices of the global mesh 
+VertexData<double> convertVertexFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& func, std::map<int, int>& vertexMap);
+
+//convert function defined on the edges of the glued mesh to a function defined on the edges of the global mesh 
+EdgeData<double> convertEdgeFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& func, std::map<int, int>& edgeMap);

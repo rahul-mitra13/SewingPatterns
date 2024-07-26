@@ -120,6 +120,40 @@ VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::ve
     return timeFunction;
 }
 
+//compute time function directly in the glued mesh setting 
+VertexData<double> computeTimeFunction(EdgeLengthGeometry& gluedGeometry, globalBoundaryConditions& bdyConditions){
+
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
+    VertexData<double> gluedTimeFunction(gluedMesh);
+    gluedGeometry.requireCotanLaplacian();
+    Eigen::SparseMatrix<double> L = gluedGeometry.cotanLaplacian;
+    //force boundary conditions 
+    Eigen::VectorXd b = Eigen::VectorXd::Zero(gluedMesh.nVertices());
+    for (int v : bdyConditions.courseStartBoundaryVertices){
+        L.row(v) *= 0.0;
+        L.coeffRef(v, v) = 1.0;
+        b(v) = 0;
+    }
+    for (int v : bdyConditions.courseEndBoundaryVertices){
+        L.row(v) *= 0.0;
+        L.coeffRef(v, v) = 1.0;
+        b(v) = 1.0;
+    }
+    Eigen::SparseLU<SparseMatrix<double>> solver;
+    solver.compute(L);
+    if (solver.info() != Eigen::Success) {
+        std::cerr << "Decomposition failed" << std::endl;
+    }
+    Eigen::VectorXd u = solver.solve(b);
+    if (solver.info() != Eigen::Success) {
+        std::cerr << "Solving failed" << std::endl;
+    }
+    for (Vertex v : gluedMesh.vertices()){
+        gluedTimeFunction[v] = u(v.getIndex());
+    }
+    return gluedTimeFunction;
+}
+
 //compute the gradient of a function defined as a scalar over vertices
 FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, VertexData<double>& vertexScalarFunction){
     
@@ -718,9 +752,7 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& globalGeometry, 
     SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     EdgeData<double> omega(gluedMesh);
-
     for (const std::pair<int, int> &p : edgeMap){
-        std::cout << globalMatchingOneForm[globalMesh.edge(p.first)] << std::endl;
         omega[gluedMesh.edge(p.second)] = globalMatchingOneForm[globalMesh.edge(p.first)];
     }
     return omega;
