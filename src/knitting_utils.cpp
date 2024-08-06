@@ -498,29 +498,10 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
     std::vector<int> bdyEdges = gbModel.getBdyEdges();
     double period = gbModel.getPeriod();
 
-    //come back to these loop constraints later
     std::vector<std::vector<double>> waleBdyPathConstraints = gbModel.getWaleBdyPathConstraints();
-    //differential operators on the glued mesh
-    Eigen::SparseMatrix<double, Eigen::RowMajor> d_zero(gluedMesh.nEdges(), gluedMesh.nVertices());
-    Eigen::SparseMatrix<double, Eigen::RowMajor> d_one(gluedMesh.nFaces(), gluedMesh.nEdges());
-    // //build d0
-    // for (Edge e : gluedMesh.edges()){
-    //     int indexSource = e.halfedge().tailVertex().getIndex();//-1
-    //     int indexTarget = e.halfedge().tipVertex().getIndex();//+1
-    //     d_zero.coeffRef(e.getIndex(), indexSource) = -1;
-    //     d_zero.coeffRef(e.getIndex(), indexTarget) = +1;
-    // }
-    //build d1
-    for (Face f : gluedMesh.faces()){
-        for (Halfedge he : f.adjacentHalfedges()){
-            if (he.orientation()){
-                d_one.coeffRef(f.getIndex(), he.edge().getIndex()) = +1;
-            }
-            else{
-                d_one.coeffRef(f.getIndex(), he.edge().getIndex()) = -1;
-            }
-        }
-    }
+
+    gluedGeometry.requireDECOperators();
+    Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
     try {
         // Create an environment
         GRBEnv env = GRBEnv(true);

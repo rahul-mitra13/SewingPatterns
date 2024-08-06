@@ -144,6 +144,19 @@ std::vector<double> createEdgeWeightsFromVertexList(VertexPositionGeometry& geom
 //@return       none                                    but has a side effect where it calls polyscope to render stitches
 void renderStitchedVertices(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs);
 
+//get the indices of the boundary edges in the glued mesh where we should set \sigma_{wale} = 0
+//
+//@param[in]    globalGeometry      VertexPositionGeometry          global input geometry 
+//@param[in]    gluedGeometry       IntrinsicGeometryInterface      glued geometry 
+//@param[in]    faceGradients       FaceData<Vector3>               course face gradients 
+//@param[in]    edgeMap             std::map<int, int>              map from edges in the global mesh to edges in the glued mesh 
+//@param[in]    val                 double                          threshold value
+//@param[in]    globalPSMesh        polyscope::SurfaceMesh          polyscope mesh for visualizing/debugging
+//
+//@return       constrainedEdges    std::vector<int>                indices of edges (in the glued mesh) where sigma_{wale} = 0
+std::vector<int> getWaleBdyEdgesInGluedMesh(VertexPositionGeometry& globalGeometry, IntrinsicGeometryInterface& gluedGeometry, FaceData<Vector3>& faceGradients, std::map<int, int>& edgeMap, double val,
+                                            polyscope::SurfaceMesh& globalPSMesh);
+
 //parse json file and render boundary conditions
 globalBoundaryConditions parseJson(VertexPositionGeometry& geometry, nlohmann::json& data);
 

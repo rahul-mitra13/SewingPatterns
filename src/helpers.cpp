@@ -293,6 +293,35 @@ void renderStitchedVertices(VertexPositionGeometry& geometry, std::vector<std::p
     stitches->setRadius(0.001);
 }
 
+//get the boundary edges in the wale direction where \sigma = 0
+std::vector<int> getWaleBdyEdgesInGluedMesh(VertexPositionGeometry& globalGeometry, IntrinsicGeometryInterface& gluedGeometry, FaceData<Vector3>& faceGradients, std::map<int, int>& edgeMap, double val,
+                                            polyscope::SurfaceMesh& globalPSMesh){
+    SurfaceMesh& globalMesh = globalGeometry.mesh; 
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    std::vector<int> edgeIndicesGlobal;
+    std::vector<int> edgeIndicesGlued;
+    EdgeData<double> constrainedEdges(globalMesh, 0.0);
+    for (Edge e : globalMesh.edges()){
+        if (!e.isBoundary()) continue;
+        Vector3 v1 = (globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()]);
+        v1 = v1.normalize();
+        Vector3 v2 = (globalGeometry.vertexPositions[e.halfedge().tailVertex()] - globalGeometry.vertexPositions[e.halfedge().tipVertex()]);
+        v2 = v2.normalize();
+        Vector3 grad1 = faceGradients[e.halfedge().face()];
+        grad1 = grad1.normalize();
+        if (dot(v1, grad1) > val || dot(v2, grad1) > val){
+            edgeIndicesGlobal.push_back(e.getIndex());
+            constrainedEdges[e] = 1.0;
+        }
+    }
+    globalPSMesh.addEdgeScalarQuantity("constrained edges", constrainedEdges);
+
+    for (int e : edgeIndicesGlobal){
+        edgeIndicesGlued.push_back(edgeMap[e]);
+    }
+    return edgeIndicesGlued;
+}
+
 //builds a vector of "stitched together" edges from a vector of "stitched" together vertices 
 std::vector<std::pair<int, int>> buildPairOfStitchedEdges(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs){
     
@@ -569,6 +598,17 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
             for (Edge e : bLoop.adjacentEdges()){
                 toReturn.courseBdyEdges.push_back(e.getIndex());
             }
+            //build weights for wale boundary conditions 
+            std::vector<double> weights(gluedMesh.nEdges(), 0.0);
+            for (Halfedge he : bLoop.adjacentHalfedges()){
+                if (he.orientation()){
+                    weights[he.edge().getIndex()] = 1.0;
+                }
+                else{
+                    weights[he.edge().getIndex()] = -1.0;
+                }
+            }
+            toReturn.waleBdyPathConstraints.push_back(weights);
         }
         //knitting end conditions
         for (int i = 0; i < endVertices.size(); i++){
@@ -580,6 +620,17 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
             for (Edge e : bLoop.adjacentEdges()){
                 toReturn.courseBdyEdges.push_back(e.getIndex());
             }
+            //build weights for wale boundary conditions 
+            std::vector<double> weights(gluedMesh.nEdges(), 0.0);
+            for (Halfedge he : bLoop.adjacentHalfedges()){
+                if (he.orientation()){
+                    weights[he.edge().getIndex()] = 1.0;
+                }
+                else{
+                    weights[he.edge().getIndex()] = -1.0;
+                }
+            }
+            toReturn.waleBdyPathConstraints.push_back(weights);
         }
     }
     else{//can't use boundary loops for both knitting start and knitting end  
@@ -609,6 +660,7 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
                 for (Edge e : edges){
                     toReturn.courseBdyEdges.push_back(e.getIndex());
                 }
+                toReturn.waleBdyPathConstraints.push_back(weights);
             }
         }
 
@@ -636,6 +688,7 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
                 for (Edge e : edges){
                     toReturn.courseBdyEdges.push_back(e.getIndex());
                 }
+                toReturn.waleBdyPathConstraints.push_back(weights);
             }
         }
     }

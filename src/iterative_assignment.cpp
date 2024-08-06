@@ -258,7 +258,7 @@ Eigen::VectorXd computeIterativeOneForm(VertexPositionGeometry& geometry, polysc
 }
 
 //compute the gradient (per face) of a 1-form
-FaceData<Vector3> computeOneFormGrad(VertexPositionGeometry& geometry, EdgeData<double> oneForm){
+FaceData<Vector3> computeOneFormGrad(VertexPositionGeometry& geometry, EdgeData<double>& oneForm){
     
     SurfaceMesh& mesh = geometry.mesh;
     //solving per face gradient
