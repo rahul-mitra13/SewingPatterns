@@ -59,7 +59,7 @@ std::vector<size_t> perm;
 std::vector<bool> orientations;
 
 //here we will do as much processing as possible directly on the glued together mesh 
-void processGluedMeshStripes(){
+void showStripePatterns(){
   
   //time function on the glued mesh 
   VertexData<double> timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
@@ -95,7 +95,7 @@ void processGluedMeshStripes(){
   std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, *gluedELG, sigmaCourseGlued, period);
   std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
   auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns", positionsCourse, edgesCourse);
-  courseStripes -> setRadius(0.004);
+  courseStripes -> setRadius(0.001);
 
   //set up the wale optimization model 
   Model modelWale; 
@@ -111,7 +111,7 @@ void processGluedMeshStripes(){
   modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
   //find boundary edges in the wale direction 
   std::vector<int> waleBdyEdges = getWaleBdyEdgesInGluedMesh(*globalGeometry, *gluedELG, timeFunctionGradientGlobal, edgeMap, threshold, *globalPSMesh);
-  modelWale.setBdyEdges(waleBdyEdges);
+  //modelWale.setBdyEdges(waleBdyEdges);
   //sigma in the glued mesh setting 
   EdgeData<double> sigmaWaleGlued = computeOneForm(*gluedELG, modelWale);
   EdgeData<double> sigmaWaleGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaWaleGlued, edgeMap);
@@ -125,7 +125,11 @@ void processGluedMeshStripes(){
   std::tie(stripeValuesSigmaWale, stripeIndicesSigmaWale) = computeStripeValuesFromOneForm(*globalGeometry, *gluedELG, sigmaWaleGlued, period);
   std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, stripeValuesSigmaWale, stripeIndicesSigmaWale, period);
   auto waleStripes = polyscope::registerCurveNetwork("wale stripe patterns", positionsWale, edgesWale);
-  waleStripes -> setRadius(0.004);
+  waleStripes -> setRadius(0.001);
+
+  //greedily placed singularities 
+  // FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *globalPSMesh, timeFunctionGlobal, omegaCourseGlobal, period, vertexMap, edgeMappingsPairs, globalBdyConditions);
+  // globalPSMesh -> addFaceScalarQuantity("Greedily placed singularities", greedySingularities);
 }
 
 // A user-defined callback, for creating control panels (etc)
@@ -134,13 +138,11 @@ void processGluedMeshStripes(){
 void callBacks() {
 
   ImGui::InputFloat("1-form period", &period);
+  //there needs to be a better way to constrain wale edges
   ImGui::InputFloat("Threshold", &threshold);
-  // if (ImGui::Button("Show Stripe Patterns")){
-  //   showStripePatterns();
-  // }
 
-  if (ImGui::Button("Process Glued Mesh")){
-    processGluedMeshStripes();
+  if (ImGui::Button("Show Stripe Patterns")){
+    showStripePatterns();
   }
 }
 
