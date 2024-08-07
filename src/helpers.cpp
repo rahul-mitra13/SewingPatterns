@@ -190,6 +190,23 @@ std::tuple<std::vector<Vertex>, std::vector<Edge>, std::vector<double>> getVerti
     return std::make_tuple(vertices, edges, weights);
 }
 
+std::tuple<std::vector<Vertex>, std::vector<Edge>, std::vector<double>> getVerticesAndEdgesInShortestEdgePath(IntrinsicGeometryInterface& geom, Vertex startVert, Vertex endVert){
+    // Gather values
+    SurfaceMesh& mesh = geom.mesh;
+    std::vector<Vertex> vertices;
+    std::vector<Edge> edges;
+    std::vector<double> weights(mesh.nEdges(), 0.0);
+    std::vector<Halfedge> heList = shortestEdgePath(geom, startVert, endVert);
+    vertices.push_back(heList[0].tailVertex());
+    for (Halfedge he : heList){
+        vertices.push_back(he.tipVertex());
+        edges.push_back(he.edge());
+        if (he.orientation()) weights[he.edge().getIndex()] = 1.0;
+        else weights[he.edge().getIndex()] = -1.0;
+    }
+    return std::make_tuple(vertices, edges, weights);
+}
+
 //this builds a mapping
 //panel1name -> pair(panel2name, (vertex from panel1 -> vertex from panel 2))
 std::map<std::pair<std::string, int>, std::pair<std::string, int>> buildLocalVertexMappingMapFromFile(const std::string& filename){
@@ -490,90 +507,6 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
     return ELG;
 }
 
-//parse the global boundary conditions on the global mesh 
-globalBoundaryConditions parseJson(VertexPositionGeometry& geometry, nlohmann::json& data){
-  
-  SurfaceMesh& mesh = geometry.mesh;
-  globalBoundaryConditions toReturn;
-  
-  //course conditions 
-  std::vector<std::vector<size_t>> courseStart = data["boundaries"]["course"]["start"];
-  std::vector<std::vector<size_t>> courseEnd = data["boundaries"]["course"]["end"];
-  std::vector<Vector3> courseBdyVertices; 
-  //parse course start boundary conditions
-  for (int i = 0; i < courseStart.size(); i++){
-    Vertex startVertex = mesh.vertex(courseStart[i][0]);
-    Vertex endVertex = mesh.vertex(courseStart[i][1]);
-    std::vector<double> weights;
-    std::vector<Vertex> vertices;
-    std::vector<Edge> edges;
-    std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
-    for (Vertex v : vertices){
-      toReturn.courseStartBoundaryVertices.push_back(v.getIndex());
-      courseBdyVertices.push_back(geometry.vertexPositions[v]);
-    }
-    for (Edge e : edges){
-      toReturn.courseBdyEdges.push_back(e.getIndex());
-    }
-  }
-  //parse course end boundary conditions
-  for (int i = 0; i < courseEnd.size(); i++){
-    Vertex startVertex = mesh.vertex(courseEnd[i][0]);
-    Vertex endVertex = mesh.vertex(courseEnd[i][1]);
-    std::vector<double> weights;
-    std::vector<Vertex> vertices;
-    std::vector<Edge> edges;
-    std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
-    for (Vertex v : vertices){
-      toReturn.courseEndBoundaryVertices.push_back(v.getIndex());
-      courseBdyVertices.push_back(geometry.vertexPositions[v]);
-    }
-    for (Edge e : edges){
-      toReturn.courseBdyEdges.push_back(e.getIndex());
-    }
-  }
-
-  //wale conditions
-  //edge alignment constraints
-  std::vector<Vector3> waleAlignmentVertices; 
-  std::vector<Vector3> waleIntegralConstraints;
-  std::vector<std::vector<size_t>> waleAlignment = data["boundaries"]["wale"]["alignment"];
-  //parse wale alignment boundary conditions 
-  for (int i = 0; i < waleAlignment.size(); i++){
-    Vertex startVertex = mesh.vertex(waleAlignment[i][0]);
-    Vertex endVertex = mesh.vertex(waleAlignment[i][1]);
-    std::vector<double> weights;
-    std::vector<Vertex> vertices; 
-    std::vector<Edge> edges; 
-    std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
-    for (Vertex v : vertices){
-        waleAlignmentVertices.push_back(geometry.vertexPositions[v]);
-    }
-    for (Edge e : edges){
-        toReturn.waleBdyEdges.push_back(e.getIndex());
-    }
-  }
-  //wale integral constraints 
-  std::vector<std::vector<size_t>> waleIntegral = data["boundaries"]["wale"]["integral"];
-  //parse wale integral boundary conditions
-  for (int i = 0; i < waleIntegral.size(); i++){
-    Vertex startVertex = mesh.vertex(waleIntegral[i][0]);
-    Vertex endVertex = mesh.vertex(waleIntegral[i][1]);
-    std::vector<double> weights;
-    std::vector<Vertex> vertices; 
-    std::vector<Edge> edges;
-    std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePathOnBoundary(geometry, startVertex, endVertex);
-    toReturn.waleBdyPathConstraints.push_back(weights); 
-    for (Vertex v : vertices){
-        waleIntegralConstraints.push_back(geometry.vertexPositions[v]);
-    }
-  }
-
-  polyscope::registerPointCloud("course boundary vertices", courseBdyVertices);
-  polyscope::registerPointCloud("wale edge alignment vertices", waleAlignmentVertices);
-  polyscope::registerPointCloud("wale integral constraint vertices", waleIntegralConstraints);
-  return toReturn;
-}
 
 //parse the global boundary conditions in the glued mesh setting
 //returns the boundary conditions on the glued together mesh  
@@ -646,6 +579,17 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
                 for (Edge e : bLoop.adjacentEdges()){
                     toReturn.courseBdyEdges.push_back(e.getIndex());
                 }
+                //build weights for wale boundary conditions
+                std::vector<double> weights(gluedMesh.nEdges(), 0.0);
+                for (Halfedge he : bLoop.adjacentHalfedges()){
+                    if (he.orientation()){
+                        weights[he.edge().getIndex()] = 1.0;
+                    }
+                    else{
+                        weights[he.edge().getIndex()] = -1.0;
+                    }
+                }
+                toReturn.waleBdyPathConstraints.push_back(weights);
             }
             else{//two vertices specify a path on the boundary 
                 Vertex startVertex = gluedMesh.vertex(vertexMap[startVertices[i][0]]);
@@ -674,6 +618,17 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
                 for (Edge e : bLoop.adjacentEdges()){
                     toReturn.courseBdyEdges.push_back(e.getIndex());
                 }
+                //build weights for wale boundary conditions
+                std::vector<double> weights(gluedMesh.nEdges(), 0.0);
+                for (Halfedge he : bLoop.adjacentHalfedges()){
+                    if (he.orientation()){
+                        weights[he.edge().getIndex()] = 1.0;
+                    }
+                    else{
+                        weights[he.edge().getIndex()] = -1.0;
+                    }
+                }
+                toReturn.waleBdyPathConstraints.push_back(weights);
             }
             else{//two vertices specify a path on the boundary 
                 Vertex startVertex = gluedMesh.vertex(vertexMap[endVertices[i][0]]);

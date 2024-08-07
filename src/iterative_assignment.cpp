@@ -7,8 +7,9 @@ std::vector<int> usedFaceIndices;
 Eigen::SparseMatrix<double, Eigen::RowMajor> d_one; 
 Eigen::SparseMatrix<double, Eigen::RowMajor> d_zero;
 
+//I really want to do this in the intrinsic mesh setting
 FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, VertexData<double>& timeFunction, EdgeData<double>& omega, 
-                                            double period, std::vector<std::pair<int, int>>& edgeMappingsPairs, globalBoundaryConditions& globalBdyConditions){
+                                            double period, std::map<int, int>& vertexMap, std::vector<std::pair<int, int>>& edgeMappingsPairs, globalBoundaryConditions& globalBdyConditions){
 
     SurfaceMesh& mesh = geometry.mesh; 
     FaceData<int> singPositions(mesh);
@@ -33,10 +34,39 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& geometry, po
             it.valueRef() = -it.value();
         }
     }
+
+    //specify boundary-boundary edge path constraint 
+    Vertex v0;
+    Vertex v1; 
+    int ctr = 0;
+    int gluedStartVertexI = globalBdyConditions.courseStartBoundaryVertices[0];
+    int gluedEndVertexI = globalBdyConditions.courseEndBoundaryVertices[0];
+    for (std::pair<int, int> p : vertexMap){
+        if (p.second == gluedStartVertexI){
+            v0 = mesh.vertex(p.first);
+            ctr++;
+        }
+        if (p.second == gluedEndVertexI){
+            v1 = mesh.vertex(p.first);
+            ctr++;
+        }
+        if (ctr == 2) break;
+    }
+    //set up the gurobi model
+    gbModel.setPeriod(period);
+    std::vector<Vertex> vertices;
+    std::vector<Edge> edges;
+    std::vector<double> weights; 
+    std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePath(geometry, v0, v1);
+    std::vector<std::pair<std::vector<double>, double>> edgePathConstraints; 
+    edgePathConstraints.push_back(std::make_pair(weights, 1.0));
+    gbModel.setEdgePathConstraints(edgePathConstraints);
+    psMesh.addEdgeScalarQuantity("bdy-bdy path", weights);
+
     //convert it back to row major format 
     d_one = d_oneColMajor;
     int numPairs = 0;
-    int maxSingularityPairs = 5;
+    int maxSingularityPairs = 2;
     //convert omega to an Eigen::VectorXd
     Eigen::VectorXd omegaEig(mesh.nEdges());
     for (Edge e : mesh.edges()){
@@ -50,14 +80,12 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& geometry, po
         usedFaceIndices.push_back(singPair.second);
         singPositions[mesh.face(singPair.first)] = 1.0;
         singPositions[mesh.face(singPair.second)] = -1.0;
-        //set up the gurobi model
-        gbModel.setPeriod(period);
         std::vector<int> singularFaces(mesh.nFaces(), 0);
         singularFaces[singPair.first] = 1.0;
         singularFaces[singPair.second] = -1.0;
         gbModel.setFaceIndices(singularFaces);
         gbModel.setBdyEdges(globalBdyConditions.courseBdyEdges);
-        omegaEig = computeIterativeOneForm(geometry, psMesh, gbModel, edgeMappingsPairs, globalBdyConditions);
+        omegaEig = computeIterativeOneForm(geometry, psMesh, gbModel, edgeMappingsPairs);
         numPairs++;
     }
     return singPositions;
@@ -160,14 +188,17 @@ std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, std::vector<int>> getTimeFunctionIs
     return std::tie(iV, iE, passes);
 }
 
-Eigen::VectorXd computeIterativeOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, Model& gbModel, std::vector<std::pair<int, int>>& edgeMappingsPairs, globalBoundaryConditions& globalBoundaryConditions){
+Eigen::VectorXd computeIterativeOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, Model& gbModel, std::vector<std::pair<int, int>>& edgeMappingsPairs){
     
     SurfaceMesh& mesh = geometry.mesh; 
     double period = gbModel.getPeriod();
     std::vector<int> faceIndices = gbModel.getFaceIndices();
-    std::vector<int> bdyEdges = globalBoundaryConditions.courseBdyEdges;
+    std::vector<int> bdyEdges = gbModel.getBdyEdges();
+    std::vector<std::pair<std::vector<double>, double>> edgePathConstraints = gbModel.getEdgePathConstraints();
     Eigen::VectorXd toReturn(mesh.nEdges());
     EdgeData<double> oneForm(mesh);
+
+    std::cout << "size of edge path constraints: " << edgePathConstraints.size() << std::endl;
 
     //solve the model
     using namespace std;
@@ -212,6 +243,15 @@ Eigen::VectorXd computeIterativeOneForm(VertexPositionGeometry& geometry, polysc
             int iEdge1 = edgeMappingsPairs[i].first;
             int iEdge2 = edgeMappingsPairs[i].second;
             model.addConstr(sigma[iEdge2] == sigma[iEdge1], "Stitched Edge Constraint");
+        }
+
+        //fourth constraint - boundary-boundary integral is 1 
+        for (int i = 0; i < edgePathConstraints.size(); i++){
+            GRBLinExpr pathIntegral = 0;
+            for (int j = 0; j < mesh.nEdges(); j++){
+                pathIntegral += edgePathConstraints[i].first[j] * sigma[j];
+            }
+            model.addConstr(pathIntegral == edgePathConstraints[i].second);
         }
 
         //trying to match energies
@@ -274,32 +314,32 @@ FaceData<Vector3> computeOneFormGrad(VertexPositionGeometry& geometry, EdgeData<
     FaceData<Vector3> face_gradients(mesh);
 
     Eigen::MatrixXd faceSystem(3, 3);
-     Eigen::VectorXd faceSigmas(3);
-     for (Face f : mesh.faces()){
-      	Halfedge he = f.halfedge();
+    Eigen::VectorXd faceSigmas(3);
+    for (Face f : mesh.faces()){
+        Halfedge he = f.halfedge();
       	Vector3 face_normal = geometry.faceNormal(f);
       	int j = 0;
       	do{	
-      	 	    Edge edgeObject = he.edge();
-      	    	int edgeIndex = edgeObject.getIndex();
-      	    	if (j == 2){//last row of RHS
-      	    		faceSigmas(j) = 0;
+      	 	Edge edgeObject = he.edge();
+      	    int edgeIndex = edgeObject.getIndex();
+      	    if (j == 2){//last row of RHS
+      	     	faceSigmas(j) = 0;
+      	    }
+      	    else{
+      	    	faceSigmas(j) = sigma(edgeIndex);
+      	    }
+      	    for (int i = 0; i < 3; i++){
+      	    	Vector3 he_vector = geometry.vertexPositions[edgeObject.halfedge().tipVertex()] 
+                                        - geometry.vertexPositions[edgeObject.halfedge().tailVertex()];
+      	    	if (j == 2){//last row of LHS
+      	    		faceSystem(j, i) = face_normal[i];
       	    	}
       	    	else{
-      	    		faceSigmas(j) = sigma(edgeIndex);
+      	    		faceSystem(j, i) = he_vector[i];
       	    	}
-      	    	for (int i = 0; i < 3; i++){
-      	    		Vector3 he_vector = geometry.vertexPositions[edgeObject.halfedge().tipVertex()] 
-                                            - geometry.vertexPositions[edgeObject.halfedge().tailVertex()];
-      	    		if (j == 2){//last row of LHS
-      	    			faceSystem(j, i) = face_normal[i];
-      	    		}
-      	    		else{
-      	    			faceSystem(j, i) = he_vector[i];
-      	    		}
-      	    	}
-      	    	j++;
-      		he = he.next();
+      	    }
+      	    j++;
+      	    he = he.next();
       	}while(he != f.halfedge());
        	Eigen::VectorXd soln = faceSystem.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(faceSigmas);
        	gradient(f.getIndex(), 0) = soln(0);

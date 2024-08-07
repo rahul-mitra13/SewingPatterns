@@ -11,7 +11,7 @@ using namespace geometrycentral::surface;
 //input: \omega the first 1-form in our iterations (in theory could be either course or wale)
 //output is the singularity positions on our mesh 
 FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, VertexData<double>& timeFunction, EdgeData<double>& omega,
-                                            double period, std::vector<std::pair<int, int>>& edgeMappingsPairs, globalBoundaryConditions& globalBdyConditions);
+                                            double period, std::map<int, int>& vertexMap, std::vector<std::pair<int, int>>& edgeMappingsPairs, globalBoundaryConditions& globalBdyConditions);
 //render d1 * omega 
 void showd1Omega(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, Eigen::VectorXd& omega, int numPairs);
 
@@ -25,7 +25,7 @@ std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, std::vector<int>> getTimeFunctionIs
 
 //computes an iterative 1-form
 //the goal here is to make this 1-form behave like a harmonic function
-Eigen::VectorXd computeIterativeOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, Model& gbModel, std::vector<std::pair<int, int>>& edgeMappingsPairs, globalBoundaryConditions& globalBoundaryConditions);
+Eigen::VectorXd computeIterativeOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, Model& gbModel, std::vector<std::pair<int, int>>& edgeMappingsPairs);
 
 
 //compute the gradient (per face) of a 1-form 

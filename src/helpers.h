@@ -32,13 +32,12 @@
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
-//global boundary conditions
+//boundary conditions on the glued mesh
 struct globalBoundaryConditions{
     std::vector<int> courseStartBoundaryVertices;//vertices where t = 0
     std::vector<int> courseEndBoundaryVertices;//vertices where t = 1
 
     std::vector<int> courseBdyEdges;//boundary edges in the course direction where sigma = 0
-    std::vector<int> waleBdyEdges;//boundary edges in the wale direction where sigma = 0
     std::vector<std::vector<double>> waleBdyPathConstraints;//vector of vectors (each of size nEdges()) where each entry stores the weight of the edge in the integration with \sigma
 };
 
@@ -98,6 +97,9 @@ std::vector<Halfedge> shortestEdgePathOnBoundary(IntrinsicGeometryInterface& geo
 //@return        tuple              std::tuple<vector<Vertex>, vector<Edge>, vector<double>>        returns a tuple of vertices and edges on the boundary between the two vertices and edge weights on this he path
 std::tuple<std::vector<Vertex>, std::vector<Edge>, std::vector<double>> getVerticesAndEdgesInShortestEdgePathOnBoundary(IntrinsicGeometryInterface& geom, Vertex startVert, Vertex endVert);
 
+//same as above but uses the shortest edge path function instead of shortest edge path on boundary function 
+std::tuple<std::vector<Vertex>, std::vector<Edge>, std::vector<double>> getVerticesAndEdgesInShortestEdgePath(IntrinsicGeometryInterface& geom, Vertex startVert, Vertex endVert);
+
 
 //build a vertex mapping map from an input txt file (for a "local" mapping across different models)
 //
@@ -156,9 +158,6 @@ void renderStitchedVertices(VertexPositionGeometry& geometry, std::vector<std::p
 //@return       constrainedEdges    std::vector<int>                indices of edges (in the glued mesh) where sigma_{wale} = 0
 std::vector<int> getWaleBdyEdgesInGluedMesh(VertexPositionGeometry& globalGeometry, IntrinsicGeometryInterface& gluedGeometry, FaceData<Vector3>& faceGradients, std::map<int, int>& edgeMap, double val,
                                             polyscope::SurfaceMesh& globalPSMesh);
-
-//parse json file and render boundary conditions
-globalBoundaryConditions parseJson(VertexPositionGeometry& geometry, nlohmann::json& data);
 
 //parse the global boundary conditions in the glued together mesh 
 globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nlohmann::json& data, std::map<int,int>& vertexMap, std::map<int, int>& edgeMap);
