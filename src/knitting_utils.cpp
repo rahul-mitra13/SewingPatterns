@@ -431,7 +431,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
                 lhs += it.value() * sigma[it.col()];
             }
             model.addConstr(lhs == 0, "Integral Constraint");
-            //model.addConstr(lhs == period * k[r], "Integral Constraint");
+            model.addConstr(lhs == period * k[r], "Integral Constraint");
         }
 
         //third constraint - sigma across stiched edges should be equal 
@@ -502,6 +502,7 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
 
     gluedGeometry.requireDECOperators();
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
+
     try {
         // Create an environment
         GRBEnv env = GRBEnv(true);
@@ -513,7 +514,7 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
 
         //set the timeout
         model.getEnv().set(GRB_DoubleParam_TimeLimit, 60);
-        //model.getEnv().set(GRB_IntParam_OutputFlag, 0);
+        model.getEnv().set(GRB_IntParam_OutputFlag, 0);
 
         //add variable 1-form variable sigma (per edge)
         std::vector<GRBVar> sigma;
@@ -627,9 +628,8 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
 
     return d0_f_avg;
 }
-
-//comput matching 1-form while taking into account "stitched together" edges
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, int direction, FaceData<Vector3> faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs){
+//compute matching 1-form while taking into account "stitched together" edges
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, int direction, FaceData<Vector3>& faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs){
 
     SurfaceMesh& mesh = geometry.mesh;
     geometry.requireFaceNormals();
@@ -641,8 +641,6 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polysc
             faceGradients[f] = faceGradients[f].normalize();
             faceGradients[f] = faceGradients[f].rotateAround(geometry.faceNormals[f], PI/2.);
         }
-        //psMesh.addFaceVectorQuantity("rotated gradient", faceGradients);
-        //std::cout << "Computing machine 1-form for wale direction " << std::endl;
     }
     int numStitchedEdges = 0;
     //create a map from the mapped edges

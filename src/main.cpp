@@ -70,13 +70,16 @@ void showStripePatterns(){
   //note that faces have a 1-to-1 mapping from global to glued setting
   FaceData<Vector3> timeFunctionGradientGlobal = computeTimeFunctionFaceGrad(*globalGeometry, timeFunctionGlobal);
   globalPSMesh -> addFaceVectorQuantity("gradient", timeFunctionGradientGlobal);
+  //find boundary edges in the wale direction 
+  //doing this here cause the gradient gets rotated later
+  std::vector<int> waleBdyEdges = getWaleBdyEdgesInGluedMesh(*globalGeometry, *gluedELG, timeFunctionGradientGlobal, edgeMap, threshold, *globalPSMesh);
+  
+  //set up the course optimization 
+  Model modelCourse; 
   //compute matching one form on the global mesh in the course direction
   EdgeData<double> omegaCourseGlobal = computeMatchingOneForm(*globalGeometry, *globalPSMesh, 0, timeFunctionGradientGlobal, edgeMappingsPairs); 
   //matching one form on the glued mesh in the course direction
   EdgeData<double> omegaCourseGlued = convertGlobalToGluedEdgeFunction(*globalGeometry, *gluedELG, omegaCourseGlobal, edgeMap);
-
-  //set up the course optimization 
-  Model modelCourse; 
   modelCourse.setPeriod(period);
   modelCourse.setBdyEdges(globalBdyConditions.courseBdyEdges);
   std::vector<double> modelMatchingTermsCourse; 
@@ -107,11 +110,10 @@ void showStripePatterns(){
   for (Edge e : (gluedELG -> mesh).edges()){
     modelMatchingTermsWale.push_back(omegaWaleGlued[e]);
   }
+  //globalPSMesh -> addOneFormTangentVectorQuantity("omega wale ", omegaWaleGlobal, orientations);
   modelWale.setMatchingTerms(modelMatchingTermsWale);
   modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
-  //find boundary edges in the wale direction 
-  std::vector<int> waleBdyEdges = getWaleBdyEdgesInGluedMesh(*globalGeometry, *gluedELG, timeFunctionGradientGlobal, edgeMap, threshold, *globalPSMesh);
-  //modelWale.setBdyEdges(waleBdyEdges);
+  modelWale.setBdyEdges(waleBdyEdges);
   //sigma in the glued mesh setting 
   EdgeData<double> sigmaWaleGlued = computeOneForm(*gluedELG, modelWale);
   EdgeData<double> sigmaWaleGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaWaleGlued, edgeMap);

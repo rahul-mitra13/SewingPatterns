@@ -91,11 +91,11 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& geometry, Model& gbModel);
 //@param[in]    faceGradients       FaceData<Vector3>       the gradients of the time function we're using to solve for the matching 1-form
 //
 //@return       matchingOneForm     EdgeData<double>        The 1-form we're trying to match 
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3> faceGradients);
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3>& faceGradients);
 
 //compute matching 1-form while taking into account "stitched together" edges
 //same parameters and return type as the function above 
 //additional parameter 
 //@param[in]    edgeMappingsPairs       std::vector<std::pair<int, int>>    vector of pairs where each pair stores edges that are stitched together
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, int direction, FaceData<Vector3> faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs);
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, int direction, FaceData<Vector3>& faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs);
 
