@@ -165,8 +165,8 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
 //create a new "glued" edge length geometry
 //create a mapping from original index to "glued" index (vertex and edges)
 //also populate edge lengths of glued mesh
-EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& originalMeshVertexIndexToGluedMeshIndex, 
-                                    std::map<int, int>& originalMeshEdgeIndexToGluedMeshIndex, std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
+EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& vertexMap, 
+                                    std::map<int, int>& edgeMap, std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
 
 
 //some utility functions for converting values defined on the glued mesh to values defined on the global mesh 

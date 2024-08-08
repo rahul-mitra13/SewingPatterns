@@ -398,8 +398,8 @@ std::vector<double> createEdgeWeightsFromVertexList(VertexPositionGeometry& geom
     return edgeWeights;
 }
 
-EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& originalMeshVertexIndexToGluedMeshIndex, 
-                                    std::map<int, int>& originalMeshEdgeIndexToGluedMeshIndex, std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
+EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& vertexMap, 
+                                    std::map<int, int>& edgeMap, std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
     SurfaceMesh& mesh = geometry.mesh;
     //find original index to glued mesh index for vertices
     int numUniqueVertices = 0;
@@ -411,27 +411,27 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
         //iterate over the mappings 
         for (auto p : vertexMappingsPairs){
             if (p.first == iV || p.second == iV){
-                if (originalMeshVertexIndexToGluedMeshIndex.find(p.first) == originalMeshVertexIndexToGluedMeshIndex.end()
-                && originalMeshVertexIndexToGluedMeshIndex.find(p.second) == originalMeshVertexIndexToGluedMeshIndex.end()){
-                    originalMeshVertexIndexToGluedMeshIndex.insert({p.first, numUniqueVertices});
-                    originalMeshVertexIndexToGluedMeshIndex.insert({p.second, numUniqueVertices});
+                if (vertexMap.find(p.first) == vertexMap.end()
+                && vertexMap.find(p.second) == vertexMap.end()){
+                    vertexMap.insert({p.first, numUniqueVertices});
+                    vertexMap.insert({p.second, numUniqueVertices});
                     //put in the other other map 
                     gluedMeshVertexIndexToOriginalMeshIndex.insert({numUniqueVertices, p.first});
                     
                     numUniqueVertices++;
                 }
-                if (originalMeshVertexIndexToGluedMeshIndex.find(p.first) != originalMeshVertexIndexToGluedMeshIndex.end()&&
-                    originalMeshVertexIndexToGluedMeshIndex.find(p.second) == originalMeshVertexIndexToGluedMeshIndex.end()){
-                    originalMeshVertexIndexToGluedMeshIndex.insert({p.second, originalMeshVertexIndexToGluedMeshIndex.at(p.first)});
+                if (vertexMap.find(p.first) != vertexMap.end()&&
+                    vertexMap.find(p.second) == vertexMap.end()){
+                    vertexMap.insert({p.second, vertexMap.at(p.first)});
                 }
-                if (originalMeshVertexIndexToGluedMeshIndex.find(p.second) != originalMeshVertexIndexToGluedMeshIndex.end() &&
-                    originalMeshVertexIndexToGluedMeshIndex.find(p.first) == originalMeshVertexIndexToGluedMeshIndex.end()){
-                    originalMeshVertexIndexToGluedMeshIndex.insert({p.first, originalMeshVertexIndexToGluedMeshIndex.at(p.second)});
+                if (vertexMap.find(p.second) != vertexMap.end() &&
+                    vertexMap.find(p.first) == vertexMap.end()){
+                    vertexMap.insert({p.first, vertexMap.at(p.second)});
                 }
             }
         }
-        if (originalMeshVertexIndexToGluedMeshIndex.find(iV) == originalMeshVertexIndexToGluedMeshIndex.end()){
-            originalMeshVertexIndexToGluedMeshIndex.insert({iV, numUniqueVertices});
+        if (vertexMap.find(iV) == vertexMap.end()){
+            vertexMap.insert({iV, numUniqueVertices});
             //put it in the other map 
             gluedMeshVertexIndexToOriginalMeshIndex.insert({numUniqueVertices, iV});
 
@@ -443,9 +443,9 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
     for (Face f : mesh.faces()){
         if (f.isBoundaryLoop()) continue;
         std::vector<size_t> currPolygon;
-        int i = originalMeshVertexIndexToGluedMeshIndex[f.halfedge().tailVertex().getIndex()];
-        int j = originalMeshVertexIndexToGluedMeshIndex[f.halfedge().next().tailVertex().getIndex()];
-        int k = originalMeshVertexIndexToGluedMeshIndex[f.halfedge().next().next().tailVertex().getIndex()];
+        int i = vertexMap[f.halfedge().tailVertex().getIndex()];
+        int j = vertexMap[f.halfedge().next().tailVertex().getIndex()];
+        int k = vertexMap[f.halfedge().next().next().tailVertex().getIndex()];
         currPolygon.push_back(i);
         currPolygon.push_back(j);
         currPolygon.push_back(k);
@@ -461,14 +461,14 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
     //     gluedOneRingMap[v.getIndex()] = std::vector<Halfedge>{};
     //     std::vector<Halfedge> halfedges;
     //     std::vector<Halfedge> gluedMeshHalfedges;
-    //     Vertex gluedMeshVertex = gluedMesh->vertex(originalMeshVertexIndexToGluedMeshIndex[v.getIndex()]);
+    //     Vertex gluedMeshVertex = gluedMesh->vertex(vertexMap[v.getIndex()]);
     //     for (Halfedge he : gluedMeshVertex.outgoingHalfedges()){
     //         gluedMeshHalfedges.push_back(he);
     //     }
     //     //find the corresponding halfedges in the original mesh
     //     for (Halfedge he : mesh.halfedges()){
     //         for (Halfedge heGlued : gluedMeshHalfedges){
-    //             if (originalMeshVertexIndexToGluedMeshIndex[he.tailVertex().getIndex()] == heGlued.tailVertex().getIndex() && originalMeshVertexIndexToGluedMeshIndex[he.tipVertex().getIndex()] == 
+    //             if (vertexMap[he.tailVertex().getIndex()] == heGlued.tailVertex().getIndex() && vertexMap[he.tipVertex().getIndex()] == 
     //             heGlued.tipVertex().getIndex()){
     //             gluedOneRingMap[v.getIndex()].push_back(he);
     //             break;
@@ -479,12 +479,12 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
 
     //build a map from edges in the original mesh to edges in the glued mesh 
     for (Halfedge he1 : mesh.halfedges()){
-        int v1 = originalMeshVertexIndexToGluedMeshIndex[he1.tailVertex().getIndex()];
-        int v2 = originalMeshVertexIndexToGluedMeshIndex[he1.tipVertex().getIndex()];
+        int v1 = vertexMap[he1.tailVertex().getIndex()];
+        int v2 = vertexMap[he1.tipVertex().getIndex()];
         //find the corresponding edge in the glued mesh 
         for (Halfedge he2 : gluedMesh->halfedges()){
             if (he2.tailVertex().getIndex() == v1 && he2.tipVertex().getIndex() == v2){
-                originalMeshEdgeIndexToGluedMeshIndex.insert({he1.edge().getIndex(), he2.edge().getIndex()});
+                edgeMap.insert({he1.edge().getIndex(), he2.edge().getIndex()});
                 edgeLengths[he2.edge()] = geometry.edgeLengths[he1.edge()];
                 break;
             }
@@ -502,6 +502,8 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
     std::cout << "Number of boundary loops in the glued mesh " << gluedMesh -> nBoundaryLoops() << std::endl;
     std::cout << "Number of connected components in the original mesh " << mesh.nConnectedComponents() << std::endl;
     std::cout << "Number of connected components ih the glued mesh " << gluedMesh -> nConnectedComponents() << std::endl;
+    std::cout << "Is original mesh oriented " << mesh.isOriented() << std::endl;
+    std::cout << "Is glued mesh oriented " << gluedMesh -> isOriented() << std::endl;
 
     EdgeLengthGeometry * ELG = new EdgeLengthGeometry(*gluedMesh, edgeLengths);
     return ELG;
