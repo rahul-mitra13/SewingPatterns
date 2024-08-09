@@ -73,7 +73,6 @@ void showStripePatterns(){
   //find boundary edges in the wale direction 
   //doing this here cause the gradient gets rotated later
   std::vector<int> waleBdyEdges = getWaleBdyEdgesInGluedMesh(*globalGeometry, *gluedELG, timeFunctionGradientGlobal, edgeMap, threshold, *globalPSMesh);
-  
   //set up the course optimization 
   Model modelCourse; 
   //compute matching one form on the global mesh in the course direction
@@ -105,6 +104,7 @@ void showStripePatterns(){
   modelWale.setPeriod(period);
   //compute matching one form on the global mesh in the wale direction 
   EdgeData<double> omegaWaleGlobal = computeMatchingOneForm(*globalGeometry, *globalPSMesh, 1, timeFunctionGradientGlobal, edgeMappingsPairs);
+  //globalPSMesh -> addOneFormTangentVectorQuantity("omega wale", omegaWaleGlobal, orientations);
   EdgeData<double> omegaWaleGlued = convertGlobalToGluedEdgeFunction(*globalGeometry, *gluedELG, omegaWaleGlobal, edgeMap);
   std::vector<double> modelMatchingTermsWale; 
   for (Edge e : (gluedELG -> mesh).edges()){
@@ -117,7 +117,13 @@ void showStripePatterns(){
   //sigma in the glued mesh setting 
   EdgeData<double> sigmaWaleGlued = computeOneForm(*gluedELG, modelWale);
   EdgeData<double> sigmaWaleGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaWaleGlued, edgeMap);
-  globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale global", sigmaWaleGlobal, orientations);
+  //globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigmaWaleGlobal, orientations);
+  //visualize the differences
+  EdgeData<double> difference(*globalMesh);
+  for (Edge e : globalMesh -> edges()){
+    difference[e] = pow(omegaWaleGlobal[e] - sigmaWaleGlobal[e], 2.0);
+  }
+  globalPSMesh -> addEdgeScalarQuantity("difference", difference);
   //global data
   CornerData<double> stripeValuesSigmaWale;
   //global data
@@ -188,9 +194,6 @@ int main(int argc, char **argv) {
   globalPSMesh -> setEdgePermutation(perm);
   //create the glued edge length geometry
   gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, vertexMap, edgeMap, gluedOneRingMap);
-  //read in the global boundary conditions from the json file
-  //processes boundary conditions in the global mesh setting
-  //globalBdyConditions = parseJson(*globalGeometry, data);
   //process boundary conditions in the glued mesh setting 
   globalBdyConditions = parseJson(*gluedELG, data, vertexMap, edgeMap);
   //render the stitched vertices

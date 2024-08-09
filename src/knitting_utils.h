@@ -82,7 +82,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
 //compute a 1-form that will be used to generate the stripes over the pathces 
 //overload from the function above
 //it does the optimization in the glued mesh setting 
-EdgeData<double> computeOneForm(EdgeLengthGeometry& geometry, Model& gbModel);
+EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbModel);
 
 //compute \omega i.e., the 1-form we're trying to match over each edge 
 //

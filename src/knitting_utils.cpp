@@ -502,6 +502,11 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
 
     gluedGeometry.requireDECOperators();
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
+    // Eigen::VectorXd omegaEig(gluedMesh.nEdges()); 
+    // for (Edge e : gluedMesh.edges()){
+    //     omegaEig(e.getIndex()) = omega[e.getIndex()];
+    // }
+    // std::cout << "d1 * omega = " << d_one * omegaEig << std::endl;
 
     try {
         // Create an environment
@@ -544,6 +549,9 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
         for (int bdy_edge_index : bdyEdges){
             model.addConstr(sigma[bdy_edge_index] == 0.0, "Boundary Constraint");
         }
+
+        //regularization term 
+        GRBQuadExpr diff2_sum = 0;
         
         //second constraint - (d1*sigma) == kP, P is period of optimization, k \in \mathbb{Z}
         for (int r = 0; r < d_one.outerSize(); ++r) {
@@ -552,7 +560,9 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
                 lhs += it.value() * sigma[it.col()];
             }
             model.addConstr(lhs == 0, "Integral Constraint");
+            diff2_sum += ((lhs - 0) * (lhs - 0));//regularization for all faces set to 0 is dumb
             //model.addConstr(lhs == period * k[r], "Integral Constraint");
+            //diff2_sum += ((lhs - period * k[r]) * (lhs - period * k[r]));
         }
 
         //third constraint - boundary integral in the wale direction
@@ -572,7 +582,7 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
         }
 
 
-        GRBQuadExpr obj = diff1_sum;
+        GRBQuadExpr obj = diff1_sum + diff2_sum;
 
         model.setObjective(obj);
         model.optimize(); 
@@ -582,6 +592,10 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
         for (Edge e : gluedMesh.edges()){
             oneForm[e] = sigma[e.getIndex()].get(GRB_DoubleAttr_X);
         }
+
+        for (int i = 0; i < waleBdyIntegerConstraints.size(); i++){
+            std::cout << "integer constraint: " << waleBdyIntegerConstraints[i].get(GRB_DoubleAttr_X) << std::endl;
+        }
     }
     catch(GRBException e) {
         std::cout << "Error code = " << e.getErrorCode() << std::endl;
@@ -589,6 +603,7 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
     } catch(...) {
         std::cout << "Exception during optimization" << std::endl;
     }
+
     return oneForm;
 }
 
@@ -661,8 +676,10 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polysc
             //normalize the face gradients first
             faceGradients[e.halfedge().face()] = faceGradients[e.halfedge().face()].normalize();
             faceGradients[e.halfedge().twin().face()] = faceGradients[e.halfedge().twin().face()].normalize();
+            Vector3 eVector = geometry.vertexPositions[e.halfedge().tipVertex()] - geometry.vertexPositions[e.halfedge().tailVertex()];
+            //eVector = eVector.normalize();
             omega[e] = 0.5 * dot((faceGradients[e.halfedge().face()] + faceGradients[e.halfedge().twin().face()]),
-                                    geometry.vertexPositions[e.halfedge().tipVertex()] - geometry.vertexPositions[e.halfedge().tailVertex()]);
+                                    eVector);
             seenEdges[e.getIndex()] = true;
         }
         else{//found a boundary halfedge
@@ -677,6 +694,7 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polysc
                 Vector3 avgVector = (e1 + e2)/2.;
                 //just pick the original edge as the "canonical" direction in the global mesh
                 //I'm not really sure the polyscope Whitney interpolation scheme is the best way to visualize these
+                //e1 = e1.normalize();
                 omega[e] = 0.5 * dot((faceGradients1 + faceGradients2), e1);
                 omega[mesh.edge(edgeMap.at(e.getIndex()))] = 0.5 * dot((faceGradients1 + (faceGradients2)), e1);
                 seenEdges[e.getIndex()] = true;
@@ -684,8 +702,9 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polysc
             }
             else{//found a boundary edge that's not stitched to anything
                 faceGradients[e.halfedge().face()] = faceGradients[e.halfedge().face()].normalize();
-                omega[e] = dot(faceGradients[e.halfedge().face()], geometry.vertexPositions[e.halfedge().tipVertex()] - 
-                                                                                geometry.vertexPositions[e.halfedge().tailVertex()]);
+                Vector3 eVector = geometry.vertexPositions[e.halfedge().tipVertex()] - geometry.vertexPositions[e.halfedge().tailVertex()];
+                //eVector = eVector.normalize();
+                omega[e] = dot(faceGradients[e.halfedge().face()], eVector);
                 seenEdges[e.getIndex()] = true;
             }
         }
