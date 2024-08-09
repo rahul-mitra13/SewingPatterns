@@ -88,6 +88,13 @@ void showStripePatterns(){
   modelCourse.setMatchingTerms(modelMatchingTermsCourse);
   //sigma in the glued mesh setting 
   EdgeData<double> sigmaCourseGlued = computeOneForm(*gluedELG, modelCourse);
+  EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
+  //visualize the differences
+  EdgeData<double> differenceCourse(*globalMesh);
+  for (Edge e : globalMesh -> edges()){
+    differenceCourse[e] = pow(omegaCourseGlobal[e] - sigmaCourseGlobal[e], 2.0);
+  }
+  globalPSMesh -> addEdgeScalarQuantity("course difference", differenceCourse);
   //global data
   CornerData<double> stripeValuesSigmaCourse;
   //global data
@@ -119,11 +126,11 @@ void showStripePatterns(){
   EdgeData<double> sigmaWaleGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaWaleGlued, edgeMap);
   //globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigmaWaleGlobal, orientations);
   //visualize the differences
-  EdgeData<double> difference(*globalMesh);
+  EdgeData<double> differenceWale(*globalMesh);
   for (Edge e : globalMesh -> edges()){
-    difference[e] = pow(omegaWaleGlobal[e] - sigmaWaleGlobal[e], 2.0);
+    differenceWale[e] = pow(omegaWaleGlobal[e] - sigmaWaleGlobal[e], 2.0);
   }
-  globalPSMesh -> addEdgeScalarQuantity("difference", difference);
+  globalPSMesh -> addEdgeScalarQuantity("wale difference", differenceWale);
   //global data
   CornerData<double> stripeValuesSigmaWale;
   //global data
@@ -134,6 +141,7 @@ void showStripePatterns(){
   std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, stripeValuesSigmaWale, stripeIndicesSigmaWale, period);
   auto waleStripes = polyscope::registerCurveNetwork("wale stripe patterns", positionsWale, edgesWale);
   waleStripes -> setRadius(0.001);
+  
 
   //greedily placed singularities 
   // FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *globalPSMesh, timeFunctionGlobal, omegaCourseGlobal, period, vertexMap, edgeMappingsPairs, globalBdyConditions);

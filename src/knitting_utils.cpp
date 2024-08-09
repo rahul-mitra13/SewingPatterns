@@ -154,7 +154,7 @@ VertexData<double> computeTimeFunction(EdgeLengthGeometry& gluedGeometry, global
     return gluedTimeFunction;
 }
 
-//compute the gradient of a function defined as a scalar over vertices
+//compute the gradient of a function defined as a scalar over vertices in the global mesh setting 
 FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, VertexData<double>& vertexScalarFunction){
     
     SurfaceMesh& mesh = geometry.mesh;
@@ -183,6 +183,39 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, 
         faceGradients[f] = Vector3{GU(f.getIndex(), 0), GU(f.getIndex(), 1), GU(f.getIndex(), 2)};
     }
     return faceGradients;
+}
+
+//compute the gradient of the a function defined as a scalar over vertices in the glued mesh setting 
+//don't think the formula I'm using in here is right
+FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, VertexData<double>& vertexScalarFunction){
+
+    SurfaceMesh& mesh = geometry.mesh; 
+    geometry.requireFaceAreas();
+    geometry.requireEdgeCotanWeights();
+    geometry.requireCornerAngles();
+    FaceData<Vector3> gradients(mesh);
+
+    for (Face f : mesh.faces()){
+        double f1 = vertexScalarFunction[f.halfedge().vertex()];
+        double f2 = vertexScalarFunction[f.halfedge().next().vertex()];
+        double f3 = vertexScalarFunction[f.halfedge().next().next().vertex()];
+        Corner c1 = f.halfedge().corner();
+        Corner c2 = f.halfedge().next().corner();
+        Corner c3 = f.halfedge().next().next().corner();
+        double cottheta1 = 1. / tan(geometry.cornerAngles[c1]);
+        double cottheta2 = 1. / tan(geometry.cornerAngles[c2]);
+        double cottheta3 = 1. / tan(geometry.cornerAngles[c3]);
+        double area = geometry.faceAreas[f];
+        std::cout << "area = " << area << std::endl; 
+        std::cout << "cot(theta1) = " << cottheta1 << std::endl;
+        std::cout << "cot(theta2) = " << cottheta2 << std::endl; 
+        std::cout << "cot(theta3) = " << cottheta3 << std::endl;
+        gradients[f][0] = 1./(2*area) * (((f2 - f1) * cottheta3) + ((f3 - f1) * cottheta2));
+        gradients[f][1] = 1./(2*area) * (((f3 - f2) * cottheta1) + ((f1 - f2) * cottheta3));
+        gradients[f][2] = 1./(2*area) * (((f1 - f3) * cottheta2) + ((f2 - f3) * cottheta1));
+    }
+
+    return gradients;
 }
 
 //compute a vector (in ambient space) per vertex that is aligned with the gradient of a scalar field
@@ -497,16 +530,10 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
     std::vector<double> omega = gbModel.getMatchingTerms();
     std::vector<int> bdyEdges = gbModel.getBdyEdges();
     double period = gbModel.getPeriod();
-
     std::vector<std::vector<double>> waleBdyPathConstraints = gbModel.getWaleBdyPathConstraints();
 
     gluedGeometry.requireDECOperators();
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
-    // Eigen::VectorXd omegaEig(gluedMesh.nEdges()); 
-    // for (Edge e : gluedMesh.edges()){
-    //     omegaEig(e.getIndex()) = omega[e.getIndex()];
-    // }
-    // std::cout << "d1 * omega = " << d_one * omegaEig << std::endl;
 
     try {
         // Create an environment
@@ -519,8 +546,9 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
 
         //set the timeout
         model.getEnv().set(GRB_DoubleParam_TimeLimit, 60);
-        model.getEnv().set(GRB_IntParam_OutputFlag, 0);
-
+        //model.getEnv().set(GRB_IntParam_OutputFlag, 0);
+        //model.getEnv().set(GRB_IntParam_MIPFocus, 2);
+        
         //add variable 1-form variable sigma (per edge)
         std::vector<GRBVar> sigma;
 
@@ -582,7 +610,7 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
         }
 
 
-        GRBQuadExpr obj = diff1_sum + diff2_sum;
+        GRBQuadExpr obj = (diff1_sum + diff2_sum);
 
         model.setObjective(obj);
         model.optimize(); 
@@ -596,6 +624,13 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
         for (int i = 0; i < waleBdyIntegerConstraints.size(); i++){
             std::cout << "integer constraint: " << waleBdyIntegerConstraints[i].get(GRB_DoubleAttr_X) << std::endl;
         }
+
+        // Eigen::VectorXd sigmaEig(gluedMesh.nEdges()); 
+        // for (Edge e : gluedMesh.edges()){
+        //     sigmaEig(e.getIndex()) = sigma[e.getIndex()].get(GRB_DoubleAttr_X);
+        // }
+        // std::cout << "d1 * sigma = " << d_one * sigmaEig << std::endl;
+
     }
     catch(GRBException e) {
         std::cout << "Error code = " << e.getErrorCode() << std::endl;
@@ -608,7 +643,7 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
 }
 
 //compute \omega that is the 1-form we're trying to match over each edge 
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3> faceGradients){
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3>& faceGradients){
     
     SurfaceMesh& mesh = geometry.mesh;
     geometry.requireFaceNormals();
