@@ -214,7 +214,6 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, Vert
         gradients[f][1] = 1./(2*area) * (((f3 - f2) * cottheta1) + ((f1 - f2) * cottheta3));
         gradients[f][2] = 1./(2*area) * (((f1 - f3) * cottheta2) + ((f2 - f3) * cottheta1));
     }
-
     return gradients;
 }
 
@@ -464,7 +463,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
                 lhs += it.value() * sigma[it.col()];
             }
             model.addConstr(lhs == 0, "Integral Constraint");
-            model.addConstr(lhs == period * k[r], "Integral Constraint");
+            //model.addConstr(lhs == period * k[r], "Integral Constraint");
         }
 
         //third constraint - sigma across stiched edges should be equal 
@@ -587,10 +586,10 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
             for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_one, r); it; ++it ) {
                 lhs += it.value() * sigma[it.col()];
             }
-            model.addConstr(lhs == 0, "Integral Constraint");
-            diff2_sum += ((lhs - 0) * (lhs - 0));//regularization for all faces set to 0 is dumb
-            //model.addConstr(lhs == period * k[r], "Integral Constraint");
-            //diff2_sum += ((lhs - period * k[r]) * (lhs - period * k[r]));
+            //model.addConstr(lhs == 0, "Integral Constraint");
+            //diff2_sum += ((lhs - 0) * (lhs - 0));//regularization for all faces set to 0 is dumb
+            model.addConstr(lhs == period * k[r], "Integral Constraint");
+            diff2_sum += ((lhs - period * k[r]) * (lhs - period * k[r]));
         }
 
         //third constraint - boundary integral in the wale direction
