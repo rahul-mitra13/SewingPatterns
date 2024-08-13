@@ -586,10 +586,10 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
             for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_one, r); it; ++it ) {
                 lhs += it.value() * sigma[it.col()];
             }
-            //model.addConstr(lhs == 0, "Integral Constraint");
-            //diff2_sum += ((lhs - 0) * (lhs - 0));//regularization for all faces set to 0 is dumb
-            model.addConstr(lhs == period * k[r], "Integral Constraint");
-            diff2_sum += ((lhs - period * k[r]) * (lhs - period * k[r]));
+            model.addConstr(lhs == 0, "Integral Constraint");
+            diff2_sum += ((lhs - 0) * (lhs - 0));//regularization for all faces set to 0 is dumb
+            //model.addConstr(lhs == period * k[r], "Integral Constraint");
+            //diff2_sum += ((lhs - period * k[r]) * (lhs - period * k[r]));
         }
 
         //third constraint - boundary integral in the wale direction
