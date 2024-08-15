@@ -64,7 +64,7 @@ class Model{
         void setMatchingTerms(std::vector<double>& matchingTerms);
 
         //set face gradients 
-        void setFaceGradients(std::vector<std::array<double, 3>> faceGradients);
+        void setFaceGradients(std::vector<std::array<double, 3>>& faceGradients);
 
         //set edge mappings 
         void setEdgeMappingsPairs(std::vector<std::pair<int, int>>& edgeMappingsPairs);

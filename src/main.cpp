@@ -87,7 +87,7 @@ void showStripePatterns(){
   }
   modelCourse.setMatchingTerms(modelMatchingTermsCourse);
   //set the face gradients 
-  std::vector<std::array<double, 3>> modelFaceGradients((gluedELG->mesh).nFaces());
+  std::vector<std::array<double, 3>> modelFaceGradients;
   for (Face f : globalMesh->faces()){
     //normalize the gradients first
     timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
@@ -96,7 +96,7 @@ void showStripePatterns(){
   }
   modelCourse.setFaceGradients(modelFaceGradients);
   //sigma in the glued mesh setting 
-  EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse);
+  EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, *globalPSMesh);
   EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
   //visualize the differences
   EdgeData<double> differenceCourse(*globalMesh);

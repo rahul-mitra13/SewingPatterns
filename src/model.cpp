@@ -42,7 +42,7 @@ void Model::setMatchingTerms(std::vector<double>& matchingTerms){
 
 }
 
-void Model::setFaceGradients(std::vector<std::array<double, 3>> faceGradients){
+void Model::setFaceGradients(std::vector<std::array<double, 3>>& faceGradients){
     
     this->faceGradients = faceGradients;
 
