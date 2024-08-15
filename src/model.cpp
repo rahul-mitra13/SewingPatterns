@@ -42,6 +42,12 @@ void Model::setMatchingTerms(std::vector<double>& matchingTerms){
 
 }
 
+void Model::setFaceGradients(std::vector<std::array<double, 3>> faceGradients){
+    
+    this->faceGradients = faceGradients;
+
+}
+
 void Model::setEdgeMappingsPairs(std::vector<std::pair<int, int>>& edgeMappingsPairs){
 
     this->edgeMappingsPairs = edgeMappingsPairs;
@@ -95,6 +101,12 @@ std::vector<int> Model::getBdyEdges(){
 std::vector<double> Model::getMatchingTerms(){
 
     return this->matchingTerms;
+
+}
+
+std::vector<std::array<double, 3>> Model::getFaceGradients(){
+
+    return this->faceGradients;
 
 }
 

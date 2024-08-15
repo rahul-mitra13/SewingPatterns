@@ -34,6 +34,9 @@ class Model{
         //these are the values we'll try to match using a quadratic minimization 
         std::vector<double> matchingTerms;
 
+        //these are the gradients over the faces that we're trying to match
+        std::vector<std::array<double, 3>> faceGradients; 
+
     public:
 
         //set optimization period 
@@ -59,6 +62,9 @@ class Model{
 
         //set matching terms 
         void setMatchingTerms(std::vector<double>& matchingTerms);
+
+        //set face gradients 
+        void setFaceGradients(std::vector<std::array<double, 3>> faceGradients);
 
         //set edge mappings 
         void setEdgeMappingsPairs(std::vector<std::pair<int, int>>& edgeMappingsPairs);
@@ -89,6 +95,9 @@ class Model{
 
         //get matching energy
         std::vector<double> getMatchingTerms();
+
+        //get face gradients
+        std::vector<std::array<double, 3>> getFaceGradients();
 
         //get pair of mapped edges 
         std::vector<std::pair<int, int>> getEdgeMappingsPairs();

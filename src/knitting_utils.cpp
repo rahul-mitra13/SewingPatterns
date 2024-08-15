@@ -175,6 +175,11 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, 
     SparseMatrix<double> G;
     igl::grad(V,F,G);
 
+    std::cout << "Number of rows in G " << G.rows() << std::endl;
+    std::cout << "Number of cols in G " << G.cols() << std::endl;
+    std::cout << "Number of rows in G*U " << (G*U).rows() << std::endl;
+    std::cout << "Number of cols in G*U " << (G*U).cols() << std::endl;
+
     // Compute gradient of U
     Eigen::MatrixXd GU = Eigen::Map<const Eigen::MatrixXd>((G*U).eval().data(),F.rows(),3);
 
@@ -521,18 +526,26 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     return oneForm;
 }
 
-EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbModel){
+EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel){
 
     SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
 
     EdgeData<double> oneForm(gluedMesh);
     std::vector<double> omega = gbModel.getMatchingTerms();
     std::vector<int> bdyEdges = gbModel.getBdyEdges();
+    std::vector<std::array<double, 3>> gradients = gbModel.getFaceGradients();
     double period = gbModel.getPeriod();
     std::vector<std::vector<double>> waleBdyPathConstraints = gbModel.getWaleBdyPathConstraints();
-
     gluedGeometry.requireDECOperators();
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
+
+    //build the gradient operator 
+    Eigen::MatrixXd V(gluedMesh.nVertices(), 3);
+    Eigen::MatrixXi F(gluedMesh.nFaces(), 3);
+    std::tie(V, F) = getVertexPositionsandFaceLists(globalGeometry);
+    // Compute gradient operator: #F*3 by #V
+    Eigen::SparseMatrix<double> G;
+    igl::grad(V,F,G);
 
     try {
         // Create an environment
@@ -608,6 +621,39 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
             diff1_sum += (sigma[i] - omega[i]) * (sigma[i] - omega[i]);
         }
 
+        //compute nP over every face 
+        std::vector<GRBLinExpr> nP(gluedMesh.nFaces());
+        for (int r = 0; r < d_one.outerSize(); ++r){
+            GRBLinExpr nPCurr = 0;
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_one, r); it; ++it ) {
+                nPCurr += it.value() * sigma[it.col()];
+            }
+            nP[r] = nPCurr;
+        }
+        //compute a piecewise linear function over the vertices of the mesh 
+        //flatten the gradients while we're here
+        std::vector<GRBLinExpr> u(gluedMesh.nVertices());
+        std::vector<double> flatGradients;
+        for (Face f : gluedMesh.faces()){
+            u[f.halfedge().vertex().getIndex()] = 0.0;
+            u[f.halfedge().next().vertex().getIndex()] = sigma[f.halfedge().next().edge().getIndex()] - (nP[f.getIndex()]/3.0);
+            u[f.halfedge().next().next().vertex().getIndex()] = sigma[f.halfedge().next().next().edge().getIndex()] - ((2.0 * nP[f.getIndex()])/3.0);
+            flatGradients.push_back(gradients[f.getIndex()][0]);
+            flatGradients.push_back(gradients[f.getIndex()][1]);
+            flatGradients.push_back(gradients[f.getIndex()][2]);
+        }
+        // std::cout << "size of flat gradients = " << flatGradients.size() << std::endl;
+
+        //compute the gradient of the PL function 
+        //this is what needs to happen
+        // std::vector<GRBLinExpr> gradU;
+        // for (int r = 0; r < G.outerSize(); ++r){
+        //     GRBLinExpr currGradU = 0;
+        //     for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, r); it; ++it ) {
+        //         currGradU += it.value() * u[it.col()];
+        //     }
+        //     gradU.push_back(currGradU);
+        // }
 
         GRBQuadExpr obj = (diff1_sum + diff2_sum);
 
@@ -629,7 +675,7 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
         //     sigmaEig(e.getIndex()) = sigma[e.getIndex()].get(GRB_DoubleAttr_X);
         // }
         // std::cout << "d1 * sigma = " << d_one * sigmaEig << std::endl;
-
+    
     }
     catch(GRBException e) {
         std::cout << "Error code = " << e.getErrorCode() << std::endl;
@@ -640,6 +686,7 @@ EdgeData<double> computeOneForm(EdgeLengthGeometry& gluedGeometry, Model& gbMode
 
     return oneForm;
 }
+
 
 //compute \omega that is the 1-form we're trying to match over each edge 
 EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3>& faceGradients){
