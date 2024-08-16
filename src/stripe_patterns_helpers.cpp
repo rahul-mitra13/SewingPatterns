@@ -182,7 +182,6 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
     double alphaJ = alphaI + sigma_ij;
     double alphaK = alphaJ + sigma_jk;
     double alphaL = alphaK + sigma_ki;
-
     // store the coordinates in the glued mesh 
     textureCoordinates[hij.corner()] = alphaI;
     textureCoordinates[hjk.corner()] = alphaJ;

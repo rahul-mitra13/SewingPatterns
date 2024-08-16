@@ -75,6 +75,15 @@ void showStripePatterns(){
   std::vector<int> waleBdyEdges = getWaleBdyEdgesInGluedMesh(*globalGeometry, *gluedELG, timeFunctionGradientGlobal, edgeMap, threshold, *globalPSMesh);
   //set up the course optimization 
   Model modelCourse; 
+  //set the face gradients 
+  std::vector<std::array<double, 3>> modelFaceGradients;
+  for (Face f : globalMesh->faces()){
+    //normalize the gradients first
+    timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
+    std::array<double, 3> gradient = {timeFunctionGradientGlobal[f][0], timeFunctionGradientGlobal[f][1], timeFunctionGradientGlobal[f][2]}; 
+    modelFaceGradients.push_back(gradient);
+  }
+  modelCourse.setFaceGradients(modelFaceGradients);
   //compute matching one form on the global mesh in the course direction
   EdgeData<double> omegaCourseGlobal = computeMatchingOneForm(*globalGeometry, *globalPSMesh, 0, timeFunctionGradientGlobal, edgeMappingsPairs); 
   //matching one form on the glued mesh in the course direction
@@ -86,17 +95,8 @@ void showStripePatterns(){
     modelMatchingTermsCourse.push_back(omegaCourseGlued[e]);
   }
   modelCourse.setMatchingTerms(modelMatchingTermsCourse);
-  //set the face gradients 
-  std::vector<std::array<double, 3>> modelFaceGradients;
-  for (Face f : globalMesh->faces()){
-    //normalize the gradients first
-    timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
-    std::array<double, 3> gradient = {timeFunctionGradientGlobal[f][0], timeFunctionGradientGlobal[f][1], timeFunctionGradientGlobal[f][2]}; 
-    modelFaceGradients.push_back(gradient);
-  }
-  modelCourse.setFaceGradients(modelFaceGradients);
   //sigma in the glued mesh setting 
-  EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, *globalPSMesh);
+  EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, timeFunctionGlued, *globalPSMesh);
   EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
   //visualize the differences
   EdgeData<double> differenceCourse(*globalMesh);

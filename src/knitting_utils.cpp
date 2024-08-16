@@ -175,12 +175,9 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, 
     SparseMatrix<double> G;
     igl::grad(V,F,G);
 
-    std::cout << "Number of rows in G " << G.rows() << std::endl;
-    std::cout << "Number of cols in G " << G.cols() << std::endl;
-    std::cout << "Number of rows in G*U " << (G*U).rows() << std::endl;
-    std::cout << "Number of cols in G*U " << (G*U).cols() << std::endl;
-
     // Compute gradient of U
+    //gradients stored per faces as (3F * 1) 
+    //all xs, then all ys, all zs
     Eigen::MatrixXd GU = (G*U);
 
     for (int i = 0; i < GU.rows(); i+=3){
@@ -211,10 +208,8 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, Vert
         double cottheta2 = 1. / tan(geometry.cornerAngles[c2]);
         double cottheta3 = 1. / tan(geometry.cornerAngles[c3]);
         double area = geometry.faceAreas[f];
-        std::cout << "area = " << area << std::endl; 
-        std::cout << "cot(theta1) = " << cottheta1 << std::endl;
-        std::cout << "cot(theta2) = " << cottheta2 << std::endl; 
-        std::cout << "cot(theta3) = " << cottheta3 << std::endl;
+        //each of these components are mutliplied by unit vectors 
+        //each unit vector is perpendicular to the opposite edge of the vertex
         gradients[f][0] = 1./(2.*area) * (((f2 - f1) * cottheta3) + ((f3 - f1) * cottheta2));
         gradients[f][1] = 1./(2.*area) * (((f3 - f2) * cottheta1) + ((f1 - f2) * cottheta3));
         gradients[f][2] = 1./(2.*area) * (((f1 - f3) * cottheta2) + ((f2 - f3) * cottheta1));
@@ -526,7 +521,8 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     return oneForm;
 }
 
-EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& vertexMap, polyscope::SurfaceMesh& psMesh){
+EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& vertexMap, VertexData<double>& timeFunction, 
+                                        polyscope::SurfaceMesh& psMesh){
 
     SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
 
@@ -626,13 +622,14 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
 
         //compute nP over every face 
         std::vector<GRBLinExpr> nP(gluedMesh.nFaces());
-        for (int r = 0; r < d_one.outerSize(); ++r){
+        for (int r = 0; r < gluedMesh.nFaces(); ++r){
             GRBLinExpr nPCurr = 0;
             for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_one, r); it; ++it ) {
                 nPCurr += it.value() * sigma[it.col()];
             }
             nP[r] = nPCurr;
         }
+
         //compute a piecewise linear function over the vertices of the mesh 
         //flatten the gradients while we're here
         std::vector<GRBLinExpr> u(gluedMesh.nVertices());
@@ -641,22 +638,30 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
             int signhIJ = f.halfedge().orientation() ? 1 : -1;
             int signhJK = f.halfedge().next().orientation() ? 1 : -1;
             u[f.halfedge().vertex().getIndex()] = 0.0;
-            u[f.halfedge().next().vertex().getIndex()] = signhIJ * sigma[f.halfedge().edge().getIndex()] - (nP[f.getIndex()]/3.0);
+            u[f.halfedge().next().vertex().getIndex()] = (signhIJ * sigma[f.halfedge().edge().getIndex()]) - (nP[f.getIndex()]/3.0);
             u[f.halfedge().next().next().vertex().getIndex()] = (signhIJ * sigma[f.halfedge().edge().getIndex()] + signhJK * sigma[f.halfedge().next().edge().getIndex()]) - ((2.0 * nP[f.getIndex()])/3.0);
+            // u[f.halfedge().vertex().getIndex()] = timeFunction[f.halfedge().vertex()];
+            // u[f.halfedge().next().vertex().getIndex()] = timeFunction[f.halfedge().next().vertex()];
+            // u[f.halfedge().next().next().vertex().getIndex()] = timeFunction[f.halfedge().next().next().vertex()];
+            
             //push back x,y,z for every face
             flatGradients.push_back(gradients[f.getIndex()][0]);
             flatGradients.push_back(gradients[f.getIndex()][1]);
             flatGradients.push_back(gradients[f.getIndex()][2]);
         }
-        
+
+        //convert u to a global mesh function 
+        std::vector<GRBLinExpr> uGlobal(globalGeometry.mesh.nVertices());
+        for (Vertex v : globalGeometry.mesh.vertices()){
+            uGlobal[v.getIndex()] = u[vertexMap[v.getIndex()]];
+        }
 
         //compute the gradient of the PL function 
         std::vector<GRBLinExpr> gradU;
         for (int r = 0; r < G.outerSize(); ++r){
             GRBLinExpr currGradU = 0;
             for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, r); it; ++it ) {
-                int gluedVertexI = vertexMap[it.col()];
-                currGradU += it.value() * u[gluedVertexI];
+                currGradU += it.value() * uGlobal[it.col()];
             }
             gradU.push_back(currGradU);
         }
@@ -669,31 +674,22 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
             gradUreshaped.push_back(gradU[currFaceI + 2 * F.rows()]);
         }
 
-        std::cout << "size of flat gradients = " << flatGradients.size() << std::endl;
-        std::cout << "size of gradUreshaped " << gradUreshaped.size() << std::endl;
-        std::cout << "size of gradU " << gradU.size() << std::endl;
-
         GRBQuadExpr gradDiff = 0;
         std::vector<std::array<double, 3>> grads;
         for (int i = 0; i < gradU.size(); i+=3){
             int currFaceI = i / 3.;
             double currArea = gluedGeometry.faceAreas[gluedMesh.face(currFaceI)];
-            std::cout << "curr face = " << currFaceI << std::endl;
-            gradDiff += currArea * (((gradUreshaped[currFaceI] - flatGradients[currFaceI]) * (gradUreshaped[currFaceI] - flatGradients[currFaceI]))
-                                 + ((gradUreshaped[currFaceI + 1] - flatGradients[currFaceI + 1]) * (gradUreshaped[currFaceI + 1] - flatGradients[currFaceI + 1])) 
-                                 + ((gradUreshaped[currFaceI + 2] - flatGradients[currFaceI + 2]) * (gradUreshaped[currFaceI + 2] - flatGradients[currFaceI + 2])));
-            std::array<double, 3> currGrad = {flatGradients[currFaceI], flatGradients[currFaceI + 1], flatGradients[currFaceI + 2]};
+            gradDiff += currArea * (((gradUreshaped[currFaceI*3] - flatGradients[currFaceI*3]) * (gradUreshaped[currFaceI*3] - flatGradients[currFaceI*3]))
+                                 + ((gradUreshaped[currFaceI*3 + 1] - flatGradients[currFaceI*3 + 1]) * (gradUreshaped[currFaceI*3 + 1] - flatGradients[currFaceI*3 + 1])) 
+                                 + ((gradUreshaped[currFaceI*3 + 2] - flatGradients[currFaceI*3 + 2]) * (gradUreshaped[currFaceI*3 + 2] - flatGradients[currFaceI*3 + 2])));
+            std::array<double, 3> currGrad = {flatGradients[currFaceI*3], flatGradients[currFaceI*3 + 1], flatGradients[currFaceI*3 + 2]};
             grads.push_back(currGrad);
         }
 
-        psMesh.addFaceVectorQuantity("gradients from utils", grads);
-
-
-
         GRBQuadExpr obj = (diff1_sum + diff2_sum);
 
-        model.setObjective(obj);
-        //model.setObjective(gradDiff);
+        //model.setObjective(obj);
+        model.setObjective(gradDiff);
         model.optimize(); 
         std::cout << "Obj: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
     
@@ -701,6 +697,19 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
         for (Edge e : gluedMesh.edges()){
             oneForm[e] = sigma[e.getIndex()].get(GRB_DoubleAttr_X);
         }
+
+        std::vector<std::array<double, 3>> gradientU;
+        for (int i = 0; i < gradU.size(); i+=3){
+            int currFaceI = i / 3.;
+            std::array<double, 3> currGrad = {gradUreshaped[currFaceI * 3].getValue(), gradUreshaped[currFaceI * 3 + 1].getValue(), gradUreshaped[currFaceI*3 + 2].getValue()};
+            gradientU.push_back(currGrad);
+        }
+        std::vector<double> globalUVals; 
+        for (int i = 0; i < globalGeometry.mesh.nVertices(); i++){
+            globalUVals.push_back(uGlobal[i].getValue());
+        }
+        psMesh.addFaceVectorQuantity("gradientU from utils", gradientU);
+        psMesh.addVertexScalarQuantity("u from utils", globalUVals);
 
         for (int i = 0; i < waleBdyIntegerConstraints.size(); i++){
             std::cout << "integer constraint: " << waleBdyIntegerConstraints[i].get(GRB_DoubleAttr_X) << std::endl;

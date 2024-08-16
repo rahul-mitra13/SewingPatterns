@@ -86,7 +86,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
 //compute a 1-form that will be used to generate the stripes over the pathces 
 //overload from the function above
 //it does the optimization in the glued mesh setting 
-EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& vertexMap, polyscope::SurfaceMesh& psMesh);
+EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& vertexMap, VertexData<double>& timeFunction, polyscope::SurfaceMesh& psMesh);
 
 //compute \omega i.e., the 1-form we're trying to match over each edge 
 //
