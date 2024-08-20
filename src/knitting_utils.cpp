@@ -556,7 +556,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
         GRBModel model = GRBModel(env);
 
         //set the timeout
-        model.getEnv().set(GRB_DoubleParam_TimeLimit, 60);
+        model.getEnv().set(GRB_DoubleParam_TimeLimit, 120);
         //model.getEnv().set(GRB_IntParam_OutputFlag, 0);
         //model.getEnv().set(GRB_IntParam_MIPFocus, 2);
         
@@ -633,6 +633,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
         //compute a piecewise linear function over the vertices of the mesh 
         //flatten the gradients while we're here
         std::vector<GRBLinExpr> u(gluedMesh.nVertices());
+        std::vector<GRBLinExpr> gradUreshaped;
         std::vector<double> flatGradients;
         for (Face f : gluedMesh.faces()){
             int signhIJ = f.halfedge().orientation() ? 1 : -1;
@@ -640,56 +641,82 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
             u[f.halfedge().vertex().getIndex()] = 0.0;
             u[f.halfedge().next().vertex().getIndex()] = (signhIJ * sigma[f.halfedge().edge().getIndex()]) - (nP[f.getIndex()]/3.0);
             u[f.halfedge().next().next().vertex().getIndex()] = (signhIJ * sigma[f.halfedge().edge().getIndex()] + signhJK * sigma[f.halfedge().next().edge().getIndex()]) - ((2.0 * nP[f.getIndex()])/3.0);
+
             // u[f.halfedge().vertex().getIndex()] = timeFunction[f.halfedge().vertex()];
             // u[f.halfedge().next().vertex().getIndex()] = timeFunction[f.halfedge().next().vertex()];
             // u[f.halfedge().next().next().vertex().getIndex()] = timeFunction[f.halfedge().next().next().vertex()];
             
+            //NEED TO COMPUTE THE GRADIENT HERE ITSELF!!!!
+            //BECAUSE OTHERWISE YOU ARE CONSTANTLY OVERWRITING VALUES OF u
+            
+            GRBLinExpr currGradU = 0.0;
+            //X component
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex()); it; ++it){
+                currGradU += it.value() * u[vertexMap[it.col()]];
+            }
+            gradUreshaped.push_back(currGradU);
+            currGradU = 0.0;
+            //Y component
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex() + F.rows()); it; ++it){
+                currGradU += it.value() * u[vertexMap[it.col()]];
+            }
+            gradUreshaped.push_back(currGradU);
+            currGradU = 0.0;
+            //Z component 
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex() + 2 * F.rows()); it; ++it){
+                currGradU += it.value() * u[vertexMap[it.col()]];
+            }
+            gradUreshaped.push_back(currGradU);
+        
+        
             //push back x,y,z for every face
             flatGradients.push_back(gradients[f.getIndex()][0]);
             flatGradients.push_back(gradients[f.getIndex()][1]);
             flatGradients.push_back(gradients[f.getIndex()][2]);
         }
 
-        //convert u to a global mesh function 
+        //convert u to a global mesh function
         std::vector<GRBLinExpr> uGlobal(globalGeometry.mesh.nVertices());
         for (Vertex v : globalGeometry.mesh.vertices()){
             uGlobal[v.getIndex()] = u[vertexMap[v.getIndex()]];
         }
 
-        //compute the gradient of the PL function 
+        //compute the gradient of the PL function (there is a 1-to-1 correspondence between faces in the global mesh to the glued mesh)
+        //this stores all the xs, then all the ys, then all the zs
         std::vector<GRBLinExpr> gradU;
         for (int r = 0; r < G.outerSize(); ++r){
             GRBLinExpr currGradU = 0;
-            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, r); it; ++it ) {
-                currGradU += it.value() * uGlobal[it.col()];
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, r); it; ++it) {
+                currGradU += it.value() * u[vertexMap[it.col()]];
             }
             gradU.push_back(currGradU);
         }
         //reshape gradU to make it x, y, z components for every face 
-        std::vector<GRBLinExpr> gradUreshaped;
-        for (int i = 0; i < gradU.size(); i+=3){
-            int currFaceI = i/3.;
-            gradUreshaped.push_back(gradU[currFaceI]); 
-            gradUreshaped.push_back(gradU[currFaceI + F.rows()]);
-            gradUreshaped.push_back(gradU[currFaceI + 2 * F.rows()]);
-        }
+        // std::vector<GRBLinExpr> gradUreshaped;
+        // for (int i = 0; i < gradU.size(); i+=3){
+        //     int currFaceI = i/3.;
+        //     gradUreshaped.push_back(gradU[currFaceI]); 
+        //     gradUreshaped.push_back(gradU[currFaceI + F.rows()]);
+        //     gradUreshaped.push_back(gradU[currFaceI + 2 * F.rows()]);
+        // }
 
+        //set up the difference
         GRBQuadExpr gradDiff = 0;
         std::vector<std::array<double, 3>> grads;
-        for (int i = 0; i < gradU.size(); i+=3){
+        for (int i = 0; i < flatGradients.size(); i+=3){
             int currFaceI = i / 3.;
             double currArea = gluedGeometry.faceAreas[gluedMesh.face(currFaceI)];
             gradDiff += currArea * (((gradUreshaped[currFaceI*3] - flatGradients[currFaceI*3]) * (gradUreshaped[currFaceI*3] - flatGradients[currFaceI*3]))
-                                 + ((gradUreshaped[currFaceI*3 + 1] - flatGradients[currFaceI*3 + 1]) * (gradUreshaped[currFaceI*3 + 1] - flatGradients[currFaceI*3 + 1])) 
-                                 + ((gradUreshaped[currFaceI*3 + 2] - flatGradients[currFaceI*3 + 2]) * (gradUreshaped[currFaceI*3 + 2] - flatGradients[currFaceI*3 + 2])));
+                                 + ((gradUreshaped[currFaceI*3 + 1] - flatGradients[currFaceI*3 + 1]) * (gradUreshaped[currFaceI*3 + 1] - flatGradients[currFaceI*3 + 1]))); 
+                                 + ((gradUreshaped[currFaceI*3 + 2] - flatGradients[currFaceI*3 + 2]) * (gradUreshaped[currFaceI*3 + 2] - flatGradients[currFaceI*3 + 2]));
             std::array<double, 3> currGrad = {flatGradients[currFaceI*3], flatGradients[currFaceI*3 + 1], flatGradients[currFaceI*3 + 2]};
             grads.push_back(currGrad);
         }
 
         GRBQuadExpr obj = (diff1_sum + diff2_sum);
 
-        //model.setObjective(obj);
-        model.setObjective(gradDiff);
+        //model.setObjective(obj, GRB_MINIMIZE);
+        model.setObjective(gradDiff, GRB_MINIMIZE);
         model.optimize(); 
         std::cout << "Obj: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
     
@@ -699,14 +726,14 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
         }
 
         std::vector<std::array<double, 3>> gradientU;
-        for (int i = 0; i < gradU.size(); i+=3){
+        for (int i = 0; i < flatGradients.size(); i+=3){
             int currFaceI = i / 3.;
-            std::array<double, 3> currGrad = {gradUreshaped[currFaceI * 3].getValue(), gradUreshaped[currFaceI * 3 + 1].getValue(), gradUreshaped[currFaceI*3 + 2].getValue()};
+            std::array<double, 3> currGrad = {gradUreshaped[currFaceI * 3].getValue(), gradUreshaped[currFaceI * 3 + 1].getValue(), gradUreshaped[currFaceI * 3 + 2].getValue()};
             gradientU.push_back(currGrad);
         }
         std::vector<double> globalUVals; 
         for (int i = 0; i < globalGeometry.mesh.nVertices(); i++){
-            globalUVals.push_back(uGlobal[i].getValue());
+            globalUVals.push_back(u[vertexMap[i]].getValue());
         }
         psMesh.addFaceVectorQuantity("gradientU from utils", gradientU);
         psMesh.addVertexScalarQuantity("u from utils", globalUVals);
@@ -775,12 +802,15 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polysc
     SurfaceMesh& mesh = geometry.mesh;
     geometry.requireFaceNormals();
     EdgeData<double> omega(mesh);
+
+    FaceData<Vector3> faceGradientsCopy = faceGradients;
+
     //if we're computing the matching 1-form in the wale direction, rotate all the gradients 
     if (direction == 1){
         for (Face f : mesh.faces()){
             //first normalize the gradients? 
-            faceGradients[f] = faceGradients[f].normalize();
-            faceGradients[f] = faceGradients[f].rotateAround(geometry.faceNormals[f], PI/2.);
+            faceGradientsCopy[f] = faceGradientsCopy[f].normalize();
+            faceGradientsCopy[f] = faceGradientsCopy[f].rotateAround(geometry.faceNormals[f], PI/2.);
         }
     }
     int numStitchedEdges = 0;
@@ -800,19 +830,19 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polysc
         if (seenEdges[e.getIndex()]) continue;
         if (e.halfedge().twin().isInterior()){//found an interior halfedge
             //normalize the face gradients first
-            faceGradients[e.halfedge().face()] = faceGradients[e.halfedge().face()].normalize();
-            faceGradients[e.halfedge().twin().face()] = faceGradients[e.halfedge().twin().face()].normalize();
+            faceGradientsCopy[e.halfedge().face()] = faceGradientsCopy[e.halfedge().face()].normalize();
+            faceGradientsCopy[e.halfedge().twin().face()] = faceGradientsCopy[e.halfedge().twin().face()].normalize();
             Vector3 eVector = geometry.vertexPositions[e.halfedge().tipVertex()] - geometry.vertexPositions[e.halfedge().tailVertex()];
             //eVector = eVector.normalize();
-            omega[e] = 0.5 * dot((faceGradients[e.halfedge().face()] + faceGradients[e.halfedge().twin().face()]),
+            omega[e] = 0.5 * dot((faceGradientsCopy[e.halfedge().face()] + faceGradientsCopy[e.halfedge().twin().face()]),
                                     eVector);
             seenEdges[e.getIndex()] = true;
         }
         else{//found a boundary halfedge
             if (edgeMap.find(e.getIndex()) != edgeMap.end()){//found a stitched together edge
                 numStitchedEdges++;
-                Vector3 faceGradients1 = faceGradients[e.halfedge().face()].normalize();
-                Vector3 faceGradients2 = faceGradients[mesh.edge(edgeMap.at(e.getIndex())).halfedge().face()].normalize();
+                Vector3 faceGradientsCopy1 = faceGradientsCopy[e.halfedge().face()].normalize();
+                Vector3 faceGradientsCopy2 = faceGradientsCopy[mesh.edge(edgeMap.at(e.getIndex())).halfedge().face()].normalize();
                 //take the average direction vector? 
                 Vector3 e1 = geometry.vertexPositions[e.halfedge().tipVertex()] - geometry.vertexPositions[e.halfedge().tailVertex()];
                 Vector3 e2 = geometry.vertexPositions[mesh.edge(edgeMap.at(e.getIndex())).halfedge().tipVertex()] 
@@ -821,16 +851,16 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polysc
                 //just pick the original edge as the "canonical" direction in the global mesh
                 //I'm not really sure the polyscope Whitney interpolation scheme is the best way to visualize these
                 //e1 = e1.normalize();
-                omega[e] = 0.5 * dot((faceGradients1 + faceGradients2), e1);
-                omega[mesh.edge(edgeMap.at(e.getIndex()))] = 0.5 * dot((faceGradients1 + (faceGradients2)), e1);
+                omega[e] = 0.5 * dot((faceGradientsCopy1 + faceGradientsCopy2), e1);
+                omega[mesh.edge(edgeMap.at(e.getIndex()))] = 0.5 * dot((faceGradientsCopy1 + (faceGradientsCopy2)), e1);
                 seenEdges[e.getIndex()] = true;
                 seenEdges[edgeMap.at(e.getIndex())] = true;
             }
             else{//found a boundary edge that's not stitched to anything
-                faceGradients[e.halfedge().face()] = faceGradients[e.halfedge().face()].normalize();
+                faceGradientsCopy[e.halfedge().face()] = faceGradientsCopy[e.halfedge().face()].normalize();
                 Vector3 eVector = geometry.vertexPositions[e.halfedge().tipVertex()] - geometry.vertexPositions[e.halfedge().tailVertex()];
                 //eVector = eVector.normalize();
-                omega[e] = dot(faceGradients[e.halfedge().face()], eVector);
+                omega[e] = dot(faceGradientsCopy[e.halfedge().face()], eVector);
                 seenEdges[e.getIndex()] = true;
             }
         }
