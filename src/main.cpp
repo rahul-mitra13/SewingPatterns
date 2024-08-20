@@ -73,17 +73,19 @@ void showStripePatterns(){
   //find boundary edges in the wale direction 
   //doing this here cause the gradient gets rotated later
   std::vector<int> waleBdyEdges = getWaleBdyEdgesInGluedMesh(*globalGeometry, *gluedELG, timeFunctionGradientGlobal, edgeMap, threshold, *globalPSMesh);
+  
+  
   //set up the course optimization 
   Model modelCourse; 
   //set the face gradients 
-  std::vector<std::array<double, 3>> modelFaceGradients;
+  std::vector<std::array<double, 3>> modelFaceGradientsCourse;
   for (Face f : globalMesh->faces()){
     //normalize the gradients first
-    timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
+    //timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
     std::array<double, 3> gradient = {timeFunctionGradientGlobal[f][0], timeFunctionGradientGlobal[f][1], timeFunctionGradientGlobal[f][2]}; 
-    modelFaceGradients.push_back(gradient);
+    modelFaceGradientsCourse.push_back(gradient);
   }
-  modelCourse.setFaceGradients(modelFaceGradients);
+  modelCourse.setFaceGradients(modelFaceGradientsCourse);
   //compute matching one form on the global mesh in the course direction
   EdgeData<double> omegaCourseGlobal = computeMatchingOneForm(*globalGeometry, *globalPSMesh, 0, timeFunctionGradientGlobal, edgeMappingsPairs); 
   //matching one form on the glued mesh in the course direction
@@ -116,9 +118,18 @@ void showStripePatterns(){
   courseStripes -> setRadius(0.001);
 
   //set up the wale optimization model 
-  /** 
   Model modelWale; 
   modelWale.setPeriod(period);
+  std::vector<std::array<double, 3>> modelFaceGradientsWale;
+  globalGeometry->requireFaceNormals();
+  for (Face f : globalMesh->faces()){
+    //normalize the gradients first
+    //timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
+    timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].rotateAround(globalGeometry->faceNormals[f], PI/2.);
+    std::array<double, 3> gradient = {timeFunctionGradientGlobal[f][0], timeFunctionGradientGlobal[f][1], timeFunctionGradientGlobal[f][2]}; 
+    modelFaceGradientsWale.push_back(gradient);
+  }
+  modelWale.setFaceGradients(modelFaceGradientsWale);
   //compute matching one form on the global mesh in the wale direction 
   EdgeData<double> omegaWaleGlobal = computeMatchingOneForm(*globalGeometry, *globalPSMesh, 1, timeFunctionGradientGlobal, edgeMappingsPairs);
   //globalPSMesh -> addOneFormTangentVectorQuantity("omega wale", omegaWaleGlobal, orientations);
@@ -132,7 +143,7 @@ void showStripePatterns(){
   modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
   modelWale.setBdyEdges(waleBdyEdges);
   //sigma in the glued mesh setting 
-  EdgeData<double> sigmaWaleGlued = computeOneForm(*globalGeometry, *gluedELG, modelWale);
+  EdgeData<double> sigmaWaleGlued = computeOneForm(*globalGeometry, *gluedELG, modelWale, vertexMap, timeFunctionGlued, *globalPSMesh);
   EdgeData<double> sigmaWaleGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaWaleGlued, edgeMap);
   //globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigmaWaleGlobal, orientations);
   //visualize the differences
@@ -151,7 +162,6 @@ void showStripePatterns(){
   std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, stripeValuesSigmaWale, stripeIndicesSigmaWale, period);
   auto waleStripes = polyscope::registerCurveNetwork("wale stripe patterns", positionsWale, edgesWale);
   waleStripes -> setRadius(0.001);
-  */
 
   //greedily placed singularities 
   // FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *globalPSMesh, timeFunctionGlobal, omegaCourseGlobal, period, vertexMap, edgeMappingsPairs, globalBdyConditions);
