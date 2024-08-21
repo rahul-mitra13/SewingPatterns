@@ -532,6 +532,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
     std::vector<std::array<double, 3>> gradients = gbModel.getFaceGradients();
     double period = gbModel.getPeriod();
     std::vector<std::vector<double>> waleBdyPathConstraints = gbModel.getWaleBdyPathConstraints();
+    bool hasIntegrabilityConstraint = gbModel.getIntegrabilityConstraint();
     gluedGeometry.requireDECOperators();
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
 
@@ -556,7 +557,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
         GRBModel model = GRBModel(env);
 
         //set the timeout
-        model.getEnv().set(GRB_DoubleParam_TimeLimit, 120);
+        model.getEnv().set(GRB_DoubleParam_TimeLimit, 180);
         //model.getEnv().set(GRB_IntParam_OutputFlag, 0);
         //model.getEnv().set(GRB_IntParam_MIPFocus, 2);
         
@@ -591,19 +592,26 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
 
         //regularization term 
         GRBQuadExpr diff2_sum = 0;
-        
+        //compute nP over every face 
+        //add the second constraint while we're here
         //second constraint - (d1*sigma) == kP, P is period of optimization, k \in \mathbb{Z}
-        for (int r = 0; r < d_one.outerSize(); ++r) {
-            GRBLinExpr lhs = 0;
+        std::vector<GRBLinExpr> nP(gluedMesh.nFaces());
+        for (int r = 0; r < gluedMesh.nFaces(); ++r){
+            GRBLinExpr nPCurr = 0;
+            GRBLinExpr lhs = 0.0;
             for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_one, r); it; ++it ) {
+                nPCurr += it.value() * sigma[it.col()];
                 lhs += it.value() * sigma[it.col()];
             }
-            model.addConstr(lhs == 0, "Integral Constraint");
-            diff2_sum += ((lhs - 0) * (lhs - 0));//regularization for all faces set to 0 is dumb
-            //model.addConstr(lhs == period * k[r], "Integral Constraint");
-            //diff2_sum += ((lhs - period * k[r]) * (lhs - period * k[r]));
+            nP[r] = nPCurr;
+            //integrability constraint
+            if (hasIntegrabilityConstraint){
+                model.addConstr(lhs == 0, "Integral Constraint");
+                diff2_sum += ((lhs - 0) * (lhs - 0));//regularization for all faces set to 0 is dumb
+                //model.addConstr(lhs == period * k[r], "Integral Constraint");
+                //diff2_sum += ((lhs - period * k[r]) * (lhs - period * k[r]));
+            }
         }
-
         //third constraint - boundary integral in the wale direction
         for (int i = 0; i < waleBdyPathConstraints.size(); i++){
             GRBLinExpr pathIntegral = 0;
@@ -612,142 +620,85 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
             }
             model.addConstr(pathIntegral == period * waleBdyIntegerConstraints[i]);
         }
-
         //trying to match energies
-        GRBQuadExpr diff1_sum = 0;
-
-        for (int i = 0; i < gluedMesh.nEdges(); i++){
-            diff1_sum += (sigma[i] - omega[i]) * (sigma[i] - omega[i]);
-        }
-
-        //compute nP over every face 
-        std::vector<GRBLinExpr> nP(gluedMesh.nFaces());
-        for (int r = 0; r < gluedMesh.nFaces(); ++r){
-            GRBLinExpr nPCurr = 0;
-            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_one, r); it; ++it ) {
-                nPCurr += it.value() * sigma[it.col()];
-            }
-            nP[r] = nPCurr;
-        }
-
+        // GRBQuadExpr diff1_sum = 0;
+        // for (int i = 0; i < gluedMesh.nEdges(); i++){
+        //     diff1_sum += (sigma[i] - omega[i]) * (sigma[i] - omega[i]);
+        // }
         //compute a piecewise linear function over the vertices of the mesh 
-        //flatten the gradients while we're here
         std::vector<GRBLinExpr> u(gluedMesh.nVertices());
-        std::vector<GRBLinExpr> gradUreshaped;
-        std::vector<double> flatGradients;
+        std::vector<std::vector<GRBLinExpr>> gradU(gluedMesh.nFaces(), std::vector<GRBLinExpr>(3));
         for (Face f : gluedMesh.faces()){
             int signhIJ = f.halfedge().orientation() ? 1 : -1;
             int signhJK = f.halfedge().next().orientation() ? 1 : -1;
             u[f.halfedge().vertex().getIndex()] = 0.0;
             u[f.halfedge().next().vertex().getIndex()] = (signhIJ * sigma[f.halfedge().edge().getIndex()]) - (nP[f.getIndex()]/3.0);
             u[f.halfedge().next().next().vertex().getIndex()] = (signhIJ * sigma[f.halfedge().edge().getIndex()] + signhJK * sigma[f.halfedge().next().edge().getIndex()]) - ((2.0 * nP[f.getIndex()])/3.0);
-
-            // u[f.halfedge().vertex().getIndex()] = timeFunction[f.halfedge().vertex()];
-            // u[f.halfedge().next().vertex().getIndex()] = timeFunction[f.halfedge().next().vertex()];
-            // u[f.halfedge().next().next().vertex().getIndex()] = timeFunction[f.halfedge().next().next().vertex()];
-            
-            //NEED TO COMPUTE THE GRADIENT HERE ITSELF!!!!
-            //BECAUSE OTHERWISE YOU ARE CONSTANTLY OVERWRITING VALUES OF u
-            
             GRBLinExpr currGradU = 0.0;
             //X component
             for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex()); it; ++it){
                 currGradU += it.value() * u[vertexMap[it.col()]];
             }
-            gradUreshaped.push_back(currGradU);
+            gradU[f.getIndex()][0] = currGradU;
             currGradU = 0.0;
             //Y component
             for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex() + F.rows()); it; ++it){
                 currGradU += it.value() * u[vertexMap[it.col()]];
             }
-            gradUreshaped.push_back(currGradU);
+            gradU[f.getIndex()][1] = currGradU;
             currGradU = 0.0;
             //Z component 
             for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex() + 2 * F.rows()); it; ++it){
                 currGradU += it.value() * u[vertexMap[it.col()]];
             }
-            gradUreshaped.push_back(currGradU);
-        
-        
-            //push back x,y,z for every face
-            flatGradients.push_back(gradients[f.getIndex()][0]);
-            flatGradients.push_back(gradients[f.getIndex()][1]);
-            flatGradients.push_back(gradients[f.getIndex()][2]);
+            gradU[f.getIndex()][2] = currGradU;
         }
-
-        //convert u to a global mesh function
-        std::vector<GRBLinExpr> uGlobal(globalGeometry.mesh.nVertices());
-        for (Vertex v : globalGeometry.mesh.vertices()){
-            uGlobal[v.getIndex()] = u[vertexMap[v.getIndex()]];
-        }
-
-        //compute the gradient of the PL function (there is a 1-to-1 correspondence between faces in the global mesh to the glued mesh)
-        //this stores all the xs, then all the ys, then all the zs
-        std::vector<GRBLinExpr> gradU;
-        for (int r = 0; r < G.outerSize(); ++r){
-            GRBLinExpr currGradU = 0;
-            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, r); it; ++it) {
-                currGradU += it.value() * u[vertexMap[it.col()]];
-            }
-            gradU.push_back(currGradU);
-        }
-        //reshape gradU to make it x, y, z components for every face 
-        // std::vector<GRBLinExpr> gradUreshaped;
-        // for (int i = 0; i < gradU.size(); i+=3){
-        //     int currFaceI = i/3.;
-        //     gradUreshaped.push_back(gradU[currFaceI]); 
-        //     gradUreshaped.push_back(gradU[currFaceI + F.rows()]);
-        //     gradUreshaped.push_back(gradU[currFaceI + 2 * F.rows()]);
-        // }
-
         //set up the difference
         GRBQuadExpr gradDiff = 0;
         std::vector<std::array<double, 3>> grads;
-        for (int i = 0; i < flatGradients.size(); i+=3){
-            int currFaceI = i / 3.;
-            double currArea = gluedGeometry.faceAreas[gluedMesh.face(currFaceI)];
-            gradDiff += currArea * (((gradUreshaped[currFaceI*3] - flatGradients[currFaceI*3]) * (gradUreshaped[currFaceI*3] - flatGradients[currFaceI*3]))
-                                 + ((gradUreshaped[currFaceI*3 + 1] - flatGradients[currFaceI*3 + 1]) * (gradUreshaped[currFaceI*3 + 1] - flatGradients[currFaceI*3 + 1]))); 
-                                 + ((gradUreshaped[currFaceI*3 + 2] - flatGradients[currFaceI*3 + 2]) * (gradUreshaped[currFaceI*3 + 2] - flatGradients[currFaceI*3 + 2]));
-            std::array<double, 3> currGrad = {flatGradients[currFaceI*3], flatGradients[currFaceI*3 + 1], flatGradients[currFaceI*3 + 2]};
-            grads.push_back(currGrad);
+        //store the per face difference 
+        std::vector<GRBQuadExpr> difference(gluedMesh.nFaces());
+        for (Face f : gluedMesh.faces()){
+            GRBQuadExpr diffX = (gradU[f.getIndex()][0] - gradients[f.getIndex()][0]) * (gradU[f.getIndex()][0] - gradients[f.getIndex()][0]);
+            GRBQuadExpr diffY = (gradU[f.getIndex()][1] - gradients[f.getIndex()][1]) * (gradU[f.getIndex()][1] - gradients[f.getIndex()][1]);
+            GRBQuadExpr diffZ = (gradU[f.getIndex()][2] - gradients[f.getIndex()][2]) * (gradU[f.getIndex()][2] - gradients[f.getIndex()][2]);
+            double currArea = gluedGeometry.faceAreas[f];
+            gradDiff += currArea * (diffX + diffY + diffZ);
+            difference[f.getIndex()] = diffX + diffY + diffZ;
         }
-
-        GRBQuadExpr obj = (diff1_sum + diff2_sum);
-
+        
+        //GRBQuadExpr obj = (diff1_sum + diff2_sum);
         //model.setObjective(obj, GRB_MINIMIZE);
-        model.setObjective(gradDiff, GRB_MINIMIZE);
+        GRBQuadExpr obj = (gradDiff + diff2_sum);
+        model.setObjective(obj, GRB_MINIMIZE);
         model.optimize(); 
         std::cout << "Obj: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
-    
         //put the computed one-form into an edge vector
         for (Edge e : gluedMesh.edges()){
             oneForm[e] = sigma[e.getIndex()].get(GRB_DoubleAttr_X);
         }
-
-        std::vector<std::array<double, 3>> gradientU;
-        for (int i = 0; i < flatGradients.size(); i+=3){
-            int currFaceI = i / 3.;
-            std::array<double, 3> currGrad = {gradUreshaped[currFaceI * 3].getValue(), gradUreshaped[currFaceI * 3 + 1].getValue(), gradUreshaped[currFaceI * 3 + 2].getValue()};
-            gradientU.push_back(currGrad);
-        }
-        std::vector<double> globalUVals; 
-        for (int i = 0; i < globalGeometry.mesh.nVertices(); i++){
-            globalUVals.push_back(u[vertexMap[i]].getValue());
+        std::vector<std::array<double, 3>> gradientU(gluedMesh.nFaces());
+        std::vector<double> differenceViz(gluedMesh.nFaces());
+        for (Face f : gluedMesh.faces()){
+            std::array<double, 3> currGrad = {gradU[f.getIndex()][0].getValue(), gradU[f.getIndex()][1].getValue(), gradU[f.getIndex()][2].getValue()};
+            gradientU[f.getIndex()] = currGrad;
+            differenceViz[f.getIndex()] = difference[f.getIndex()].getValue();
         }
         psMesh.addFaceVectorQuantity("gradientU from utils", gradientU);
-        psMesh.addVertexScalarQuantity("u from utils", globalUVals);
+        psMesh.addFaceVectorQuantity("gradient from utils", gradients);
+        psMesh.addFaceScalarQuantity("difference per face", differenceViz);
+
+        if (!hasIntegrabilityConstraint){
+            std::vector<double> nPViz(gluedMesh.nFaces());
+            for (Face f : gluedMesh.faces()){
+                nPViz[f.getIndex()] = nP[f.getIndex()].getValue();
+            }
+            psMesh.addFaceScalarQuantity("d1 * sigma", nPViz);
+        }
 
         for (int i = 0; i < waleBdyIntegerConstraints.size(); i++){
             std::cout << "integer constraint: " << waleBdyIntegerConstraints[i].get(GRB_DoubleAttr_X) << std::endl;
         }
-
-        // Eigen::VectorXd sigmaEig(gluedMesh.nEdges()); 
-        // for (Edge e : gluedMesh.edges()){
-        //     sigmaEig(e.getIndex()) = sigma[e.getIndex()].get(GRB_DoubleAttr_X);
-        // }
-        // std::cout << "d1 * sigma = " << d_one * sigmaEig << std::endl;
-    
     }
     catch(GRBException e) {
         std::cout << "Error code = " << e.getErrorCode() << std::endl;
