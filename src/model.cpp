@@ -5,6 +5,11 @@ void Model::setPeriod(double period){
     this->period = period;
 }
 
+void Model::setIntegrabilityConstraint(bool flag){
+
+    this->integrabilityContraint = flag;
+}
+
 void Model::setTimeOut(double timeOut){
     
     this->timeOut = timeOut;
@@ -68,6 +73,11 @@ double Model::getPeriod(){
 double Model::getTimeOut(){
 
     return this->timeOut;
+}
+
+bool Model::getIntegrabilityConstraint(){
+    
+    return this->integrabilityContraint;
 }
 
 std::vector<int> Model::getSmoothFaces(){

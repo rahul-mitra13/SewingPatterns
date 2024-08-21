@@ -10,6 +10,9 @@ class Model{
         //timeout for optimization
         double timeOut;
 
+        //if we want to specify the integrability constraint or not 
+        bool integrabilityContraint;
+
         //stores a pair of (edge indices, integral value of the path that those edge indices specify) 
         std::vector<std::pair<std::vector<double>, double>> edgePathConstraints;
 
@@ -41,6 +44,9 @@ class Model{
 
         //set optimization period 
         void setPeriod(double period);
+
+        //set integrability constraint 
+        void setIntegrabilityConstraint(bool flag);
 
         //set optimization timeout 
         void setTimeOut(double timeOut);
@@ -77,6 +83,9 @@ class Model{
 
         //get period value 
         double getPeriod();
+
+        //get integrability constraint
+        bool getIntegrabilityConstraint();
 
         //get timeout value
         double getTimeOut();

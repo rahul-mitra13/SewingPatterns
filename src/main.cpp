@@ -74,14 +74,14 @@ void showStripePatterns(){
   //doing this here cause the gradient gets rotated later
   std::vector<int> waleBdyEdges = getWaleBdyEdgesInGluedMesh(*globalGeometry, *gluedELG, timeFunctionGradientGlobal, edgeMap, threshold, *globalPSMesh);
   
-  
   //set up the course optimization 
-  Model modelCourse; 
+  Model modelCourse;
+  modelCourse.setIntegrabilityConstraint(true); 
   //set the face gradients 
   std::vector<std::array<double, 3>> modelFaceGradientsCourse;
   for (Face f : globalMesh->faces()){
     //normalize the gradients first
-    //timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
+    timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
     std::array<double, 3> gradient = {timeFunctionGradientGlobal[f][0], timeFunctionGradientGlobal[f][1], timeFunctionGradientGlobal[f][2]}; 
     modelFaceGradientsCourse.push_back(gradient);
   }
@@ -101,11 +101,11 @@ void showStripePatterns(){
   EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, timeFunctionGlued, *globalPSMesh);
   EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
   //visualize the differences
-  EdgeData<double> differenceCourse(*globalMesh);
-  for (Edge e : globalMesh -> edges()){
-    differenceCourse[e] = pow(omegaCourseGlobal[e] - sigmaCourseGlobal[e], 2.0);
-  }
-  globalPSMesh -> addEdgeScalarQuantity("course difference", differenceCourse);
+  // EdgeData<double> differenceCourse(*globalMesh);
+  // for (Edge e : globalMesh -> edges()){
+  //   differenceCourse[e] = pow(omegaCourseGlobal[e] - sigmaCourseGlobal[e], 2.0);
+  // }
+  //globalPSMesh -> addEdgeScalarQuantity("course difference", differenceCourse);
   //global data
   CornerData<double> stripeValuesSigmaCourse;
   //global data
@@ -116,15 +116,16 @@ void showStripePatterns(){
   std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
   auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns", positionsCourse, edgesCourse);
   courseStripes -> setRadius(0.001);
-
+  
   //set up the wale optimization model 
   Model modelWale; 
+  modelWale.setIntegrabilityConstraint(true);
   modelWale.setPeriod(period);
   std::vector<std::array<double, 3>> modelFaceGradientsWale;
   globalGeometry->requireFaceNormals();
   for (Face f : globalMesh->faces()){
     //normalize the gradients first
-    //timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
+    timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
     timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].rotateAround(globalGeometry->faceNormals[f], PI/2.);
     std::array<double, 3> gradient = {timeFunctionGradientGlobal[f][0], timeFunctionGradientGlobal[f][1], timeFunctionGradientGlobal[f][2]}; 
     modelFaceGradientsWale.push_back(gradient);
@@ -147,11 +148,11 @@ void showStripePatterns(){
   EdgeData<double> sigmaWaleGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaWaleGlued, edgeMap);
   //globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigmaWaleGlobal, orientations);
   //visualize the differences
-  EdgeData<double> differenceWale(*globalMesh);
-  for (Edge e : globalMesh -> edges()){
-    differenceWale[e] = pow(omegaWaleGlobal[e] - sigmaWaleGlobal[e], 2.0);
-  }
-  globalPSMesh -> addEdgeScalarQuantity("wale difference", differenceWale);
+  // EdgeData<double> differenceWale(*globalMesh);
+  // for (Edge e : globalMesh -> edges()){
+  //   differenceWale[e] = pow(omegaWaleGlobal[e] - sigmaWaleGlobal[e], 2.0);
+  // }
+  //globalPSMesh -> addEdgeScalarQuantity("wale difference", differenceWale);
   //global data
   CornerData<double> stripeValuesSigmaWale;
   //global data
@@ -162,6 +163,11 @@ void showStripePatterns(){
   std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, stripeValuesSigmaWale, stripeIndicesSigmaWale, period);
   auto waleStripes = polyscope::registerCurveNetwork("wale stripe patterns", positionsWale, edgesWale);
   waleStripes -> setRadius(0.001);
+
+  Model modelCourseHeuristic = modelCourse;
+  modelCourseHeuristic.setIntegrabilityConstraint(false);
+  //viz the non-integrability
+  sigmaWaleGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourseHeuristic, vertexMap, timeFunctionGlued, *globalPSMesh);
 
   //greedily placed singularities 
   // FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *globalPSMesh, timeFunctionGlobal, omegaCourseGlobal, period, vertexMap, edgeMappingsPairs, globalBdyConditions);
