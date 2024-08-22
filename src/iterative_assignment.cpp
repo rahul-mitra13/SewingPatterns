@@ -6,8 +6,10 @@ Model gbModel;
 std::vector<int> usedFaceIndices;
 Eigen::SparseMatrix<double, Eigen::RowMajor> d_one; 
 Eigen::SparseMatrix<double, Eigen::RowMajor> d_zero;
+std::map<int, int> globalToGluedVertexMap;
 
-//I really want to do this in the intrinsic mesh setting
+//----------------First strategy------------------------//
+//This should reall happen in the intrinsic setting
 FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, VertexData<double>& timeFunction, EdgeData<double>& omega, 
                                             double period, std::map<int, int>& vertexMap, std::vector<std::pair<int, int>>& edgeMappingsPairs, globalBoundaryConditions& globalBdyConditions){
 
@@ -34,8 +36,8 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& geometry, po
             it.valueRef() = -it.value();
         }
     }
-
     //specify boundary-boundary edge path constraint 
+    //i.e., non-collapse constraint
     Vertex v0;
     Vertex v1; 
     int ctr = 0;
@@ -350,4 +352,82 @@ FaceData<Vector3> computeOneFormGrad(VertexPositionGeometry& geometry, EdgeData<
     }
 
     return face_gradients;
+}
+//-------------------End of first strategy---------------------//
+
+
+//------------------Second strategy----------------------------//
+FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, Model& model, 
+                                                VertexData<double>& gluedTimeFunction, std::map<int, int>& vertexMap){
+
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
+    SurfaceMesh& globalMesh = globalGeometry.mesh; 
+    FaceData<int> singularityPositions(globalMesh);
+    gluedGeometry.requireDECOperators();
+    d_one = gluedGeometry.d1;
+    globalToGluedVertexMap = vertexMap;
+    //unset the integrability constraint in the model 
+    Model gbModelHeuristic = model;
+    gbModelHeuristic.setIntegrabilityConstraint(false);
+    //vizualize the non-integrability
+    EdgeData<double> sigmaTilde = computeOneForm(globalGeometry, gluedGeometry, gbModelHeuristic, vertexMap, psMesh);
+    Eigen::Map<Eigen::VectorXd> sigmaTildeEig(sigmaTilde.raw().data(), gluedMesh.nEdges());
+    std::pair<int, int> p = findSingularityPair(globalGeometry, gluedGeometry, gluedTimeFunction, sigmaTildeEig);
+    return singularityPositions;
+}
+
+std::pair<int, int> findSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction, const Eigen::VectorXd& sigmaTilde){
+
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    SurfaceMesh& globalMesh = globalGeometry.mesh; 
+    
+    Eigen::VectorXd d1Sigma = d_one * sigmaTilde; 
+    std::pair<int, int> toReturn;
+    
+    //find face with max absolute curl
+    double maxAbsCurl = -DBL_MAX;
+    int maxFace = -1;
+
+    for (int i = 0; i < gluedMesh.nFaces(); i++){
+        if (std::find(usedFaceIndices.begin(), usedFaceIndices.end(), i) != usedFaceIndices.end()) continue;//don't use faces that have already been set
+        if (std::fabs(d1Sigma(i)) > maxAbsCurl){
+            maxAbsCurl = d1Sigma(i);
+            maxFace = i;
+        }
+    }
+    Face maxCurlFace = gluedMesh.face(maxFace);
+    double isoVal = (gluedTimeFunction[maxCurlFace.halfedge().vertex()] +  gluedTimeFunction[maxCurlFace.halfedge().next().vertex()] 
+                    + gluedTimeFunction[maxCurlFace.halfedge().next().next().vertex()]) / 3.;
+
+    VertexData<double> globalTimeFunction = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, gluedTimeFunction, globalToGluedVertexMap);
+
+    Eigen::MatrixXd iV;
+    Eigen::MatrixXd iE;
+    std::vector<int> f;
+    std::tie(iV, iE, f) = getTimeFunctionIsoLine(globalGeometry, globalTimeFunction, isoVal);
+    polyscope::registerCurveNetwork("Isoline", iV, iE);
+
+    //find singularity of similar curl but opposite sign
+    double minDiff = DBL_MAX;
+    int minFace = -1;
+    for (int i = 0; i < f.size(); i++){
+        if (std::find(usedFaceIndices.begin(), usedFaceIndices.end(), f[i]) != usedFaceIndices.end()) continue;//don't use faces that have already been set
+        if ((d1Sigma(f[i]) * d1Sigma(maxFace)) < 0){//max abs curl and current face differ in sign
+            double diffSignCurl = std::fabs(d1Sigma(f[i]));
+            if (std::fabs(maxAbsCurl - diffSignCurl) < minDiff){
+                minDiff = std::fabs(maxAbsCurl - diffSignCurl);
+                minFace = f[i];
+            }
+        }
+    }
+    if (d1Sigma(maxFace) > 0 && d1Sigma(minFace) < 0){
+        std::cout << "max curl face " << maxFace << std::endl;
+        std::cout << "min curl face " << minFace << std::endl;
+        return std::make_pair(maxFace, minFace);
+    }
+    else{
+        std::cout << "max curl face " << minFace << std::endl;
+        std::cout << "min curl face " << maxFace << std::endl;
+        return std::make_pair(minFace, maxFace);
+    }
 }

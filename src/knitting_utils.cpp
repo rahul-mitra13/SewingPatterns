@@ -521,7 +521,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     return oneForm;
 }
 
-EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& vertexMap, VertexData<double>& timeFunction, 
+EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& vertexMap,
                                         polyscope::SurfaceMesh& psMesh){
 
     SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
@@ -664,9 +664,8 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
             GRBQuadExpr diffZ = (gradU[f.getIndex()][2] - gradients[f.getIndex()][2]) * (gradU[f.getIndex()][2] - gradients[f.getIndex()][2]);
             double currArea = gluedGeometry.faceAreas[f];
             gradDiff += currArea * (diffX + diffY + diffZ);
-            difference[f.getIndex()] = diffX + diffY + diffZ;
+            difference[f.getIndex()] = currArea * (diffX + diffY + diffZ);
         }
-        
         //GRBQuadExpr obj = (diff1_sum + diff2_sum);
         //model.setObjective(obj, GRB_MINIMIZE);
         GRBQuadExpr obj = (gradDiff + diff2_sum);
@@ -679,21 +678,22 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
         }
         std::vector<std::array<double, 3>> gradientU(gluedMesh.nFaces());
         std::vector<double> differenceViz(gluedMesh.nFaces());
-        for (Face f : gluedMesh.faces()){
-            std::array<double, 3> currGrad = {gradU[f.getIndex()][0].getValue(), gradU[f.getIndex()][1].getValue(), gradU[f.getIndex()][2].getValue()};
-            gradientU[f.getIndex()] = currGrad;
-            differenceViz[f.getIndex()] = difference[f.getIndex()].getValue();
-        }
-        psMesh.addFaceVectorQuantity("gradientU from utils", gradientU);
-        psMesh.addFaceVectorQuantity("gradient from utils", gradients);
-        psMesh.addFaceScalarQuantity("difference per face", differenceViz);
-
+    
         if (!hasIntegrabilityConstraint){
             std::vector<double> nPViz(gluedMesh.nFaces());
             for (Face f : gluedMesh.faces()){
                 nPViz[f.getIndex()] = nP[f.getIndex()].getValue();
             }
             psMesh.addFaceScalarQuantity("d1 * sigma", nPViz);
+        }
+        else{
+            for (Face f : gluedMesh.faces()){
+                std::array<double, 3> currGrad = {gradU[f.getIndex()][0].getValue(), gradU[f.getIndex()][1].getValue(), gradU[f.getIndex()][2].getValue()};
+                gradientU[f.getIndex()] = currGrad;
+                differenceViz[f.getIndex()] = difference[f.getIndex()].getValue();
+            }
+            psMesh.addFaceVectorQuantity("gradientU from utils", gradientU);
+            psMesh.addFaceScalarQuantity("difference per face", differenceViz);
         }
 
         for (int i = 0; i < waleBdyIntegerConstraints.size(); i++){

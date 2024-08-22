@@ -34,7 +34,7 @@ std::vector<std::pair<int, int>> vertexMappingsPairs;
 std::vector<std::pair<int, int>> edgeMappingsPairs;
 //build an index map from vertices in the original mesh to vertices in the glued mesh 
 std::map<int, int> vertexMap;
-//build a map from edges in the orignal mesh to edges in the glued
+//build an index map from edges in the orignal mesh to edges in the glued
 std::map<int, int> edgeMap;
 //one-ring map for vertices in the glued mesh for performance 
 std::map<int, std::vector<Halfedge>> gluedOneRingMap;
@@ -86,26 +86,11 @@ void showStripePatterns(){
     modelFaceGradientsCourse.push_back(gradient);
   }
   modelCourse.setFaceGradients(modelFaceGradientsCourse);
-  //compute matching one form on the global mesh in the course direction
-  EdgeData<double> omegaCourseGlobal = computeMatchingOneForm(*globalGeometry, *globalPSMesh, 0, timeFunctionGradientGlobal, edgeMappingsPairs); 
-  //matching one form on the glued mesh in the course direction
-  EdgeData<double> omegaCourseGlued = convertGlobalToGluedEdgeFunction(*globalGeometry, *gluedELG, omegaCourseGlobal, edgeMap);
   modelCourse.setPeriod(period);
   modelCourse.setBdyEdges(globalBdyConditions.courseBdyEdges);
-  std::vector<double> modelMatchingTermsCourse; 
-  for (Edge e : (gluedELG -> mesh).edges()){
-    modelMatchingTermsCourse.push_back(omegaCourseGlued[e]);
-  }
-  modelCourse.setMatchingTerms(modelMatchingTermsCourse);
   //sigma in the glued mesh setting 
-  EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, timeFunctionGlued, *globalPSMesh);
+  EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, *globalPSMesh);
   EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
-  //visualize the differences
-  // EdgeData<double> differenceCourse(*globalMesh);
-  // for (Edge e : globalMesh -> edges()){
-  //   differenceCourse[e] = pow(omegaCourseGlobal[e] - sigmaCourseGlobal[e], 2.0);
-  // }
-  //globalPSMesh -> addEdgeScalarQuantity("course difference", differenceCourse);
   //global data
   CornerData<double> stripeValuesSigmaCourse;
   //global data
@@ -131,28 +116,11 @@ void showStripePatterns(){
     modelFaceGradientsWale.push_back(gradient);
   }
   modelWale.setFaceGradients(modelFaceGradientsWale);
-  //compute matching one form on the global mesh in the wale direction 
-  EdgeData<double> omegaWaleGlobal = computeMatchingOneForm(*globalGeometry, *globalPSMesh, 1, timeFunctionGradientGlobal, edgeMappingsPairs);
-  //globalPSMesh -> addOneFormTangentVectorQuantity("omega wale", omegaWaleGlobal, orientations);
-  EdgeData<double> omegaWaleGlued = convertGlobalToGluedEdgeFunction(*globalGeometry, *gluedELG, omegaWaleGlobal, edgeMap);
-  std::vector<double> modelMatchingTermsWale; 
-  for (Edge e : (gluedELG -> mesh).edges()){
-    modelMatchingTermsWale.push_back(omegaWaleGlued[e]);
-  }
-  //globalPSMesh -> addOneFormTangentVectorQuantity("omega wale ", omegaWaleGlobal, orientations);
-  modelWale.setMatchingTerms(modelMatchingTermsWale);
   modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
   modelWale.setBdyEdges(waleBdyEdges);
   //sigma in the glued mesh setting 
-  EdgeData<double> sigmaWaleGlued = computeOneForm(*globalGeometry, *gluedELG, modelWale, vertexMap, timeFunctionGlued, *globalPSMesh);
+  EdgeData<double> sigmaWaleGlued = computeOneForm(*globalGeometry, *gluedELG, modelWale, vertexMap, *globalPSMesh);
   EdgeData<double> sigmaWaleGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaWaleGlued, edgeMap);
-  //globalPSMesh -> addOneFormTangentVectorQuantity("sigma wale", sigmaWaleGlobal, orientations);
-  //visualize the differences
-  // EdgeData<double> differenceWale(*globalMesh);
-  // for (Edge e : globalMesh -> edges()){
-  //   differenceWale[e] = pow(omegaWaleGlobal[e] - sigmaWaleGlobal[e], 2.0);
-  // }
-  //globalPSMesh -> addEdgeScalarQuantity("wale difference", differenceWale);
   //global data
   CornerData<double> stripeValuesSigmaWale;
   //global data
@@ -164,14 +132,14 @@ void showStripePatterns(){
   auto waleStripes = polyscope::registerCurveNetwork("wale stripe patterns", positionsWale, edgesWale);
   waleStripes -> setRadius(0.001);
 
-  Model modelCourseHeuristic = modelCourse;
-  modelCourseHeuristic.setIntegrabilityConstraint(false);
-  //viz the non-integrability
-  sigmaWaleGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourseHeuristic, vertexMap, timeFunctionGlued, *globalPSMesh);
+  //copy the model over to visualize the non-integrability
+  // Model modelCourseHeuristic = modelCourse;
+  // modelCourseHeuristic.setIntegrabilityConstraint(false);
+  // //viz the non-integrability
+  // sigmaWaleGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourseHeuristic, vertexMap, timeFunctionGlued, *globalPSMesh);
 
   //greedily placed singularities 
-  // FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *globalPSMesh, timeFunctionGlobal, omegaCourseGlobal, period, vertexMap, edgeMappingsPairs, globalBdyConditions);
-  // globalPSMesh -> addFaceScalarQuantity("Greedily placed singularities", greedySingularities);
+  FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap);
 }
 
 // A user-defined callback, for creating control panels (etc)
