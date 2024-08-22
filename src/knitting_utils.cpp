@@ -532,6 +532,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
     std::vector<std::array<double, 3>> gradients = gbModel.getFaceGradients();
     double period = gbModel.getPeriod();
     std::vector<std::vector<double>> waleBdyPathConstraints = gbModel.getWaleBdyPathConstraints();
+    std::vector<std::pair<int, int>> singularFaceIndices = gbModel.getSingularFaces();
     bool hasIntegrabilityConstraint = gbModel.getIntegrabilityConstraint();
     gluedGeometry.requireDECOperators();
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
@@ -599,7 +600,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
         for (int r = 0; r < gluedMesh.nFaces(); ++r){
             GRBLinExpr nPCurr = 0;
             GRBLinExpr lhs = 0.0;
-            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_one, r); it; ++it ) {
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_one, r); it; ++it) {
                 nPCurr += it.value() * sigma[it.col()];
                 lhs += it.value() * sigma[it.col()];
             }
@@ -620,6 +621,18 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
             }
             model.addConstr(pathIntegral == period * waleBdyIntegerConstraints[i]);
         }
+
+        //fourth constraint - place singularities at specified faces 
+        for (std::pair<int, int> p : singularFaceIndices){
+            int fIndex = p.first; 
+            int integralVal = p.second;
+            GRBLinExpr lhs = 0;
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_one, fIndex); it; ++it){
+                lhs += it.value() * sigma[it.col()];
+            }
+            model.addConstr(lhs == integralVal, "Specified singularity constraint");
+        }
+
         //trying to match energies
         // GRBQuadExpr diff1_sum = 0;
         // for (int i = 0; i < gluedMesh.nEdges(); i++){
@@ -679,14 +692,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
         std::vector<std::array<double, 3>> gradientU(gluedMesh.nFaces());
         std::vector<double> differenceViz(gluedMesh.nFaces());
     
-        if (!hasIntegrabilityConstraint){
-            std::vector<double> nPViz(gluedMesh.nFaces());
-            for (Face f : gluedMesh.faces()){
-                nPViz[f.getIndex()] = nP[f.getIndex()].getValue();
-            }
-            psMesh.addFaceScalarQuantity("d1 * sigma", nPViz);
-        }
-        else{
+        if (hasIntegrabilityConstraint){
             for (Face f : gluedMesh.faces()){
                 std::array<double, 3> currGrad = {gradU[f.getIndex()][0].getValue(), gradU[f.getIndex()][1].getValue(), gradU[f.getIndex()][2].getValue()};
                 gradientU[f.getIndex()] = currGrad;
@@ -695,6 +701,13 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
             psMesh.addFaceVectorQuantity("gradientU from utils", gradientU);
             psMesh.addFaceScalarQuantity("difference per face", differenceViz);
         }
+        // else{
+        //     std::vector<double> nPViz(gluedMesh.nFaces());
+        //     for (Face f : gluedMesh.faces()){
+        //         nPViz[f.getIndex()] = nP[f.getIndex()].getValue();
+        //     }
+        //     psMesh.addFaceScalarQuantity("nP viz", nPViz);
+        // }
 
         for (int i = 0; i < waleBdyIntegerConstraints.size(); i++){
             std::cout << "integer constraint: " << waleBdyIntegerConstraints[i].get(GRB_DoubleAttr_X) << std::endl;

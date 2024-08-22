@@ -4,8 +4,8 @@
 EdgeData<double> omega;
 Model gbModel;
 std::vector<int> usedFaceIndices;
-Eigen::SparseMatrix<double, Eigen::RowMajor> d_one; 
-Eigen::SparseMatrix<double, Eigen::RowMajor> d_zero;
+Eigen::SparseMatrix<double, Eigen::RowMajor> dOne; 
+Eigen::SparseMatrix<double, Eigen::RowMajor> dZero;
 std::map<int, int> globalToGluedVertexMap;
 
 //----------------First strategy------------------------//
@@ -17,15 +17,15 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& geometry, po
     FaceData<int> singPositions(mesh);
     //build differential operators in this stitched mesh setting
     geometry.requireDECOperators();
-    d_zero = geometry.d0;
-    d_one = geometry.d1;
-    //convert d_one to column major for easy updates of columns 
+    dZero = geometry.d0;
+    dOne = geometry.d1;
+    //convert dOne to column major for easy updates of columns 
     Eigen::SparseMatrix<double, Eigen::ColMajor> d_oneColMajor;
-    d_oneColMajor = d_one;
+    d_oneColMajor = dOne;
     //invert the signs to account for "stitched together" panels in d0
     for (std::pair<int, int> p : edgeMappingsPairs){
         int iE2 = p.second;
-        for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_zero, iE2); it; ++it){
+        for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(dZero, iE2); it; ++it){
             it.valueRef() = -it.value();
         }
     }
@@ -66,7 +66,7 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& geometry, po
     psMesh.addEdgeScalarQuantity("bdy-bdy path", weights);
 
     //convert it back to row major format 
-    d_one = d_oneColMajor;
+    dOne = d_oneColMajor;
     int numPairs = 0;
     int maxSingularityPairs = 2;
     //convert omega to an Eigen::VectorXd
@@ -96,7 +96,7 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& geometry, po
 //render d1*omega
 void showd1Omega(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, Eigen::VectorXd& omega, int numPairs){
     SurfaceMesh& mesh = geometry.mesh;
-    Eigen::VectorXd d1_omega = d_one * omega;
+    Eigen::VectorXd d1_omega = dOne * omega;
     psMesh.addFaceScalarQuantity("d1_times_omega_" + std::to_string(numPairs), d1_omega);
 }
 
@@ -105,7 +105,7 @@ void showd1Omega(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMes
 std::pair<int, int> findSingularityPair(VertexPositionGeometry& geometry, VertexData<double>& timeFunction,  Eigen::VectorXd& omega){
 
     SurfaceMesh& mesh = geometry.mesh;
-    Eigen::VectorXd d1_omega = d_one * omega;
+    Eigen::VectorXd d1_omega = dOne * omega;
 
     std::pair<int, int> toReturn;
     
@@ -232,9 +232,9 @@ Eigen::VectorXd computeIterativeOneForm(VertexPositionGeometry& geometry, polysc
 
         //second constraint - (d1*sigma) == +/- 1 based on curl
         //d1*sigma == 0 on every other face
-        for (int r = 0; r < d_one.outerSize(); ++r ){
+        for (int r = 0; r < dOne.outerSize(); ++r ){
             GRBLinExpr lhs = 0;
-                for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_one, r); it; ++it ) {
+                for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(dOne, r); it; ++it ) {
                     lhs += it.value() * sigma[it.col()];
                 }
             model.addConstr(lhs == period * faceIndices[r]);
@@ -364,15 +364,34 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeomet
     SurfaceMesh& globalMesh = globalGeometry.mesh; 
     FaceData<int> singularityPositions(globalMesh);
     gluedGeometry.requireDECOperators();
-    d_one = gluedGeometry.d1;
+    dOne = gluedGeometry.d1;
     globalToGluedVertexMap = vertexMap;
     //unset the integrability constraint in the model 
-    Model gbModelHeuristic = model;
-    gbModelHeuristic.setIntegrabilityConstraint(false);
+    gbModel = model;
+    gbModel.setIntegrabilityConstraint(false);
+    int maxSingularityPairs = 1; 
+    int numPairs = 0; 
+    std::vector<std::pair<int, int>> singularFaces;
     //vizualize the non-integrability
-    EdgeData<double> sigmaTilde = computeOneForm(globalGeometry, gluedGeometry, gbModelHeuristic, vertexMap, psMesh);
+    EdgeData<double> sigmaTilde = computeOneForm(globalGeometry, gluedGeometry, gbModel, vertexMap, psMesh);
     Eigen::Map<Eigen::VectorXd> sigmaTildeEig(sigmaTilde.raw().data(), gluedMesh.nEdges());
-    std::pair<int, int> p = findSingularityPair(globalGeometry, gluedGeometry, gluedTimeFunction, sigmaTildeEig);
+    Eigen::VectorXd d1Sigma = dOne * sigmaTildeEig; 
+    psMesh.addFaceScalarQuantity("d1 sigma " + std::to_string(numPairs), d1Sigma);
+    while(numPairs < maxSingularityPairs){
+        std::pair<int, int> p = findSingularityPair(globalGeometry, gluedGeometry, gluedTimeFunction, sigmaTildeEig);
+        usedFaceIndices.push_back(p.first);
+        usedFaceIndices.push_back(p.second);   
+        singularFaces.push_back(std::make_pair(p.first, 1));
+        singularFaces.push_back(std::make_pair(p.second, -1));
+        gbModel.setSingularFaceIndices(singularFaces);
+        singularityPositions[globalMesh.face(p.first)] = 1; 
+        singularityPositions[globalMesh.face(p.second)] = -1;
+        numPairs++;
+        sigmaTilde = computeOneForm(globalGeometry, gluedGeometry, gbModel, vertexMap, psMesh);
+        Eigen::Map<Eigen::VectorXd> sigmaTildeEig(sigmaTilde.raw().data(), gluedMesh.nEdges());
+        d1Sigma = dOne * sigmaTildeEig; 
+        psMesh.addFaceScalarQuantity("d1 sigma " + std::to_string(numPairs), d1Sigma);
+    }
     return singularityPositions;
 }
 
@@ -380,10 +399,8 @@ std::pair<int, int> findSingularityPair(VertexPositionGeometry& globalGeometry, 
 
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     SurfaceMesh& globalMesh = globalGeometry.mesh; 
-    
-    Eigen::VectorXd d1Sigma = d_one * sigmaTilde; 
-    std::pair<int, int> toReturn;
-    
+    Eigen::VectorXd d1Sigma = dOne * sigmaTilde; 
+  
     //find face with max absolute curl
     double maxAbsCurl = -DBL_MAX;
     int maxFace = -1;
@@ -405,7 +422,8 @@ std::pair<int, int> findSingularityPair(VertexPositionGeometry& globalGeometry, 
     Eigen::MatrixXd iE;
     std::vector<int> f;
     std::tie(iV, iE, f) = getTimeFunctionIsoLine(globalGeometry, globalTimeFunction, isoVal);
-    polyscope::registerCurveNetwork("Isoline", iV, iE);
+    //auto isoLine = polyscope::registerCurveNetwork("Isoline", iV, iE);
+    //isoLine->setRadius(0.001);
 
     //find singularity of similar curl but opposite sign
     double minDiff = DBL_MAX;
@@ -421,13 +439,9 @@ std::pair<int, int> findSingularityPair(VertexPositionGeometry& globalGeometry, 
         }
     }
     if (d1Sigma(maxFace) > 0 && d1Sigma(minFace) < 0){
-        std::cout << "max curl face " << maxFace << std::endl;
-        std::cout << "min curl face " << minFace << std::endl;
         return std::make_pair(maxFace, minFace);
     }
     else{
-        std::cout << "max curl face " << minFace << std::endl;
-        std::cout << "min curl face " << maxFace << std::endl;
         return std::make_pair(minFace, maxFace);
     }
 }

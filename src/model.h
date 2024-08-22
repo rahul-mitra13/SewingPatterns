@@ -20,7 +20,7 @@ class Model{
         std::vector<int> smoothFaces;
 
         //singular face indices
-        std::vector<int> singularFaces;
+        std::vector<std::pair<int, int>> singularFaces;
 
         //specify all face indices (both smooth and singular)
         std::vector<int> faceIndices;
@@ -55,7 +55,7 @@ class Model{
         void setEdgePathConstraints(std::vector<std::pair<std::vector<double>, double>>& edgePathConstraints);
 
         //set singular face indices 
-        void setSingularFaceIndices(std::vector<int>& singularFaces);
+        void setSingularFaceIndices(std::vector<std::pair<int, int>>& singularFaces);
 
         //set smooth face indices 
         void setSmoothFaceIndices(std::vector<int>& smoothFaces);
@@ -94,7 +94,7 @@ class Model{
         std::vector<int> getSmoothFaces();
 
         //get singular faces
-        std::vector<int> getSingularFaces();
+        std::vector<std::pair<int, int>> getSingularFaces();
 
         //get all face indices
         std::vector<int> getFaceIndices();

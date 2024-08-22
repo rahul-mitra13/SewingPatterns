@@ -20,7 +20,7 @@ void Model::setEdgePathConstraints(std::vector<std::pair<std::vector<double>, do
     this->edgePathConstraints = edgePathConstraints;
 }
 
-void Model::setSingularFaceIndices(std::vector<int>& singularFaces){
+void Model::setSingularFaceIndices(std::vector<std::pair<int, int>>& singularFaces){
 
     this->singularFaces = singularFaces;
 }
@@ -85,7 +85,7 @@ std::vector<int> Model::getSmoothFaces(){
     return this->smoothFaces;
 }
 
-std::vector<int> Model::getSingularFaces(){
+std::vector<std::pair<int, int>> Model::getSingularFaces(){
 
     return this->singularFaces;
 

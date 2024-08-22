@@ -49,7 +49,7 @@ globalBoundaryConditions globalBdyConditions;
 
 
 //1-form optimization period
-float period = 10;
+float period = 1;
 //threshold for constraining wale boundary edges 
 //I don't really like this and need to figure out a better way of doing this
 float threshold = 0.6;
@@ -136,10 +136,15 @@ void showStripePatterns(){
   // Model modelCourseHeuristic = modelCourse;
   // modelCourseHeuristic.setIntegrabilityConstraint(false);
   // //viz the non-integrability
-  // sigmaWaleGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourseHeuristic, vertexMap, timeFunctionGlued, *globalPSMesh);
+  // EdgeData<double> sigmaTilde = computeOneForm(*globalGeometry, *gluedELG, modelCourseHeuristic, vertexMap, *globalPSMesh);
+  // Eigen::Map<Eigen::VectorXd> sigmaTildeEig(sigmaTilde.raw().data(), gluedELG->mesh.nEdges());
+  // Eigen::VectorXd d1Sigma = gluedELG -> d1 * sigmaTildeEig; 
+  // globalPSMesh->addFaceScalarQuantity("d1Sigma from outside", d1Sigma);
 
   //greedily placed singularities 
   FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap);
+  globalPSMesh -> addFaceScalarQuantity("greedy singularities", greedySingularities);
+
 }
 
 // A user-defined callback, for creating control panels (etc)
