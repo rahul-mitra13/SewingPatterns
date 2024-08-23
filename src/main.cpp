@@ -61,6 +61,8 @@ std::vector<bool> orientations;
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
   
+  //require the DEC operators
+  gluedELG->requireDECOperators();
   //time function on the glued mesh 
   VertexData<double> timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
   //time function on the global mesh 
@@ -88,9 +90,22 @@ void showStripePatterns(){
   modelCourse.setFaceGradients(modelFaceGradientsCourse);
   modelCourse.setPeriod(period);
   modelCourse.setBdyEdges(globalBdyConditions.courseBdyEdges);
+  
+  EdgeData<double> omegaCourseGlobal = computeMatchingOneForm(*globalGeometry, *globalPSMesh, 0, timeFunctionGradientGlobal, edgeMappingsPairs);
+  EdgeData<double> omegaCourseGlued = convertGlobalToGluedEdgeFunction(*globalGeometry, *gluedELG, omegaCourseGlobal, edgeMap);
+  Eigen::Map<Eigen::VectorXd> omegaEig(omegaCourseGlued.raw().data(), (gluedELG->mesh).nEdges());
+  //std::vector<double> modelMatchingTermsCourse(omegaEig.data(), omegaEig.data() + omegaEig.rows());
+  //modelCourse.setMatchingTerms(modelMatchingTermsCourse);
+  Eigen::VectorXd d1Omega = gluedELG->d1 * omegaEig;
+  globalPSMesh->addFaceScalarQuantity("d1 omega", d1Omega);
   //sigma in the glued mesh setting 
   EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, *globalPSMesh);
   EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
+  
+  //Eigen::Map<Eigen::VectorXd> sigmaEig(sigmaCourseGlued.raw().data(), (gluedELG->mesh).nEdges());
+  //Eigen::VectorXd d1Sigma = gluedELG->d1 * omegaEig;
+  //globalPSMesh->addFaceScalarQuantity("d1 sigma", d1Sigma);
+
   //global data
   CornerData<double> stripeValuesSigmaCourse;
   //global data
@@ -131,15 +146,6 @@ void showStripePatterns(){
   std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, stripeValuesSigmaWale, stripeIndicesSigmaWale, period);
   auto waleStripes = polyscope::registerCurveNetwork("wale stripe patterns", positionsWale, edgesWale);
   waleStripes -> setRadius(0.001);
-
-  //copy the model over to visualize the non-integrability
-  // Model modelCourseHeuristic = modelCourse;
-  // modelCourseHeuristic.setIntegrabilityConstraint(false);
-  // //viz the non-integrability
-  // EdgeData<double> sigmaTilde = computeOneForm(*globalGeometry, *gluedELG, modelCourseHeuristic, vertexMap, *globalPSMesh);
-  // Eigen::Map<Eigen::VectorXd> sigmaTildeEig(sigmaTilde.raw().data(), gluedELG->mesh.nEdges());
-  // Eigen::VectorXd d1Sigma = gluedELG -> d1 * sigmaTildeEig; 
-  // globalPSMesh->addFaceScalarQuantity("d1Sigma from outside", d1Sigma);
 
   //greedily placed singularities 
   FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap);

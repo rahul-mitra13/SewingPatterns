@@ -527,10 +527,11 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
     SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
 
     EdgeData<double> oneForm(gluedMesh);
-    std::vector<double> omega = gbModel.getMatchingTerms();
+    //std::vector<double> omega = gbModel.getMatchingTerms();
     std::vector<int> bdyEdges = gbModel.getBdyEdges();
     std::vector<std::array<double, 3>> gradients = gbModel.getFaceGradients();
     double period = gbModel.getPeriod();
+    std::vector<double> modelMatchingTerms = gbModel.getMatchingTerms();
     std::vector<std::vector<double>> waleBdyPathConstraints = gbModel.getWaleBdyPathConstraints();
     std::vector<std::pair<int, int>> singularFaceIndices = gbModel.getSingularFaces();
     bool hasIntegrabilityConstraint = gbModel.getIntegrabilityConstraint();
@@ -638,6 +639,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
         // for (int i = 0; i < gluedMesh.nEdges(); i++){
         //     diff1_sum += (sigma[i] - omega[i]) * (sigma[i] - omega[i]);
         // }
+
         //compute a piecewise linear function over the vertices of the mesh 
         std::vector<GRBLinExpr> u(gluedMesh.nVertices());
         std::vector<std::vector<GRBLinExpr>> gradU(gluedMesh.nFaces(), std::vector<GRBLinExpr>(3));
@@ -680,7 +682,6 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
             difference[f.getIndex()] = currArea * (diffX + diffY + diffZ);
         }
         //GRBQuadExpr obj = (diff1_sum + diff2_sum);
-        //model.setObjective(obj, GRB_MINIMIZE);
         GRBQuadExpr obj = (gradDiff + diff2_sum);
         model.setObjective(obj, GRB_MINIMIZE);
         model.optimize(); 
@@ -701,13 +702,6 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
             psMesh.addFaceVectorQuantity("gradientU from utils", gradientU);
             psMesh.addFaceScalarQuantity("difference per face", differenceViz);
         }
-        // else{
-        //     std::vector<double> nPViz(gluedMesh.nFaces());
-        //     for (Face f : gluedMesh.faces()){
-        //         nPViz[f.getIndex()] = nP[f.getIndex()].getValue();
-        //     }
-        //     psMesh.addFaceScalarQuantity("nP viz", nPViz);
-        // }
 
         for (int i = 0; i < waleBdyIntegerConstraints.size(); i++){
             std::cout << "integer constraint: " << waleBdyIntegerConstraints[i].get(GRB_DoubleAttr_X) << std::endl;

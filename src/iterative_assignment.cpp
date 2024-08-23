@@ -390,6 +390,11 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeomet
         sigmaTilde = computeOneForm(globalGeometry, gluedGeometry, gbModel, vertexMap, psMesh);
         Eigen::Map<Eigen::VectorXd> sigmaTildeEig(sigmaTilde.raw().data(), gluedMesh.nEdges());
         d1Sigma = dOne * sigmaTildeEig; 
+        double sum = 0;
+        for (int i = 0; i < d1Sigma.rows(); i++){
+            sum += d1Sigma(i);
+        }
+        std::cout << "Sum of d1 sigma = " << sum << std::endl;
         psMesh.addFaceScalarQuantity("d1 sigma " + std::to_string(numPairs), d1Sigma);
     }
     return singularityPositions;
