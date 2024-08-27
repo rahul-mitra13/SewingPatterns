@@ -74,7 +74,7 @@ VertexData<Vector3> computeVertexValuedField(VertexPositionGeometry& geometry, V
 //@return       directionField      VertexData<Vector2>                 direction field at each vertex
 VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, VertexData<Vector3>& vertexValuedField);
 
-//compute a 1-form that will be used to generate the stripes over the quad patches 
+//compute a 1-form that will be used to generate the stripes over the patches
 //
 //@param[in]    geometry            VertexPositionGeometry              input geometry 
 //@param[in]    model               Model                               The gurobi model we're interested in solving
@@ -86,7 +86,8 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
 //compute a 1-form that will be used to generate the stripes over the pathces 
 //overload from the function above
 //it does the optimization in the glued mesh setting 
-EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& vertexMap, polyscope::SurfaceMesh& psMesh);
+EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& vertexMap, std::map<int, int>& edgeMap,
+                                        polyscope::SurfaceMesh& psMesh);
 
 //compute \omega i.e., the 1-form we're trying to match over each edge 
 //

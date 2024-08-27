@@ -358,10 +358,11 @@ FaceData<Vector3> computeOneFormGrad(VertexPositionGeometry& geometry, EdgeData<
 
 //------------------Second strategy----------------------------//
 FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, Model& model, 
-                                                VertexData<double>& gluedTimeFunction, std::map<int, int>& vertexMap){
+                                                VertexData<double>& gluedTimeFunction, std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, std::vector<bool>& orientations){
 
     SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
-    SurfaceMesh& globalMesh = globalGeometry.mesh; 
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+
     FaceData<int> singularityPositions(globalMesh);
     gluedGeometry.requireDECOperators();
     dOne = gluedGeometry.d1;
@@ -369,14 +370,16 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeomet
     //unset the integrability constraint in the model 
     gbModel = model;
     gbModel.setIntegrabilityConstraint(false);
-    int maxSingularityPairs = 1; 
+    int maxSingularityPairs = 0; 
     int numPairs = 0; 
     std::vector<std::pair<int, int>> singularFaces;
     //vizualize the non-integrability
-    EdgeData<double> sigmaTilde = computeOneForm(globalGeometry, gluedGeometry, gbModel, vertexMap, psMesh);
+    EdgeData<double> sigmaTilde = computeOneForm(globalGeometry, gluedGeometry, gbModel, vertexMap, edgeMap, psMesh);
+    EdgeData<double> sigmaTildeGlobal = convertGluedToGlobalEdgeFunction(globalGeometry, gluedGeometry, sigmaTilde, edgeMap);
     Eigen::Map<Eigen::VectorXd> sigmaTildeEig(sigmaTilde.raw().data(), gluedMesh.nEdges());
     Eigen::VectorXd d1Sigma = dOne * sigmaTildeEig; 
-    psMesh.addFaceScalarQuantity("d1 sigma " + std::to_string(numPairs), d1Sigma);
+    psMesh.addFaceScalarQuantity("d1(sigma" + std::to_string(numPairs) + ")", d1Sigma);
+    psMesh.addOneFormTangentVectorQuantity("sigma" + std::to_string(numPairs) + "(Whitney)", sigmaTildeGlobal, orientations);
     while(numPairs < maxSingularityPairs){
         std::pair<int, int> p = findSingularityPair(globalGeometry, gluedGeometry, gluedTimeFunction, sigmaTildeEig);
         usedFaceIndices.push_back(p.first);
@@ -387,7 +390,7 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeomet
         singularityPositions[globalMesh.face(p.first)] = 1; 
         singularityPositions[globalMesh.face(p.second)] = -1;
         numPairs++;
-        sigmaTilde = computeOneForm(globalGeometry, gluedGeometry, gbModel, vertexMap, psMesh);
+        sigmaTilde = computeOneForm(globalGeometry, gluedGeometry, gbModel, vertexMap, edgeMap, psMesh);
         Eigen::Map<Eigen::VectorXd> sigmaTildeEig(sigmaTilde.raw().data(), gluedMesh.nEdges());
         d1Sigma = dOne * sigmaTildeEig; 
         double sum = 0;

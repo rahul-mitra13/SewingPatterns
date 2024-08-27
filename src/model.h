@@ -42,6 +42,11 @@ class Model{
 
     public:
 
+        //flags for debugging purposes and using a different comparison in the objective 
+        bool useEdgeAveraging = false;
+        bool useFaceDifferenceViz = false;
+        bool usePsuedoHarmViz = false;   
+    
         //set optimization period 
         void setPeriod(double period);
 

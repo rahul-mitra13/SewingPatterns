@@ -41,6 +41,6 @@ FaceData<Vector3> computeOneFormGrad(VertexPositionGeometry& geometry, EdgeData<
 //Here we remove the integrability constraint i.e., d1\sigma = 0 and try and greedily match max/min d1\sigma's of similar magnitude but opposite sign
 //then we re-optimize by fixing those singular faces 
 FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, Model& model, 
-                                                VertexData<double>& gluedTimeFunction, std::map<int, int>& vertexMap);
+                                                VertexData<double>& gluedTimeFunction, std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, std::vector<bool>& orientations);
 
 std::pair<int, int> findSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction, const Eigen::VectorXd& sigmaTilde);
