@@ -496,6 +496,8 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
     std::cout << "Number of vertices in the glued mesh " << gluedMesh -> nVertices() << std::endl;
     std::cout << "Number of edges in the original mesh " << mesh.nEdges() << std::endl;
     std::cout << "Number of edges in the glued mesh " << gluedMesh -> nEdges() << std::endl;
+    std::cout << "Number of halfedges in the original mesh " << mesh.nHalfedges() << std::endl;
+    std::cout << "Number of halfedges in the glued mesh " << gluedMesh -> nHalfedges() << std::endl;
     std::cout << "Number of corners in the original mesh " << mesh.nCorners() << std::endl;
     std::cout << "Number of corners in the glued mesh " << gluedMesh -> nCorners() << std::endl;
     std::cout << "Number of boundary loops in the original mesh " << mesh.nBoundaryLoops() << std::endl;
@@ -693,3 +695,21 @@ EdgeData<double> convertGlobalToGluedEdgeFunction(VertexPositionGeometry& global
 
     return gluedEdgeFunction;
 }
+
+//convert function defined on the halfedges of the glued mesh to a function defined on the halfedges of the global mesh 
+HalfedgeData<double> convertGluedToGlobalHalfedgeFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& func, std::map<int, int>& edgeMap){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh; 
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    HalfedgeData<double> globalHalfedgeFunction;
+    for (Edge e : globalMesh.edges()){
+        //gluedEdgeFunction[edgeMap[e.getIndex()]] = func[e];
+        if (e.halfedge().isInterior())
+            globalHalfedgeFunction[e.halfedge()] = func[gluedMesh.edge(edgeMap[e.getIndex()]).halfedge()];
+        if (e.halfedge().twin().isInterior())
+            globalHalfedgeFunction[e.halfedge().twin()] = func[gluedMesh.edge(edgeMap[e.getIndex()]).halfedge().twin()];
+    }
+
+    return globalHalfedgeFunction;
+}
+

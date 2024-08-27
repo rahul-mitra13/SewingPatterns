@@ -181,3 +181,6 @@ EdgeData<double> convertGluedToGlobalEdgeFunction(VertexPositionGeometry& global
 
 //convert function defined on the edges of the global mesh to a function defined on the edges of the glued mesh 
 EdgeData<double> convertGlobalToGluedEdgeFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& func, std::map<int, int>& edgeMap);
+
+//convert function defined on the halfedges of the glued mesh to a function defined on the halfedges of the global mesh 
+HalfedgeData<double> convertGluedToGlobalHalfedgeFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& func, std::map<int, int>& edgeMap);
