@@ -540,7 +540,6 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
     //debug stuff 
     bool useEdgeAveraging = gbModel.useEdgeAveraging;
     bool useFaceDifferenceViz = gbModel.useFaceDifferenceViz;
-    bool usePsuedoHarmViz = gbModel.usePsuedoHarmViz;
 
     gluedGeometry.requireDECOperators();
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
@@ -733,18 +732,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
                 psMesh.addFaceVectorQuantity("gradientU from (sigma with sings)", gradientU);
             }
         }
-        // if (usePsuedoHarmViz){
-        //     HalfedgeData<double> uHalfedgesContainer(gluedMesh);
-        //     for (Halfedge he : gluedMesh.halfedges()){
-        //         uHalfedgesContainer[he] = uGluedHalfedge[he.getIndex()].getValue();
-        //     }
-        //     std::vector<double> uHalfedgesGlobal;
-        //     uHalfedgesGlobal = convertGluedToGlobalHalfedgeFunction(globalGeometry, gluedGeometry, uHalfedgesContainer, edgeMap);
-        //     std::cout << "Size of uHalfedgesGlobal " << uHalfedgesGlobal.size() << std::endl;
-        //     std::cout << "Number of halfedges in the global mesh " << globalMesh.nHalfedges() << std::endl;
-        //     psMesh.addHalfedgeScalarQuantity("Psuedo time function u", uHalfedgesGlobal);
-        // }
-
+        
         for (int i = 0; i < waleBdyIntegerConstraints.size(); i++){
             std::cout << "integer constraint: " << waleBdyIntegerConstraints[i].get(GRB_DoubleAttr_X) << std::endl;
         }

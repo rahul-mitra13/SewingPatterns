@@ -166,7 +166,8 @@ void showStripePatterns(){
   modelCourseDebug.useEdgeAveraging = true; 
   std::vector<int> faceIndices(globalMesh -> nFaces(), 0);
   
-  //singularity indices on the bent cylinder 
+  //singularity indices on the bent_cylinder 
+  //somehow this also works for bent_cylinder_fat
   faceIndices[7] = 1; 
   faceIndices[10] = -1;
 
@@ -185,6 +186,12 @@ void showStripePatterns(){
   auto debugStripes = polyscope::registerCurveNetwork("debug stripe patterns sings (omega)", positionsDebug, edgesDebug);
   debugStripes -> setRadius(0.001);
   globalPSMesh -> addOneFormTangentVectorQuantity("omega with sings (Whitney)", omegaDebugGlobal, orientations);
+  //find the difference with objective 
+  EdgeData<double> difference(*globalMesh);
+  for (Edge e : globalMesh->edges()){
+    difference[e] = (omegaDebugGlobal[e] - omegaCourseGlobal[e]) * (omegaDebugGlobal[e] - omegaCourseGlobal[e]);
+  }
+  globalPSMesh -> addEdgeScalarQuantity("objective difference (omega with sings)", difference);
     
   //visualize ||\delta \sigma - \frac{\nabla h}{||\nabla h||}||^2
   modelCourseDebug.useEdgeAveraging = false; 
@@ -201,9 +208,6 @@ void showStripePatterns(){
   debugStripes = polyscope::registerCurveNetwork("debug stripe patterns sings (sigma)", positionsDebug, edgesDebug);
   debugStripes -> setRadius(0.001);
   globalPSMesh -> addOneFormTangentVectorQuantity("sigma with sings (Whitney)", sigmaDebugGlobal, orientations);
-
-  //don't have ||W(\sigma) - \frac{\nabla h}{||\nabla h||}||^2 - would have to implement Whitney interpolant in this setting 
-
 
 }
 
