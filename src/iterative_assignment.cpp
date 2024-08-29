@@ -453,3 +453,46 @@ std::pair<int, int> findSingularityPair(VertexPositionGeometry& globalGeometry, 
         return std::make_pair(minFace, maxFace);
     }
 }
+//-----------------End of second strategy---------------------//
+
+
+//------------------Third strategy------------------------------//
+//just sample isolines at equal spacing and introduce singularities at max/min d1\omega or d1\sigma at every specific isonline
+FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, VertexData<double>& gluedTimeFunction, 
+                                            const Eigen::VectorXd& curl, std::map<int, int>& vertexMap){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    FaceData<int> singularFaces(globalMesh, 0);
+    globalToGluedVertexMap = vertexMap;
+    double stepSize = 0.25; 
+    double curr = stepSize; 
+    double end = 1.0; 
+    VertexData<double> globalTimeFunction = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, gluedTimeFunction, globalToGluedVertexMap);
+    while(curr < end){
+        Eigen::MatrixXd iV;
+        Eigen::MatrixXd iE;
+        std::vector<int> f;
+        //find max curl face from the set of faces on the current isoline
+        double maxCurl = -DBL_MAX; 
+        double minCurl = DBL_MAX;
+        int maxCurlFace, minCurlFace;
+        std::tie(iV, iE, f) = getTimeFunctionIsoLine(globalGeometry, globalTimeFunction, curr);
+        for (int i = 0; i < f.size(); i++){
+            if (curl(f[i]) > maxCurl){
+                maxCurl = curl(f[i]);
+                maxCurlFace = f[i];
+            }
+            if (curl(f[i]) < minCurl){
+                minCurl = curl(f[i]);
+                minCurlFace = f[i];
+            }
+        }
+        curr += stepSize;
+        singularFaces[globalMesh.face(maxCurlFace)] = 1.0;
+        singularFaces[globalMesh.face(minCurlFace)] = -1.0;
+    }
+    
+    return singularFaces;
+
+}

@@ -60,7 +60,33 @@ std::vector<bool> orientations;
 
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
-  
+
+  std::vector<int> HeOrientations;
+  for (Face f : globalMesh->faces()){
+    Halfedge hij = f.halfedge();
+    Halfedge hjk = hij.next();
+    Halfedge hki = hjk.next();
+    if (hij.orientation()){
+      HeOrientations.push_back(1);
+    }
+    else{
+      HeOrientations.push_back(0);
+    }
+    if (hjk.orientation()){
+      HeOrientations.push_back(1);
+    }
+    else{
+      HeOrientations.push_back(0);
+    }
+    if (hki.orientation()){
+      HeOrientations.push_back(1);
+    }
+    else{
+      HeOrientations.push_back(0);
+    }
+  }
+  globalPSMesh->addHalfedgeScalarQuantity("halfedge orientations", HeOrientations);
+
   //require the DEC operators
   gluedELG->requireDECOperators();
   //time function on the glued mesh 
@@ -107,10 +133,6 @@ void showStripePatterns(){
   EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, edgeMap, *globalPSMesh);
   EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
   
-  //Eigen::Map<Eigen::VectorXd> sigmaEig(sigmaCourseGlued.raw().data(), (gluedELG->mesh).nEdges());
-  //Eigen::VectorXd d1Sigma = gluedELG->d1 * omegaEig;
-  //globalPSMesh->addFaceScalarQuantity("d1 sigma", d1Sigma);
-
   //global data
   CornerData<double> stripeValuesSigmaCourse;
   //global data
@@ -154,9 +176,13 @@ void showStripePatterns(){
   waleStripes -> setRadius(0.001);
   */
 
-  //greedily placed singularities 
-  FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations);
-  //globalPSMesh -> addFaceScalarQuantity("greedy singularities", greedySingularities)
+  //some greedy singularity placement strategies
+  //strategy 2 - use the co-differential 
+  //FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations);
+  //strategy 3 - placing singularities based on max/min curl at regular isoline intervals
+  FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *gluedELG, *globalPSMesh, timeFunctionGlued, d1Omega, vertexMap);
+  //visualizing the found singularities 
+  globalPSMesh -> addFaceScalarQuantity("greedy singularities", greedySingularities);
 
   //-----------------------------DEBUGGING STUFF-----------------------------//
 
@@ -189,7 +215,7 @@ void showStripePatterns(){
   //find the difference with objective 
   EdgeData<double> difference(*globalMesh);
   for (Edge e : globalMesh->edges()){
-    difference[e] = (omegaDebugGlobal[e] - omegaCourseGlobal[e]) * (omegaDebugGlobal[e] - omegaCourseGlobal[e]);
+    difference[e] = (omegaDebugGlobal[e] - omegaCourseGlobal[e]);
   }
   globalPSMesh -> addEdgeScalarQuantity("objective difference (omega with sings)", difference);
     
