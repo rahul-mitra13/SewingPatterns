@@ -60,32 +60,23 @@ std::vector<bool> orientations;
 
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
-
-  std::vector<int> HeOrientations;
-  for (Face f : globalMesh->faces()){
-    Halfedge hij = f.halfedge();
-    Halfedge hjk = hij.next();
-    Halfedge hki = hjk.next();
-    if (hij.orientation()){
-      HeOrientations.push_back(1);
-    }
-    else{
-      HeOrientations.push_back(0);
-    }
-    if (hjk.orientation()){
-      HeOrientations.push_back(1);
-    }
-    else{
-      HeOrientations.push_back(0);
-    }
-    if (hki.orientation()){
-      HeOrientations.push_back(1);
-    }
-    else{
-      HeOrientations.push_back(0);
-    }
+  
+  //register the point cloud that is the mesh
+  std::vector<Vector3> points(globalMesh->nVertices());  
+  std::vector<std::array<int, 2>> edges(globalMesh->nEdges());
+  std::vector<Vector3> edgeVectors(globalMesh->nEdges());
+  globalGeometry->requireVertexPositions();
+  for (Vertex v : globalMesh -> vertices()){
+    points[v.getIndex()] = globalGeometry->vertexPositions[v];
   }
-  globalPSMesh->addHalfedgeScalarQuantity("halfedge orientations", HeOrientations);
+  for (Edge e : globalMesh -> edges()){
+    std::array<int, 2> edge = {(int) e.halfedge().tailVertex().getIndex(), (int) e.halfedge().tipVertex().getIndex()};
+    edges[e.getIndex()] = edge;
+    edgeVectors[e.getIndex()] = globalGeometry->vertexPositions[e.halfedge().tipVertex()] - globalGeometry->vertexPositions[e.halfedge().tailVertex()];
+  }
+  auto meshNetwork = polyscope::registerCurveNetwork("Mesh curve network", points, edges);
+  meshNetwork -> setRadius(0.001);
+  meshNetwork -> addEdgeVectorQuantity("Canonical Edge Directions", edgeVectors);
 
   //require the DEC operators
   gluedELG->requireDECOperators();
