@@ -398,7 +398,7 @@ std::vector<double> createEdgeWeightsFromVertexList(VertexPositionGeometry& geom
     return edgeWeights;
 }
 
-EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& vertexMap, 
+std::unique_ptr<EdgeLengthGeometry> createGluedEdgeLengthGeometry(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& vertexMap, 
                                     std::map<int, int>& edgeMap, std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
     SurfaceMesh& mesh = geometry.mesh;
     //find original index to glued mesh index for vertices
@@ -507,8 +507,10 @@ EdgeLengthGeometry * createGluedEdgeLengthGeometry(VertexPositionGeometry& geome
     std::cout << "Is original mesh oriented " << mesh.isOriented() << std::endl;
     std::cout << "Is glued mesh oriented " << gluedMesh -> isOriented() << std::endl;
 
-    EdgeLengthGeometry * ELG = new EdgeLengthGeometry(*gluedMesh, edgeLengths);
-    return ELG;
+    //EdgeLengthGeometry * ELG = new EdgeLengthGeometry(*gluedMesh, edgeLengths);
+    //return a smart pointer 
+    //std::unique_ptr<EdgeLengthGeometry> ELGSmart(ELG);
+    return std::unique_ptr<EdgeLengthGeometry>(new EdgeLengthGeometry(*gluedMesh, edgeLengths));
 }
 
 
