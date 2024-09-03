@@ -1,21 +1,19 @@
 //this is to appropriately parse the GarmentCode specification
 #include <Python.h>
 
+//geometry-central includes 
 #include "geometrycentral/surface/manifold_surface_mesh.h"
 #include "geometrycentral/surface/meshio.h"
 #include "geometrycentral/surface/vertex_position_geometry.h"
 #include "geometrycentral/surface/direction_fields.h"
 #include "geometrycentral/surface/edge_length_geometry.h"
 
-
-
-#include "geometrycentral/surface/direction_fields.h"
-#include "geometrycentral/surface/direction_fields.h"
-
+//polyscope includes 
 #include "polyscope/polyscope.h"
 #include "polyscope/surface_mesh.h"
 #include "polyscope/curve_network.h"
 
+//external libs
 #include "args/args.hxx"
 #include "nlohmann/json.hpp"
 #include "imgui.h"
@@ -24,6 +22,7 @@
 #include "knitting_utils.h"
 #include "stripe_patterns_helpers.h"
 #include "iterative_assignment.h"
+#include "KnitGraph.h"
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -39,7 +38,8 @@ std::map<int, int> edgeMap;
 //one-ring map for vertices in the glued mesh for performance 
 std::map<int, std::vector<Halfedge>> gluedOneRingMap;
 //build a glued edge length geoemtry to make our life a little easier for some procedures
-EdgeLengthGeometry *gluedELG;
+//EdgeLengthGeometry *gluedELG;
+std::unique_ptr<EdgeLengthGeometry> gluedELG;
 
 std::unique_ptr<ManifoldSurfaceMesh> globalMesh;
 std::unique_ptr<VertexPositionGeometry> globalGeometry;
@@ -169,14 +169,14 @@ void showStripePatterns(){
 
   //some greedy singularity placement strategies
   //strategy 2 - use the co-differential 
-  //FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations);
+  FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations);
   //strategy 3 - placing singularities based on max/min curl at regular isoline intervals
-  FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *gluedELG, *globalPSMesh, timeFunctionGlued, d1Omega, vertexMap);
+  //FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *gluedELG, *globalPSMesh, timeFunctionGlued, d1Omega, vertexMap);
   //visualizing the found singularities 
   globalPSMesh -> addFaceScalarQuantity("greedy singularities", greedySingularities);
 
   //-----------------------------DEBUGGING STUFF-----------------------------//
-
+  /**
   //visualize ||\sigma - \omega_c||^2 dubject to d1 constraints everywhere
   //numerous hard-coded values here 
   Model modelCourseDebug = modelCourse;
@@ -225,6 +225,10 @@ void showStripePatterns(){
   debugStripes = polyscope::registerCurveNetwork("debug stripe patterns sings (sigma)", positionsDebug, edgesDebug);
   debugStripes -> setRadius(0.001);
   globalPSMesh -> addOneFormTangentVectorQuantity("sigma with sings (Whitney)", sigmaDebugGlobal, orientations);
+  */
+
+ std::unique_ptr<KnitGraph> graph = std::unique_ptr<KnitGraph>(new KnitGraph(*globalGeometry, *globalPSMesh, period, sigmaCourseGlobal, sigmaCourseGlobal));
+ graph->buildGraph();
 
 }
 

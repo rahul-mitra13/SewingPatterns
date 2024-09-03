@@ -370,7 +370,7 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeomet
     //unset the integrability constraint in the model 
     gbModel = model;
     gbModel.setIntegrabilityConstraint(false);
-    int maxSingularityPairs = 0; 
+    int maxSingularityPairs = 2; 
     int numPairs = 0; 
     std::vector<std::pair<int, int>> singularFaces;
     //vizualize the non-integrability
@@ -394,11 +394,8 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeomet
         Eigen::Map<Eigen::VectorXd> sigmaTildeEig(sigmaTilde.raw().data(), gluedMesh.nEdges());
         d1Sigma = dOne * sigmaTildeEig; 
         double sum = 0;
-        for (int i = 0; i < d1Sigma.rows(); i++){
-            sum += d1Sigma(i);
-        }
-        std::cout << "Sum of d1 sigma = " << sum << std::endl;
-        psMesh.addFaceScalarQuantity("d1 sigma " + std::to_string(numPairs), d1Sigma);
+        //d1\omega sums to 0 - which is expected
+        psMesh.addFaceScalarQuantity("d1(sigma " + std::to_string(numPairs) + ")", d1Sigma);
     }
     return singularityPositions;
 }
