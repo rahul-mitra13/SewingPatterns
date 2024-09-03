@@ -88,7 +88,7 @@ void showStripePatterns(){
   //gradient on the glued/global mesh
   //note that faces have a 1-to-1 mapping from global to glued setting
   FaceData<Vector3> timeFunctionGradientGlobal = computeTimeFunctionFaceGrad(*globalGeometry, timeFunctionGlobal);
-  globalPSMesh -> addFaceVectorQuantity("gradient (unnormalized)", timeFunctionGradientGlobal);
+  //globalPSMesh -> addFaceVectorQuantity("gradient (unnormalized)", timeFunctionGradientGlobal);
   //find boundary edges in the wale direction 
   //doing this here cause the gradient gets rotated later
   std::vector<int> waleBdyEdges = getWaleBdyEdgesInGluedMesh(*globalGeometry, *gluedELG, timeFunctionGradientGlobal, edgeMap, threshold, *globalPSMesh);
@@ -120,7 +120,7 @@ void showStripePatterns(){
   globalPSMesh->addFaceScalarQuantity("d1(omega0)", d1Omega);
   //visualize the 1-form \omega using Whitney interpolation 
   globalPSMesh->addOneFormTangentVectorQuantity("omega0(Whitney)", omegaCourseGlobal, orientations);
-  //sigma in the glued mesh setting 
+  //the 1-form in the glued mesh setting 
   EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, edgeMap, *globalPSMesh);
   EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
   
@@ -176,8 +176,8 @@ void showStripePatterns(){
   globalPSMesh -> addFaceScalarQuantity("greedy singularities", greedySingularities);
 
   //-----------------------------DEBUGGING STUFF-----------------------------//
-  /**
-  //visualize ||\sigma - \omega_c||^2 dubject to d1 constraints everywhere
+  
+  //visualize ||\sigma - \omega_c||^2 subject to d1 constraints everywhere
   //numerous hard-coded values here 
   Model modelCourseDebug = modelCourse;
   modelCourseDebug.useEdgeAveraging = true; 
@@ -210,7 +210,7 @@ void showStripePatterns(){
   }
   globalPSMesh -> addEdgeScalarQuantity("objective difference (omega with sings)", difference);
     
-  //visualize ||\delta \sigma - \frac{\nabla h}{||\nabla h||}||^2
+  //visualize ||\delta \sigma - \frac{\nabla h}{||\nabla h||}||^2 subject to d1 constraints everywhere 
   modelCourseDebug.useEdgeAveraging = false; 
   modelCourseDebug.useFaceDifferenceViz = true;
   //modelCourseDebug.usePsuedoHarmViz = true;
@@ -225,10 +225,10 @@ void showStripePatterns(){
   debugStripes = polyscope::registerCurveNetwork("debug stripe patterns sings (sigma)", positionsDebug, edgesDebug);
   debugStripes -> setRadius(0.001);
   globalPSMesh -> addOneFormTangentVectorQuantity("sigma with sings (Whitney)", sigmaDebugGlobal, orientations);
-  */
 
- std::unique_ptr<KnitGraph> graph = std::unique_ptr<KnitGraph>(new KnitGraph(*globalGeometry, *globalPSMesh, period, sigmaCourseGlobal, sigmaCourseGlobal));
- graph->buildGraph();
+  //for knit graph generation
+  std::unique_ptr<KnitGraph> graph = std::unique_ptr<KnitGraph>(new KnitGraph(*globalGeometry, *globalPSMesh, period, sigmaCourseGlobal, sigmaCourseGlobal));
+  graph->buildGraph();
 
 }
 
