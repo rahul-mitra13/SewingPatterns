@@ -176,7 +176,7 @@ void showStripePatterns(){
   globalPSMesh -> addFaceScalarQuantity("greedy singularities", greedySingularities);
 
   //-----------------------------DEBUGGING STUFF-----------------------------//
-  
+  /**
   //visualize ||\sigma - \omega_c||^2 subject to d1 constraints everywhere
   //numerous hard-coded values here 
   Model modelCourseDebug = modelCourse;
@@ -229,6 +229,7 @@ void showStripePatterns(){
   //for knit graph generation
   std::unique_ptr<KnitGraph> graph = std::unique_ptr<KnitGraph>(new KnitGraph(*globalGeometry, *globalPSMesh, period, sigmaCourseGlobal, sigmaCourseGlobal));
   graph->buildGraph();
+  */
 
 }
 

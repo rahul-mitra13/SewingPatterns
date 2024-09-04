@@ -643,7 +643,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
             for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_one, fIndex); it; ++it){
                 lhs += it.value() * sigma[it.col()];
             }
-            model.addConstr(lhs == integralVal, "Specified singularity constraint");
+            model.addConstr(lhs == period * integralVal, "Specified singularity constraint");
         }
 
         //trying to match energies
