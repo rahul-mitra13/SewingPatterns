@@ -167,13 +167,17 @@ void showStripePatterns(){
   waleStripes -> setRadius(0.001);
   */
 
-  //some greedy singularity placement strategies
+  //some greedy singularity placement strategies and testing
   //strategy 2 - use the co-differential 
-  FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations);
+  //FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations);
   //strategy 3 - placing singularities based on max/min curl at regular isoline intervals
   //FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *gluedELG, *globalPSMesh, timeFunctionGlued, d1Omega, vertexMap);
   //visualizing the found singularities 
-  globalPSMesh -> addFaceScalarQuantity("greedy singularities", greedySingularities);
+  //globalPSMesh -> addFaceScalarQuantity("greedy singularities", greedySingularities);
+
+  //compute the curl of a face-based vector field 
+  //curl concentrated at vertices
+  VertexData<int> vertexCurl = computeCurlOnVertex(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations);
 
   //-----------------------------DEBUGGING STUFF-----------------------------//
   /**

@@ -493,3 +493,37 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeomet
     return singularFaces;
 
 }
+
+//------------------------------SOME IDEAS TO TEST---------------------------//
+//Compute singular vertex indices
+//Eq. 9 from De Goes SIGGRAPH course, "Vector Field Design"
+VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, Model& model, 
+                                                VertexData<double>& gluedTimeFunction, std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, std::vector<bool>& orientations){
+
+    
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    std::vector<std::array<double, 3>> gradients = model.getFaceGradients();
+    FaceData<Vector3> faceGradients(globalMesh);
+    VertexData<double> curl(globalMesh);
+    VertexData<int> vertexSingularities(globalMesh);
+    globalGeometry.requireVertexPositions();
+
+    for (Face f : globalMesh.faces()){
+        faceGradients[f] = Vector3{gradients[f.getIndex()][0], gradients[f.getIndex()][1], gradients[f.getIndex()][2]};
+    }
+    for (Vertex vi : globalMesh.vertices()){
+        double sum = 0.0;
+        for (Halfedge he : vi.outgoingHalfedges()){
+            Halfedge hjk = he.next();
+            if (!hjk.isInterior()) continue;
+            Vector3 hjkVec = globalGeometry.vertexPositions[hjk.tipVertex()] - globalGeometry.vertexPositions[hjk.tailVertex()];
+            sum += dot(hjkVec, faceGradients[he.face()]);
+        }
+        curl[vi] = sum;
+    }
+
+    psMesh.addVertexScalarQuantity("vertex curl", curl);
+
+    return vertexSingularities;
+
+}
