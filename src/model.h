@@ -22,6 +22,9 @@ class Model{
         //singular face indices
         std::vector<std::pair<int, int>> singularFaces;
 
+        //singular vertex indices 
+        std::vector<std::pair<int, int>> singularVertices;
+
         //specify all face indices (both smooth and singular)
         std::vector<int> faceIndices;
 
@@ -35,6 +38,7 @@ class Model{
         std::vector<std::pair<int, int>> edgeMappingsPairs;
 
         //these are the values we'll try to match using a quadratic minimization 
+        //these are edge based matching
         std::vector<double> matchingTerms;
 
         //these are the gradients over the faces that we're trying to match
@@ -60,6 +64,9 @@ class Model{
 
         //set singular face indices 
         void setSingularFaceIndices(std::vector<std::pair<int, int>>& singularFaces);
+
+        //set singular vertex indices 
+        void setSingularVertexIndices(std::vector<std::pair<int, int>>& singularVertices);
 
         //set smooth face indices 
         void setSmoothFaceIndices(std::vector<int>& smoothFaces);
@@ -99,6 +106,9 @@ class Model{
 
         //get singular faces
         std::vector<std::pair<int, int>> getSingularFaces();
+
+        //get singular vertices 
+        std::vector<std::pair<int, int>> getSingularVertices();
 
         //get all face indices
         std::vector<int> getFaceIndices();
