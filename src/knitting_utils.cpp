@@ -197,24 +197,39 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, Vert
     geometry.requireCornerAngles();
     FaceData<Vector3> gradients(mesh);
 
+    //don't know if this is the right thing to do here
     for (Face f : mesh.faces()){
-        double f1 = vertexScalarFunction[f.halfedge().vertex()];
-        double f2 = vertexScalarFunction[f.halfedge().next().vertex()];
-        double f3 = vertexScalarFunction[f.halfedge().next().next().vertex()];
-        Corner c1 = f.halfedge().corner();
-        Corner c2 = f.halfedge().next().corner();
-        Corner c3 = f.halfedge().next().next().corner();
-        double cottheta1 = 1. / tan(geometry.cornerAngles[c1]);
-        double cottheta2 = 1. / tan(geometry.cornerAngles[c2]);
-        double cottheta3 = 1. / tan(geometry.cornerAngles[c3]);
+        double fi = vertexScalarFunction[f.halfedge().vertex()];
+        double fj = vertexScalarFunction[f.halfedge().next().vertex()];
+        double fk = vertexScalarFunction[f.halfedge().next().next().vertex()];
         double area = geometry.faceAreas[f];
-        //each of these components are mutliplied by unit vectors 
-        //each unit vector is perpendicular to the opposite edge of the vertex
-        gradients[f][0] = 1./(2.*area) * (((f2 - f1) * cottheta3) + ((f3 - f1) * cottheta2));
-        gradients[f][1] = 1./(2.*area) * (((f3 - f2) * cottheta1) + ((f1 - f2) * cottheta3));
-        gradients[f][2] = 1./(2.*area) * (((f1 - f3) * cottheta2) + ((f2 - f3) * cottheta1));
+        BarycentricVector X_ik_perp = (BarycentricVector(f, Vector3{1., 0, -1.})).rotated90(geometry);
+        BarycentricVector X_ji_perp = (BarycentricVector(f, Vector3{-1., 1., 0.})).rotated90(geometry);
+        BarycentricVector gradF = ((fj - fi) * X_ik_perp + (fk - fi) * X_ji_perp)/ (2. * area); 
+        BarycentricVector gradFNormalized = gradF / norm(geometry, gradF);
+        gradients[f] = Vector3{gradFNormalized.faceCoords[0], gradFNormalized.faceCoords[1], gradFNormalized.faceCoords[2]};
     }
     return gradients;
+    
+
+    // for (Face f : mesh.faces()){
+    //     double f1 = vertexScalarFunction[f.halfedge().vertex()];
+    //     double f2 = vertexScalarFunction[f.halfedge().next().vertex()];
+    //     double f3 = vertexScalarFunction[f.halfedge().next().next().vertex()];
+    //     Corner c1 = f.halfedge().corner();
+    //     Corner c2 = f.halfedge().next().corner();
+    //     Corner c3 = f.halfedge().next().next().corner();
+    //     double cottheta1 = 1. / tan(geometry.cornerAngles[c1]);
+    //     double cottheta2 = 1. / tan(geometry.cornerAngles[c2]);
+    //     double cottheta3 = 1. / tan(geometry.cornerAngles[c3]);
+    //     double area = geometry.faceAreas[f];
+    //     //each of these components are mutliplied by unit vectors 
+    //     //each unit vector is perpendicular to the opposite edge of the vertex
+    //     gradients[f][0] = 1./(2.*area) * (((f2 - f1) * cottheta3) + ((f3 - f1) * cottheta2));
+    //     gradients[f][1] = 1./(2.*area) * (((f3 - f2) * cottheta1) + ((f1 - f2) * cottheta3));
+    //     gradients[f][2] = 1./(2.*area) * (((f1 - f3) * cottheta2) + ((f2 - f3) * cottheta1));
+    // }
+    // return gradients;
 }
 
 //compute a vector (in ambient space) per vertex that is aligned with the gradient of a scalar field

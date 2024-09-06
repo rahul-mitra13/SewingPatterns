@@ -175,14 +175,21 @@ void showStripePatterns(){
   //visualizing the found singularities 
   //globalPSMesh -> addFaceScalarQuantity("greedy singularities", greedySingularities);
 
-  //compute the curl of a face-based vector field 
+  //compute the curl of a face-based vector field
+  //here we can set the intrinsic gradients instead of the extrinsic gradients if desired
+  // std::vector<std::array<double, 3>> intrinsicGradients(gluedELG->mesh.nFaces());
+  //FaceData<Vector3> timeFunctionGradientGlued = computeTimeFunctionFaceGrad(*gluedELG, timeFunctionGlued);
+  // for (Face f : gluedELG -> mesh.faces()){
+  //   intrinsicGradients[f.getIndex()] = std::array{timeFunctionGradientGlued[f][0], timeFunctionGradientGlued[f][1], timeFunctionGradientGlued[f][2]};
+  // }
+  // modelCourse.setFaceGradients(intrinsicGradients);
   //curl concentrated at vertices
-  VertexData<int> vertexCurl = computeCurlOnVertex(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations);
+  VertexData<int> vertexCurl = computeCurlOnVertex(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations, gluedOneRingMap);
 
   //-----------------------------DEBUGGING STUFF-----------------------------//
-  /**
   //visualize ||\sigma - \omega_c||^2 subject to d1 constraints everywhere
   //numerous hard-coded values here 
+  /**
   Model modelCourseDebug = modelCourse;
   modelCourseDebug.useEdgeAveraging = true; 
   std::vector<int> faceIndices(globalMesh -> nFaces(), 0);
@@ -234,6 +241,7 @@ void showStripePatterns(){
   std::unique_ptr<KnitGraph> graph = std::unique_ptr<KnitGraph>(new KnitGraph(*globalGeometry, *globalPSMesh, period, sigmaCourseGlobal, sigmaCourseGlobal));
   graph->buildGraph();
   */
+  
 
 }
 

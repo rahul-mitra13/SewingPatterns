@@ -6,6 +6,7 @@
 #include "geometrycentral/surface/vertex_position_geometry.h"
 #include "geometrycentral/utilities/utilities.h"
 #include "geometrycentral/surface/stripe_patterns.h"
+#include "geometrycentral/surface/barycentric_vector.h"
 
 //libigl includes
 //I guess we'll just put all the libigl includes here for now 

@@ -58,4 +58,5 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeomet
 //Visualizing the curl of a face-based vector field 
 //Eq. 9 from De Goes SIGGRAPH course, "Vector Field Design"
 VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, Model& model, 
-                                                VertexData<double>& gluedTimeFunction, std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, std::vector<bool>& orientations);
+                                                VertexData<double>& gluedTimeFunction, std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, std::vector<bool>& orientations
+                                                , std::map<int, std::vector<Halfedge>>& gluedOneRingMap);

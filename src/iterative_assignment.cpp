@@ -498,9 +498,11 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeomet
 //Compute singular vertex indices
 //Eq. 9 from De Goes SIGGRAPH course, "Vector Field Design"
 VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, Model& model, 
-                                                VertexData<double>& gluedTimeFunction, std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, std::vector<bool>& orientations){
+                                                VertexData<double>& gluedTimeFunction, std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, std::vector<bool>& orientations
+                                                , std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
 
     
+    //using global gradients (extrinsic)
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     std::vector<std::array<double, 3>> gradients = model.getFaceGradients();
     FaceData<Vector3> faceGradients(globalMesh);
@@ -513,7 +515,7 @@ VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, Edge
     }
     for (Vertex vi : globalMesh.vertices()){
         double sum = 0.0;
-        for (Halfedge he : vi.outgoingHalfedges()){
+        for (Halfedge he : gluedOneRingMap[vi.getIndex()]){
             Halfedge hjk = he.next();
             if (!hjk.isInterior()) continue;
             Vector3 hjkVec = globalGeometry.vertexPositions[hjk.tipVertex()] - globalGeometry.vertexPositions[hjk.tailVertex()];
@@ -523,6 +525,33 @@ VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, Edge
     }
 
     psMesh.addVertexScalarQuantity("vertex curl", curl);
+
+    //using gradients in the glued mesh setting (intrinsic)
+    //don't know if this is the right thing to do here
+    // SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
+    // SurfaceMesh& globalMesh = globalGeometry.mesh;
+    // std::vector<std::array<double, 3>> gradients = model.getFaceGradients();
+    // FaceData<Vector3> faceGradients(gluedMesh);
+    // VertexData<double> curl(gluedMesh);
+    // VertexData<int> vertexSingularities(globalMesh);
+    // VertexData<double> curlGlobal(globalMesh);
+
+    // for (Face f : gluedMesh.faces()){
+    //     faceGradients[f] = Vector3{gradients[f.getIndex()][0], gradients[f.getIndex()][1], gradients[f.getIndex()][2]};
+    // }
+    // for (Vertex vi : gluedMesh.vertices()){
+    //     double sum = 0.0;
+    //     for (Halfedge he : vi.outgoingHalfedges()){
+    //         if (!he.next().isInterior()) continue;
+    //         Vector3 hjk = Vector3{0, -1., 1.};
+    //         sum += dot(faceGradients[he.face()], hjk);
+    //     }
+    //     curl[vi] = sum;
+    // }
+
+    // curlGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, curl, vertexMap);
+    // psMesh.addVertexScalarQuantity("vertex curl intrinsic", curlGlobal);
+
 
     return vertexSingularities;
 
