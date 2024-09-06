@@ -457,25 +457,25 @@ std::unique_ptr<EdgeLengthGeometry> createGluedEdgeLengthGeometry(VertexPosition
     geometry.requireEdgeLengths();
     //create a map (vertex in original mesh -> outgoing halfedges in the glued mesh)
     //don't need this really slow bit if you're carrying out the intergration in the glued mesh setting
-    // for (Vertex v : mesh.vertices()){
-    //     gluedOneRingMap[v.getIndex()] = std::vector<Halfedge>{};
-    //     std::vector<Halfedge> halfedges;
-    //     std::vector<Halfedge> gluedMeshHalfedges;
-    //     Vertex gluedMeshVertex = gluedMesh->vertex(vertexMap[v.getIndex()]);
-    //     for (Halfedge he : gluedMeshVertex.outgoingHalfedges()){
-    //         gluedMeshHalfedges.push_back(he);
-    //     }
-    //     //find the corresponding halfedges in the original mesh
-    //     for (Halfedge he : mesh.halfedges()){
-    //         for (Halfedge heGlued : gluedMeshHalfedges){
-    //             if (vertexMap[he.tailVertex().getIndex()] == heGlued.tailVertex().getIndex() && vertexMap[he.tipVertex().getIndex()] == 
-    //             heGlued.tipVertex().getIndex()){
-    //             gluedOneRingMap[v.getIndex()].push_back(he);
-    //             break;
-    //             }
-    //         }
-    //     }
-    // }
+    for (Vertex v : mesh.vertices()){
+        gluedOneRingMap[v.getIndex()] = std::vector<Halfedge>{};
+        std::vector<Halfedge> halfedges;
+        std::vector<Halfedge> gluedMeshHalfedges;
+        Vertex gluedMeshVertex = gluedMesh->vertex(vertexMap[v.getIndex()]);
+        for (Halfedge he : gluedMeshVertex.outgoingHalfedges()){
+            gluedMeshHalfedges.push_back(he);
+        }
+        //find the corresponding halfedges in the original mesh
+        for (Halfedge he : mesh.halfedges()){
+            for (Halfedge heGlued : gluedMeshHalfedges){
+                if (vertexMap[he.tailVertex().getIndex()] == heGlued.tailVertex().getIndex() && vertexMap[he.tipVertex().getIndex()] == 
+                heGlued.tipVertex().getIndex()){
+                gluedOneRingMap[v.getIndex()].push_back(he);
+                break;
+                }
+            }
+        }
+    }
 
     //build a map from edges in the original mesh to edges in the glued mesh 
     for (Halfedge he1 : mesh.halfedges()){
