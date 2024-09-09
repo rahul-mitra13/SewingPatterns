@@ -424,10 +424,6 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
     Eigen::VectorXd constFunc(mesh.nVertices());
     constFunc.setOnes();
     Eigen::SparseMatrix<double> prod = d_one * d_zero;
-    //sanity check for construction of derivatives 
-    std::cout<< "the number of nonzeros with comparison: \n"
-    << (Eigen::Map<Eigen::VectorXd> (prod.valuePtr(), prod.nonZeros()).array() != 0).count()
-    << std::endl;
     
     try {
         // Create an environment
@@ -869,4 +865,45 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polysc
         }
     }
     return omega;
+}
+
+
+//compute a face-based field through the optimization 
+//here the singularities are placed on the vertices
+FaceData<Vector3> computeFaceBasedField(VertexPositionGeometry& globalGeometry, Model& model){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    FaceData<Vector3> field(globalMesh);
+    globalGeometry.requireFaceAreas();
+
+    try {
+        // Create an environment
+        GRBEnv env = GRBEnv(true);
+        env.set("LogFile", "1-form computation.log");
+        env.start();
+
+        // Create an empty model
+        GRBModel model = GRBModel(env);
+
+        //set the timeout
+        model.getEnv().set(GRB_DoubleParam_TimeLimit, 60);
+        model.getEnv().set(GRB_IntParam_OutputFlag, 0);
+        std::vector<std::array<GRBVar, 3>> W(globalMesh.nFaces());
+        for (Face f : globalMesh.faces()){
+            std::array<GRBVar, 3> grad = {model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS), model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS),
+                                            model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS)};
+            
+        }
+
+    }
+    catch(GRBException e) {
+        std::cout << "Error code = " << e.getErrorCode() << std::endl;
+        std::cout << e.getMessage() << std::endl;
+    } catch(...) {
+        std::cout << "Exception during optimization" << std::endl;
+    }
+
+
+
+    return field;
 }

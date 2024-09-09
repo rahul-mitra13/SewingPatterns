@@ -90,6 +90,10 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
 EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& vertexMap, std::map<int, int>& edgeMap,
                                         polyscope::SurfaceMesh& psMesh);
 
+//compute a face-based field through the optimization 
+//here the singularities are placed on the vertices
+FaceData<Vector3> computeFaceBasedField(VertexPositionGeometry& globalGeometry, Model& model);
+
 //compute \omega i.e., the 1-form we're trying to match over each edge 
 //
 //@param[in]    geometry            VertexPositionGeometry  input geometry

@@ -4,6 +4,7 @@
 EdgeData<double> omega;
 Model gbModel;
 std::vector<int> usedFaceIndices;
+std::vector<int> usedVertices;
 Eigen::SparseMatrix<double, Eigen::RowMajor> dOne; 
 Eigen::SparseMatrix<double, Eigen::RowMajor> dZero;
 std::map<int, int> globalToGluedVertexMap;
@@ -495,6 +496,7 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeomet
 }
 
 //------------------------------SOME IDEAS TO TEST---------------------------//
+//Greedy singularities placed on vertices
 //Compute singular vertex indices
 //Eq. 9 from De Goes SIGGRAPH course, "Vector Field Design"
 VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, Model& model, 
@@ -505,6 +507,7 @@ VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, Edge
     //using global gradients (extrinsic)
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     std::vector<std::array<double, 3>> gradients = model.getFaceGradients();
+    globalToGluedVertexMap = vertexMap;
     FaceData<Vector3> faceGradients(globalMesh);
     VertexData<double> curl(globalMesh);
     VertexData<int> vertexSingularities(globalMesh);
@@ -526,33 +529,79 @@ VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, Edge
 
     psMesh.addVertexScalarQuantity("vertex curl", curl);
 
-    //using gradients in the glued mesh setting (intrinsic)
-    //don't know if this is the right thing to do here
-    // SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
-    // SurfaceMesh& globalMesh = globalGeometry.mesh;
-    // std::vector<std::array<double, 3>> gradients = model.getFaceGradients();
-    // FaceData<Vector3> faceGradients(gluedMesh);
-    // VertexData<double> curl(gluedMesh);
-    // VertexData<int> vertexSingularities(globalMesh);
-    // VertexData<double> curlGlobal(globalMesh);
+    int numPairs = 0;
+    int maxPairs = 1;
 
-    // for (Face f : gluedMesh.faces()){
-    //     faceGradients[f] = Vector3{gradients[f.getIndex()][0], gradients[f.getIndex()][1], gradients[f.getIndex()][2]};
-    // }
-    // for (Vertex vi : gluedMesh.vertices()){
-    //     double sum = 0.0;
-    //     for (Halfedge he : vi.outgoingHalfedges()){
-    //         if (!he.next().isInterior()) continue;
-    //         Vector3 hjk = Vector3{0, -1., 1.};
-    //         sum += dot(faceGradients[he.face()], hjk);
-    //     }
-    //     curl[vi] = sum;
-    // }
+    std::vector<std::pair<int, int>> vertexSingularPositions;
 
-    // curlGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, curl, vertexMap);
-    // psMesh.addVertexScalarQuantity("vertex curl intrinsic", curlGlobal);
+    while (numPairs < maxPairs){
+        std::pair<int, int> singPair = findVertexSingularityPair(globalGeometry, gluedGeometry, curl, gluedTimeFunction, psMesh);
+        vertexSingularities[singPair.first] = 1;
+        vertexSingularities[singPair.second] = -1;
+        usedVertices.push_back(singPair.first);
+        usedVertices.push_back(singPair.second);
+        vertexSingularPositions.push_back(std::make_pair(singPair.first, 1.0));
+        vertexSingularPositions.push_back(std::make_pair(singPair.second, -1.0));
+        model.setSingularVertexIndices(vertexSingularPositions);
+        FaceData<Vector3> field = computeFaceBasedField(globalGeometry, model);
+        
+        numPairs++;
+    }
 
+    psMesh.addVertexScalarQuantity("vertex singularities", vertexSingularities);
 
     return vertexSingularities;
 
+}
+
+std::pair<int, int> findVertexSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& curl,
+                                            VertexData<double>& gluedTimeFunction, polyscope::SurfaceMesh& psMesh){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh; 
+  
+    //find vertex with max abs curl
+    double maxAbsCurl = -DBL_MAX;
+    int maxVertex = -1;
+
+    for (Vertex v : globalMesh.vertices()){
+        if (std::find(usedVertices.begin(), usedVertices.end(), v.getIndex()) != usedVertices.end()) continue;//don't use vertices we've already used 
+        if (std::abs(curl[v]) > maxAbsCurl){
+            maxAbsCurl = curl[v];
+            maxVertex = v.getIndex();
+        }
+    }
+
+    VertexData<double> globalTimeFunction = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, gluedTimeFunction, globalToGluedVertexMap);
+    double isoVal = globalTimeFunction[globalMesh.vertex(maxVertex)];
+
+    Eigen::MatrixXd iV;
+    Eigen::MatrixXd iE;
+    std::vector<int> f;
+    std::tie(iV, iE, f) = getTimeFunctionIsoLine(globalGeometry, globalTimeFunction, isoVal);
+    polyscope::registerCurveNetwork("vertex isoline", iV, iE);
+    
+
+    //find singularity of similar curl but opposite sign
+    double minDiff = DBL_MAX;
+    int minVertex = -1;
+    for (int i = 0; i < f.size(); i++){
+        //find the face where the average isoval is nearest the current isoval 
+        Face currFace = globalMesh.face(f[i]);
+        for (Vertex v : currFace.adjacentVertices()){
+            if (maxAbsCurl * curl[v] < 0){//max abs curl and curl on current vertex differ in sign
+                double diffSignCurl = std::fabs(curl[v]);
+                if (std::fabs(maxAbsCurl - diffSignCurl) < minDiff){
+                    minDiff = std::fabs(maxAbsCurl - diffSignCurl);
+                    minVertex = v.getIndex();
+                }
+            }
+        }
+    }
+    
+    if (curl[maxVertex] > 0 && curl[minVertex] < 0){
+        return std::make_pair(maxVertex, minVertex);
+    }
+    else{
+        return std::make_pair(minVertex, maxVertex);
+    }
 }

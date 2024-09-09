@@ -60,3 +60,7 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeomet
 VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, Model& model, 
                                                 VertexData<double>& gluedTimeFunction, std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, std::vector<bool>& orientations
                                                 , std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
+
+//find max/min vertex singularity pair from vertex
+std::pair<int, int> findVertexSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& curl,
+                                            VertexData<double>& gluedTimeFunction, polyscope::SurfaceMesh& psMesh);
