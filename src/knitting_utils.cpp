@@ -868,13 +868,35 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polysc
 }
 
 
-//compute a face-based field through the optimization 
+//compute a edge-based field through the optimization
 //here the singularities are placed on the vertices
-FaceData<Vector3> computeFaceBasedField(VertexPositionGeometry& globalGeometry, Model& model){
+EdgeData<double> computeVertexSingularityField(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& vertexMap){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
-    FaceData<Vector3> field(globalMesh);
-    globalGeometry.requireFaceAreas();
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    EdgeData<double> oneForm(gluedMesh);
+
+    //query information from the model 
+    std::vector<int> bdyEdges = model.getBdyEdges();
+    std::vector<std::vector<double>> waleBdyPathConstraints = model.getWaleBdyPathConstraints();
+    gluedGeometry.requireDECOperators();
+    Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
+    std::vector<std::pair<int, int>> singularFaceIndices = model.getSingularFaces();
+    std::vector<int> faceIndices = model.getFaceIndices();
+    double period = model.getPeriod();
+    bool hasIntegrabilityConstraint = model.getIntegrabilityConstraint();
+    std::vector<std::pair<int, int>> singularEdges = model.getSingularEdges();
+
+    //build the gradient operator 
+    Eigen::MatrixXd V(gluedMesh.nVertices(), 3);
+    Eigen::MatrixXi F(gluedMesh.nFaces(), 3);
+    std::tie(V, F) = getVertexPositionsandFaceLists(globalGeometry);
+    // Compute the global gradient operator: #F*3 by #V
+    Eigen::SparseMatrix<double> grad;
+    igl::grad(V,F,grad);
+    Eigen::SparseMatrix<double, Eigen::RowMajor> G(grad);
+    //require the face areas
+    gluedGeometry.requireFaceAreas();
 
     try {
         // Create an environment
@@ -888,12 +910,91 @@ FaceData<Vector3> computeFaceBasedField(VertexPositionGeometry& globalGeometry, 
         //set the timeout
         model.getEnv().set(GRB_DoubleParam_TimeLimit, 60);
         model.getEnv().set(GRB_IntParam_OutputFlag, 0);
-        std::vector<std::array<GRBVar, 3>> W(globalMesh.nFaces());
-        for (Face f : globalMesh.faces()){
-            std::array<GRBVar, 3> grad = {model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS), model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS),
-                                            model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS)};
+
+        std::vector<GRBVar> sigma;
+        for (size_t i = 0; i < gluedMesh.nEdges(); i++){
+            GRBVar sigma_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS);
+            //add gurobi vars
+            sigma.push_back(sigma_i);//decision variables
+        }
+
+        //add boundary integral variable for wale direction stripes 
+        std::vector<GRBVar> waleBdyIntegerConstraints;
+        for (size_t i = 0; i < waleBdyPathConstraints.size(); i++){
+            GRBVar k_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_INTEGER);
+            waleBdyIntegerConstraints.push_back(k_i);
+        }
+
+        //first constraint - sigma at boundary edges should be 0
+        for (int bdy_edge_index : bdyEdges){
+            model.addConstr(sigma[bdy_edge_index] == 0.0, "Boundary Constraint");
+        }
+
+        //compute nP over every face 
+        //add the second constraint while we're here
+        //second constraint - (d1*sigma) == kP, P is period of optimization, k \in \mathbb{Z}
+        std::vector<GRBLinExpr> nP(gluedMesh.nFaces());
+        for (int r = 0; r < gluedMesh.nFaces(); ++r){
+            GRBLinExpr nPCurr = 0;
+            GRBLinExpr lhs = 0.0;
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(d_one, r); it; ++it) {
+                nPCurr += it.value() * sigma[it.col()];
+                lhs += it.value() * sigma[it.col()];
+            }
+            nP[r] = nPCurr;
+            //integrability constraint
+            if (hasIntegrabilityConstraint){
+                if (faceIndices.size() == 0){//no face indices specified, either set it to 0, or do MIP search
+                    model.addConstr(lhs == 0, "Integral Constraint");
+                    //model.addConstr(lhs == period * k[r], "Integral Constraint");
+                }
+                else{
+                    model.addConstr(lhs == period * faceIndices[r], "Integral Constraint");
+                }
+            }
+        }
+
+        //third constraint 
+        //edge constraints for singularities at vertices 
+        for (std::pair <int, int> p : singularEdges){
             
         }
+
+        //compute a piecewise linear function over the vertices of the mesh 
+        std::vector<GRBLinExpr> u(gluedMesh.nVertices());
+        std::vector<GRBLinExpr> uGluedHalfedge(gluedMesh.nHalfedges());
+        std::vector<std::vector<GRBLinExpr>> gradU(gluedMesh.nFaces(), std::vector<GRBLinExpr>(3));
+        for (Face f : gluedMesh.faces()){
+            int signhIJ = f.halfedge().orientation() ? 1 : -1;
+            int signhJK = f.halfedge().next().orientation() ? 1 : -1;
+            u[f.halfedge().vertex().getIndex()] = 0.0;
+            uGluedHalfedge[f.halfedge().getIndex()] = 0.0;
+            u[f.halfedge().next().vertex().getIndex()] = (signhIJ * sigma[f.halfedge().edge().getIndex()]) - (nP[f.getIndex()]/3.0);
+            uGluedHalfedge[f.halfedge().next().getIndex()] = (signhIJ * sigma[f.halfedge().edge().getIndex()]) - (nP[f.getIndex()]/3.0);
+            u[f.halfedge().next().next().vertex().getIndex()] = (signhIJ * sigma[f.halfedge().edge().getIndex()] + signhJK * sigma[f.halfedge().next().edge().getIndex()]) - ((2.0 * nP[f.getIndex()])/3.0);
+            uGluedHalfedge[f.halfedge().next().next().getIndex()] = (signhIJ * sigma[f.halfedge().edge().getIndex()] + signhJK * sigma[f.halfedge().next().edge().getIndex()]) - ((2.0 * nP[f.getIndex()])/3.0);
+            
+            GRBLinExpr currGradU = 0.0;
+            //X component
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex()); it; ++it){
+                currGradU += it.value() * u[vertexMap[it.col()]];
+            }
+            gradU[f.getIndex()][0] = currGradU;
+            currGradU = 0.0;
+            //Y component
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex() + F.rows()); it; ++it){
+                currGradU += it.value() * u[vertexMap[it.col()]];
+            }
+            gradU[f.getIndex()][1] = currGradU;
+            currGradU = 0.0;
+            //Z component 
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex() + 2 * F.rows()); it; ++it){
+                currGradU += it.value() * u[vertexMap[it.col()]];
+            }
+            gradU[f.getIndex()][2] = currGradU;
+        }
+
+        
 
     }
     catch(GRBException e) {
@@ -905,5 +1006,5 @@ FaceData<Vector3> computeFaceBasedField(VertexPositionGeometry& globalGeometry, 
 
 
 
-    return field;
+    return oneForm;
 }

@@ -8,6 +8,7 @@ std::vector<int> usedVertices;
 Eigen::SparseMatrix<double, Eigen::RowMajor> dOne; 
 Eigen::SparseMatrix<double, Eigen::RowMajor> dZero;
 std::map<int, int> globalToGluedVertexMap;
+std::map<int, int> globalToGluedEdgeMap;
 
 //----------------First strategy------------------------//
 //This should reall happen in the intrinsic setting
@@ -508,6 +509,7 @@ VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, Edge
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     std::vector<std::array<double, 3>> gradients = model.getFaceGradients();
     globalToGluedVertexMap = vertexMap;
+    globalToGluedEdgeMap = edgeMap;
     FaceData<Vector3> faceGradients(globalMesh);
     VertexData<double> curl(globalMesh);
     VertexData<int> vertexSingularities(globalMesh);
@@ -532,18 +534,25 @@ VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, Edge
     int numPairs = 0;
     int maxPairs = 1;
 
+
     std::vector<std::pair<int, int>> vertexSingularPositions;
+    std::vector<std::pair<int, int>> singularEdges;
 
     while (numPairs < maxPairs){
-        std::pair<int, int> singPair = findVertexSingularityPair(globalGeometry, gluedGeometry, curl, gluedTimeFunction, psMesh);
-        vertexSingularities[singPair.first] = 1;
-        vertexSingularities[singPair.second] = -1;
-        usedVertices.push_back(singPair.first);
-        usedVertices.push_back(singPair.second);
-        vertexSingularPositions.push_back(std::make_pair(singPair.first, 1.0));
-        vertexSingularPositions.push_back(std::make_pair(singPair.second, -1.0));
+        std::pair<int, int> singVertexPair = findVertexSingularityPair(globalGeometry, gluedGeometry, curl, gluedTimeFunction, psMesh);
+        vertexSingularities[singVertexPair.first] = 1;
+        vertexSingularities[singVertexPair.second] = -1;
+        usedVertices.push_back(singVertexPair.first);
+        usedVertices.push_back(singVertexPair.second);
+        //find singular edges 
+        std::pair<int, int> singularEdgeIndices = findSingularEdges(globalGeometry, gluedGeometry, singVertexPair, gluedOneRingMap, model);
+        singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singularEdgeIndices.first], 1));
+        singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singularEdgeIndices.second], -1));
+        vertexSingularPositions.push_back(std::make_pair(globalToGluedVertexMap[singVertexPair.first], 1.0));
+        vertexSingularPositions.push_back(std::make_pair(globalToGluedVertexMap[singVertexPair.second], -1.0));
         model.setSingularVertexIndices(vertexSingularPositions);
-        FaceData<Vector3> field = computeFaceBasedField(globalGeometry, model);
+        model.setSingularEdges(singularEdges);
+        EdgeData<double> sigmaTilde = computeVertexSingularityField(globalGeometry, gluedGeometry, model, globalToGluedVertexMap);
         
         numPairs++;
     }
@@ -598,10 +607,53 @@ std::pair<int, int> findVertexSingularityPair(VertexPositionGeometry& globalGeom
         }
     }
     
+    //return vertices in the global mesh setting
     if (curl[maxVertex] > 0 && curl[minVertex] < 0){
         return std::make_pair(maxVertex, minVertex);
     }
     else{
         return std::make_pair(minVertex, maxVertex);
     }
+}
+
+std::pair<int, int> findSingularEdges(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, std::pair<int, int>& singVertexPair,
+                                        std::map<int, std::vector<Halfedge>>& gluedOneRingMap, Model& model){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+
+    std::vector<std::array<double, 3>> gradients = model.getFaceGradients();
+    Vertex posSingVertex = globalMesh.vertex(singVertexPair.first);
+    Vertex negSingVertex = globalMesh.vertex(singVertexPair.second);
+    Edge posEdge, negEdge;
+    double minVal = DBL_MAX;
+
+    FaceData<Vector3> faceGradients(globalMesh);
+    for (Face f : globalMesh.faces()){
+        faceGradients[f] = Vector3{gradients[f.getIndex()][0], gradients[f.getIndex()][1], gradients[f.getIndex()][2]};
+    }
+    globalGeometry.requireVertexPositions();
+    for (Halfedge he : gluedOneRingMap[posSingVertex.getIndex()]){
+        //find edge that is most perpendicular to the gradient field for the positive vertex
+        Vector3 e = globalGeometry.vertexPositions[he.tipVertex()] - globalGeometry.vertexPositions[posSingVertex];
+        double dotProd = dot(e, faceGradients[he.face()]);
+        if (std::fabs(dotProd) < minVal){
+            minVal = dotProd;
+            posEdge = he.edge();
+        }
+    }
+
+    minVal = DBL_MAX;
+    for (Halfedge he : gluedOneRingMap[negSingVertex.getIndex()]){
+        //find edge that is most perpendicular to the gradient field for the negative vertex
+        Vector3 e = globalGeometry.vertexPositions[he.tipVertex()] - globalGeometry.vertexPositions[negSingVertex];
+        double dotProd = dot(e, faceGradients[he.face()]);
+        if (std::fabs(dotProd) < minVal){
+            minVal = dotProd;
+            negEdge = he.edge();
+        }
+    }
+
+    return std::make_pair(posEdge.getIndex(), negEdge.getIndex());
+
 }

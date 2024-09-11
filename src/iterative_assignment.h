@@ -64,3 +64,7 @@ VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, Edge
 //find max/min vertex singularity pair from vertex
 std::pair<int, int> findVertexSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& curl,
                                             VertexData<double>& gluedTimeFunction, polyscope::SurfaceMesh& psMesh);
+
+//find max/min singular edge indices
+std::pair<int, int> findSingularEdges(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, std::pair<int, int>& singVertexPair,
+                                        std::map<int, std::vector<Halfedge>>& gluedOneRingMap, Model& model);
