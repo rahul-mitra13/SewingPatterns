@@ -1,6 +1,7 @@
 //file includes
 #include "knitting_utils.h"
 #include "helpers.h"
+#include "stripe_patterns_helpers.h"
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;

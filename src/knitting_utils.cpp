@@ -886,6 +886,7 @@ EdgeData<double> computeVertexSingularityField(VertexPositionGeometry& globalGeo
     double period = model.getPeriod();
     bool hasIntegrabilityConstraint = model.getIntegrabilityConstraint();
     std::vector<std::pair<int, int>> singularEdges = model.getSingularEdges();
+    std::vector<std::array<double, 3>> gradients = model.getFaceGradients();
 
     //build the gradient operator 
     Eigen::MatrixXd V(gluedMesh.nVertices(), 3);
@@ -899,6 +900,8 @@ EdgeData<double> computeVertexSingularityField(VertexPositionGeometry& globalGeo
     gluedGeometry.requireFaceAreas();
 
     try {
+
+        /** 
         // Create an environment
         GRBEnv env = GRBEnv(true);
         env.set("LogFile", "1-form computation.log");
@@ -911,6 +914,7 @@ EdgeData<double> computeVertexSingularityField(VertexPositionGeometry& globalGeo
         model.getEnv().set(GRB_DoubleParam_TimeLimit, 60);
         model.getEnv().set(GRB_IntParam_OutputFlag, 0);
 
+        //defined over halfedges
         std::vector<GRBVar> sigma;
         for (size_t i = 0; i < gluedMesh.nEdges(); i++){
             GRBVar sigma_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS);
@@ -954,26 +958,38 @@ EdgeData<double> computeVertexSingularityField(VertexPositionGeometry& globalGeo
             }
         }
 
-        //third constraint 
-        //edge constraints for singularities at vertices 
-        for (std::pair <int, int> p : singularEdges){
-            
-        }
-
+        std::cout << "Size of singular edges = " << singularEdges.size() << std::endl;
         //compute a piecewise linear function over the vertices of the mesh 
         std::vector<GRBLinExpr> u(gluedMesh.nVertices());
         std::vector<GRBLinExpr> uGluedHalfedge(gluedMesh.nHalfedges());
         std::vector<std::vector<GRBLinExpr>> gradU(gluedMesh.nFaces(), std::vector<GRBLinExpr>(3));
         for (Face f : gluedMesh.faces()){
-            int signhIJ = f.halfedge().orientation() ? 1 : -1;
-            int signhJK = f.halfedge().next().orientation() ? 1 : -1;
+            int signhIJ, signhJK;
+            //for singular edges ensure they have the same sign 
+            //by not taking into account the directionality of the halfedges
+            for (std::pair<int, int> p : singularEdges){
+                if (p.first == f.halfedge().edge().getIndex()){
+                    signhIJ = 1;
+                }
+                else{
+                    signhIJ = f.halfedge().orientation() ? 1 : -1;
+                }
+            }
+            
+            for (std::pair<int, int> p : singularEdges){
+                if (p.first == f.halfedge().next().edge().getIndex()){
+                    signhJK = 1;
+                }
+                else{
+                    signhJK = f.halfedge().next().orientation() ? 1 : -1;
+                }
+            } 
             u[f.halfedge().vertex().getIndex()] = 0.0;
             uGluedHalfedge[f.halfedge().getIndex()] = 0.0;
             u[f.halfedge().next().vertex().getIndex()] = (signhIJ * sigma[f.halfedge().edge().getIndex()]) - (nP[f.getIndex()]/3.0);
             uGluedHalfedge[f.halfedge().next().getIndex()] = (signhIJ * sigma[f.halfedge().edge().getIndex()]) - (nP[f.getIndex()]/3.0);
             u[f.halfedge().next().next().vertex().getIndex()] = (signhIJ * sigma[f.halfedge().edge().getIndex()] + signhJK * sigma[f.halfedge().next().edge().getIndex()]) - ((2.0 * nP[f.getIndex()])/3.0);
             uGluedHalfedge[f.halfedge().next().next().getIndex()] = (signhIJ * sigma[f.halfedge().edge().getIndex()] + signhJK * sigma[f.halfedge().next().edge().getIndex()]) - ((2.0 * nP[f.getIndex()])/3.0);
-            
             GRBLinExpr currGradU = 0.0;
             //X component
             for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex()); it; ++it){
@@ -994,7 +1010,112 @@ EdgeData<double> computeVertexSingularityField(VertexPositionGeometry& globalGeo
             gradU[f.getIndex()][2] = currGradU;
         }
 
-        
+        //set up the difference
+        GRBQuadExpr gradDiff = 0;
+        std::vector<std::array<double, 3>> grads;
+        //store the per face difference 
+        std::vector<GRBQuadExpr> difference(gluedMesh.nFaces());
+        for (Face f : gluedMesh.faces()){
+            GRBQuadExpr diffX = (gradU[f.getIndex()][0] - gradients[f.getIndex()][0]) * (gradU[f.getIndex()][0] - gradients[f.getIndex()][0]);
+            GRBQuadExpr diffY = (gradU[f.getIndex()][1] - gradients[f.getIndex()][1]) * (gradU[f.getIndex()][1] - gradients[f.getIndex()][1]);
+            GRBQuadExpr diffZ = (gradU[f.getIndex()][2] - gradients[f.getIndex()][2]) * (gradU[f.getIndex()][2] - gradients[f.getIndex()][2]);
+            double currArea = gluedGeometry.faceAreas[f];
+            gradDiff += currArea * (diffX + diffY + diffZ);
+            difference[f.getIndex()] = currArea * (diffX + diffY + diffZ);
+        }
+
+        GRBQuadExpr obj = gradDiff;
+
+        model.setObjective(obj, GRB_MINIMIZE);
+        model.optimize(); 
+        std::cout << "Obj: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
+        //put the computed one-form into an edge vector
+        for (Edge e : gluedMesh.edges()){
+            oneForm[e] = sigma[e.getIndex()].get(GRB_DoubleAttr_X);
+        }
+        */
+
+       //reformulate the problem in terms of halfedges 
+        // Create an environment
+        GRBEnv env = GRBEnv(true);
+        env.set("LogFile", "1-form computation.log");
+        env.start();
+
+        // Create an empty model
+        GRBModel model = GRBModel(env);
+
+        //set the timeout
+        model.getEnv().set(GRB_DoubleParam_TimeLimit, 60);
+        model.getEnv().set(GRB_IntParam_OutputFlag, 0);
+
+        //defined over halfedges
+        std::vector<GRBVar> sigma;
+        for (size_t i = 0; i < gluedMesh.nHalfedges(); i++){
+            GRBVar sigma_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS);
+            //add gurobi vars
+            sigma.push_back(sigma_i);//decision variables
+        }
+
+        //add boundary integral value for wale direction stripes
+        std::vector<GRBVar> waleBdyIntegerConstraints;
+        for (size_t i = 0; i < waleBdyPathConstraints.size(); i++){
+            GRBVar k_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_INTEGER);
+            waleBdyIntegerConstraints.push_back(k_i);
+        }
+
+        //first constraint - sigma at boundary edges should be 0
+        for (int bdy_edge_index : bdyEdges){
+            model.addConstr(sigma[gluedMesh.edge(bdy_edge_index).halfedge().getIndex()] == 0.0, "Boundary Constraint");
+            model.addConstr(sigma[gluedMesh.edge(bdy_edge_index).halfedge().twin().getIndex()] == 0.0, "Boundary Constraint");
+        }
+
+        //compute nP over every face 
+        //add the second constraint while we're here
+        //second constraint - (d1*sigma) == kP, P is period of optimization, k \in \mathbb{Z}
+        std::vector<GRBLinExpr> nP(gluedMesh.nFaces());
+        for (Face f : gluedMesh.faces()){
+            GRBLinExpr lhs = 0.0;
+            Halfedge hij = f.halfedge();
+            Halfedge hjk = hij.next();
+            Halfedge hki = hjk.next();
+            nP[f.getIndex()] = sigma[hij.getIndex()] + sigma[hjk.getIndex()] + sigma[hki.getIndex()];
+            lhs = sigma[hij.getIndex()] + sigma[hjk.getIndex()] + sigma[hki.getIndex()];
+            model.addConstr(lhs == 0.0);
+        }
+
+        //third constraint 
+        //ensure that values are opposite sign across halfedges
+        //if it's not a singular halfedge 
+        for (Halfedge he : gluedMesh.halfedges()){
+            for (std::pair<int, int> p : singularEdges){
+                if (he.edge().getIndex() == p.first){
+                    model.addConstr(sigma[he.getIndex()] == 1.0 - sigma[he.twin().getIndex()]);
+                }
+                else{
+                    model.addConstr(sigma[he.getIndex()] == -1.0 * sigma[he.twin().getIndex()]);
+                }
+            }
+        }
+
+        //fourth constraint 
+        //add constraints in the wale direction
+        for (int i = 0; i < waleBdyPathConstraints.size(); i++){
+            std::vector<double> path = waleBdyPathConstraints[i];
+            GRBLinExpr pathIntegral = 0;
+            std::vector<double> hePath(gluedMesh.nHalfedges(), 0.0);
+            for (int j = 0; j < gluedMesh.nEdges(); j++){
+                if (path[j] > 0){
+                    hePath[gluedMesh.edge(i).halfedge().getIndex()] = path[j];
+                }
+                else if (path[j] < 0){
+                    hePath[gluedMesh.edge(i).halfedge().twin().getIndex()] = path[j];
+                }
+            }
+            for (int k = 0; k < gluedMesh.nHalfedges(); k++){
+                pathIntegral += hePath[k] * sigma[k];
+            }
+            model.addConstr(pathIntegral == period * waleBdyIntegerConstraints[i]);
+        }
 
     }
     catch(GRBException e) {

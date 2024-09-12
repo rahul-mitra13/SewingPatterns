@@ -537,6 +537,7 @@ VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, Edge
 
     std::vector<std::pair<int, int>> vertexSingularPositions;
     std::vector<std::pair<int, int>> singularEdges;
+    std::vector<int> singularEdgesViz(globalMesh.nEdges(), 0);
 
     while (numPairs < maxPairs){
         std::pair<int, int> singVertexPair = findVertexSingularityPair(globalGeometry, gluedGeometry, curl, gluedTimeFunction, psMesh);
@@ -548,15 +549,30 @@ VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, Edge
         std::pair<int, int> singularEdgeIndices = findSingularEdges(globalGeometry, gluedGeometry, singVertexPair, gluedOneRingMap, model);
         singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singularEdgeIndices.first], 1));
         singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singularEdgeIndices.second], -1));
+        singularEdgesViz[singularEdgeIndices.first] = 1; 
+        singularEdgesViz[singularEdgeIndices.second] = -1;
         vertexSingularPositions.push_back(std::make_pair(globalToGluedVertexMap[singVertexPair.first], 1.0));
         vertexSingularPositions.push_back(std::make_pair(globalToGluedVertexMap[singVertexPair.second], -1.0));
         model.setSingularVertexIndices(vertexSingularPositions);
         model.setSingularEdges(singularEdges);
         EdgeData<double> sigmaTilde = computeVertexSingularityField(globalGeometry, gluedGeometry, model, globalToGluedVertexMap);
+        EdgeData<double> sigmaTildeGlobal = convertGluedToGlobalEdgeFunction(globalGeometry, gluedGeometry, sigmaTilde, globalToGluedEdgeMap);
+  
+        //global data
+        CornerData<double> stripeValuesSigmaCourse;
+        //global data
+        FaceData<int> stripeIndicesSigmaCourse;
+        std::vector<Vector3> positionsCourse;
+        std::vector<std::array<int, 2>> edgesCourse;
+        std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaTilde, model.getPeriod());
+        std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, model.getPeriod());
+        auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns (vertex singularities)", positionsCourse, edgesCourse);
+        courseStripes -> setRadius(0.001);
         
         numPairs++;
     }
 
+    psMesh.addEdgeScalarQuantity("edge singularities", singularEdgesViz);
     psMesh.addVertexScalarQuantity("vertex singularities", vertexSingularities);
 
     return vertexSingularities;
@@ -626,7 +642,7 @@ std::pair<int, int> findSingularEdges(VertexPositionGeometry& globalGeometry, Ed
     Vertex posSingVertex = globalMesh.vertex(singVertexPair.first);
     Vertex negSingVertex = globalMesh.vertex(singVertexPair.second);
     Edge posEdge, negEdge;
-    double minVal = DBL_MAX;
+    double maxVal = DBL_MIN;
 
     FaceData<Vector3> faceGradients(globalMesh);
     for (Face f : globalMesh.faces()){
@@ -634,22 +650,22 @@ std::pair<int, int> findSingularEdges(VertexPositionGeometry& globalGeometry, Ed
     }
     globalGeometry.requireVertexPositions();
     for (Halfedge he : gluedOneRingMap[posSingVertex.getIndex()]){
-        //find edge that is most perpendicular to the gradient field for the positive vertex
+        //find edge that is most aligned to the gradient field for the positive vertex
         Vector3 e = globalGeometry.vertexPositions[he.tipVertex()] - globalGeometry.vertexPositions[posSingVertex];
         double dotProd = dot(e, faceGradients[he.face()]);
-        if (std::fabs(dotProd) < minVal){
-            minVal = dotProd;
+        if (dotProd > maxVal){
+            maxVal = dotProd;
             posEdge = he.edge();
         }
     }
 
-    minVal = DBL_MAX;
+    maxVal = DBL_MIN;
     for (Halfedge he : gluedOneRingMap[negSingVertex.getIndex()]){
-        //find edge that is most perpendicular to the gradient field for the negative vertex
+        //find edge that is most aligned to the gradient field for the negative vertex
         Vector3 e = globalGeometry.vertexPositions[he.tipVertex()] - globalGeometry.vertexPositions[negSingVertex];
         double dotProd = dot(e, faceGradients[he.face()]);
-        if (std::fabs(dotProd) < minVal){
-            minVal = dotProd;
+        if (dotProd > maxVal){
+            maxVal = dotProd;
             negEdge = he.edge();
         }
     }
