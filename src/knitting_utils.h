@@ -90,7 +90,6 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
 EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& vertexMap, std::map<int, int>& edgeMap,
                                         polyscope::SurfaceMesh& psMesh);
 
-
 //compute a face-based field through the optimization 
 //here the singularities are placed on the vertices
 HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& vertexMap);
