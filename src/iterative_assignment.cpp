@@ -555,20 +555,18 @@ VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, Edge
         vertexSingularPositions.push_back(std::make_pair(globalToGluedVertexMap[singVertexPair.second], -1.0));
         model.setSingularVertexIndices(vertexSingularPositions);
         model.setSingularEdges(singularEdges);
-        EdgeData<double> sigmaTilde = computeVertexSingularityField(globalGeometry, gluedGeometry, model, globalToGluedVertexMap);
-        EdgeData<double> sigmaTildeGlobal = convertGluedToGlobalEdgeFunction(globalGeometry, gluedGeometry, sigmaTilde, globalToGluedEdgeMap);
-  
+        //sigmaTilde in the glued mesh setting
+        HalfedgeData<double> sigmaTilde = computeVertexSingularityField(globalGeometry, gluedGeometry, model, globalToGluedVertexMap);
         //global data
-        CornerData<double> stripeValuesSigmaCourse;
+        CornerData<double> stripeValuesSigmaTilde;
         //global data
-        FaceData<int> stripeIndicesSigmaCourse;
-        std::vector<Vector3> positionsCourse;
-        std::vector<std::array<int, 2>> edgesCourse;
-        std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaTilde, model.getPeriod());
-        std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, model.getPeriod());
-        auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns (vertex singularities)", positionsCourse, edgesCourse);
-        courseStripes -> setRadius(0.001);
-        
+        FaceData<int> stripeIndicesSigmaTilde;
+        std::vector<Vector3> positions;
+        std::vector<std::array<int, 2>> edges;
+        std::tie(stripeValuesSigmaTilde, stripeIndicesSigmaTilde) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaTilde, model.getPeriod());
+        std::tie(positions, edges) = generateIsoLines(globalGeometry, stripeValuesSigmaTilde, stripeIndicesSigmaTilde, model.getPeriod());
+        auto stripes = polyscope::registerCurveNetwork("vertex singularity stripes", positions, edges);
+        stripes -> setRadius(0.001);    
         numPairs++;
     }
 

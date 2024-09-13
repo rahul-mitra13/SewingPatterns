@@ -92,7 +92,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
 
 //compute a face-based field through the optimization 
 //here the singularities are placed on the vertices
-EdgeData<double> computeVertexSingularityField(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& vertexMap);
+HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& vertexMap);
 
 //compute \omega i.e., the 1-form we're trying to match over each edge 
 //

@@ -102,7 +102,7 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
 }
 
 //carry out the integration in the glued mesh setting
-//sigma is defined over the glued mesh 
+//sigma is defined over the EDGES of glued mesh 
 std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& sigma, float period){
 
   SurfaceMesh& globalMesh = globalGeometry.mesh; 
@@ -176,6 +176,90 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
     double sigma_ij = sigma_halfedges[hij];
     double sigma_jk = sigma_halfedges[hjk];
     double sigma_ki = sigma_halfedges[hki];
+
+    //compute alpha values at triangle corners
+    double alphaI = sigma_mod[f.halfedge().vertex()];
+    double alphaJ = alphaI + sigma_ij;
+    double alphaK = alphaJ + sigma_jk;
+    double alphaL = alphaK + sigma_ki;
+    // store the coordinates in the glued mesh 
+    textureCoordinates[hij.corner()] = alphaI;
+    textureCoordinates[hjk.corner()] = alphaJ;
+    textureCoordinates[hki.corner()] = alphaK;
+    paramIndices[f] = std::round((alphaL - alphaI) / (period));
+
+    //store the coordiantes in the global mesh 
+    textureCoordinatesGlobal[globalMesh.face(f.getIndex()).halfedge().corner()] = alphaI; 
+    textureCoordinatesGlobal[globalMesh.face(f.getIndex()).halfedge().next().corner()] = alphaJ; 
+    textureCoordinatesGlobal[globalMesh.face(f.getIndex()).halfedge().next().next().corner()] = alphaK; 
+    paramIndicesGlobal[globalMesh.face(f.getIndex())] = std::round((alphaL - alphaI) / (period));
+  }
+
+  return std::tie(textureCoordinatesGlobal, paramIndicesGlobal);
+}
+
+//carry out the integration in the glued mesh setting
+//sigma is defined over the HALFEDGES of the glued mesh
+std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde, float period){
+
+  SurfaceMesh& globalMesh = globalGeometry.mesh; 
+  SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+
+  //integrate up the sigma values now onto vertices
+  VertexData<double> sigma_mod(gluedMesh); 
+  VertexData<bool> visited(gluedMesh, false);
+  //vertex to start integration
+  Vertex startVertex; 
+  for (Vertex v : gluedMesh.vertices()){
+    //start integrating from a boundary vertex
+    if (v.isBoundary()){
+      startVertex = v;
+      break;
+    }
+  }
+
+  std::queue<Vertex> Q;
+  Q.push(startVertex);
+  // Floating point thing for knit graph
+  sigma_mod[startVertex] = 0.0 + 1e-16;
+  visited[startVertex] = true;
+  while(!Q.empty()){
+    Vertex vi = Q.front(); Q.pop();
+    Halfedge h = vi.halfedge();
+    do{
+      Vertex vj = h.twin().vertex();
+      if (!visited[vj]){
+        sigma_mod[vj] = fmod(sigma_mod[vi] + sigmaTilde[h], period);
+        visited[vj] = true;
+        Q.push(vj);
+      }
+      h = h.twin().next();
+    }
+    while( h != vi.halfedge());
+  }
+
+  //assign texture coordinates to the glued mesh 
+  CornerData<double> textureCoordinates(gluedMesh);
+  FaceData<int> paramIndices(gluedMesh);
+  
+  //assign texture coordinates to the global mesh 
+  CornerData<double> textureCoordinatesGlobal(globalMesh);
+  FaceData<int> paramIndicesGlobal(globalMesh);
+
+  for (Face f : gluedMesh.faces()){
+
+    //skip boundary faces
+    if (f.isBoundaryLoop()) continue;
+    
+    //grab the halfedges
+    Halfedge hij = f.halfedge();
+    Halfedge hjk = hij.next();
+    Halfedge hki = hjk.next();
+
+    //grab the sigmas
+    double sigma_ij = sigmaTilde[hij];
+    double sigma_jk = sigmaTilde[hjk];
+    double sigma_ki = sigmaTilde[hki];
 
     //compute alpha values at triangle corners
     double alphaI = sigma_mod[f.halfedge().vertex()];
