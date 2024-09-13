@@ -541,6 +541,8 @@ VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, Edge
 
     while (numPairs < maxPairs){
         std::pair<int, int> singVertexPair = findVertexSingularityPair(globalGeometry, gluedGeometry, curl, gluedTimeFunction, psMesh);
+        std::cout << "pos singular vertex " << singVertexPair.first << std::endl;
+        std::cout << "neg singular vertex " << singVertexPair.second << std::endl;
         vertexSingularities[singVertexPair.first] = 1;
         vertexSingularities[singVertexPair.second] = -1;
         usedVertices.push_back(singVertexPair.first);
@@ -587,7 +589,7 @@ std::pair<int, int> findVertexSingularityPair(VertexPositionGeometry& globalGeom
     int maxVertex = -1;
 
     for (Vertex v : globalMesh.vertices()){
-        if (std::find(usedVertices.begin(), usedVertices.end(), v.getIndex()) != usedVertices.end()) continue;//don't use vertices we've already used 
+        //if (std::find(usedVertices.begin(), usedVertices.end(), v.getIndex()) != usedVertices.end()) continue;//don't use vertices we've already used 
         if (std::abs(curl[v]) > maxAbsCurl){
             maxAbsCurl = curl[v];
             maxVertex = v.getIndex();

@@ -877,7 +877,7 @@ HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globa
     HalfedgeData<double> oneForm(gluedMesh);
 
 
-    std::cout << "Solving the last model " << std::endl; 
+    std::cout << "Solving the vertex singularity model " << std::endl; 
     std::cout << "------------------------" << std::endl;
 
     //query information from the model 
@@ -958,7 +958,7 @@ HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globa
         EdgeData<int> handled(gluedMesh, 0);
         for (std::pair<int, int> p : singularEdges){
             model.addConstr(sigma[gluedMesh.edge(p.first).halfedge().getIndex()] 
-                                    + sigma[gluedMesh.edge(p.first).halfedge().twin().getIndex()] == p.second * period);
+                                    + sigma[gluedMesh.edge(p.first).halfedge().twin().getIndex()] == -1.0 * p.second * period);
             handled[gluedMesh.edge(p.first)] = 1;
         }
         for (Halfedge he : gluedMesh.halfedges()){

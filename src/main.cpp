@@ -121,8 +121,9 @@ void showStripePatterns(){
   //visualize the 1-form \omega using Whitney interpolation 
   globalPSMesh->addOneFormTangentVectorQuantity("omega0(Whitney)", omegaCourseGlobal, orientations);
   //the 1-form in the glued mesh setting 
-  EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, edgeMap, *globalPSMesh);
-  EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
+  // EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, edgeMap, *globalPSMesh);
+  // EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
+  HalfedgeData<double> sigmaCourseGlued = computeVertexSingularityField(*globalGeometry, *gluedELG, modelCourse, vertexMap);
   
   //global data
   CornerData<double> stripeValuesSigmaCourse;
