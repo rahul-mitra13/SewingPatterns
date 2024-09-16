@@ -92,7 +92,8 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
 
 //compute a face-based field through the optimization 
 //here the singularities are placed on the vertices
-HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& vertexMap);
+HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, polyscope::SurfaceMesh& psMesh, std::map<int, int>& vertexMap,
+                                                  std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
 
 //compute \omega i.e., the 1-form we're trying to match over each edge 
 //

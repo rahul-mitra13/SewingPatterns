@@ -501,8 +501,8 @@ FaceData<int> getGreedySingularityPositions(VertexPositionGeometry& globalGeomet
 //Compute singular vertex indices
 //Eq. 9 from De Goes SIGGRAPH course, "Vector Field Design"
 VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, Model& model, 
-                                                VertexData<double>& gluedTimeFunction, std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, std::vector<bool>& orientations
-                                                , std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
+                                                VertexData<double>& gluedTimeFunction, std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, std::vector<bool>& orientations,
+                                                std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
 
     
     //using global gradients (extrinsic)
@@ -538,11 +538,11 @@ VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, Edge
     std::vector<std::pair<int, int>> vertexSingularPositions;
     std::vector<std::pair<int, int>> singularEdges;
     std::vector<int> singularEdgesViz(globalMesh.nEdges(), 0);
+    HalfedgeData<double> sigmaTilde(globalMesh);
+    FaceData<Vector2> faceVec(globalMesh);
 
     while (numPairs < maxPairs){
         std::pair<int, int> singVertexPair = findVertexSingularityPair(globalGeometry, gluedGeometry, curl, gluedTimeFunction, psMesh);
-        std::cout << "pos singular vertex " << singVertexPair.first << std::endl;
-        std::cout << "neg singular vertex " << singVertexPair.second << std::endl;
         vertexSingularities[singVertexPair.first] = 1;
         vertexSingularities[singVertexPair.second] = -1;
         usedVertices.push_back(singVertexPair.first);
@@ -558,7 +558,8 @@ VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, Edge
         model.setSingularVertexIndices(vertexSingularPositions);
         model.setSingularEdges(singularEdges);
         //sigmaTilde in the glued mesh setting
-        HalfedgeData<double> sigmaTilde = computeVertexSingularityField(globalGeometry, gluedGeometry, model, globalToGluedVertexMap);
+        sigmaTilde = computeVertexSingularityField(globalGeometry, gluedGeometry, model, psMesh, globalToGluedVertexMap, gluedOneRingMap);
+        faceVec = computeFaceBasisVector(globalGeometry, gluedGeometry, sigmaTilde);
         //global data
         CornerData<double> stripeValuesSigmaTilde;
         //global data
@@ -571,7 +572,18 @@ VertexData<int> computeCurlOnVertex(VertexPositionGeometry& globalGeometry, Edge
         stripes -> setRadius(0.001);    
         numPairs++;
     }
+    
+    // Gather vertex tangent spaces
+    globalGeometry.requireFaceTangentBasis();
+    FaceData<Vector3> fBasisX(globalMesh);
+    FaceData<Vector3> fBasisY(globalMesh);
+    for(Face f : globalMesh.faces()) {
+        fBasisX[f] = globalGeometry.faceTangentBasis[f][0];
+        fBasisY[f] = globalGeometry.faceTangentBasis[f][1];
+        //std::cout << "value of field = " << faceVec[f] << std::endl;
+    }
 
+    psMesh.addFaceTangentVectorQuantity("vertex tangent field", faceVec, fBasisX, fBasisY);
     psMesh.addEdgeScalarQuantity("edge singularities", singularEdgesViz);
     psMesh.addVertexScalarQuantity("vertex singularities", vertexSingularities);
 
@@ -671,5 +683,38 @@ std::pair<int, int> findSingularEdges(VertexPositionGeometry& globalGeometry, Ed
     }
 
     return std::make_pair(posEdge.getIndex(), negEdge.getIndex());
+
+}
+
+//compute the face basis vector of the 1-form using Whitney interpolation 
+FaceData<Vector2> computeFaceBasisVector(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+
+    //sigmaTilde in the global mesh setting
+    HalfedgeData<double> sigmaTildeGlobal(globalMesh);
+    FaceData<Vector2> vecField(globalMesh);
+    HalfedgeData<double> formValues(globalMesh);
+    HalfedgeData<Vector3> vecValues(globalMesh);
+
+    globalGeometry.requireFaceAreas();
+    globalGeometry.requireFaceNormals();
+    globalGeometry.requireFaceTangentBasis();
+
+    for (Face f : gluedMesh.faces()){
+        for (Halfedge he : f.adjacentHalfedges()){
+            formValues[he] = sigmaTilde[f.halfedge()];
+            Vector3 heVec = globalGeometry.vertexPositions[he.tipVertex()] - globalGeometry.vertexPositions[he.tailVertex()];
+            vecValues[he] = cross(heVec, globalGeometry.faceNormals[f]);
+            // Whitney interpolation at center
+            Vector3 result{0., 0., 0.};
+            result += formValues[he] * vecValues[he];
+            result /= static_cast<float>(6. * globalGeometry.faceAreas[f]);
+            vecField[f] = {dot(result, globalGeometry.faceTangentBasis[f][0]), dot(result, globalGeometry.faceTangentBasis[f][1])};
+        }
+    }
+
+    return vecField;
 
 }

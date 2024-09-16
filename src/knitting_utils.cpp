@@ -870,7 +870,9 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polysc
 
 //compute a edge-based field through the optimization
 //here the singularities are placed on the vertices
-HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& vertexMap){
+HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, 
+                                                    polyscope::SurfaceMesh& psMesh, std::map<int, int>& vertexMap,
+                                                    std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
@@ -957,12 +959,13 @@ HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globa
         //if it's not a singular halfedge 
         EdgeData<int> handled(gluedMesh, 0);
         for (std::pair<int, int> p : singularEdges){
+            //invert the sign of the constraint
             model.addConstr(sigma[gluedMesh.edge(p.first).halfedge().getIndex()] 
                                     + sigma[gluedMesh.edge(p.first).halfedge().twin().getIndex()] == -1.0 * p.second * period);
             handled[gluedMesh.edge(p.first)] = 1;
         }
         for (Halfedge he : gluedMesh.halfedges()){
-            if (handled[he.edge()]) continue; 
+            if (handled[he.edge()]) continue; //if the halfedge is already handled
             model.addConstr(sigma[he.getIndex()] == -1.0 * sigma[he.twin().getIndex()]);
         }
 
@@ -1038,6 +1041,26 @@ HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globa
         for (Halfedge he : gluedMesh.halfedges()){
             oneForm[he] = sigma[he.getIndex()].get(GRB_DoubleAttr_X);
         }
+
+        FaceData<Vector3> gradientU(gluedMesh);
+        VertexData<double> curl(globalMesh);
+        for (Face f : gluedMesh.faces()){
+            std::array<double, 3> currGrad = {gradU[f.getIndex()][0].getValue(), gradU[f.getIndex()][1].getValue(), gradU[f.getIndex()][2].getValue()};
+            gradientU[f.getIndex()] = Vector3{currGrad[0], currGrad[1], currGrad[2]};
+        }
+        for (Vertex vi : globalMesh.vertices()){
+            double sum = 0.0;
+            for (Halfedge he : gluedOneRingMap[vi.getIndex()]){
+                Halfedge hjk = he.next();
+                if (!hjk.isInterior()) continue;
+                Vector3 hjkVec = globalGeometry.vertexPositions[hjk.tipVertex()] - globalGeometry.vertexPositions[hjk.tailVertex()];
+                sum += dot(hjkVec, gradientU[globalMesh.face(he.face().getIndex())]);
+            }
+            curl[vi] = sum;
+        }
+        
+        psMesh.addFaceVectorQuantity("gradientU vertex singularity", gradientU);
+        psMesh.addVertexScalarQuantity("vertex curl using gradientU", curl);
 
     }
     catch(GRBException e) {

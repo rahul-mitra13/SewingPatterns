@@ -69,3 +69,6 @@ std::pair<int, int> findVertexSingularityPair(VertexPositionGeometry& globalGeom
 //find max/min singular edge indices
 std::pair<int, int> findSingularEdges(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, std::pair<int, int>& singVertexPair,
                                         std::map<int, std::vector<Halfedge>>& gluedOneRingMap, Model& model);
+
+//compute the face basis vector of the 1-form using Whitney interpolation 
+FaceData<Vector2> computeFaceBasisVector(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde);
