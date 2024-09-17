@@ -74,9 +74,9 @@ void showStripePatterns(){
     edges[e.getIndex()] = edge;
     edgeVectors[e.getIndex()] = globalGeometry->vertexPositions[e.halfedge().tipVertex()] - globalGeometry->vertexPositions[e.halfedge().tailVertex()];
   }
-  auto meshNetwork = polyscope::registerCurveNetwork("Mesh curve network", points, edges);
-  meshNetwork -> setRadius(0.001);
-  meshNetwork -> addEdgeVectorQuantity("Canonical Edge Directions", edgeVectors);
+  //auto meshNetwork = polyscope::registerCurveNetwork("Mesh curve network", points, edges);
+  //meshNetwork -> setRadius(0.001);
+  //meshNetwork -> addEdgeVectorQuantity("Canonical Edge Directions", edgeVectors);
 
   //require the DEC operators
   gluedELG->requireDECOperators();
@@ -91,7 +91,7 @@ void showStripePatterns(){
   //globalPSMesh -> addFaceVectorQuantity("gradient (unnormalized)", timeFunctionGradientGlobal);
   //find boundary edges in the wale direction 
   //doing this here cause the gradient gets rotated later
-  std::vector<int> waleBdyEdges = getWaleBdyEdgesInGluedMesh(*globalGeometry, *gluedELG, timeFunctionGradientGlobal, edgeMap, threshold, *globalPSMesh);
+  //std::vector<int> waleBdyEdges = getWaleBdyEdgesInGluedMesh(*globalGeometry, *gluedELG, timeFunctionGradientGlobal, edgeMap, threshold, *globalPSMesh);
   
   //set up the course optimization 
   Model modelCourse;
@@ -109,7 +109,7 @@ void showStripePatterns(){
   modelCourse.setPeriod(period);
   modelCourse.setBdyEdges(globalBdyConditions.courseBdyEdges);
   //visualize the normalized gradients 
-  globalPSMesh -> addFaceVectorQuantity("gradient (normalized)", timeFunctionGradientGlobal);
+  //globalPSMesh -> addFaceVectorQuantity("gradient (normalized)", timeFunctionGradientGlobal);
 
   EdgeData<double> omegaCourseGlobal = computeMatchingOneForm(*globalGeometry, *globalPSMesh, 0, timeFunctionGradientGlobal, edgeMappingsPairs);
   EdgeData<double> omegaCourseGlued = convertGlobalToGluedEdgeFunction(*globalGeometry, *gluedELG, omegaCourseGlobal, edgeMap);
@@ -117,9 +117,9 @@ void showStripePatterns(){
   std::vector<double> modelMatchingTermsCourse(omegaEig.data(), omegaEig.data() + omegaEig.rows());
   modelCourse.setMatchingTerms(modelMatchingTermsCourse);
   Eigen::VectorXd d1Omega = gluedELG->d1 * omegaEig;
-  globalPSMesh->addFaceScalarQuantity("d1(omega0)", d1Omega);
+  //globalPSMesh->addFaceScalarQuantity("d1(omega0)", d1Omega);
   //visualize the 1-form \omega using Whitney interpolation 
-  globalPSMesh->addOneFormTangentVectorQuantity("omega0(Whitney)", omegaCourseGlobal, orientations);
+  //globalPSMesh->addOneFormTangentVectorQuantity("omega0(Whitney)", omegaCourseGlobal, orientations);
   //the 1-form in the glued mesh setting 
   // EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, edgeMap, *globalPSMesh);
   // EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
@@ -133,117 +133,11 @@ void showStripePatterns(){
   std::vector<std::array<int, 2>> edgesCourse;
   std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, *gluedELG, sigmaCourseGlued, period);
   std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
-  auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns no sings (sigma)", positionsCourse, edgesCourse);
-  courseStripes -> setRadius(0.001);
+  //auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns no sings (sigma)", positionsCourse, edgesCourse);
+  //courseStripes -> setRadius(0.001);
   
-  //set up the wale optimization model
-  /**  
-  Model modelWale; 
-  modelWale.setIntegrabilityConstraint(true);
-  modelWale.setPeriod(period);
-  std::vector<std::array<double, 3>> modelFaceGradientsWale;
-  globalGeometry->requireFaceNormals();
-  for (Face f : globalMesh->faces()){
-    //normalize the gradients first
-    timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
-    timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].rotateAround(globalGeometry->faceNormals[f], PI/2.);
-    std::array<double, 3> gradient = {timeFunctionGradientGlobal[f][0], timeFunctionGradientGlobal[f][1], timeFunctionGradientGlobal[f][2]}; 
-    modelFaceGradientsWale.push_back(gradient);
-  }
-  modelWale.setFaceGradients(modelFaceGradientsWale);
-  modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
-  modelWale.setBdyEdges(waleBdyEdges);
-  //sigma in the glued mesh setting 
-  EdgeData<double> sigmaWaleGlued = computeOneForm(*globalGeometry, *gluedELG, modelWale, vertexMap, *globalPSMesh);
-  EdgeData<double> sigmaWaleGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaWaleGlued, edgeMap);
-  //global data
-  CornerData<double> stripeValuesSigmaWale;
-  //global data
-  FaceData<int> stripeIndicesSigmaWale;
-  std::vector<Vector3> positionsWale;
-  std::vector<std::array<int, 2>> edgesWale;
-  std::tie(stripeValuesSigmaWale, stripeIndicesSigmaWale) = computeStripeValuesFromOneForm(*globalGeometry, *gluedELG, sigmaWaleGlued, period);
-  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, stripeValuesSigmaWale, stripeIndicesSigmaWale, period);
-  auto waleStripes = polyscope::registerCurveNetwork("wale stripe patterns", positionsWale, edgesWale);
-  waleStripes -> setRadius(0.001);
-  */
-
-  //some greedy singularity placement strategies and testing
-  //strategy 2 - use the co-differential 
-  //FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations);
-  //strategy 3 - placing singularities based on max/min curl at regular isoline intervals
-  //FaceData<int> greedySingularities = getGreedySingularityPositions(*globalGeometry, *gluedELG, *globalPSMesh, timeFunctionGlued, d1Omega, vertexMap);
-  //visualizing the found singularities 
-  //globalPSMesh -> addFaceScalarQuantity("greedy singularities", greedySingularities);
-
-  //compute the curl of a face-based vector field
-  //here we can set the intrinsic gradients instead of the extrinsic gradients if desired
-  // std::vector<std::array<double, 3>> intrinsicGradients(gluedELG->mesh.nFaces());
-  //FaceData<Vector3> timeFunctionGradientGlued = computeTimeFunctionFaceGrad(*gluedELG, timeFunctionGlued);
-  // for (Face f : gluedELG -> mesh.faces()){
-  //   intrinsicGradients[f.getIndex()] = std::array{timeFunctionGradientGlued[f][0], timeFunctionGradientGlued[f][1], timeFunctionGradientGlued[f][2]};
-  // }
-  // modelCourse.setFaceGradients(intrinsicGradients);
-  //curl concentrated at vertices
-  VertexData<int> vertexCurl = computeCurlOnVertex(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations, gluedOneRingMap);
-
-  //-----------------------------DEBUGGING STUFF-----------------------------//
-  //visualize ||\sigma - \omega_c||^2 subject to d1 constraints everywhere
-  //numerous hard-coded values here 
-  /**
-  Model modelCourseDebug = modelCourse;
-  modelCourseDebug.useEdgeAveraging = true; 
-  std::vector<int> faceIndices(globalMesh -> nFaces(), 0);
+  //VertexData<int> vertexCurl = computeCurlOnVertex(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations, gluedOneRingMap);
   
-  //singularity indices on the bent_cylinder 
-  //somehow this also works for bent_cylinder_fat
-  faceIndices[7] = 1; 
-  faceIndices[10] = -1;
-
-  globalPSMesh -> addFaceScalarQuantity("singular faces", faceIndices);
-  modelCourseDebug.setFaceIndices(faceIndices);
-  EdgeData<double> omegaDebugGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourseDebug, vertexMap, edgeMap, *globalPSMesh);
-  EdgeData<double> omegaDebugGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, omegaDebugGlued, edgeMap);
-  //global data
-  CornerData<double> stripeValuesOmegaDebug;
-  //global data
-  FaceData<int> stripeIndicesOmegaDebug;
-  std::vector<Vector3> positionsDebug;
-  std::vector<std::array<int, 2>> edgesDebug;
-  std::tie(stripeValuesOmegaDebug, stripeIndicesOmegaDebug) = computeStripeValuesFromOneForm(*globalGeometry, *gluedELG, omegaDebugGlued, period);
-  std::tie(positionsDebug, edgesDebug) = generateIsoLines(*globalGeometry, stripeValuesOmegaDebug, stripeIndicesOmegaDebug, period);
-  auto debugStripes = polyscope::registerCurveNetwork("debug stripe patterns sings (omega)", positionsDebug, edgesDebug);
-  debugStripes -> setRadius(0.001);
-  globalPSMesh -> addOneFormTangentVectorQuantity("omega with sings (Whitney)", omegaDebugGlobal, orientations);
-  //find the difference with objective 
-  EdgeData<double> difference(*globalMesh);
-  for (Edge e : globalMesh->edges()){
-    difference[e] = (omegaDebugGlobal[e] - omegaCourseGlobal[e]);
-  }
-  globalPSMesh -> addEdgeScalarQuantity("objective difference (omega with sings)", difference);
-    
-  //visualize ||\delta \sigma - \frac{\nabla h}{||\nabla h||}||^2 subject to d1 constraints everywhere 
-  modelCourseDebug.useEdgeAveraging = false; 
-  modelCourseDebug.useFaceDifferenceViz = true;
-  //modelCourseDebug.usePsuedoHarmViz = true;
-  EdgeData<double> sigmaDebugGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourseDebug, vertexMap, edgeMap,*globalPSMesh);
-  EdgeData<double> sigmaDebugGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaDebugGlued, edgeMap);
-  //global data
-  CornerData<double> stripeValuesSigmaDebug;
-  //global data
-  FaceData<int> stripeIndicesSigmaDebug;
-  std::tie(stripeValuesSigmaDebug, stripeIndicesSigmaDebug) = computeStripeValuesFromOneForm(*globalGeometry, *gluedELG, sigmaDebugGlued, period);
-  std::tie(positionsDebug, edgesDebug) = generateIsoLines(*globalGeometry, stripeValuesSigmaDebug, stripeIndicesSigmaDebug, period);
-  debugStripes = polyscope::registerCurveNetwork("debug stripe patterns sings (sigma)", positionsDebug, edgesDebug);
-  debugStripes -> setRadius(0.001);
-  globalPSMesh -> addOneFormTangentVectorQuantity("sigma with sings (Whitney)", sigmaDebugGlobal, orientations);
-
-  //for knit graph generation
-  std::unique_ptr<KnitGraph> graph = std::unique_ptr<KnitGraph>(new KnitGraph(*globalGeometry, *globalPSMesh, period, sigmaCourseGlobal, sigmaCourseGlobal));
-  graph->buildGraph();
-  */
-  
-
 }
 
 // A user-defined callback, for creating control panels (etc)

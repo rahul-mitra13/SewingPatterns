@@ -1059,8 +1059,8 @@ HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globa
             curl[vi] = sum;
         }
         
-        psMesh.addFaceVectorQuantity("gradientU vertex singularity", gradientU);
-        psMesh.addVertexScalarQuantity("vertex curl using gradientU", curl);
+        //psMesh.addFaceVectorQuantity("gradientU vertex singularity", gradientU);
+        //psMesh.addVertexScalarQuantity("vertex curl using gradientU", curl);
 
     }
     catch(GRBException e) {
