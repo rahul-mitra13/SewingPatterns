@@ -187,3 +187,6 @@ EdgeData<double> convertGlobalToGluedEdgeFunction(VertexPositionGeometry& global
 
 //convert function defined on the halfedges of the glued mesh to a function defined on the halfedges of the global mesh 
 HalfedgeData<double> convertGluedToGlobalHalfedgeFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& func, std::map<int, int>& edgeMap);
+
+//draw the mesh curve network 
+void drawMeshCurveNetwork(VertexPositionGeometry& globalGeometry, polyscope::SurfaceMesh& psMesh);

@@ -715,3 +715,26 @@ HalfedgeData<double> convertGluedToGlobalHalfedgeFunction(VertexPositionGeometry
     return globalHalfedgeFunction;
 }
 
+//draw the mesh curve network 
+void drawMeshCurveNetwork(VertexPositionGeometry& globalGeometry, polyscope::SurfaceMesh& psMesh){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+
+    //register the point cloud that is the mesh
+    std::vector<Vector3> points(globalMesh.nVertices());  
+    std::vector<std::array<int, 2>> edges(globalMesh.nEdges());
+    std::vector<Vector3> edgeVectors(globalMesh.nEdges());
+    globalGeometry.requireVertexPositions();
+    for (Vertex v : globalMesh.vertices()){
+        points[v.getIndex()] = globalGeometry.vertexPositions[v];
+    }
+    for (Edge e : globalMesh.edges()){
+        std::array<int, 2> edge = {(int) e.halfedge().tailVertex().getIndex(), (int) e.halfedge().tipVertex().getIndex()};
+        edges[e.getIndex()] = edge;
+        edgeVectors[e.getIndex()] = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
+    }
+    auto meshNetwork = polyscope::registerCurveNetwork("Mesh curve network", points, edges);
+    meshNetwork -> setRadius(0.001);
+    meshNetwork -> addEdgeVectorQuantity("Canonical Edge Directions", edgeVectors);
+}
+

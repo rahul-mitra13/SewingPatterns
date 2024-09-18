@@ -61,22 +61,7 @@ std::vector<bool> orientations;
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
   
-  //register the point cloud that is the mesh
-  std::vector<Vector3> points(globalMesh->nVertices());  
-  std::vector<std::array<int, 2>> edges(globalMesh->nEdges());
-  std::vector<Vector3> edgeVectors(globalMesh->nEdges());
-  globalGeometry->requireVertexPositions();
-  for (Vertex v : globalMesh -> vertices()){
-    points[v.getIndex()] = globalGeometry->vertexPositions[v];
-  }
-  for (Edge e : globalMesh -> edges()){
-    std::array<int, 2> edge = {(int) e.halfedge().tailVertex().getIndex(), (int) e.halfedge().tipVertex().getIndex()};
-    edges[e.getIndex()] = edge;
-    edgeVectors[e.getIndex()] = globalGeometry->vertexPositions[e.halfedge().tipVertex()] - globalGeometry->vertexPositions[e.halfedge().tailVertex()];
-  }
-  //auto meshNetwork = polyscope::registerCurveNetwork("Mesh curve network", points, edges);
-  //meshNetwork -> setRadius(0.001);
-  //meshNetwork -> addEdgeVectorQuantity("Canonical Edge Directions", edgeVectors);
+  //drawMeshCurveNetwork(*globalGeometry, *globalPSMesh);
 
   //require the DEC operators
   gluedELG->requireDECOperators();
@@ -88,6 +73,12 @@ void showStripePatterns(){
   //gradient on the glued/global mesh
   //note that faces have a 1-to-1 mapping from global to glued setting
   FaceData<Vector3> timeFunctionGradientGlobal = computeTimeFunctionFaceGrad(*globalGeometry, timeFunctionGlobal);
+  //normalize the gradient of the timeFunction 
+  FaceData<Vector3> timeFunctionGradientGlobalNormalized(*globalMesh);
+  for (Face f : globalMesh -> faces()){
+    timeFunctionGradientGlobalNormalized[f] = timeFunctionGradientGlobal[f].normalize();
+  }
+  globalPSMesh -> addFaceVectorQuantity("normalized time function gradient", timeFunctionGradientGlobalNormalized);
   //globalPSMesh -> addFaceVectorQuantity("gradient (unnormalized)", timeFunctionGradientGlobal);
   //find boundary edges in the wale direction 
   //doing this here cause the gradient gets rotated later
@@ -122,7 +113,7 @@ void showStripePatterns(){
   //globalPSMesh->addOneFormTangentVectorQuantity("omega0(Whitney)", omegaCourseGlobal, orientations);
   //the 1-form in the glued mesh setting 
   // EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, edgeMap, *globalPSMesh);
-  // EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
+  //EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
   HalfedgeData<double> sigmaCourseGlued = computeVertexSingularityField(*globalGeometry, *gluedELG, modelCourse, *globalPSMesh, vertexMap, gluedOneRingMap);
   
   //global data
@@ -136,7 +127,7 @@ void showStripePatterns(){
   //auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns no sings (sigma)", positionsCourse, edgesCourse);
   //courseStripes -> setRadius(0.001);
   
-  //VertexData<int> vertexCurl = computeCurlOnVertex(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations, gluedOneRingMap);
+  VertexData<int> vertexCurl = computeCurlOnVertex(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations, gluedOneRingMap);
   
 }
 
