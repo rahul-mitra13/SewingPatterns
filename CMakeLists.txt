@@ -117,6 +117,7 @@ add_executable(
         src/helpers.cpp
 	      src/stripe_patterns_helpers.cpp
         src/iterative_assignment.cpp
+        src/experiments.cpp
         src/KnitGraph.cpp
 )
 
