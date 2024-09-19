@@ -617,7 +617,6 @@ std::pair<int, int> findVertexSingularityPair(VertexPositionGeometry& globalGeom
     std::tie(iV, iE, f) = getTimeFunctionIsoLine(globalGeometry, globalTimeFunction, isoVal);
     polyscope::registerCurveNetwork("vertex isoline", iV, iE);
     
-
     //find singularity of similar curl but opposite sign
     double minDiff = DBL_MAX;
     int minVertex = -1;

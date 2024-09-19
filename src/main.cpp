@@ -22,6 +22,7 @@
 #include "knitting_utils.h"
 #include "stripe_patterns_helpers.h"
 #include "iterative_assignment.h"
+#include "experiments.h"
 #include "KnitGraph.h"
 
 using namespace geometrycentral;
@@ -127,8 +128,14 @@ void showStripePatterns(){
   //auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns no sings (sigma)", positionsCourse, edgesCourse);
   //courseStripes -> setRadius(0.001);
   
-  VertexData<int> vertexCurl = computeCurlOnVertex(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations, gluedOneRingMap);
-  
+  //VertexData<int> vertexCurl = computeCurlOnVertex(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations, gluedOneRingMap);
+
+  HalfedgeData<double> sigmaTilde(globalGeometry -> mesh);
+  VertexData<double> vertexSingularities(globalGeometry -> mesh);
+
+  std::tie(sigmaTilde, vertexSingularities) = strategy1Impl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
+                                                                *globalPSMesh, vertexMap, period);
+
 }
 
 // A user-defined callback, for creating control panels (etc)
