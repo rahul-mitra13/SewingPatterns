@@ -23,7 +23,7 @@ std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositio
     //tracking objective values 
     double oldObj;
 
-    int maxPairs = 20;
+    int maxPairs = 5;
     int numPairs = 1;
 
     //compute curl per vertex of gradient field
