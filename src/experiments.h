@@ -17,8 +17,9 @@ using namespace geometrycentral::surface;
 //4. For C_i with largest average ||\frac{\nabla h}{||\nabla h||, search max/min singularities and insert 
 //5. Stop when ||\delta \sigma - \frac{\nabla h}{||\nabla h}||^2 doesn't decrease any more 
 std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction,
-                                                                    FaceData<Vector3>& globalFaceGradients, std::map<int, std::vector<Halfedge>>& gluedOneRingMap, polyscope::SurfaceMesh& psMesh,
-                                                                    std::map<int, int>& globalToGluedVertexMap, double period);
+                                                                    FaceData<Vector3>& globalFaceGradients, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
+                                                                    std::map<int, int>& globalToGluedVertexMap, std::map<int, int>& globalToGluedEdgeMap,
+                                                                    polyscope::SurfaceMesh& psMesh, globalBoundaryConditions& boundaryConditions, double period);
 
 //compute the per-face gradient of a 1-form
 FaceData<Vector3> computeOneFormFaceGrad(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& sigmaTilde);
@@ -29,5 +30,12 @@ VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, Edg
 
 //find max/min curl vertex for a given isoline 
 std::pair<int, int> findVertexSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& curl,
-                                            VertexData<double>& gluedTimeFunction, polyscope::SurfaceMesh& psMesh, std::map<int, int>& globalToGluedVertexMap, 
-                                            double isoVal, bool useAllVertices);
+                                            VertexData<double>& gluedTimeFunction, polyscope::SurfaceMesh& psMesh, std::map<int, int>& globalToGluedVertexMap,
+                                            std::vector<double>& usedIsoVals, double isoVal, bool useAllVertices);
+
+//solve the optimization problem for strategy 1
+std::tuple<HalfedgeData<double>, double> computeStrategy1_oneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& globalToGluedVertexMap);
+
+//find the isoval with max average deviation from \frac{\nabla h}{||h||}
+double findIsoValWithMaxDeviation(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, FaceData<Vector3>& gradSigmaTilde, FaceData<Vector3>& globalFaceGradients,
+                                VertexData<double>& gluedTimeFunction, std::vector<double>& usedIsoVals, std::map<int, int>& globalToGluedVertexMap);

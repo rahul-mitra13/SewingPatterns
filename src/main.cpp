@@ -115,7 +115,7 @@ void showStripePatterns(){
   //the 1-form in the glued mesh setting 
   // EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, edgeMap, *globalPSMesh);
   //EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
-  HalfedgeData<double> sigmaCourseGlued = computeVertexSingularityField(*globalGeometry, *gluedELG, modelCourse, *globalPSMesh, vertexMap, gluedOneRingMap);
+  //HalfedgeData<double> sigmaCourseGlued = computeVertexSingularityField(*globalGeometry, *gluedELG, modelCourse, *globalPSMesh, vertexMap, gluedOneRingMap);
   
   //global data
   CornerData<double> stripeValuesSigmaCourse;
@@ -123,8 +123,8 @@ void showStripePatterns(){
   FaceData<int> stripeIndicesSigmaCourse;
   std::vector<Vector3> positionsCourse;
   std::vector<std::array<int, 2>> edgesCourse;
-  std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, *gluedELG, sigmaCourseGlued, period);
-  std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
+  //std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, *gluedELG, sigmaCourseGlued, period);
+  //std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
   //auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns no sings (sigma)", positionsCourse, edgesCourse);
   //courseStripes -> setRadius(0.001);
   
@@ -134,7 +134,7 @@ void showStripePatterns(){
   VertexData<double> vertexSingularities(globalGeometry -> mesh);
 
   std::tie(sigmaTilde, vertexSingularities) = strategy1Impl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
-                                                                *globalPSMesh, vertexMap, period);
+                                                            vertexMap, edgeMap, *globalPSMesh, globalBdyConditions, period);
 
 }
 
