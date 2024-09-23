@@ -22,7 +22,7 @@ std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositio
                                                                     polyscope::SurfaceMesh& psMesh, globalBoundaryConditions& boundaryConditions, double period);
 
 //compute the per-face gradient of a 1-form
-FaceData<Vector3> computeOneFormFaceGrad(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& sigmaTilde);
+FaceData<Vector3> computeOneFormFaceGrad(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde);
 
 //compute curl per vertex using the curl discretization from De Goes SIGGRAPH notes
 VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
@@ -39,3 +39,11 @@ std::tuple<HalfedgeData<double>, double> computeStrategy1_oneForm(VertexPosition
 //find the isoval with max average deviation from \frac{\nabla h}{||h||}
 double findIsoValWithMaxDeviation(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, FaceData<Vector3>& gradSigmaTilde, FaceData<Vector3>& globalFaceGradients,
                                 VertexData<double>& gluedTimeFunction, std::vector<double>& usedIsoVals, std::map<int, int>& globalToGluedVertexMap);
+
+
+//-------------------------Experiment 2-----------------------------//
+//optimizing min \sum_{{ij} \in E}||\omegaTilde_{ij} - \sigmaTild_{ij}||^2 + \lambda \sum{e \in E}||\sigma_{ij} + \sigma_{ji}||^2
+//visualizing where ||\sigma_{ij} + \sigma_{ji}||^2 is highest 
+void vizEdgeDifference(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
+                        FaceData<Vector3>& globalFaceGradients, polyscope::SurfaceMesh& psMesh, 
+                        globalBoundaryConditions& boundaryConditions, double period);

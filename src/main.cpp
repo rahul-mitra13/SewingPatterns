@@ -127,14 +127,18 @@ void showStripePatterns(){
   //std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
   //auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns no sings (sigma)", positionsCourse, edgesCourse);
   //courseStripes -> setRadius(0.001);
-  
   //VertexData<int> vertexCurl = computeCurlOnVertex(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations, gluedOneRingMap);
 
+  //-------experiment 1---------------//
   HalfedgeData<double> sigmaTilde(globalGeometry -> mesh);
   VertexData<double> vertexSingularities(globalGeometry -> mesh);
-
   std::tie(sigmaTilde, vertexSingularities) = strategy1Impl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
                                                             vertexMap, edgeMap, *globalPSMesh, globalBdyConditions, period);
+
+  //-----experiment 2---------------//
+  vizEdgeDifference(*globalGeometry, *gluedELG,
+                    timeFunctionGradientGlobalNormalized, *globalPSMesh, 
+                    globalBdyConditions, period);
 
 }
 
