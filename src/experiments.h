@@ -28,10 +28,18 @@ FaceData<Vector3> computeOneFormFaceGrad(VertexPositionGeometry& globalGeometry,
 VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
                                         FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
 
+//compute curl per edge in the global setting 
+EdgeData<double> computeEdgeCurl(VertexPositionGeometry& globalGeometry, FaceData<Vector3>& globalFaceGradients);
+
 //find max/min curl vertex for a given isoline 
 std::pair<int, int> findVertexSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& curl,
                                             VertexData<double>& gluedTimeFunction, polyscope::SurfaceMesh& psMesh, std::map<int, int>& globalToGluedVertexMap,
-                                            std::vector<double>& usedIsoVals, double isoVal, bool useAllVertices);
+                                            std::vector<double>& usedIsoVals, double isoVal, int numPairs, bool useAllVertices);
+
+//find max/min curl edge for a given isoline (on global setting)
+std::pair<int, int> findEdgeSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& curl,
+                                            VertexData<double>& gluedTimeFunction, polyscope::SurfaceMesh& psMesh, std::map<int, int>& globalToGluedVertexMap,
+                                            std::vector<double>& usedIsoVals, double isoVal, bool useAllEdges);
 
 //solve the optimization problem for strategy 1
 std::tuple<HalfedgeData<double>, double> computeStrategy1_oneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& globalToGluedVertexMap);
@@ -46,4 +54,4 @@ double findIsoValWithMaxDeviation(VertexPositionGeometry& globalGeometry, EdgeLe
 //visualizing where ||\sigma_{ij} + \sigma_{ji}||^2 is highest 
 void vizEdgeDifference(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
                         FaceData<Vector3>& globalFaceGradients, polyscope::SurfaceMesh& psMesh, 
-                        globalBoundaryConditions& boundaryConditions, double period);
+                        globalBoundaryConditions& boundaryConditions, double period, double lambda);

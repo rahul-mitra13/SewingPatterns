@@ -54,6 +54,10 @@ float period = 1;
 //threshold for constraining wale boundary edges 
 //I don't really like this and need to figure out a better way of doing this
 float threshold = 0.6;
+//optimizing min \sum_{{ij} \in E}||\omegaTilde_{ij} - \sigmaTild_{ij}||^2 + \lambda \sum{e \in E}||\sigma_{ij} + \sigma_{ji}||^2
+//visualizing where ||\sigma_{ij} + \sigma_{ji}||^2 is highest
+//regularization term, \lambda 
+float lambda = 0.0;
 
 //set the permutation of edges and orientations for 1-form viz
 std::vector<size_t> perm;
@@ -138,7 +142,7 @@ void showStripePatterns(){
   //-----experiment 2---------------//
   vizEdgeDifference(*globalGeometry, *gluedELG,
                     timeFunctionGradientGlobalNormalized, *globalPSMesh, 
-                    globalBdyConditions, period);
+                    globalBdyConditions, period, lambda);
 
 }
 
@@ -150,6 +154,8 @@ void callBacks() {
   ImGui::InputFloat("1-form period", &period);
   //there needs to be a better way to constrain wale edges
   ImGui::InputFloat("Threshold", &threshold);
+  //lambda as regularization term in the optimization 
+  ImGui::InputFloat("Regularization term, lambda", &lambda);
 
   if (ImGui::Button("Show Stripe Patterns")){
     showStripePatterns();
