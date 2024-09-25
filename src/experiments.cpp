@@ -107,6 +107,7 @@ std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositio
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
 
+    //FINDING SINGULAR EDGES USING VERTEX CURL
     while (true){
         //gradient of sigmaTilde in the global setting 
         FaceData<Vector3> gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, oldGluedSigmaTilde);
@@ -154,6 +155,8 @@ std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositio
         courseStripes -> setRadius(0.001);
         courseStripes -> setEnabled(false);
     }
+
+    //FINDING SINGULAR EDGES DIRECTLY USING EDGE CURL (HAVE TO WRITE THIS UP)
 
     return std::tie(oldGluedSigmaTilde, vertexSingularities);
 
