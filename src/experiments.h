@@ -18,8 +18,9 @@ using namespace geometrycentral::surface;
 //5. Stop when ||\delta \sigma - \frac{\nabla h}{||\nabla h}||^2 doesn't decrease any more 
 std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction,
                                                                     FaceData<Vector3>& globalFaceGradients, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
-                                                                    std::map<int, int>& globalToGluedVertexMap, std::map<int, int>& globalToGluedEdgeMap,
-                                                                    polyscope::SurfaceMesh& psMesh, globalBoundaryConditions& boundaryConditions, double period);
+                                                                    std::map<int, int>& globalToGluedVertexMap, std::map<int, int>& globalToGluedEdgeMap, 
+                                                                    std::vector<std::pair<int, int>>& edgeMappingsPairs, polyscope::SurfaceMesh& psMesh, 
+                                                                    globalBoundaryConditions& boundaryConditions, double period);
 
 //compute the per-face gradient of a 1-form
 FaceData<Vector3> computeOneFormFaceGrad(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde);
@@ -29,7 +30,8 @@ VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, Edg
                                         FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
 
 //compute curl per edge in the global setting 
-EdgeData<double> computeEdgeCurl(VertexPositionGeometry& globalGeometry, FaceData<Vector3>& globalFaceGradients);
+EdgeData<double> computeEdgeCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
+                                FaceData<Vector3>& globalFaceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs);
 
 //find max/min curl vertex for a given isoline 
 std::pair<int, int> findVertexSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& curl,
@@ -37,9 +39,9 @@ std::pair<int, int> findVertexSingularityPair(VertexPositionGeometry& globalGeom
                                             std::vector<double>& usedIsoVals, double isoVal, int numPairs, bool useAllVertices);
 
 //find max/min curl edge for a given isoline (on global setting)
-std::pair<int, int> findEdgeSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& curl,
+std::pair<int, int> findEdgeSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& curl,
                                             VertexData<double>& gluedTimeFunction, polyscope::SurfaceMesh& psMesh, std::map<int, int>& globalToGluedVertexMap,
-                                            std::vector<double>& usedIsoVals, double isoVal, bool useAllEdges);
+                                            std::vector<double>& usedIsoVals, double isoVal, int numPairs, bool useAllEdges);
 
 //solve the optimization problem for strategy 1
 std::tuple<HalfedgeData<double>, double> computeStrategy1_oneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& globalToGluedVertexMap);
@@ -54,4 +56,5 @@ double findIsoValWithMaxDeviation(VertexPositionGeometry& globalGeometry, EdgeLe
 //visualizing where ||\sigma_{ij} + \sigma_{ji}||^2 is highest 
 void vizEdgeDifference(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
                         FaceData<Vector3>& globalFaceGradients, polyscope::SurfaceMesh& psMesh, 
-                        globalBoundaryConditions& boundaryConditions, double period, double lambda);
+                        globalBoundaryConditions& boundaryConditions, double period, double lambda,
+                        std::map<int,int>& globalToGluedEdgeMap);

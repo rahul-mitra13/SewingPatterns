@@ -796,7 +796,8 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
     return d0_f_avg;
 }
 //compute matching 1-form while taking into account "stitched together" edges
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, int direction, FaceData<Vector3>& faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs){
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, int direction, FaceData<Vector3>& faceGradients, 
+                                    std::vector<std::pair<int, int>>& edgeMappingsPairs){
 
     SurfaceMesh& mesh = geometry.mesh;
     geometry.requireFaceNormals();
@@ -846,7 +847,7 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polysc
                 Vector3 e1 = geometry.vertexPositions[e.halfedge().tipVertex()] - geometry.vertexPositions[e.halfedge().tailVertex()];
                 Vector3 e2 = geometry.vertexPositions[mesh.edge(edgeMap.at(e.getIndex())).halfedge().tipVertex()] 
                                             - geometry.vertexPositions[mesh.edge(edgeMap.at(e.getIndex())).halfedge().tailVertex()];
-                Vector3 avgVector = (e1 + e2)/2.;
+                // Vector3 avgVector = (e1 + e2)/2.;
                 //just pick the original edge as the "canonical" direction in the global mesh
                 //I'm not really sure the polyscope Whitney interpolation scheme is the best way to visualize these
                 //e1 = e1.normalize();

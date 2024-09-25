@@ -705,7 +705,6 @@ HalfedgeData<double> convertGluedToGlobalHalfedgeFunction(VertexPositionGeometry
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     HalfedgeData<double> globalHalfedgeFunction;
     for (Edge e : globalMesh.edges()){
-        //gluedEdgeFunction[edgeMap[e.getIndex()]] = func[e];
         if (e.halfedge().isInterior())
             globalHalfedgeFunction[e.halfedge()] = func[gluedMesh.edge(edgeMap[e.getIndex()]).halfedge()];
         if (e.halfedge().twin().isInterior())

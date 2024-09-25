@@ -30,7 +30,7 @@ using namespace geometrycentral::surface;
 
 //vertex mappings from txt file (between panels)
 std::vector<std::pair<int, int>> vertexMappingsPairs;
-//edge mappings from txt file
+//edge mappings from txt file (between panels)
 std::vector<std::pair<int, int>> edgeMappingsPairs;
 //build an index map from vertices in the original mesh to vertices in the glued mesh 
 std::map<int, int> vertexMap;
@@ -137,12 +137,13 @@ void showStripePatterns(){
   HalfedgeData<double> sigmaTilde(globalGeometry -> mesh);
   VertexData<double> vertexSingularities(globalGeometry -> mesh);
   std::tie(sigmaTilde, vertexSingularities) = strategy1Impl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
-                                                            vertexMap, edgeMap, *globalPSMesh, globalBdyConditions, period);
+                                                            vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
 
   //-----experiment 2---------------//
   vizEdgeDifference(*globalGeometry, *gluedELG,
                     timeFunctionGradientGlobalNormalized, *globalPSMesh, 
-                    globalBdyConditions, period, lambda);
+                    globalBdyConditions, period, lambda,
+                    edgeMap);
 
 }
 
