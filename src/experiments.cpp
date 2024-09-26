@@ -4,7 +4,7 @@
 std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction,
                                                                     FaceData<Vector3>& globalFaceGradients, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
                                                                     std::map<int, int>& globalToGluedVertexMap, std::map<int, int>& globalToGluedEdgeMap, 
-                                                                    std::vector<std::pair<int, int>>& edgeMappingsPairs, polyscope::SurfaceMesh& psMesh, globalBoundaryConditions& boundaryConditions, double period){
+                                                                    polyscope::SurfaceMesh& psMesh, globalBoundaryConditions& boundaryConditions, double period){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
@@ -46,7 +46,8 @@ std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositio
     vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, globalFaceGradients, gluedOneRingMap);
     //compute curl per edge of the gradient field (in the global setting)
     edgeCurl = computeEdgeCurl(globalGeometry, gluedGeometry,
-                                globalFaceGradients, edgeMappingsPairs);
+                                globalFaceGradients, 
+                                globalToGluedEdgeMap);
 
 
 
@@ -61,13 +62,13 @@ std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositio
                                         gluedTimeFunction, psMesh, globalToGluedVertexMap, usedIsoVals, 0.0, numPairs, true);
     
     //find max/min curl edge over entire mesh 
-    // std::pair<int, int> singEdgePair = findEdgeSingularityPair(globalGeometry, gluedGeometry, edgeCurl,
-    //                                     gluedTimeFunction, psMesh, globalToGluedVertexMap, usedIsoVals, 0.0, numPairs, true);
+    std::pair<int, int> singEdgePair = findEdgeSingularityPair(globalGeometry, gluedGeometry, edgeCurl,
+                                        gluedTimeFunction, psMesh, globalToGluedVertexMap, usedIsoVals, 0.0, numPairs, true);
     
     vertexSingularities[globalMesh.vertex(singVertexPair.first)] = 1.0;
     vertexSingularities[globalMesh.vertex(singVertexPair.second)] = -1.0;
-    // edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
-    // edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
+    edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
+    edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
     singularVertices.push_back(std::make_pair(globalToGluedVertexMap[singVertexPair.first], 1.0));
     singularVertices.push_back(std::make_pair(globalToGluedVertexMap[singVertexPair.second], -1.0));
     
@@ -214,60 +215,36 @@ VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, Edg
 
 //compute curl per edge in the global setting 
 EdgeData<double> computeEdgeCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
-                                FaceData<Vector3>& globalFaceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs){
+                                FaceData<Vector3>& globalFaceGradients, std::map<int, int>& globalToGluedEdgeMap){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     EdgeData<double> globalCurl(globalMesh);
     EdgeData<double> gluedCurl(gluedMesh);
 
-    // for (Edge e : globalMesh.edges()){
-    //     Vector3 heVec = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
-    //     Vector3 heTwinVec = globalGeometry.vertexPositions[e.halfedge().tailVertex()] - globalGeometry.vertexPositions[e.halfedge().tipVertex()];
-    //     //consider dividing by cotan weights, edge length, 1/3 * adjacent face areas etc. 
-    //     globalCurl[e] = dot(globalFaceGradients[e.halfedge().face()], heVec) + dot(globalFaceGradients[e.halfedge().twin().face()], heTwinVec);
-    // }
+    HalfedgeData<double> globalOmegaTilde(globalMesh);
+    HalfedgeData<double> gluedOmegaTilde(gluedMesh);
 
-    // gluedCurl = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, globalCurl, globalToGluedEdgeMap);
-
-    //create a map from the mapped edges
-    std::map<int, int> edgeMap;
-    for (std::pair<int, int> pair : edgeMappingsPairs){
-        edgeMap.insert({pair.first, pair.second});
-    }
-
-    //edges which we've handles already
-    std::map<int, bool> seenEdges;
-    for (Edge e : globalMesh.edges()){
-        seenEdges.insert({e.getIndex(), false});
-    }
-
-    for (Edge e : globalMesh.edges()){
-        if (seenEdges[e.getIndex()]) continue;
-        if (e.halfedge().twin().isInterior()){//found an interior halfedge
-            Vector3 heVec = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
-            Vector3 heTwinVec = globalGeometry.vertexPositions[e.halfedge().tailVertex()] - globalGeometry.vertexPositions[e.halfedge().tipVertex()];
-            globalCurl[e] = dot(globalFaceGradients[e.halfedge().face()], heVec) + dot(globalFaceGradients[e.halfedge().twin().face()], heTwinVec);
-            seenEdges[e.getIndex()] = true;
-        }
-        else{//found a boundary halfedge
-            if (edgeMap.find(e.getIndex()) != edgeMap.end()){//found a stitched together edge
-                Vector3 heVec = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
-                Vector3 heTwinVec = globalGeometry.vertexPositions[e.halfedge().tailVertex()] - globalGeometry.vertexPositions[e.halfedge().tipVertex()];
-                globalCurl[e] = dot(globalFaceGradients[e.halfedge().face()], heVec) + 
-                                    dot(globalFaceGradients[globalMesh.edge(edgeMap[e.getIndex()]).halfedge().face()], heTwinVec);
-                globalCurl[globalMesh.edge(edgeMap[e.getIndex()])] = dot(globalFaceGradients[e.halfedge().face()], heVec) + 
-                                    dot(globalFaceGradients[globalMesh.edge(edgeMap[e.getIndex()]).halfedge().face()], heTwinVec);
-                seenEdges[e.getIndex()] = true;
-                seenEdges[edgeMap.at(e.getIndex())] = true;
-            }
-            else{//found a boundary halfedge not stiched to anything 
-                Vector3 heVec = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
-                globalCurl[e] = dot(globalFaceGradients[e.halfedge().face()], heVec);
-                seenEdges[e.getIndex()] = true;
-            }
+    for (Face f : globalMesh.faces()){
+        Vector3 grad = globalFaceGradients[f];
+        for (Halfedge he : f.adjacentHalfedges()){
+            Vector3 heVec = globalGeometry.vertexPositions[he.tipVertex()] - globalGeometry.vertexPositions[he.tailVertex()];
+            //omega tilde in the global setting
+            globalOmegaTilde[he] = dot(heVec, grad);
         }
     }
+
+    for (Face f : gluedMesh.faces()){
+        gluedOmegaTilde[f.halfedge()] = globalOmegaTilde[globalMesh.face(f.getIndex()).halfedge()];
+        gluedOmegaTilde[f.halfedge().next()] = globalOmegaTilde[globalMesh.face(f.getIndex()).halfedge().next()];
+        gluedOmegaTilde[f.halfedge().next().next()] = globalOmegaTilde[globalMesh.face(f.getIndex()).halfedge().next().next()];
+    }
+
+    for (Edge e : gluedMesh.edges()){
+        gluedCurl[e] = gluedOmegaTilde[e.halfedge()] + gluedOmegaTilde[e.halfedge().twin()];
+    }
+
+    globalCurl = convertGluedToGlobalEdgeFunction(globalGeometry, gluedGeometry, gluedCurl, globalToGluedEdgeMap);
 
     return globalCurl;
 

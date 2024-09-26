@@ -137,7 +137,7 @@ void showStripePatterns(){
   HalfedgeData<double> sigmaTilde(globalGeometry -> mesh);
   VertexData<double> vertexSingularities(globalGeometry -> mesh);
   std::tie(sigmaTilde, vertexSingularities) = strategy1Impl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
-                                                            vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
+                                                            vertexMap, edgeMap, *globalPSMesh, globalBdyConditions, period);
 
   //-----experiment 2---------------//
   vizEdgeDifference(*globalGeometry, *gluedELG,

@@ -19,8 +19,7 @@ using namespace geometrycentral::surface;
 std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction,
                                                                     FaceData<Vector3>& globalFaceGradients, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
                                                                     std::map<int, int>& globalToGluedVertexMap, std::map<int, int>& globalToGluedEdgeMap, 
-                                                                    std::vector<std::pair<int, int>>& edgeMappingsPairs, polyscope::SurfaceMesh& psMesh, 
-                                                                    globalBoundaryConditions& boundaryConditions, double period);
+                                                                    polyscope::SurfaceMesh& psMesh, globalBoundaryConditions& boundaryConditions, double period);
 
 //compute the per-face gradient of a 1-form
 FaceData<Vector3> computeOneFormFaceGrad(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde);
@@ -31,7 +30,7 @@ VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, Edg
 
 //compute curl per edge in the global setting 
 EdgeData<double> computeEdgeCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
-                                FaceData<Vector3>& globalFaceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs);
+                                FaceData<Vector3>& globalFaceGradients, std::map<int, int>& globalToGluedEdgeMap);
 
 //find max/min curl vertex for a given isoline 
 std::pair<int, int> findVertexSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& curl,
