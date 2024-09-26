@@ -46,8 +46,13 @@ std::pair<int, int> findEdgeSingularityPair(VertexPositionGeometry& globalGeomet
 std::tuple<HalfedgeData<double>, double> computeStrategy1_oneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& globalToGluedVertexMap);
 
 //find the isoval with max average deviation from \frac{\nabla h}{||h||}
-double findIsoValWithMaxDeviation(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, FaceData<Vector3>& gradSigmaTilde, FaceData<Vector3>& globalFaceGradients,
+double findIsoValWithMaxVertexCurlDeviation(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, FaceData<Vector3>& gradSigmaTilde, FaceData<Vector3>& globalFaceGradients,
                                 VertexData<double>& gluedTimeFunction, std::vector<double>& usedIsoVals, std::map<int, int>& globalToGluedVertexMap);
+
+//find the isoval with max averga curl in the edge setting
+double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& curl, 
+                                            VertexData<double>& gluedTimeFunction, std::vector<double>& usedIsoVals, 
+                                            std::map<int, int>& globalToGluedVertexMap);
 
 
 //-------------------------Experiment 2-----------------------------//
