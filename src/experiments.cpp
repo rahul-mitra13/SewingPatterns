@@ -1044,6 +1044,9 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
                     hePath[gluedMesh.edge(i).halfedge().twin().getIndex()] = path[j];
                 }
             }
+            for (int k = 0; k < gluedMesh.nHalfedges(); k++){
+                pathIntegral += hePath[k] * sigma[k];
+            }
             model.addConstr(pathIntegral == period * edgePathConstraints[i].second);
         }
 
