@@ -1,7 +1,7 @@
 #include "experiments.h"
 
 //--------------------------Implementation of strategy 1---------------------------------------//
-std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction,
+std::tuple<HalfedgeData<double>, EdgeData<double>> strategy1Impl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction,
                                                                     FaceData<Vector3>& globalFaceGradients, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
                                                                     std::map<int, int>& globalToGluedVertexMap, std::map<int, int>& globalToGluedEdgeMap, 
                                                                     polyscope::SurfaceMesh& psMesh, globalBoundaryConditions& boundaryConditions, double period){
@@ -12,7 +12,8 @@ std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositio
     HalfedgeData<double> oldGluedSigmaTilde(gluedMesh);
     HalfedgeData<double> newGluedSigmaTilde(gluedMesh);
     HalfedgeData<double> globalSigmaTilde(globalMesh);
-    double currObj;
+    //tracking objective values
+    double currObj, oldObj;
     //vertex singularities for polyscope viz 
     VertexData<double> vertexSingularities(globalMesh, 0.0);
     //edge singularities for polyscope viz 
@@ -23,12 +24,11 @@ std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositio
     EdgeData<double> edgeCurl(globalMesh);
     //singular vertex indices 
     std::vector<std::pair<int, int>> singularVertices;
-    //singular edges
+    //singular edges for gurobi optimization
     std::vector<std::pair<int, int>> singularEdges;
     //iso values we've placed singularities
     std::vector<double> usedIsoVals;
-    //tracking objective values 
-    double oldObj;
+    
     //striping information 
     //global data
     CornerData<double> stripeValuesSigmaCourse;
@@ -175,12 +175,12 @@ std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositio
                                     gradSigmaTilde[globalMesh.face(f.getIndex())][2]};
         }
         model.setFaceGradients(newGrads);
-        //recompute edge curl
+        //recompute edge curl using gradSigmaTilde
         edgeCurl = computeEdgeCurl(globalGeometry, gluedGeometry, gradSigmaTilde, globalToGluedEdgeMap);
         psMesh.addEdgeScalarQuantity("edge curl after placing " + std::to_string(numPairs) + " singularity pairs", edgeCurl);
         double isoVal = findIsoValWithMaxAvgEdgeCurl(globalGeometry, gluedGeometry, edgeCurl, gluedTimeFunction,
                                                     usedIsoVals, globalToGluedVertexMap);
-        if (std::fabs(isoVal - 0.0) < 1e-15) break;//our function couldn't find any more isovalues
+        if (std::fabs(isoVal - (-1.0) < 1e-15)) break;//our function couldn't find any more isovalues
         std::cout << "next isoval = " << isoVal << std::endl;
         singEdgePair = findEdgeSingularityPair(globalGeometry, gluedGeometry, edgeCurl,
                                         gluedTimeFunction, psMesh, globalToGluedVertexMap, usedIsoVals, isoVal, numPairs, false);
@@ -218,7 +218,7 @@ std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositio
         courseStripes -> setEnabled(false);
     }
     
-    return std::tie(oldGluedSigmaTilde, vertexSingularities);
+    return std::tie(oldGluedSigmaTilde, edgeSingularities);
 
 }
 
@@ -480,10 +480,7 @@ std::tuple<HalfedgeData<double>, double> computeStrategy1_oneForm(VertexPosition
     std::vector<std::vector<double>> waleBdyPathConstraints = gbModel.getWaleBdyPathConstraints();
     gluedGeometry.requireDECOperators();
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
-    std::vector<std::pair<int, int>> singularFaceIndices = gbModel.getSingularFaces();
-    std::vector<int> faceIndices = gbModel.getFaceIndices();
     double period = gbModel.getPeriod();
-    bool hasIntegrabilityConstraint = gbModel.getIntegrabilityConstraint();
     std::vector<std::pair<int, int>> singularEdges = gbModel.getSingularEdges();
     std::vector<std::array<double, 3>> gradients = gbModel.getFaceGradients();
 
@@ -716,11 +713,11 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Edge
     }
 
     double start = 0.1;
-    double stepSize = 0.001;
+    double stepSize = 0.1;
     double end = 1.0;
     double curr = start;
     double maxAvgDeviation = -DBL_MAX;
-    double maxAvgDeviationIsoVal = 0.0;
+    double maxAvgDeviationIsoVal = -1.0;
     double eps = 1e-6;
     bool skipFlag = false;
     globalGeometry.requireFaceAreas();
@@ -866,4 +863,211 @@ void vizEdgeDifference(VertexPositionGeometry& globalGeometry, EdgeLengthGeometr
 
     psMesh.addEdgeScalarQuantity("edge difference", globalEdgeDiff);
 
+}
+
+//------------------------Experiment 3----------------------------//
+//Trying to find a harmonic 1-form in the halfedge optimization setting 
+//use the thus far inserted singular edges (and edge-based curl of zero elsewhere), 
+//enforce face-based curl of zero, and an integral of 1 along some path from either boundary to optimize 
+//for a harmonic (half-edge) one-form subject to the singularity placements; do this at each 
+//iteration and then normalize to find edge-based curl
+std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction,
+                                                                    FaceData<Vector3>& globalFaceGradients, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
+                                                                    std::map<int, int>& globalToGluedVertexMap, std::map<int, int>& globalToGluedEdgeMap, 
+                                                                    polyscope::SurfaceMesh& psMesh, globalBoundaryConditions& boundaryConditions, double period){
+    
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+
+    //curl per edge
+    EdgeData<double> edgeCurl(globalMesh);
+    //striping 1-form quantities
+    HalfedgeData<double> oldGluedSigmaTilde(gluedMesh);
+    HalfedgeData<double> newGluedSigmaTilde(gluedMesh);
+    //edge singularities 
+    EdgeData<double> edgeSingularities(globalMesh);
+    //iso values we've placed singularities
+    std::vector<double> usedIsoVals;
+    //singular edges for gurobi optimization
+    std::vector<std::pair<int, int>> singularEdges;
+    //objective values
+    double oldObj, currObj;
+    //striping information 
+    //global data
+    CornerData<double> stripeValuesSigmaCourse;
+    //global data
+    FaceData<int> stripeIndicesSigmaCourse;
+    std::vector<Vector3> positionsCourse;
+    std::vector<std::array<int, 2>> edgesCourse;
+    //start by specifying bdy-bdy path constraint for non-collapse 
+    Vertex v0 = gluedMesh.vertex(globalToGluedVertexMap[boundaryConditions.courseStartBoundaryVertices[0]]);
+    Vertex v1 = gluedMesh.vertex(globalToGluedVertexMap[boundaryConditions.courseEndBoundaryVertices[1]]);
+    std::vector<Vertex> vertices;
+    std::vector<Edge> edges;
+    std::vector<double> weights; 
+    std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePath(gluedGeometry, v0, v1);
+    std::vector<std::pair<std::vector<double>, double>> edgePathConstraints; 
+    edgePathConstraints.push_back(std::make_pair(weights, 1.0));
+    int numPairs = 0;
+    //compute curl per edge of the gradient field (in the global setting)
+    edgeCurl = computeEdgeCurl(globalGeometry, gluedGeometry,
+                                globalFaceGradients, 
+                                globalToGluedEdgeMap);
+
+    psMesh.addEdgeScalarQuantity("edge curl after placing " + std::to_string(numPairs) + " singularity pairs", edgeCurl);
+
+    //find max/min curl edge over entire mesh 
+    std::pair<int, int> singEdgePair = findEdgeSingularityPair(globalGeometry, gluedGeometry, edgeCurl,
+                                        gluedTimeFunction, psMesh, globalToGluedVertexMap, usedIsoVals, 0.0, numPairs, true);
+    
+    edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
+    edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
+
+    Model model;
+    
+    model.setPeriod(period);
+    model.setBdyEdges(boundaryConditions.courseBdyEdges);
+    //solve the model without any singularities 
+    std::tie(newGluedSigmaTilde, currObj) = computeHarmonic1Form(globalGeometry, gluedGeometry, model, globalToGluedVertexMap);
+    oldObj = currObj;
+    oldGluedSigmaTilde = newGluedSigmaTilde;
+    //first pair of singular edges (edge-curl approach)
+    singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singEdgePair.first], -1));
+    singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singEdgePair.second], 1));
+    model.setSingularEdges(singularEdges);
+    model.setEdgePathConstraints(edgePathConstraints);
+    numPairs++;
+    //psMesh.addVertexScalarQuantity("vertex singularity after inserting " + std::to_string(numPairs) + " singularity pairs", vertexSingularities);
+    psMesh.addEdgeScalarQuantity("edge singularities after inserting " + std::to_string(numPairs) + " singularity pairs", edgeSingularities);
+    //solve the model with 1 pair of singularities
+    std::tie(newGluedSigmaTilde, currObj) = computeHarmonic1Form(globalGeometry, gluedGeometry, model, globalToGluedVertexMap);
+    oldObj = currObj;
+    oldGluedSigmaTilde = newGluedSigmaTilde;
+    std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, oldGluedSigmaTilde, period);
+        std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
+        auto courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numPairs) + 
+                                                    " singularity pairs", positionsCourse, edgesCourse);
+    courseStripes -> setRadius(0.001);
+    courseStripes -> setEnabled(false);
+
+    return std::tie(oldGluedSigmaTilde, edgeSingularities);
+
+}
+
+//solve the optimization problem for the harmonic 1-form
+std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
+                                                                std::map<int, int>& globalToGluedVertexMap){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    HalfedgeData<double> gluedOneForm(gluedMesh);
+
+    double objectiveVal;
+
+    //query information from the model 
+    std::vector<int> bdyEdges = gbModel.getBdyEdges();
+    std::vector<std::pair<std::vector<double>, double>> edgePathConstraints = gbModel.getEdgePathConstraints();
+    gluedGeometry.requireDECOperators();
+    Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
+    double period = gbModel.getPeriod();
+    std::vector<std::pair<int, int>> singularEdges = gbModel.getSingularEdges();
+
+    try {
+        //reformulate the problem in terms of halfedges 
+        // Create an environment
+        GRBEnv env = GRBEnv(true);
+        env.set("LogFile", "1-form computation.log");
+        env.start();
+
+        // Create an empty model
+        GRBModel model = GRBModel(env);
+
+        //set the timeout
+        model.getEnv().set(GRB_DoubleParam_TimeLimit, 60);
+        model.getEnv().set(GRB_IntParam_OutputFlag, 0);
+
+        //defined over halfedges
+        std::vector<GRBVar> sigma;
+        for (size_t i = 0; i < gluedMesh.nHalfedges(); i++){
+            GRBVar sigma_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS);
+            //add gurobi vars
+            sigma.push_back(sigma_i);//decision variables
+        }
+
+        //first constraint - sigma at boundary edges should be 0
+        for (int bdy_edge_index : bdyEdges){
+            model.addConstr(sigma[gluedMesh.edge(bdy_edge_index).halfedge().getIndex()] == 0.0, "Boundary Constraint");
+            model.addConstr(sigma[gluedMesh.edge(bdy_edge_index).halfedge().twin().getIndex()] == 0.0, "Boundary Constraint");
+        }
+
+        //compute nP over every face 
+        //add the second constraint while we're here
+        //second constraint - (d1*sigma) == kP, P is period of optimization, k \in \mathbb{Z}
+        //here it will (d1 * sigma) == 0
+        std::vector<GRBLinExpr> nP(gluedMesh.nFaces());
+        for (Face f : gluedMesh.faces()){
+            GRBLinExpr lhs = 0.0;
+            Halfedge hij = f.halfedge();
+            Halfedge hjk = hij.next();
+            Halfedge hki = hjk.next();
+            nP[f.getIndex()] = sigma[hij.getIndex()] + sigma[hjk.getIndex()] + sigma[hki.getIndex()];
+            lhs = sigma[hij.getIndex()] + sigma[hjk.getIndex()] + sigma[hki.getIndex()];
+            model.addConstr(lhs == 0.0);
+        }
+
+        //third constraint 
+        //ensure that values are opposite sign across halfedges
+        //if it's not a singular halfedge 
+        EdgeData<int> handled(gluedMesh, 0);
+        for (std::pair<int, int> p : singularEdges){
+            //invert the sign of the constraint
+            model.addConstr(sigma[gluedMesh.edge(p.first).halfedge().getIndex()] 
+                                    + sigma[gluedMesh.edge(p.first).halfedge().twin().getIndex()] == -1.0 * p.second * period);
+            handled[gluedMesh.edge(p.first)] = 1;
+        }
+        for (Halfedge he : gluedMesh.halfedges()){
+            if (handled[he.edge()]) continue; //if the halfedge is already handled, continue
+            model.addConstr(sigma[he.getIndex()] == -1.0 * sigma[he.twin().getIndex()]);
+        }
+
+        //fourth constraint: add bdy-bdy path constraint 
+        //this constraint is causing some infeasibility issues
+        for (int i = 0; i < edgePathConstraints.size(); i++){
+            std::vector<double> path = edgePathConstraints[i].first;
+            GRBLinExpr pathIntegral = 0;
+            std::vector<double> hePath(gluedMesh.nHalfedges(), 0.0);
+            for (int j = 0; j < gluedMesh.nEdges(); j++){
+                if (path[j] > 0){
+                    hePath[gluedMesh.edge(i).halfedge().getIndex()] = path[j];
+                }
+                else if (path[j] < 0){
+                    hePath[gluedMesh.edge(i).halfedge().twin().getIndex()] = path[j];
+                }
+            }
+            model.addConstr(pathIntegral == period * edgePathConstraints[i].second);
+        }
+
+        //set up the objective term
+        GRBQuadExpr obj = 0;
+        
+        for (Halfedge he : gluedMesh.halfedges()){
+            obj += sigma[he.getIndex()] * sigma[he.getIndex()];
+        }
+        model.setObjective(obj, GRB_MINIMIZE);
+        model.optimize(); 
+        std::cout << "Objective after placing " << singularEdges.size()/2 << " singularity pairs: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
+        objectiveVal = model.get(GRB_DoubleAttr_ObjVal);
+        //put the computed one-form into an edge vector
+        for (Halfedge he : gluedMesh.halfedges()){
+            gluedOneForm[he] = sigma[he.getIndex()].get(GRB_DoubleAttr_X);
+        }     
+    }
+    catch(GRBException e) {
+        std::cout << "Error code = " << e.getErrorCode() << std::endl;
+        std::cout << e.getMessage() << std::endl;
+    } catch(...) {
+        std::cout << "Exception during optimization" << std::endl;
+    }
+
+    return std::tie(gluedOneForm, objectiveVal);
 }

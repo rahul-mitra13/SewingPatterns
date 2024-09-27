@@ -12,11 +12,11 @@ using namespace geometrycentral::surface;
 //compute the iterative 1-form and vertex singularity positions trying the strategy 1 
 //strategy 1
 //1. Sample level sets at intervals of P, say C_i 
-//2. For each C_i, consider all the level sets it passes through, say T_i 
-//3. Calc average ||\frac{\nabla h}{||\nabla h}||^2 - \grad \sigma_j} (probably area-weighted) over T_i
-//4. For C_i with largest average ||\frac{\nabla h}{||\nabla h||, search max/min singularities and insert 
+//2. For each C_i, consider all the edges it passes through, say T_i 
+//3. Calc average edge curl over every T_i
+//4. For C_i with largest average edge curl, search max/min edge curl and insert singularities
 //5. Stop when ||\delta \sigma - \frac{\nabla h}{||\nabla h}||^2 doesn't decrease any more 
-std::tuple<HalfedgeData<double>, VertexData<double>> strategy1Impl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction,
+std::tuple<HalfedgeData<double>, EdgeData<double>> strategy1Impl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction,
                                                                     FaceData<Vector3>& globalFaceGradients, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
                                                                     std::map<int, int>& globalToGluedVertexMap, std::map<int, int>& globalToGluedEdgeMap, 
                                                                     polyscope::SurfaceMesh& psMesh, globalBoundaryConditions& boundaryConditions, double period);
@@ -58,7 +58,23 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Edge
 //-------------------------Experiment 2-----------------------------//
 //optimizing min \sum_{{ij} \in E}||\omegaTilde_{ij} - \sigmaTild_{ij}||^2 + \lambda \sum{e \in E}||\sigma_{ij} + \sigma_{ji}||^2
 //visualizing where ||\sigma_{ij} + \sigma_{ji}||^2 is highest 
+//for various values of \lambda
 void vizEdgeDifference(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
                         FaceData<Vector3>& globalFaceGradients, polyscope::SurfaceMesh& psMesh, 
                         globalBoundaryConditions& boundaryConditions, double period, double lambda,
                         std::map<int,int>& globalToGluedEdgeMap);
+
+
+//------------------------Experiment 3----------------------------//
+//Trying to find a harmonic 1-form in the halfedge optimization setting 
+//use the thus far inserted singular edges (and edge-based curl of zero elsewhere), 
+//enforce face-based curl of zero, and an integral of 1 along some path from either boundary to optimize 
+//for a harmonic (half-edge) one-form subject to the singularity placements; do this at each 
+//iteration and then normalize to find edge-based curl
+std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction,
+                                                                    FaceData<Vector3>& globalFaceGradients, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
+                                                                    std::map<int, int>& globalToGluedVertexMap, std::map<int, int>& globalToGluedEdgeMap, 
+                                                                    polyscope::SurfaceMesh& psMesh, globalBoundaryConditions& boundaryConditions, double period);
+
+//solve the optimization problem for the harmonic 1-form
+std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& globalToGluedVertexMap);

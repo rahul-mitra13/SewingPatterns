@@ -134,16 +134,22 @@ void showStripePatterns(){
   //VertexData<int> vertexCurl = computeCurlOnVertex(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations, gluedOneRingMap);
 
   //-------experiment 1---------------//
-  HalfedgeData<double> sigmaTilde(globalGeometry -> mesh);
-  VertexData<double> vertexSingularities(globalGeometry -> mesh);
-  std::tie(sigmaTilde, vertexSingularities) = strategy1Impl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
-                                                            vertexMap, edgeMap, *globalPSMesh, globalBdyConditions, period);
+  // HalfedgeData<double> sigmaTilde(globalGeometry -> mesh);
+  // EdgeData<double> edgeSingularities(globalGeometry -> mesh);
+  // std::tie(sigmaTilde, edgeSingularities) = strategy1Impl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
+  //                                                           vertexMap, edgeMap, *globalPSMesh, globalBdyConditions, period);
 
-  //-----experiment 2---------------//
-  vizEdgeDifference(*globalGeometry, *gluedELG,
-                    timeFunctionGradientGlobalNormalized, *globalPSMesh, 
-                    globalBdyConditions, period, lambda,
-                    edgeMap);
+  // //-----experiment 2---------------//
+  // vizEdgeDifference(*globalGeometry, *gluedELG,
+  //                   timeFunctionGradientGlobalNormalized, *globalPSMesh, 
+  //                   globalBdyConditions, period, lambda,
+  //                   edgeMap);
+  
+  //-------experiment 3----------//
+  HalfedgeData<double> sigmaTilde(globalGeometry -> mesh);
+  EdgeData<double> edgeSingularities(globalGeometry -> mesh);
+  std::tie(sigmaTilde, edgeSingularities) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
+                                                            vertexMap, edgeMap, *globalPSMesh, globalBdyConditions, period);
 
 }
 
