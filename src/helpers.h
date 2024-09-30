@@ -38,7 +38,9 @@ struct globalBoundaryConditions{
     std::vector<int> courseEndBoundaryVertices;//vertices where t = 1
 
     std::vector<int> courseBdyEdges;//boundary edges in the course direction where sigma = 0
-    std::vector<std::vector<double>> waleBdyPathConstraints;//vector of vectors (each of size nEdges()) where each entry stores the weight of the edge in the integration with \sigma
+    std::vector<std::vector<double>> waleBdyPathConstraints;//vector of vectors (each of size nEdges()) where each entry stores the weight of the edge in the integration with \sigma (path around a boundary)
+
+    std::vector<std::vector<double>> bdyBdyPathConstraints;//vector of vectors (each of size nEdges()) where each entry stores the weight of the edge in the integration with \sigma (boundary-boundary path)
 };
 
 

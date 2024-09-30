@@ -521,6 +521,9 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     globalBoundaryConditions toReturn;
 
+    std::vector<int> knittingStartVertices;
+    std::vector<int> knittingEndVertices;
+
     //course conditions 
     bool courseUseBdyLoops = data["boundaries"]["course"]["useBoundaryLoops"];
     //first handle course boundary conditions
@@ -529,6 +532,7 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
         std::vector<int> endVertices = data["boundaries"]["course"]["endVertices"];
         //knitting start conditions
         for (int i = 0; i < startVertices.size(); i++){
+            knittingStartVertices.push_back(startVertices[i]);
             //grab the boundary face
             BoundaryLoop bLoop = gluedMesh.vertex(vertexMap[startVertices[i]]).halfedge().twin().face().asBoundaryLoop();
             for (Vertex v : bLoop.adjacentVertices()){
@@ -551,6 +555,7 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
         }
         //knitting end conditions
         for (int i = 0; i < endVertices.size(); i++){
+            knittingEndVertices.push_back(endVertices[i]);
             //grab the boundary face 
             BoundaryLoop bLoop = gluedMesh.vertex(vertexMap[endVertices[i]]).halfedge().twin().face().asBoundaryLoop();
             for (Vertex v : bLoop.adjacentVertices()){
@@ -578,6 +583,7 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
         //knitting start conditions
         for (int i = 0; i < startVertices.size(); i++){
             if (startVertices[i].size() == 1){//this is just a vertex on a boundary loop, do the same as above 
+                knittingStartVertices.push_back(startVertices[i][0]);
                 BoundaryLoop bLoop = gluedMesh.vertex(vertexMap[startVertices[i][0]]).halfedge().twin().face().asBoundaryLoop();
                 for (Vertex v : bLoop.adjacentVertices()){
                     toReturn.courseStartBoundaryVertices.push_back(v.getIndex());
@@ -598,6 +604,7 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
                 toReturn.waleBdyPathConstraints.push_back(weights);
             }
             else{//two vertices specify a path on the boundary 
+                knittingStartVertices.push_back(startVertices[i][0]);
                 Vertex startVertex = gluedMesh.vertex(vertexMap[startVertices[i][0]]);
                 Vertex endVertex = gluedMesh.vertex(vertexMap[startVertices[i][1]]);
                 std::vector<double> weights;
@@ -617,6 +624,7 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
         //knitting end conditions 
         for (int i = 0; i < endVertices.size(); i++){
             if (endVertices[i].size() == 1){//this is just a vertex on a boundary loop, do the same as above 
+                knittingEndVertices.push_back(endVertices[i][0]);
                 BoundaryLoop bLoop = gluedMesh.vertex(vertexMap[endVertices[i][0]]).halfedge().twin().face().asBoundaryLoop();
                 for (Vertex v : bLoop.adjacentVertices()){
                     toReturn.courseEndBoundaryVertices.push_back(v.getIndex());
@@ -637,6 +645,7 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
                 toReturn.waleBdyPathConstraints.push_back(weights);
             }
             else{//two vertices specify a path on the boundary 
+                knittingEndVertices.push_back(endVertices[i][0]);
                 Vertex startVertex = gluedMesh.vertex(vertexMap[endVertices[i][0]]);
                 Vertex endVertex = gluedMesh.vertex(vertexMap[endVertices[i][1]]);
                 std::vector<double> weights;
@@ -651,6 +660,19 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
                 }
                 toReturn.waleBdyPathConstraints.push_back(weights);
             }
+        }
+    }
+
+    //create boundary-boundary intergation paths 
+    for (int i = 0; i < knittingStartVertices.size(); i++){
+        for (int j = 0; j < knittingEndVertices.size(); j++){
+            Vertex v1 = gluedMesh.vertex(vertexMap[knittingStartVertices[i]]);
+            Vertex v2 = gluedMesh.vertex(vertexMap[knittingEndVertices[j]]);
+            std::vector<Vertex> vertices;
+            std::vector<Edge> edges;
+            std::vector<double> weights; 
+            std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePath(gluedGeometry, v1, v2);
+            toReturn.bdyBdyPathConstraints.push_back(weights);
         }
     }
 

@@ -899,15 +899,17 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
     FaceData<int> stripeIndicesSigmaCourse;
     std::vector<Vector3> positionsCourse;
     std::vector<std::array<int, 2>> edgesCourse;
-    //start by specifying bdy-bdy path constraint for non-collapse 
-    Vertex v0 = gluedMesh.vertex(globalToGluedVertexMap[boundaryConditions.courseStartBoundaryVertices[0]]);
-    Vertex v1 = gluedMesh.vertex(globalToGluedVertexMap[boundaryConditions.courseEndBoundaryVertices[1]]);
-    std::vector<Vertex> vertices;
-    std::vector<Edge> edges;
-    std::vector<double> weights; 
-    std::tie(vertices, edges, weights) = getVerticesAndEdgesInShortestEdgePath(gluedGeometry, v0, v1);
     std::vector<std::pair<std::vector<double>, double>> edgePathConstraints; 
-    edgePathConstraints.push_back(std::make_pair(weights, 1.0));
+    for (int i = 0; i < boundaryConditions.bdyBdyPathConstraints.size(); i++){
+        EdgeData<double> bdyBdyPath(globalMesh);
+        //for visualizing bdy-bdy edge constraints
+        // for (Edge e : globalMesh.edges()){
+        //     bdyBdyPath[e] = boundaryConditions.bdyBdyPathConstraints[i][globalToGluedEdgeMap[e.getIndex()]];
+        // }
+        // psMesh.addEdgeScalarQuantity("bdy bdy path " + std::to_string(i), bdyBdyPath);
+        edgePathConstraints.push_back(std::make_pair(boundaryConditions.bdyBdyPathConstraints[i], 1.0));
+    }
+
     int numPairs = 0;
     //compute curl per edge of the gradient field (in the global setting)
     edgeCurl = computeEdgeCurl(globalGeometry, gluedGeometry,
@@ -922,30 +924,37 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
     
     edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
     edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
-
-    Model model;
-    
-    model.setPeriod(period);
-    model.setBdyEdges(boundaryConditions.courseBdyEdges);
-    //solve the model without any singularities 
-    std::tie(newGluedSigmaTilde, currObj) = computeHarmonic1Form(globalGeometry, gluedGeometry, model, globalToGluedVertexMap);
-    oldObj = currObj;
-    oldGluedSigmaTilde = newGluedSigmaTilde;
+    psMesh.addEdgeScalarQuantity("edge singularities after inserting " + std::to_string(numPairs) + " singularity pairs", edgeSingularities);
     //first pair of singular edges (edge-curl approach)
     singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singEdgePair.first], -1));
     singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singEdgePair.second], 1));
-    model.setSingularEdges(singularEdges);
+
+    Model model;
+    model.setPeriod(period);
+    model.setBdyEdges(boundaryConditions.courseBdyEdges);
+    //set non-collapse constraint
     model.setEdgePathConstraints(edgePathConstraints);
-    numPairs++;
-    //psMesh.addVertexScalarQuantity("vertex singularity after inserting " + std::to_string(numPairs) + " singularity pairs", vertexSingularities);
-    psMesh.addEdgeScalarQuantity("edge singularities after inserting " + std::to_string(numPairs) + " singularity pairs", edgeSingularities);
-    //solve the model with 1 pair of singularities
+    //solve the model without any singularities 
     std::tie(newGluedSigmaTilde, currObj) = computeHarmonic1Form(globalGeometry, gluedGeometry, model, globalToGluedVertexMap);
     oldObj = currObj;
     oldGluedSigmaTilde = newGluedSigmaTilde;
     std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, oldGluedSigmaTilde, period);
         std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
         auto courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numPairs) + 
+                                                    " singularity pairs", positionsCourse, edgesCourse);
+    courseStripes -> setRadius(0.001);
+    courseStripes -> setEnabled(false);
+
+
+    model.setSingularEdges(singularEdges);
+    numPairs++;
+    //solve the model with 1 pair of singularities
+    std::tie(newGluedSigmaTilde, currObj) = computeHarmonic1Form(globalGeometry, gluedGeometry, model, globalToGluedVertexMap);
+    oldObj = currObj;
+    oldGluedSigmaTilde = newGluedSigmaTilde;
+    std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, oldGluedSigmaTilde, period);
+        std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
+        courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numPairs) + 
                                                     " singularity pairs", positionsCourse, edgesCourse);
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
