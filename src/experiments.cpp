@@ -45,11 +45,7 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> strategy1Impl(VertexPositionG
     //compute curl per vertex of gradient field (in the global setting)
     vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, globalFaceGradients, gluedOneRingMap);
     //compute curl per edge of the gradient field (in the global setting)
-    edgeCurl = computeEdgeCurl(globalGeometry, gluedGeometry,
-                                globalFaceGradients, 
-                                globalToGluedEdgeMap);
-
-
+    edgeCurl = computeEdgeCurl(globalGeometry, gluedGeometry, globalFaceGradients, globalToGluedEdgeMap);
 
     //visualize the vertex curl 
     //this quantity never changes through the optimization 
@@ -180,13 +176,16 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> strategy1Impl(VertexPositionG
         psMesh.addEdgeScalarQuantity("edge curl after placing " + std::to_string(numPairs) + " singularity pairs", edgeCurl);
         double isoVal = findIsoValWithMaxAvgEdgeCurl(globalGeometry, gluedGeometry, edgeCurl, gluedTimeFunction,
                                                     usedIsoVals, globalToGluedVertexMap);
-        if (std::fabs(isoVal - (-1.0) < 1e-15)) break;//our function couldn't find any more isovalues
+        if (std::fabs(isoVal - (-1.0) < 1e-15)){
+            std::cout << "Breaking cause we can't find any more sensible isovalues " << std::endl;
+            break;//our function couldn't find any more isovalues
+        } 
         std::cout << "next isoval = " << isoVal << std::endl;
         singEdgePair = findEdgeSingularityPair(globalGeometry, gluedGeometry, edgeCurl,
                                         gluedTimeFunction, psMesh, globalToGluedVertexMap, usedIsoVals, isoVal, numPairs, false);
         if (std::find(singularEdges.begin(), singularEdges.end(), std::make_pair(globalToGluedEdgeMap[singEdgePair.first], -1.0)) != singularEdges.end()
             || std::find(singularEdges.begin(), singularEdges.end(), std::make_pair(globalToGluedEdgeMap[singEdgePair.second], 1.0)) != singularEdges.end()){
-            //don't use isovals you've seen before
+            //don't use edges you've used before
             usedIsoVals.push_back(isoVal);
             continue;
         }
@@ -281,10 +280,12 @@ EdgeData<double> computeEdgeCurl(VertexPositionGeometry& globalGeometry, EdgeLen
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     EdgeData<double> globalCurl(globalMesh);
-    EdgeData<double> gluedCurl(gluedMesh);
+    EdgeData<double> gluedCurl(gluedMesh, 0.0);
 
     HalfedgeData<double> globalOmegaTilde(globalMesh);
     HalfedgeData<double> gluedOmegaTilde(gluedMesh);
+
+    gluedGeometry.requireEdgeLengths();
 
     for (Face f : globalMesh.faces()){
         Vector3 grad = globalFaceGradients[f];
@@ -302,7 +303,8 @@ EdgeData<double> computeEdgeCurl(VertexPositionGeometry& globalGeometry, EdgeLen
     }
 
     for (Edge e : gluedMesh.edges()){
-        gluedCurl[e] = gluedOmegaTilde[e.halfedge()] + gluedOmegaTilde[e.halfedge().twin()];
+        if (e.isBoundary()) continue;
+        gluedCurl[e] = (gluedOmegaTilde[e.halfedge()] + gluedOmegaTilde[e.halfedge().twin()]) / gluedGeometry.edgeLengths[e];
     }
 
     globalCurl = convertGluedToGlobalEdgeFunction(globalGeometry, gluedGeometry, gluedCurl, globalToGluedEdgeMap);
@@ -409,7 +411,7 @@ std::pair<int, int> findEdgeSingularityPair(VertexPositionGeometry& globalGeomet
         Eigen::MatrixXd iE;
         std::vector<int> f;
         std::tie(iV, iE, f) = getTimeFunctionIsoLine(globalGeometry, globalTimeFunction, isoVal);
-        auto isoline = polyscope::registerCurveNetwork("Isoline for pair " + std::to_string(numPairs), iV, iE);
+        auto isoline = polyscope::registerCurveNetwork("Isoline for pair " + std::to_string(numPairs + 1), iV, iE);
         isoline -> setRadius(0.001);
         isoline -> setEnabled(false);
         //find min curl on the same isoline as the max edge 
@@ -434,7 +436,7 @@ std::pair<int, int> findEdgeSingularityPair(VertexPositionGeometry& globalGeomet
         Eigen::MatrixXd iE;
         std::vector<int> f;
         std::tie(iV, iE, f) = getTimeFunctionIsoLine(globalGeometry, globalTimeFunction, isoVal);
-        auto isoline = polyscope::registerCurveNetwork("Isoline for pair " + std::to_string(numPairs), iV, iE);
+        auto isoline = polyscope::registerCurveNetwork("Isoline for pair " + std::to_string(numPairs + 1), iV, iE);
         isoline -> setEnabled(false);
         isoline -> setRadius(0.001);
         int maxEdge, minEdge = -1;
@@ -712,35 +714,38 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Edge
         std::cout << "used iso vals = " << usedIsoVals[i] << std::endl;
     }
 
-    double start = 0.1;
     double stepSize = 0.1;
     double end = 1.0;
-    double curr = start;
-    double maxAvgDeviation = -DBL_MAX;
-    double maxAvgDeviationIsoVal = -1.0;
-    double eps = 1e-6;
+    double curr = stepSize;
+    double maxDeviation = -DBL_MAX;
+    double maxDeviationIsoVal = -1.0;
+    double eps = 1e-8;
     bool skipFlag = false;
     globalGeometry.requireFaceAreas();
     VertexData<double> globalTimeFunction = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, gluedTimeFunction, globalToGluedVertexMap);
+    double currAvgDeviation = 0.0;
+    double currDeviationSum = 0.0;
 
     while (curr < end){
         for (int i = 0; i < usedIsoVals.size(); i++){
             //don't isoVals you've used before
             if (std::fabs(usedIsoVals[i] - curr) < eps){
+                std::cout << "skipping isoval " << usedIsoVals[i] << std::endl;
                 skipFlag = true;
             }
         }
         if (skipFlag){
             curr += stepSize;
+            skipFlag = false;
             continue;
         }
         Eigen::MatrixXd iV;
         Eigen::MatrixXd iE;
         std::vector<int> f;
         std::tie(iV, iE, f) = getTimeFunctionIsoLine(globalGeometry, globalTimeFunction, curr);
-
-        double currAvgDeviation = 0.0;
-        double currDeviationSum = 0.0;
+        //reset values
+        currAvgDeviation = 0.0;
+        currDeviationSum = 0.0;
         int numEdges = 0;
         for (int i = 0; i < f.size(); i++){
             Face currFace = globalMesh.face(f[i]);
@@ -748,20 +753,23 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Edge
                 //check if current isoline crosses this edge
                 if ((curr > globalTimeFunction[e.halfedge().tailVertex()] && curr < globalTimeFunction[e.halfedge().tipVertex()])
                     ||(curr > globalTimeFunction[e.halfedge().tipVertex()] && curr < globalTimeFunction[e.halfedge().tailVertex()])){
-                    currDeviationSum += curl[e];
-                    numEdges++;
+                    currDeviationSum += std::fabs(curl[e]);
                 }
             }
         }
-        currAvgDeviation = currDeviationSum / numEdges;
-        if (currAvgDeviation > maxAvgDeviation){
-            maxAvgDeviation = currAvgDeviation;
-            maxAvgDeviationIsoVal = curr;
+        std::cout << "Sum for isoval " << curr << " is " << currDeviationSum << std::endl;
+        if (currDeviationSum > maxDeviation){
+            maxDeviation = currDeviationSum;
+            maxDeviationIsoVal = curr;
         }
+
         skipFlag = false;
         curr += stepSize;
     }
-    return maxAvgDeviationIsoVal;
+
+    std::cout << "maxDeviation " << maxDeviation << std::endl;
+    std::cout << "maxDeviationIsoVal " << maxDeviationIsoVal << std::endl;
+    return maxDeviationIsoVal;
 }
 
 //-------------------------Experiment 2-----------------------------//
@@ -901,8 +909,8 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
     std::vector<std::array<int, 2>> edgesCourse;
     std::vector<std::pair<std::vector<double>, double>> edgePathConstraints; 
     for (int i = 0; i < boundaryConditions.bdyBdyPathConstraints.size(); i++){
-        EdgeData<double> bdyBdyPath(globalMesh);
-        //for visualizing bdy-bdy edge constraints
+        //visualizing bdy-bdy edge constraints
+        // EdgeData<double> bdyBdyPath(globalMesh);
         // for (Edge e : globalMesh.edges()){
         //     bdyBdyPath[e] = boundaryConditions.bdyBdyPathConstraints[i][globalToGluedEdgeMap[e.getIndex()]];
         // }
@@ -924,7 +932,6 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
     
     edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
     edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
-    psMesh.addEdgeScalarQuantity("edge singularities after inserting " + std::to_string(numPairs) + " singularity pairs", edgeSingularities);
     //first pair of singular edges (edge-curl approach)
     singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singEdgePair.first], -1));
     singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singEdgePair.second], 1));
@@ -942,12 +949,12 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
         std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
         auto courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numPairs) + 
                                                     " singularity pairs", positionsCourse, edgesCourse);
+
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
-
-
     model.setSingularEdges(singularEdges);
     numPairs++;
+    psMesh.addEdgeScalarQuantity("edge singularities after inserting " + std::to_string(numPairs) + " singularity pairs", edgeSingularities);
     //solve the model with 1 pair of singularities
     std::tie(newGluedSigmaTilde, currObj) = computeHarmonic1Form(globalGeometry, gluedGeometry, model, globalToGluedVertexMap);
     oldObj = currObj;
