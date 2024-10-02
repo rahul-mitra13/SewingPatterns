@@ -140,10 +140,10 @@ void showStripePatterns(){
                                                             vertexMap, edgeMap, *globalPSMesh, globalBdyConditions, period);
 
   // //-----experiment 2---------------//
-  // vizEdgeDifference(*globalGeometry, *gluedELG,
-  //                   timeFunctionGradientGlobalNormalized, *globalPSMesh, 
-  //                   globalBdyConditions, period, lambda,
-  //                   edgeMap);
+  vizEdgeDifference(*globalGeometry, *gluedELG,
+                    timeFunctionGradientGlobalNormalized, *globalPSMesh, 
+                    globalBdyConditions, period, lambda,
+                    edgeMap);
   
   //-------experiment 3----------//
   // HalfedgeData<double> sigmaTilde(globalGeometry -> mesh);

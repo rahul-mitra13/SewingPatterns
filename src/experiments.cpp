@@ -165,12 +165,12 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> strategy1Impl(VertexPositionG
         FaceData<Vector3> gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, oldGluedSigmaTilde);
         psMesh.addFaceVectorQuantity("grad sigmaTilde after placing " + std::to_string(numPairs) + " singularity pairs", gradSigmaTilde);
         //use the previous iterates in place of the gradient of the time function when re-optimizing
-        std::vector<std::array<double, 3>> newGrads(gluedMesh.nFaces());
-        for (Face f : globalMesh.faces()){
-            newGrads[f.getIndex()] = std::array{gradSigmaTilde[globalMesh.face(f.getIndex())][0], gradSigmaTilde[globalMesh.face(f.getIndex())][1], 
-                                    gradSigmaTilde[globalMesh.face(f.getIndex())][2]};
-        }
-        model.setFaceGradients(newGrads);
+        // std::vector<std::array<double, 3>> newGrads(gluedMesh.nFaces());
+        // for (Face f : globalMesh.faces()){
+        //     newGrads[f.getIndex()] = std::array{gradSigmaTilde[globalMesh.face(f.getIndex())][0], gradSigmaTilde[globalMesh.face(f.getIndex())][1], 
+        //                             gradSigmaTilde[globalMesh.face(f.getIndex())][2]};
+        // }
+        // model.setFaceGradients(newGrads);
         //recompute edge curl using gradSigmaTilde
         edgeCurl = computeEdgeCurl(globalGeometry, gluedGeometry, gradSigmaTilde, globalToGluedEdgeMap);
         psMesh.addEdgeScalarQuantity("edge curl after placing " + std::to_string(numPairs) + " singularity pairs", edgeCurl);
@@ -714,7 +714,7 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Edge
         std::cout << "used iso vals = " << usedIsoVals[i] << std::endl;
     }
 
-    double stepSize = 0.1;
+    double stepSize = 0.05;
     double end = 1.0;
     double curr = stepSize;
     double maxDeviation = -DBL_MAX;
