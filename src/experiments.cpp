@@ -714,7 +714,7 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Edge
         std::cout << "used iso vals = " << usedIsoVals[i] << std::endl;
     }
 
-    double stepSize = 0.05;
+    double stepSize = 0.1;
     double end = 1.0;
     double curr = stepSize;
     double maxDeviation = -DBL_MAX;
@@ -763,7 +763,6 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Edge
             maxDeviationIsoVal = curr;
         }
 
-        skipFlag = false;
         curr += stepSize;
     }
 
