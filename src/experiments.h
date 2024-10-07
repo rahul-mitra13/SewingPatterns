@@ -21,6 +21,12 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> strategy1Impl(VertexPositionG
                                                                     std::map<int, int>& globalToGluedVertexMap, std::map<int, int>& globalToGluedEdgeMap, 
                                                                     polyscope::SurfaceMesh& psMesh, globalBoundaryConditions& boundaryConditions, double period);
 
+//trying to solve for a 1-form that only optimizes for equally spaced stripes 
+//Matteo's idea: The objective term is || ||\delta \sigma||^2 - 1||^2 
+//Have a bdy-bdy path integral for non-collapse and directionality specification
+std::tuple<HalfedgeData<double>, double> computeEquallySpacedOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
+                                                                std::map<int, int>& globalToGluedVertexMap);
+
 //compute the per-face gradient of a 1-form
 FaceData<Vector3> computeOneFormFaceGrad(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde);
 
