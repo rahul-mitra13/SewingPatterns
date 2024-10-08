@@ -204,7 +204,7 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
 
   SurfaceMesh& globalMesh = globalGeometry.mesh; 
   SurfaceMesh& gluedMesh = gluedGeometry.mesh;
-
+  
   //integrate up the sigma values now onto vertices
   VertexData<double> sigma_mod(gluedMesh); 
   VertexData<bool> visited(gluedMesh, false);
