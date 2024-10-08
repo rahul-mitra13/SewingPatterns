@@ -1,6 +1,3 @@
-//this is to appropriately parse the GarmentCode specification
-#include <Python.h>
-
 //geometry-central includes 
 #include "geometrycentral/surface/manifold_surface_mesh.h"
 #include "geometrycentral/surface/meshio.h"
