@@ -820,9 +820,7 @@ std::tuple<HalfedgeData<double>, double> computeEquallySpacedOneForm(VertexPosit
 
         //compute a piecewise linear function over the vertices of the mesh 
         std::vector<GRBLinExpr> u(gluedMesh.nVertices());
-        //std::vector<GRBVar> u(gluedMesh.nVertices());
         std::vector<std::vector<GRBLinExpr>> gradU(gluedMesh.nFaces(), std::vector<GRBLinExpr>(3));
-        //std::vector<std::vector<GRBVar>> gradU(gluedMesh.nFaces(), std::vector<GRBVar>(3));
         for (Face f : gluedMesh.faces()){
 
             u[f.halfedge().vertex().getIndex()] = 0.0;
@@ -1227,6 +1225,35 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
     double period = gbModel.getPeriod();
     std::vector<std::pair<int, int>> singularEdges = gbModel.getSingularEdges();
+    
+
+    //build the gradient operator 
+    Eigen::MatrixXd V(gluedMesh.nVertices(), 3);
+    Eigen::MatrixXi F(gluedMesh.nFaces(), 3);
+    std::tie(V, F) = getVertexPositionsandFaceLists(globalGeometry);
+    // Compute the global gradient operator: #F*3 by #V
+    Eigen::SparseMatrix<double> grad;
+    igl::grad(V,F,grad);
+    Eigen::SparseMatrix<double, Eigen::RowMajor> G(grad);
+
+
+    //require the face areas
+    gluedGeometry.requireFaceAreas();
+    //require edge lengths 
+    gluedGeometry.requireEdgeLengths();
+    //require edge cotan weights
+    gluedGeometry.requireEdgeCotanWeights();
+
+    Eigen::SparseMatrix<double, Eigen::RowMajor> d_oneTranspose = d_one.transpose();
+    Eigen::SparseMatrix<double, Eigen::RowMajor> d_not = gluedGeometry.d0;
+    Eigen::SparseMatrix<double, Eigen::RowMajor> d_notTranspose = d_not.transpose();
+    Eigen::SparseMatrix<double, Eigen::RowMajor> hodgeZeroInv = gluedGeometry.hodge0Inverse;
+    Eigen::SparseMatrix<double, Eigen::RowMajor> hodgeOne = gluedGeometry.hodge1;
+    Eigen::SparseMatrix<double, Eigen::RowMajor> hodgeOneInv = gluedGeometry.hodge1Inverse;
+    Eigen::SparseMatrix<double, Eigen::RowMajor> hodgeTwo = gluedGeometry.hodge2;
+
+
+
 
     try {
         //reformulate the problem in terms of halfedges 
@@ -1239,8 +1266,8 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
         GRBModel model = GRBModel(env);
 
         //set the timeout
-        model.getEnv().set(GRB_DoubleParam_TimeLimit, 60);
-        model.getEnv().set(GRB_IntParam_OutputFlag, 0);
+        model.getEnv().set(GRB_DoubleParam_TimeLimit, 30);
+        //model.getEnv().set(GRB_IntParam_OutputFlag, 0);
 
         //defined over halfedges
         std::vector<GRBVar> sigma;
@@ -1305,14 +1332,52 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
             model.addConstr(pathIntegral == period * edgePathConstraints[i].second);
         }
 
-        std::cout << std::endl << std::endl;
+        //compute a piecewise linear function over the vertices of the mesh 
+        std::vector<GRBLinExpr> u(gluedMesh.nVertices());
+        std::vector<std::vector<GRBLinExpr>> gradU(gluedMesh.nFaces(), std::vector<GRBLinExpr>(3));
+        for (Face f : gluedMesh.faces()){
+
+            u[f.halfedge().vertex().getIndex()] = 0.0;
+            u[f.halfedge().next().vertex().getIndex()] = (sigma[f.halfedge().getIndex()]) - (nP[f.getIndex()]/3.0);
+            u[f.halfedge().next().next().vertex().getIndex()] = (sigma[f.halfedge().getIndex()] + sigma[f.halfedge().next().getIndex()]) - ((2.0 * nP[f.getIndex()])/3.0);
+
+            GRBLinExpr currGradU = 0.0;
+            //GRBVar currGradU = 0.0;
+            //X component
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex()); it; ++it){
+                currGradU += it.value() * u[globalToGluedVertexMap[it.col()]];
+            }
+            gradU[f.getIndex()][0] = currGradU;
+            currGradU = 0.0;
+            //Y component
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex() + F.rows()); it; ++it){
+                currGradU += it.value() * u[globalToGluedVertexMap[it.col()]];
+            }
+            gradU[f.getIndex()][1] = currGradU;
+            currGradU = 0.0;
+            //Z component 
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex() + 2 * F.rows()); it; ++it){
+                currGradU += it.value() * u[globalToGluedVertexMap[it.col()]];
+            }
+            gradU[f.getIndex()][2] = currGradU;
+        }
+
 
         //set up the objective term
         GRBQuadExpr obj = 0;
         
-        for (Halfedge he : gluedMesh.halfedges()){
-            obj += sigma[he.getIndex()] * sigma[he.getIndex()];
+        //setting the objective to be min ||\sigma||^2
+        // for (Halfedge he : gluedMesh.halfedges()){
+        //     obj += gluedGeometry.edgeCotanWeights[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
+        // }
+
+        //setting the objective to be min ||\nabla \sigma||^2
+        //weighted by the face areas
+        for (Face f : gluedMesh.faces()){
+            obj += gluedGeometry.faceAreas[f] * (gradU[f.getIndex()][0] * gradU[f.getIndex()][0] + gradU[f.getIndex()][1] * gradU[f.getIndex()][1]
+                    + gradU[f.getIndex()][2] * gradU[f.getIndex()][2]);
         }
+
         model.setObjective(obj, GRB_MINIMIZE);
         model.optimize(); 
         std::cout << "Objective after placing " << singularEdges.size()/2 << " singularity pairs: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
