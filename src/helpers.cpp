@@ -693,6 +693,20 @@ VertexData<double> convertGluedToGlobalVertexFunction(VertexPositionGeometry& gl
     return globalVertexFunction; 
 }
 
+//convert a line field defined on the global mesh to a line field defined on the glued mesh 
+VertexData<Vector2> convertGlobalToGluedVertexLineField(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<Vector2>& globalLineField, std::map<int, int>& vertexMap){
+    
+    SurfaceMesh& globalMesh = globalGeometry.mesh; 
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    VertexData<Vector2> gluedLineField(gluedMesh);
+
+    for (Vertex v : globalMesh.vertices()){
+        gluedLineField[vertexMap[v.getIndex()]] = globalLineField[v];
+    }
+
+    return gluedLineField;
+}
+
 //convert function defined on the edges of the glued mesh to a function defined on the edges of the global mesh 
 EdgeData<double> convertGluedToGlobalEdgeFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& func, std::map<int, int>& edgeMap){
 

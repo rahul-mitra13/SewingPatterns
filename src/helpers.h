@@ -181,6 +181,9 @@ std::unique_ptr<EdgeLengthGeometry> createGluedEdgeLengthGeometry(VertexPosition
 //convert a function defined on the vertices of the glued mesh to a function defined on the vertices of the global mesh 
 VertexData<double> convertGluedToGlobalVertexFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& func, std::map<int, int>& vertexMap);
 
+//convert a line field defined on the global mesh to a line field defined on the glued mesh 
+VertexData<Vector2> convertGlobalToGluedVertexLineField(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<Vector2>& globalLineField, std::map<int, int>& vertexMap);
+
 //convert function defined on the edges of the glued mesh to a function defined on the edges of the global mesh 
 EdgeData<double> convertGluedToGlobalEdgeFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& func, std::map<int, int>& edgeMap);
 

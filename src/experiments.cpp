@@ -575,38 +575,38 @@ std::tuple<HalfedgeData<double>, double> computeStrategy1_oneForm(VertexPosition
         }
 
         //set up the difference for L2 norms 
-        GRBQuadExpr gradDiff_L2 = 0;
+        //GRBQuadExpr gradDiff_L2 = 0;
         //set up the difference for L1 norms
-        //GRBLinExpr gradDiff_L1 = 0;
+        GRBLinExpr gradDiff_L1 = 0;
         std::vector<std::array<double, 3>> grads;
         //store the per face difference 
         std::vector<GRBQuadExpr> difference(gluedMesh.nFaces());
         for (Face f : gluedMesh.faces()){
             //objective is 2-norm squared 
-            GRBQuadExpr diffX = (gradU[f.getIndex()][0] - gradients[f.getIndex()][0]) * (gradU[f.getIndex()][0] - gradients[f.getIndex()][0]);
-            GRBQuadExpr diffY = (gradU[f.getIndex()][1] - gradients[f.getIndex()][1]) * (gradU[f.getIndex()][1] - gradients[f.getIndex()][1]);
-            GRBQuadExpr diffZ = (gradU[f.getIndex()][2] - gradients[f.getIndex()][2]) * (gradU[f.getIndex()][2] - gradients[f.getIndex()][2]);
+            // GRBQuadExpr diffX = (gradU[f.getIndex()][0] - gradients[f.getIndex()][0]) * (gradU[f.getIndex()][0] - gradients[f.getIndex()][0]);
+            // GRBQuadExpr diffY = (gradU[f.getIndex()][1] - gradients[f.getIndex()][1]) * (gradU[f.getIndex()][1] - gradients[f.getIndex()][1]);
+            // GRBQuadExpr diffZ = (gradU[f.getIndex()][2] - gradients[f.getIndex()][2]) * (gradU[f.getIndex()][2] - gradients[f.getIndex()][2]);
 
             //objective is 1-norm
-            // GRBLinExpr diffX = (gradU[f.getIndex()][0] - gradients[f.getIndex()][0]);
-            // GRBVar absDiffX = model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "abs_DiffX");
-            // GRBLinExpr diffY = (gradU[f.getIndex()][1] - gradients[f.getIndex()][1]);
-            // GRBVar absDiffY = model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "abs_DiffY");
-            // GRBLinExpr diffZ = (gradU[f.getIndex()][2] - gradients[f.getIndex()][2]);
-            // GRBVar absDiffZ = model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "abs_DiffZ");
-            // model.addConstr(absDiffX >= diffX);
-            // model.addConstr(absDiffX >= -diffX);
-            // model.addConstr(absDiffY >= diffY);
-            // model.addConstr(absDiffY >= -diffY);
-            // model.addConstr(absDiffZ >= diffZ);
-            // model.addConstr(absDiffZ >= -diffZ);
+            GRBLinExpr diffX = (gradU[f.getIndex()][0] - gradients[f.getIndex()][0]);
+            GRBVar absDiffX = model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "abs_DiffX");
+            GRBLinExpr diffY = (gradU[f.getIndex()][1] - gradients[f.getIndex()][1]);
+            GRBVar absDiffY = model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "abs_DiffY");
+            GRBLinExpr diffZ = (gradU[f.getIndex()][2] - gradients[f.getIndex()][2]);
+            GRBVar absDiffZ = model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "abs_DiffZ");
+            model.addConstr(absDiffX >= diffX);
+            model.addConstr(absDiffX >= -diffX);
+            model.addConstr(absDiffY >= diffY);
+            model.addConstr(absDiffY >= -diffY);
+            model.addConstr(absDiffZ >= diffZ);
+            model.addConstr(absDiffZ >= -diffZ);
 
             double currArea = gluedGeometry.faceAreas[f];
-            gradDiff_L2 += currArea * (diffX + diffY + diffZ);
+            gradDiff_L1 += currArea * (absDiffX + absDiffY + absDiffZ);
             difference[f.getIndex()] = currArea * (diffX + diffY + diffZ);
         }
 
-        GRBQuadExpr obj = gradDiff_L2;
+        GRBQuadExpr obj = gradDiff_L1;
 
         model.setObjective(obj, GRB_MINIMIZE);
         model.optimize(); 
@@ -902,7 +902,7 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Edge
         std::cout << "used iso vals = " << usedIsoVals[i] << std::endl;
     }
 
-    double stepSize = 0.1;
+    double stepSize = 0.01;
     double end = 1.0;
     double curr = stepSize;
     double maxDeviation = -DBL_MAX;
@@ -1074,6 +1074,18 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
 
+    //show the level set of the time function 
+    VertexData<double> globalTimeFunction = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, gluedTimeFunction, globalToGluedVertexMap);
+    for (double i = 0.01; i <= 1.0; i+= 0.01){
+        std::cout << "generating isoline for value: " << i << std::endl;
+        Eigen::MatrixXd iV;
+        Eigen::MatrixXd iE;
+        std::vector<int> f;
+        std::tie(iV, iE, f) = getTimeFunctionIsoLine(globalGeometry, globalTimeFunction, i);
+        auto isoline = polyscope::registerCurveNetwork("time function isoline " + std::to_string(i), iV, iE);
+        isoline->setRadius(0.001);
+    }
+
     //curl per edge
     EdgeData<double> edgeCurl(globalMesh);
     //striping 1-form quantities
@@ -1102,7 +1114,7 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
             bdyBdyPath[e] = boundaryConditions.bdyBdyPathConstraints[i][globalToGluedEdgeMap[e.getIndex()]];
         }
         psMesh.addEdgeScalarQuantity("bdy bdy path " + std::to_string(i), bdyBdyPath);
-        edgePathConstraints.push_back(std::make_pair(boundaryConditions.bdyBdyPathConstraints[i], 80.0));
+        edgePathConstraints.push_back(std::make_pair(boundaryConditions.bdyBdyPathConstraints[i], 100.0));
     }
 
     int numPairs = 0;
@@ -1155,7 +1167,8 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
 
     //FINDING SINGULAR EDGES DIRECTLY USING EDGE CURL (HAVE TO WRITE THIS UP)
     int ctr = 0;
-    while(true){
+    //hard-coding stopping conditions for now
+    while(ctr < 4){
         //gradient of sigmaTilde in the global setting 
         FaceData<Vector3> gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, oldGluedSigmaTilde);
         psMesh.addFaceVectorQuantity("grad sigmaTilde after placing " + std::to_string(numPairs) + " singularity pairs", gradSigmaTilde);
@@ -1184,12 +1197,12 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
         //solve the optimization problem 
         //sigmaTilde is in the glued mesh setting 
         std::tie(newGluedSigmaTilde, currObj) = computeHarmonic1Form(globalGeometry, gluedGeometry, model, globalToGluedVertexMap);
-        if (currObj > oldObj){//current objective become worse or staying the same 
-            std::cout << "Breaking cause objective no longer improving..." << std::endl;
-            std::cout << "oldObj " << oldObj << std::endl;
-            std::cout << "currObj " << currObj << std::endl;
-            break;
-        }
+        // if (currObj > oldObj){//current objective become worse or staying the same 
+        //     std::cout << "Breaking cause objective no longer improving..." << std::endl;
+        //     std::cout << "oldObj " << oldObj << std::endl;
+        //     std::cout << "currObj " << currObj << std::endl;
+        //     break;
+        // }
         //increment, update and visualize
         edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
         edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
@@ -1403,13 +1416,13 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
         GRBQuadExpr obj = 0;        
         //setting the objective to be min ||\sigma||^2
         // for (Halfedge he : gluedMesh.halfedges()){
-        //     obj += gluedGeometry.edgeCotanWeights[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
+        //     obj +=  sigma[he.getIndex()] * sigma[he.getIndex()];
         // }
 
         //setting the objective to be min ||\nabla \sigma||^2
         //weighted by the face areas
         for (Face f : gluedMesh.faces()){
-            obj += gluedGeometry.faceAreas[f] * (gradU[f.getIndex()][0] * gradU[f.getIndex()][0] + gradU[f.getIndex()][1] * gradU[f.getIndex()][1]
+            obj +=  (gradU[f.getIndex()][0] * gradU[f.getIndex()][0] + gradU[f.getIndex()][1] * gradU[f.getIndex()][1]
                     + gradU[f.getIndex()][2] * gradU[f.getIndex()][2]);
         }
 

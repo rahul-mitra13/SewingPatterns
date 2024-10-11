@@ -148,6 +148,18 @@ void showStripePatterns(){
   std::tie(sigmaTilde, edgeSingularities) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
                                                             vertexMap, edgeMap, *globalPSMesh, globalBdyConditions, period);
 
+  //KNIT GRAPH GENERATION 
+  //first rotate the gradients by 
+  // VertexData<Vector3> vertexValuedFieldRotated = computeVertexValuedField(*globalGeometry, timeFunctionGlobal, PI/2.);
+  // globalPSMesh -> addVertexVectorQuantity("rotated time function per vertex", vertexValuedFieldRotated);
+  // VertexData<Vector2> vertexLineField = vertexDirectionField(*globalGeometry, vertexValuedFieldRotated);
+  // CornerData<double> gluedStripeValues(gluedELG -> mesh);
+  // FaceData<int> gluedSingularityIndices(gluedELG -> mesh);
+  // FaceData<int> gluedBranchIndices(gluedELG -> mesh);
+  // VertexData<double> gluedFreq(gluedELG -> mesh, 1./period);
+  // std::tie(gluedStripeValues, gluedSingularityIndices, gluedBranchIndices) = computeStripePattern(*gluedELG, gluedFreq, vertexLineField);
+  // //FaceData<int> globalSingularityIndices = gluedSingularityIndices.reinterpretTo(globalGeometry->mesh);
+  // globalPSMesh->addFaceScalarQuantity("Knoppel wale singularities", gluedSingularityIndices);
 }
 
 // A user-defined callback, for creating control panels (etc)
