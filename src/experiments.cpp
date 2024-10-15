@@ -899,7 +899,7 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Edge
     SurfaceMesh& globalMesh = globalGeometry.mesh; 
 
     for (int i = 0; i < usedIsoVals.size(); i++){
-        std::cout << "used iso vals = " << usedIsoVals[i] << std::endl;
+    //    std::cout << "used iso vals = " << usedIsoVals[i] << std::endl;
     }
 
     double stepSize = 0.01;
@@ -918,7 +918,7 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Edge
         for (int i = 0; i < usedIsoVals.size(); i++){
             //don't isoVals you've used before
             if (std::fabs(usedIsoVals[i] - curr) < eps){
-                std::cout << "skipping isoval " << usedIsoVals[i] << std::endl;
+            //    std::cout << "skipping isoval " << usedIsoVals[i] << std::endl;
                 skipFlag = true;
             }
         }
@@ -945,7 +945,7 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Edge
                 }
             }
         }
-        std::cout << "Sum for isoval " << curr << " is " << currDeviationSum << std::endl;
+        //std::cout << "Sum for isoval " << curr << " is " << currDeviationSum << std::endl;
         if (currDeviationSum > maxDeviation){
             maxDeviation = currDeviationSum;
             maxDeviationIsoVal = curr;
@@ -954,8 +954,8 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Edge
         curr += stepSize;
     }
 
-    std::cout << "maxDeviation " << maxDeviation << std::endl;
-    std::cout << "maxDeviationIsoVal " << maxDeviationIsoVal << std::endl;
+    // std::cout << "maxDeviation " << maxDeviation << std::endl;
+    // std::cout << "maxDeviationIsoVal " << maxDeviationIsoVal << std::endl;
     return maxDeviationIsoVal;
 }
 
@@ -1076,18 +1076,11 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
 
     //show the level set of the time function 
     VertexData<double> globalTimeFunction = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, gluedTimeFunction, globalToGluedVertexMap);
-    for (double i = 0.01; i <= 1.0; i+= 0.01){
-        std::cout << "generating isoline for value: " << i << std::endl;
-        Eigen::MatrixXd iV;
-        Eigen::MatrixXd iE;
-        std::vector<int> f;
-        std::tie(iV, iE, f) = getTimeFunctionIsoLine(globalGeometry, globalTimeFunction, i);
-        auto isoline = polyscope::registerCurveNetwork("time function isoline " + std::to_string(i), iV, iE);
-        isoline->setRadius(0.001);
-    }
 
     //curl per edge
     EdgeData<double> edgeCurl(globalMesh);
+    //curl per face 
+    FaceData<double> faceCurl(globalMesh);
     //striping 1-form quantities
     HalfedgeData<double> oldGluedSigmaTilde(gluedMesh);
     HalfedgeData<double> newGluedSigmaTilde(gluedMesh);
@@ -1122,8 +1115,13 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
     edgeCurl = computeEdgeCurl(globalGeometry, gluedGeometry,
                                 globalFaceGradients, 
                                 globalToGluedEdgeMap);
+    //compute curl per face as the average of the edge curls on a face
+    faceCurl = computeAverageEdgeCurlonFaces(globalGeometry, gluedGeometry,
+                                globalFaceGradients, 
+                                globalToGluedEdgeMap);
 
     psMesh.addEdgeScalarQuantity("edge curl after placing " + std::to_string(numPairs) + " singularity pairs", edgeCurl);
+    psMesh.addFaceScalarQuantity("face curl after placing " + std::to_string(numPairs) + " singularity pairs", faceCurl);
 
     //find max/min curl edge over entire mesh 
     std::pair<int, int> singEdgePair = findEdgeSingularityPair(globalGeometry, gluedGeometry, edgeCurl,
@@ -1168,7 +1166,7 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
     //FINDING SINGULAR EDGES DIRECTLY USING EDGE CURL (HAVE TO WRITE THIS UP)
     int ctr = 0;
     //hard-coding stopping conditions for now
-    while(ctr < 4){
+    while(ctr < 6){
         //gradient of sigmaTilde in the global setting 
         FaceData<Vector3> gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, oldGluedSigmaTilde);
         psMesh.addFaceVectorQuantity("grad sigmaTilde after placing " + std::to_string(numPairs) + " singularity pairs", gradSigmaTilde);
@@ -1305,6 +1303,12 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
     Eigen::SparseMatrix<double, Eigen::RowMajor> term2 = (d0 * hodge0Inverse * d0.transpose() * hodge1);
     Eigen::SparseMatrix<double, Eigen::RowMajor> OneLaplacian = term1 + term2;
 
+    // Eigen::LLT<Eigen::MatrixXd> lltOfOneLaplacian(OneLaplacian); // compute the Cholesky decomposition of A
+    // if(lltOfOneLaplacian.info() == Eigen::NumericalIssue)
+    // {
+    //     throw std::runtime_error("One Laplacian is possibly non semi-positive definitie matrix!");
+    // }    
+
     try {
         //reformulate the problem in terms of halfedges 
         // Create an environment
@@ -1426,8 +1430,6 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
                     + gradU[f.getIndex()][2] * gradU[f.getIndex()][2]);
         }
 
-
-
         //setting the objective to be min ||\sigma^T \Delta^1 \sigma||
         // std::vector<GRBLinExpr> delSigma(gluedMesh.nHalfedges()); 
         // for (int r = 0; r < OneLaplacian.outerSize(); ++r) {
@@ -1440,7 +1442,6 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
         // for (Halfedge he : gluedMesh.halfedges()){
         //     obj += sigma[he.getIndex()] * delSigma[he.getIndex()];
         // }
-
 
         model.setObjective(obj, GRB_MINIMIZE);
         model.optimize(); 
@@ -1469,6 +1470,14 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
             }
             std::cout << "value of path integral " << i << " is: " << pathIntegral << std::endl;
         } 
+
+        double sum = 0.0;
+        //print out the average norm of gradU 
+        for (Face f : gluedMesh.faces()){
+            sum += sqrt(pow(gradU[f.getIndex()][0].getValue(), 2) + pow(gradU[f.getIndex()][1].getValue(), 2) + pow(gradU[f.getIndex()][2].getValue(), 2));
+        }
+
+        std::cout << "Average length of gradU after placing " << singularEdges.size()/2 << " singularity pairs: " << sum/gluedMesh.nFaces() << std::endl;
 
         /**
         //trying to optimize directly over edges 
@@ -1535,5 +1544,24 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
     }
 
     return std::tie(gluedOneForm, objectiveVal);
+}
+
+//compute face curl by averaging edge curl over the edges in a face 
+FaceData<double> computeAverageEdgeCurlonFaces(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
+                                FaceData<Vector3>& globalFaceGradients, std::map<int, int>& globalToGluedEdgeMap){
+    
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    FaceData<double> faceCurl(globalMesh);
+    EdgeData<double> edgeCurl = computeEdgeCurl(globalGeometry, gluedGeometry, globalFaceGradients, globalToGluedEdgeMap);
+
+    for (Face f : globalMesh.faces()){
+        double sum = 0.0;
+        for (Edge e : f.adjacentEdges()){
+            sum += edgeCurl[e];
+        }
+        faceCurl[f] = sum/3.;
+    }
+    return faceCurl;   
 }
 

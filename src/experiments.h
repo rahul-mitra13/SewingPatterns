@@ -84,3 +84,7 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
 
 //solve the optimization problem for the harmonic 1-form
 std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& globalToGluedVertexMap);
+
+//compute face curl by averaging edge curl over the edges in a face 
+FaceData<double> computeAverageEdgeCurlonFaces(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
+                                FaceData<Vector3>& globalFaceGradients, std::map<int, int>& globalToGluedEdgeMap);
