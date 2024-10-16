@@ -88,3 +88,9 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
 //compute face curl by averaging edge curl over the edges in a face 
 FaceData<double> computeAverageEdgeCurlonFaces(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
                                 FaceData<Vector3>& globalFaceGradients, std::map<int, int>& globalToGluedEdgeMap);
+
+//find max/min curl face for a given isoline of the TIME FUNCTION 
+//would probably want to change tracing the level sets of the time function with level sets of the harmonic 1-form
+std::pair<int, int> findFaceSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, FaceData<double>& curl,
+                                            VertexData<double>& gluedTimeFunction, polyscope::SurfaceMesh& psMesh, std::map<int, int>& globalToGluedVertexMap,
+                                            std::vector<double>& usedIsoVals, double isoVal, int numPairs, bool useAllFaces);
