@@ -83,7 +83,8 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
                                                                     polyscope::SurfaceMesh& psMesh, globalBoundaryConditions& boundaryConditions, double period);
 
 //solve the optimization problem for the harmonic 1-form
-std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& globalToGluedVertexMap);
+std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& globalToGluedVertexMap, 
+                                                                polyscope::SurfaceMesh& psMesh);
 
 //compute face curl by averaging edge curl over the edges in a face 
 FaceData<double> computeAverageEdgeCurlonFaces(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
