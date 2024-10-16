@@ -1262,7 +1262,9 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
                                                     " singularity pairs", positionsCourse, edgesCourse);
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
-
+    FaceData<Vector3> gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, oldGluedSigmaTilde);
+    faceCurl = computeAverageEdgeCurlonFaces(globalGeometry, gluedGeometry, gradSigmaTilde, globalToGluedEdgeMap);
+    psMesh.addFaceScalarQuantity("face curl after placing " + std::to_string(numPairs) + " singularity pairs", faceCurl);
     return std::tie(oldGluedSigmaTilde, edgeSingularities);
 }
 
