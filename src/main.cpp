@@ -146,7 +146,7 @@ void showStripePatterns(){
   HalfedgeData<double> sigmaTilde(globalGeometry -> mesh);
   EdgeData<double> edgeSingularities(globalGeometry -> mesh);
   std::tie(sigmaTilde, edgeSingularities) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
-                                                            vertexMap, edgeMap, *globalPSMesh, globalBdyConditions, period);
+                                                            vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
 
   //KNIT GRAPH GENERATION 
   //first rotate the gradients by 

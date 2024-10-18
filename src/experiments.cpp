@@ -1068,7 +1068,7 @@ void vizEdgeDifference(VertexPositionGeometry& globalGeometry, EdgeLengthGeometr
 //iteration and then normalize to find edge-based curl
 std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction,
                                                                     FaceData<Vector3>& globalFaceGradients, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
-                                                                    std::map<int, int>& globalToGluedVertexMap, std::map<int, int>& globalToGluedEdgeMap, 
+                                                                    std::map<int, int>& globalToGluedVertexMap, std::map<int, int>& globalToGluedEdgeMap, std::vector<std::pair<int, int>>& edgeMappingsPairs, 
                                                                     polyscope::SurfaceMesh& psMesh, globalBoundaryConditions& boundaryConditions, double period){
     
     SurfaceMesh& globalMesh = globalGeometry.mesh;
@@ -1117,7 +1117,7 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
             bdyBdyPath[e] = boundaryConditions.bdyBdyPathConstraints[i][globalToGluedEdgeMap[e.getIndex()]];
         }
         psMesh.addEdgeScalarQuantity("bdy bdy path " + std::to_string(i), bdyBdyPath);
-        edgePathConstraints.push_back(std::make_pair(boundaryConditions.bdyBdyPathConstraints[i], 30.0));
+        edgePathConstraints.push_back(std::make_pair(boundaryConditions.bdyBdyPathConstraints[i], 100.0));
     }
     model.setPeriod(period);
     model.setBdyEdges(boundaryConditions.courseBdyEdges);
@@ -1131,18 +1131,37 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
                                 globalToGluedEdgeMap);
 
     psMesh.addEdgeScalarQuantity("edge curl after placing " + std::to_string(numPairs) + " singularity pairs", edgeCurl);
-    //find max/min curl edge over entire mesh 
-    std::pair<int, int> singEdgePair = findEdgeSingularityPair(globalGeometry, gluedGeometry, edgeCurl,
+    faceCurl = computeAverageEdgeCurlonFaces(globalGeometry, gluedGeometry, globalFaceGradients, globalToGluedEdgeMap);
+    psMesh.addFaceScalarQuantity("face curl after placing " + std::to_string(numPairs) + " singularity pairs", faceCurl);
+    //find max/min curl face over entire mesh 
+    std::pair<int, int> singFacePair = findFaceSingularityPair(globalGeometry, gluedGeometry, faceCurl,
                                         gluedTimeFunction, psMesh, globalToGluedVertexMap, usedIsoVals, 0.0, numPairs, true);
+    faceSingularities[singFacePair.first] = 1.0;
+    faceSingularities[singFacePair.second] = -1.0;
+    faceIndices[singFacePair.first] = 1.0;
+    faceIndices[singFacePair.second] = -1.0;
+    //find max/min curl edge over entire mesh 
+    // std::pair<int, int> singEdgePair = findEdgeSingularityPair(globalGeometry, gluedGeometry, edgeCurl,
+    //                                     gluedTimeFunction, psMesh, globalToGluedVertexMap, usedIsoVals, 0.0, numPairs, true);
     
-    edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
-    edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
-    //first pair of singular edges (edge-curl approach)
-    singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singEdgePair.first], -1));
-    singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singEdgePair.second], 1));
+    // edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
+    // edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
+    // //first pair of singular edges (edge-curl approach)
+    // singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singEdgePair.first], -1));
+    // singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singEdgePair.second], 1));
 
+    int negEdge = findSingularEdgeFromSingularFace(globalGeometry, gluedGeometry, singFacePair.first, globalFaceGradients[singFacePair.first]);
+    int posEdge = findSingularEdgeFromSingularFace(globalGeometry, gluedGeometry, singFacePair.second, globalFaceGradients[singFacePair.second]);
+    edgeSingularities[globalMesh.edge(posEdge)] = 1.0;
+    edgeSingularities[globalMesh.edge(negEdge)] = -1.0;
+    //first pair of singular edges (edge-curl approach)
+    singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[negEdge], -1));
+    singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[posEdge], 1));
+    std::cout << "negative edge " << negEdge << std::endl;
+    std::cout << "positive edge " << posEdge << std::endl;
+    
     //solve the model without any singularities 
-    std::tie(newGluedSigmaTilde, currObj) = computeHarmonic1Form(globalGeometry, gluedGeometry, model, globalToGluedVertexMap, psMesh);
+    std::tie(newGluedSigmaTilde, currObj) = computeHarmonic1Form(globalGeometry, gluedGeometry, model, globalToGluedVertexMap, edgeMappingsPairs, psMesh);
     oldObj = currObj;
     oldGluedSigmaTilde = newGluedSigmaTilde;
     std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, oldGluedSigmaTilde, period);
@@ -1156,7 +1175,7 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
     numPairs++;
     psMesh.addEdgeScalarQuantity("edge singularities after inserting " + std::to_string(numPairs) + " singularity pairs", edgeSingularities);
     //solve the model with 1 pair of singularities
-    std::tie(newGluedSigmaTilde, currObj) = computeHarmonic1Form(globalGeometry, gluedGeometry, model, globalToGluedVertexMap, psMesh);
+    std::tie(newGluedSigmaTilde, currObj) = computeHarmonic1Form(globalGeometry, gluedGeometry, model, globalToGluedVertexMap, edgeMappingsPairs, psMesh);
     oldObj = currObj;
     oldGluedSigmaTilde = newGluedSigmaTilde;
     std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, oldGluedSigmaTilde, period);
@@ -1174,10 +1193,9 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
         psMesh.addFaceVectorQuantity("grad sigmaTilde after placing " + std::to_string(numPairs) + " singularity pairs", gradSigmaTilde);
         //recompute edge curl using gradSigmaTilde
         edgeCurl = computeEdgeCurl(globalGeometry, gluedGeometry, gradSigmaTilde, globalToGluedEdgeMap);
-        //compute vertex curl to see what it looks like 
-        //VertexData<double> vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, gradSigmaTilde, gluedOneRingMap);
-        //psMesh.addVertexScalarQuantity("vertex curl after placing " + std::to_string(numPairs) + " edge singularity pairs", vertexCurl);
         psMesh.addEdgeScalarQuantity("edge curl after placing " + std::to_string(numPairs) + " singularity pairs", edgeCurl);
+        faceCurl = computeAverageEdgeCurlonFaces(globalGeometry, gluedGeometry, gradSigmaTilde, globalToGluedEdgeMap);
+        psMesh.addFaceScalarQuantity("face curl after placing " + std::to_string(numPairs) + " singularity pairs", faceCurl);
         double isoVal = findIsoValWithMaxAvgEdgeCurl(globalGeometry, gluedGeometry, edgeCurl, gluedTimeFunction,
                                                     usedIsoVals, globalToGluedVertexMap);
         if (std::fabs(isoVal - (-1.0) < 1e-15)){
@@ -1185,21 +1203,48 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
             break;//our function couldn't find any more isovalues
         } 
         std::cout << "next isoval = " << isoVal << std::endl;
-        singEdgePair = findEdgeSingularityPair(globalGeometry, gluedGeometry, edgeCurl,
-                                        gluedTimeFunction, psMesh, globalToGluedVertexMap, usedIsoVals, isoVal, numPairs, false);
-        if (std::find(singularEdges.begin(), singularEdges.end(), std::make_pair(globalToGluedEdgeMap[singEdgePair.first], -1.0)) != singularEdges.end()
-            || std::find(singularEdges.begin(), singularEdges.end(), std::make_pair(globalToGluedEdgeMap[singEdgePair.second], 1.0)) != singularEdges.end()){
+        // singEdgePair = findEdgeSingularityPair(globalGeometry, gluedGeometry, edgeCurl,
+        //                                 gluedTimeFunction, psMesh, globalToGluedVertexMap, usedIsoVals, isoVal, numPairs, false);
+        //find max/min curl face 
+        singFacePair = findFaceSingularityPair(globalGeometry, gluedGeometry, faceCurl,
+                                            gluedTimeFunction, psMesh, globalToGluedVertexMap, usedIsoVals, isoVal, numPairs, false);
+        // if (std::find(singularEdges.begin(), singularEdges.end(), std::make_pair(globalToGluedEdgeMap[singEdgePair.first], -1.0)) != singularEdges.end()
+        //     || std::find(singularEdges.begin(), singularEdges.end(), std::make_pair(globalToGluedEdgeMap[singEdgePair.second], 1.0)) != singularEdges.end()){
+        //     //don't use edges you've used before
+        //     usedIsoVals.push_back(isoVal);
+        //     continue;
+        // }
+        if (faceIndices[singFacePair.first] != 0
+            || faceIndices[singFacePair.second] != 0){
+            //don't use faces you've used before
+            usedIsoVals.push_back(isoVal);
+            continue;
+        }
+        faceSingularities[singFacePair.first] = 1.0;
+        faceSingularities[singFacePair.second] = -1.0;
+        faceIndices[singFacePair.first] = 1.0;
+        faceIndices[singFacePair.second] = -1.0;
+        int negEdge = findSingularEdgeFromSingularFace(globalGeometry, gluedGeometry, singFacePair.first, globalFaceGradients[singFacePair.first]);
+        int posEdge = findSingularEdgeFromSingularFace(globalGeometry, gluedGeometry, singFacePair.second, globalFaceGradients[singFacePair.second]);
+        //don't select edges we've seen before 
+        if ((std::find(singularEdges.begin(), singularEdges.end(), std::make_pair(globalToGluedEdgeMap[posEdge], 1)) != singularEdges.end())
+            || std::find(singularEdges.begin(), singularEdges.end(), std::make_pair(globalToGluedEdgeMap[negEdge], -1)) != singularEdges.end()){
             //don't use edges you've used before
             usedIsoVals.push_back(isoVal);
             continue;
         }
+        edgeSingularities[globalMesh.edge(posEdge)] = 1.0;
+        edgeSingularities[globalMesh.edge(negEdge)] = -1.0;
+        //first pair of singular edges (edge-curl approach)
+        singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[negEdge], -1));
+        singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[posEdge], 1));
         usedIsoVals.push_back(isoVal);
-        singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singEdgePair.first], -1));
-        singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singEdgePair.second], 1));
+        // singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singEdgePair.first], -1));
+        // singularEdges.push_back(std::make_pair(globalToGluedEdgeMap[singEdgePair.second], 1));
         model.setSingularEdges(singularEdges);
         //solve the optimization problem 
         //sigmaTilde is in the glued mesh setting 
-        std::tie(newGluedSigmaTilde, currObj) = computeHarmonic1Form(globalGeometry, gluedGeometry, model, globalToGluedVertexMap, psMesh);
+        std::tie(newGluedSigmaTilde, currObj) = computeHarmonic1Form(globalGeometry, gluedGeometry, model, globalToGluedVertexMap, edgeMappingsPairs, psMesh);
         // if (currObj > oldObj){//current objective become worse or staying the same 
         //     std::cout << "Breaking cause objective no longer improving..." << std::endl;
         //     std::cout << "oldObj " << oldObj << std::endl;
@@ -1207,9 +1252,10 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
         //     break;
         // }
         //increment, update and visualize
-        edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
-        edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
+        //edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
+        //edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
         numPairs++;
+        psMesh.addFaceScalarQuantity("face singularities after inserting " + std::to_string(numPairs) + " singularity pairs", faceSingularities);
         psMesh.addEdgeScalarQuantity("edge singularities after inserting " + std::to_string(numPairs) + " singularity pairs", edgeSingularities);
         oldObj = currObj;
         oldGluedSigmaTilde = newGluedSigmaTilde;
@@ -1271,7 +1317,7 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPosit
 
 //solve the optimization problem for the harmonic 1-form
 std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
-                                                                std::map<int, int>& globalToGluedVertexMap, polyscope::SurfaceMesh& psMesh){
+                                                        std::map<int, int>& globalToGluedVertexMap, std::vector<std::pair<int, int>>& edgeMappingsPairs, polyscope::SurfaceMesh& psMesh){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
@@ -1529,19 +1575,44 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
         }
 
         //compute edge-averaged del sigma 
+        //create a map from the mapped edges
+        std::map<int, int> edgeMap;
+        for (std::pair<int, int> pair : edgeMappingsPairs){
+            edgeMap.insert({pair.first, pair.second});
+        }
+
+        //edges which we've handles already
+        std::map<int, bool> seenEdges;
         for (Edge e : globalMesh.edges()){
-            if (e.halfedge().twin().isInterior()){
-                if (e.halfedge().orientation()){
-                    edgeAveragedDelSigma[e] = 0.5 * dot((normalizedDelSigma[e.halfedge().face()] + normalizedDelSigma[e.halfedge().twin().face()]),
-                                    globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()]);
+            seenEdges.insert({e.getIndex(), false});
+        }
+
+        for (Edge e : globalMesh.edges()){
+            if (seenEdges[e.getIndex()]) continue;
+            if (e.halfedge().twin().isInterior()){//found an interior halfedge
+                Vector3 eVector = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
+                edgeAveragedDelSigma[e] = 0.5 * dot((normalizedDelSigma[e.halfedge().face()] + normalizedDelSigma[e.halfedge().twin().face()]),
+                                    eVector);
+                seenEdges[e.getIndex()] = true;
+            }
+            else{//found a boundary halfedge
+                if (edgeMap.find(e.getIndex()) != edgeMap.end()){//found a stitched together edge
+                    //take the average direction vector? 
+                    Vector3 e1 = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
+                    //just pick the original edge as the "canonical" direction in the global mesh
+                    edgeAveragedDelSigma[e] = 0.5 * dot((normalizedDelSigma[e.halfedge().face()] + normalizedDelSigma[e.halfedge().twin().face()]), e1);
+                    edgeAveragedDelSigma[globalMesh.edge(edgeMap.at(e.getIndex()))] = 0.5 * dot((normalizedDelSigma[e.halfedge().face()] + normalizedDelSigma[e.halfedge().twin().face()]), e1);
+                    seenEdges[e.getIndex()] = true;
+                    seenEdges[edgeMap.at(e.getIndex())] = true;
+                }
+                else{//found a boundary edge that's not stitched to anything
+                    Vector3 eVector = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
+                    edgeAveragedDelSigma[e] = dot(normalizedDelSigma[e.halfedge().face()], eVector);
+                    seenEdges[e.getIndex()] = true;
                 }
             }
-      	    //handle edges on the boundary
-      	    else{
-      		    edgeAveragedDelSigma[e] = dot(normalizedDelSigma[e.halfedge().face()], globalGeometry.vertexPositions[e.halfedge().tipVertex()] - 
-                                                                                globalGeometry.vertexPositions[e.halfedge().tailVertex()]);
-      	    }
         }
+
         //compute curl use edge-averaged del sigma
         for (Face f : globalMesh.faces()){
             int signIJ = f.halfedge().orientation() ? 1 : -1;
@@ -1551,7 +1622,6 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
             double valJK = signJK * edgeAveragedDelSigma[f.halfedge().next().edge()];
             double valKI = signKI * edgeAveragedDelSigma[f.halfedge().next().next().edge()];
             d1edgeAveragedDelSigma[f] = valIJ + valJK + valKI;
-            //d1edgeAveragedDelSigma[f] = d1edgeAveragedDelSigma[f] > 0 ? std::log(d1edgeAveragedDelSigma[f]) : -std::log(std::fabs(d1edgeAveragedDelSigma[f]));
         }
     }
     catch(GRBException e) {
@@ -1561,8 +1631,8 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
         std::cout << "Exception during optimization" << std::endl;
     }
 
-    psMesh.addFaceScalarQuantity("d1 * edge averaged del sigma after placing " + std::to_string(numSingularFaces) + " singular edges", d1edgeAveragedDelSigma);
-    psMesh.addFaceVectorQuantity("normalized del sigma after placing " + std::to_string(numSingularFaces) + " singular edges", normalizedDelSigma);
+    psMesh.addFaceScalarQuantity("d1 * edge averaged del sigma after placing " + std::to_string(singularEdges.size() / 2) + " singular edges", d1edgeAveragedDelSigma);
+    //psMesh.addFaceVectorQuantity("normalized del sigma after placing " + std::to_string(numSingularFaces) + " singular edges", normalizedDelSigma);
     return std::tie(gluedOneForm, objectiveVal);
 }
 
@@ -1654,6 +1724,31 @@ std::pair<int, int> findFaceSingularityPair(VertexPositionGeometry& globalGeomet
         }
         return std::make_pair(maxFace, minFace);
     }
+}
 
+int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, int singFaceIndex, Vector3 globalFaceGradient){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh; 
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+
+    double max = -DBL_MAX;
+    Edge maxEdge;
+    
+    for (Edge e : globalMesh.face(singFaceIndex).adjacentEdges()){
+        Halfedge he1 = e.halfedge();
+        Halfedge he2 = e.halfedge().twin();
+        double p1 = dot(globalGeometry.vertexPositions[he1.tipVertex()] - globalGeometry.vertexPositions[he1.tailVertex()], globalFaceGradient);
+        double p2 = dot(globalGeometry.vertexPositions[he2.tipVertex()] - globalGeometry.vertexPositions[he2.tailVertex()], globalFaceGradient);
+        if (p1 > max){
+            max = p1;
+            maxEdge = he1.edge();
+        }
+        else if (p2 > max){
+            max = p2;
+            maxEdge = he2.edge();
+        }
+    }
+    std::cout << "max edge = " << maxEdge << std::endl;
+    return maxEdge.getIndex();
 }
 
