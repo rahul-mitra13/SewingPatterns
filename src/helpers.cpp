@@ -417,7 +417,6 @@ std::unique_ptr<EdgeLengthGeometry> createGluedEdgeLengthGeometry(VertexPosition
                     vertexMap.insert({p.second, numUniqueVertices});
                     //put in the other other map 
                     gluedMeshVertexIndexToOriginalMeshIndex.insert({numUniqueVertices, p.first});
-                    
                     numUniqueVertices++;
                 }
                 if (vertexMap.find(p.first) != vertexMap.end()&&

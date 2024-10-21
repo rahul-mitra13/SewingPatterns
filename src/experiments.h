@@ -99,3 +99,8 @@ std::pair<int, int> findFaceSingularityPair(VertexPositionGeometry& globalGeomet
 //after finding a face singularity, find a singular edge in that face 
 //edge that is most aligned with the gradient of the time function
 int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, int singFaceIndex, Vector3 globalFaceGradient);
+
+//find the isoval with max average curl in the face setting
+double findIsoValWithMaxAvgFaceCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, FaceData<double>& curl, 
+                                            VertexData<double>& gluedTimeFunction, std::vector<double>& usedIsoVals, 
+                                            std::map<int, int>& globalToGluedVertexMap);
