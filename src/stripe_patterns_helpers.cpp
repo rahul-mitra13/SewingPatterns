@@ -460,3 +460,68 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
 
   return std::tie(points, edges);
 }
+
+// Compute the 1-form \omega_{ij} such as defined in eq.7 of [Knoppel et al. 2015]
+//this returns omega per edge in the glued mesh setting 
+EdgeData<double> computeOmega(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Edge& globalMeshEdge,
+                    std::map<int, int>& globalToGluedEdgeMap, std::vector<std::pair<int, int>>& edgeMappingsPairs, int direction, FaceData<Vector3>& gradient){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    globalGeometry.requireFaceNormals();
+    EdgeData<double> globalOmega(globalMesh);
+    EdgeData<double> gluedOmega(gluedMesh);
+    FaceData<Vector3> faceGradientsCopy = gradient;
+    //if we're computing the matching 1-form in the wale direction, rotate all the gradients 
+    if (direction == 1){
+        for (Face f : globalMesh.faces()){
+            //first normalize the gradients? 
+            faceGradientsCopy[f] = faceGradientsCopy[f].rotateAround(globalGeometry.faceNormals[f], PI/2.);
+            faceGradientsCopy[f] = faceGradientsCopy[f].normalize();
+        }
+    }
+
+    //create a map from the mapped edges
+    std::map<int, int> edgeMap;
+    for (std::pair<int, int> pair : edgeMappingsPairs){
+        edgeMap.insert({pair.first, pair.second});
+    }
+
+    //edges which we've handles already
+    std::map<int, bool> seenEdges;
+    for (Edge e : globalMesh.edges()){
+        seenEdges.insert({e.getIndex(), false});
+    }
+
+    for (Edge e : globalMesh.edges()){
+        if (seenEdges[e.getIndex()]) continue;
+        if (e.halfedge().twin().isInterior()){//found an interior halfedge
+            Vector3 eVector = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
+            globalOmega[e] = 0.5 * dot((faceGradientsCopy[e.halfedge().face()] + faceGradientsCopy[e.halfedge().twin().face()]),
+                                    eVector);
+            seenEdges[e.getIndex()] = true;
+        }
+        else{//found a boundary halfedge
+            if (edgeMap.find(e.getIndex()) != edgeMap.end()){//found a stitched together edge
+                Vector3 faceGradientsCopy1 = faceGradientsCopy[e.halfedge().face()].normalize();
+                Vector3 faceGradientsCopy2 = faceGradientsCopy[globalMesh.edge(edgeMap.at(e.getIndex())).halfedge().face()].normalize();
+                Vector3 e1 = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
+                globalOmega[e] = 0.5 * dot((faceGradientsCopy1 + faceGradientsCopy2), e1);
+                globalOmega[globalMesh.edge(edgeMap.at(e.getIndex()))] = 0.5 * dot((faceGradientsCopy1 + (faceGradientsCopy2)), e1);
+                seenEdges[e.getIndex()] = true;
+                seenEdges[edgeMap.at(e.getIndex())] = true;
+            }
+            else{//found a boundary edge that's not stitched to anything
+                faceGradientsCopy[e.halfedge().face()] = faceGradientsCopy[e.halfedge().face()].normalize();
+                Vector3 eVector = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
+                globalOmega[e] = dot(faceGradientsCopy[e.halfedge().face()], eVector);
+                seenEdges[e.getIndex()] = true;
+            }
+        }
+    }
+    
+    gluedOmega = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, globalOmega, globalToGluedEdgeMap);
+
+    return gluedOmega;
+
+}

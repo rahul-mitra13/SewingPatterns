@@ -118,6 +118,13 @@ void showStripePatterns(){
   // EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, edgeMap, *globalPSMesh);
   //EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
   //HalfedgeData<double> sigmaCourseGlued = computeVertexSingularityField(*globalGeometry, *gluedELG, modelCourse, *globalPSMesh, vertexMap, gluedOneRingMap);
+
+  VertexData<Vector2> lineField = computeSmoothestBoundaryAlignedVertexDirectionField(*globalGeometry, 2);
+  std::vector<Vector3> pos; 
+  std::vector<std::array<size_t, 2>> edges; 
+  VertexData<double> frequencies(*globalMesh, 25 * PI);
+  std::tie(pos, edges) = computeStripePatternPolylines(*globalGeometry,frequencies, lineField, true);
+  polyscope::registerCurveNetwork("stripe patterns", pos, edges);
   
   //global data
   CornerData<double> stripeValuesSigmaCourse;

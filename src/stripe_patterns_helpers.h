@@ -9,6 +9,9 @@
 
 #include "polyscope/surface_mesh.h"
 
+//utility helper functions
+#include "helpers.h"
+
 #include <vector>
 #include <queue>
 
@@ -59,3 +62,9 @@ HalfedgeData<std::vector<double>> getHalfEdgeIsoValues(IntrinsicGeometryInterfac
 std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLines(EmbeddedGeometryInterface& geometry,
                                                       const CornerData<double>& stripeValues,
                                                       const FaceData<int>& stripesIndices, double period);
+
+
+// Compute the 1-form \omega_{ij} such as defined in eq.7 of [Knoppel et al. 2015]
+//this returns omega per edge in the glued mesh setting 
+EdgeData<double> computeOmega(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Edge& globalMeshEdge,
+                    std::map<int, int>& globalToGluedEdgeMap, std::vector<std::pair<int, int>>& edgeMappingsPairs, int direction, FaceData<Vector3>& gradient);
