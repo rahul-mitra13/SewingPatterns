@@ -4,6 +4,7 @@
 #include "geometrycentral/surface/vertex_position_geometry.h"
 #include "geometrycentral/surface/direction_fields.h"
 #include "geometrycentral/surface/edge_length_geometry.h"
+#include "geometrycentral/surface/remeshing.h"
 
 //polyscope includes 
 #include "polyscope/polyscope.h"
@@ -196,6 +197,7 @@ int main(int argc, char **argv) {
     std::cout << "Error: Mesh is not triangular" << std::endl;
     throw std::exception();
   }
+  fixDelaunay(*globalMesh, *globalGeometry);
   globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(data["model_path"]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
   vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(data["vertex_mappings"]);
   edgeMappingsPairs = buildPairOfStitchedEdges(*globalGeometry, vertexMappingsPairs);
