@@ -461,9 +461,11 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
   return std::tie(points, edges);
 }
 
+//-------------------------re-impleminting Knoppel's stripes-----------------------//
+
 // Compute the 1-form \omega_{ij} such as defined in eq.7 of [Knoppel et al. 2015]
 //this returns omega per edge in the glued mesh setting 
-EdgeData<double> computeOmega(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Edge& globalMeshEdge,
+EdgeData<double> computeOmega(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
                     std::map<int, int>& globalToGluedEdgeMap, std::vector<std::pair<int, int>>& edgeMappingsPairs, int direction, FaceData<Vector3>& gradient){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
@@ -475,9 +477,7 @@ EdgeData<double> computeOmega(VertexPositionGeometry& globalGeometry, EdgeLength
     //if we're computing the matching 1-form in the wale direction, rotate all the gradients 
     if (direction == 1){
         for (Face f : globalMesh.faces()){
-            //first normalize the gradients? 
-            faceGradientsCopy[f] = faceGradientsCopy[f].rotateAround(globalGeometry.faceNormals[f], PI/2.);
-            faceGradientsCopy[f] = faceGradientsCopy[f].normalize();
+          faceGradientsCopy[f] = faceGradientsCopy[f].rotateAround(globalGeometry.faceNormals[f], PI/2.);
         }
     }
 
@@ -492,7 +492,6 @@ EdgeData<double> computeOmega(VertexPositionGeometry& globalGeometry, EdgeLength
     for (Edge e : globalMesh.edges()){
         seenEdges.insert({e.getIndex(), false});
     }
-
     for (Edge e : globalMesh.edges()){
         if (seenEdges[e.getIndex()]) continue;
         if (e.halfedge().twin().isInterior()){//found an interior halfedge
@@ -503,8 +502,8 @@ EdgeData<double> computeOmega(VertexPositionGeometry& globalGeometry, EdgeLength
         }
         else{//found a boundary halfedge
             if (edgeMap.find(e.getIndex()) != edgeMap.end()){//found a stitched together edge
-                Vector3 faceGradientsCopy1 = faceGradientsCopy[e.halfedge().face()].normalize();
-                Vector3 faceGradientsCopy2 = faceGradientsCopy[globalMesh.edge(edgeMap.at(e.getIndex())).halfedge().face()].normalize();
+                Vector3 faceGradientsCopy1 = faceGradientsCopy[e.halfedge().face()];
+                Vector3 faceGradientsCopy2 = faceGradientsCopy[globalMesh.edge(edgeMap.at(e.getIndex())).halfedge().face()];
                 Vector3 e1 = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
                 globalOmega[e] = 0.5 * dot((faceGradientsCopy1 + faceGradientsCopy2), e1);
                 globalOmega[globalMesh.edge(edgeMap.at(e.getIndex()))] = 0.5 * dot((faceGradientsCopy1 + (faceGradientsCopy2)), e1);
@@ -512,7 +511,7 @@ EdgeData<double> computeOmega(VertexPositionGeometry& globalGeometry, EdgeLength
                 seenEdges[edgeMap.at(e.getIndex())] = true;
             }
             else{//found a boundary edge that's not stitched to anything
-                faceGradientsCopy[e.halfedge().face()] = faceGradientsCopy[e.halfedge().face()].normalize();
+                faceGradientsCopy[e.halfedge().face()] = faceGradientsCopy[e.halfedge().face()];
                 Vector3 eVector = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
                 globalOmega[e] = dot(faceGradientsCopy[e.halfedge().face()], eVector);
                 seenEdges[e.getIndex()] = true;
@@ -523,5 +522,216 @@ EdgeData<double> computeOmega(VertexPositionGeometry& globalGeometry, EdgeLength
     gluedOmega = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, globalOmega, globalToGluedEdgeMap);
 
     return gluedOmega;
+
+}
+
+// Build a Laplace-like matrix with double entries (necessary to represent complex conjugation)
+SparseMatrix<double> buildVertexEnergyMatrix(EdgeLengthGeometry& gluedGeometry, const FaceData<int>& branchIndices, const EdgeData<double>& omega){
+
+  SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+
+  gluedGeometry.requireVertexIndices();
+  gluedGeometry.requireHalfedgeCotanWeights();
+
+  std::vector<Eigen::Triplet<double>> triplets;
+  triplets.reserve(12 * gluedMesh.nEdges());
+  for (Edge e : gluedMesh.edges()) {
+    // compute the discrete 1-form
+    double omegaIJ = omega[e];
+
+    // compute the cotan weight
+    double w = 0;
+    if (branchIndices[e.halfedge().face()] == 0) {
+      w += gluedGeometry.halfedgeCotanWeights[e.halfedge()];
+    }
+    if (!e.isBoundary() && branchIndices[e.halfedge().twin().face()] == 0) {
+      w += gluedGeometry.halfedgeCotanWeights[e.halfedge().twin()];
+    }
+
+    int i = 2 * gluedGeometry.vertexIndices[e.halfedge().vertex()];
+    int j = 2 * gluedGeometry.vertexIndices[e.halfedge().twin().vertex()];
+
+    // add the diagonal terms
+    triplets.emplace_back(i + 0, i + 0, w);
+    triplets.emplace_back(i + 1, i + 1, w);
+
+    triplets.emplace_back(j + 0, j + 0, w);
+    triplets.emplace_back(j + 1, j + 1, w);
+
+    // compute the new transport coefficient
+    Vector2 rij = w * Vector2::fromAngle(omegaIJ);
+
+    // these terms are the same in both cases
+    triplets.emplace_back(i + 0, j + 0, -rij.x);
+    triplets.emplace_back(i + 1, j + 0, rij.y);
+
+    triplets.emplace_back(j + 0, i + 0, -rij.x);
+    triplets.emplace_back(j + 0, i + 1, rij.y);
+
+    triplets.emplace_back(i + 0, j + 1, -rij.y);
+    triplets.emplace_back(i + 1, j + 1, -rij.x);
+
+    triplets.emplace_back(j + 1, i + 0, -rij.y);
+    triplets.emplace_back(j + 1, i + 1, -rij.x);
+
+  }
+
+  // assemble matrix from triplets
+  SparseMatrix<double> vertexEnergyMatrix(2 * gluedMesh.nVertices(), 2 * gluedMesh.nVertices());
+  vertexEnergyMatrix.setFromTriplets(triplets.begin(), triplets.end());
+
+  // Shift to avoid singularity
+  SparseMatrix<double> eye(2 * gluedMesh.nVertices(), 2 * gluedMesh.nVertices());
+  eye.setIdentity();
+  vertexEnergyMatrix += 1e-4 * eye;
+  
+  return vertexEnergyMatrix;
+}
+
+// Build a lumped mass matrix with double entries
+SparseMatrix<double> computeRealVertexMassMatrix(IntrinsicGeometryInterface& geometry) {
+
+  SurfaceMesh& mesh = geometry.mesh;
+
+  geometry.requireVertexDualAreas();
+
+  std::vector<Eigen::Triplet<double>> triplets(2 * mesh.nVertices());
+  for (size_t i = 0; i < mesh.nVertices(); ++i) {
+    double area = geometry.vertexDualAreas[i];
+    triplets[2 * i] = Eigen::Triplet<double>(2 * i, 2 * i, area);
+    triplets[2 * i + 1] = Eigen::Triplet<double>(2 * i + 1, 2 * i + 1, area);
+  }
+
+  // assemble matrix from triplets
+  SparseMatrix<double> realVertexMassMatrix(2 * mesh.nVertices(), 2 * mesh.nVertices());
+  realVertexMassMatrix.setFromTriplets(triplets.begin(), triplets.end());
+
+  return realVertexMassMatrix;
+
+}
+
+// Build a lumped mass matrix with double entries
+SparseMatrix<double> computeRealVertexMassMatrix(EdgeLengthGeometry& gluedGeometry){
+
+  SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+
+  gluedGeometry.requireVertexDualAreas();
+
+  std::vector<Eigen::Triplet<double>> triplets(2 * gluedMesh.nVertices());
+  for (size_t i = 0; i < gluedMesh.nVertices(); ++i) {
+    double area = gluedGeometry.vertexDualAreas[i];
+    triplets[2 * i] = Eigen::Triplet<double>(2 * i, 2 * i, area);
+    triplets[2 * i + 1] = Eigen::Triplet<double>(2 * i + 1, 2 * i + 1, area);
+  }
+
+  // assemble matrix from triplets
+  SparseMatrix<double> realVertexMassMatrix(2 * gluedMesh.nVertices(), 2 * gluedMesh.nVertices());
+  realVertexMassMatrix.setFromTriplets(triplets.begin(), triplets.end());
+
+  return realVertexMassMatrix;
+
+}
+
+// Solve the generalized eigenvalue problem in equation 9 [Knoppel et al. 2015]
+VertexData<Vector2> computeParameterization(EdgeLengthGeometry& gluedGeometry,
+                                            const FaceData<int>& branchIndices, const EdgeData<double>& omega){
+
+  SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+
+  // Compute vertex energy matrix A and mass matrix B
+  SparseMatrix<double> energyMatrix = buildVertexEnergyMatrix(gluedGeometry, branchIndices, omega);
+  SparseMatrix<double> massMatrix = computeRealVertexMassMatrix(gluedGeometry);
+
+
+  // Find the smallest eigenvector
+  Vector<double> solution = smallestEigenvectorPositiveDefinite(energyMatrix, massMatrix, 20);
+
+  // Copy the result to a VertexData vector
+  VertexData<Vector2> toReturn(gluedMesh);
+  for (size_t i = 0; i < gluedMesh.nVertices(); ++i) {
+    toReturn[i].x = solution(2 * i);
+    toReturn[i].y = solution(2 * i + 1);
+    toReturn[i] = toReturn[i].normalize();
+  }
+  return toReturn;
+}
+
+// extract the final texture coordinates from the parameterization
+std::tuple<CornerData<double>, FaceData<int>> computeTextureCoordinates(EdgeLengthGeometry& gluedGeometry,
+                                                                        const EdgeData<double>& omega,
+                                                                        const VertexData<Vector2>& parameterization){
+
+
+  SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+
+  CornerData<double> textureCoordinates(gluedMesh);
+  FaceData<int> paramIndices(gluedMesh);
+
+  gluedGeometry.requireTransportVectorsAlongHalfedge();
+
+  for (Face f : gluedMesh.faces()) {
+    textureCoordinates[f.halfedge().corner()] = parameterization[f.halfedge().vertex()].arg();
+
+    for (Halfedge he : f.adjacentHalfedges()) {
+      // grab the parameter values at vertices
+      Vector2 psiI = parameterization[he.vertex()];
+      Vector2 psiJ = parameterization[he.next().vertex()];
+
+      // is each halfedge canonical?
+      double cIJ = (he.edge().halfedge() != he ? -1 : 1);
+
+      // grab the connection coeffients
+      double omegaIJ = cIJ * omega[he.edge()];
+
+      // construct complex transport coefficients
+      Vector2 rij = Vector2::fromAngle(omegaIJ);
+
+      if (he.next() != f.halfedge()) {
+        textureCoordinates[he.next().corner()] = textureCoordinates[he.corner()] + omegaIJ - (rij * psiI / psiJ).arg();
+      } else {
+        double alpha = textureCoordinates[he.corner()] + omegaIJ - (rij * psiI / psiJ).arg();
+        paramIndices[f] = std::round((alpha - textureCoordinates[he.next().corner()]) / (2 * PI));
+      }
+    }
+  }
+
+  return std::tie(textureCoordinates, paramIndices);
+}
+
+// Isolines of this function are stripes perpendicular to the direction field spaced according to the target frequencies
+std::tuple<CornerData<double>, FaceData<int>>
+computeStripePattern(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
+                    std::map<int, int>& globalToGluedEdgeMap, std::vector<std::pair<int, int>>& edgeMappingsPairs, int direction, FaceData<Vector3>& gradient, 
+                    polyscope::SurfaceMesh& psMesh, std::vector<bool>& orientations){
+
+  SurfaceMesh& globalMesh = globalGeometry.mesh;
+  SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+  EdgeData<double> omega(gluedMesh);
+  EdgeData<double> omegaViz(globalMesh);
+
+  //unnormalized gradient vector field integrable everywhere
+  FaceData<int> branchIndices(gluedMesh, 0);
+
+  omega = computeOmega(globalGeometry, gluedGeometry,
+                    globalToGluedEdgeMap, edgeMappingsPairs, 1, gradient); 
+  
+  omegaViz = convertGluedToGlobalEdgeFunction(globalGeometry, gluedGeometry, omega, globalToGluedEdgeMap);
+  
+  psMesh.addOneFormTangentVectorQuantity("rotated 1-form", omegaViz, orientations);
+ 
+  // find singularities of the direction field
+  //FaceData<int> branchIndices = computeFaceIndex(gluedGeometry, directionField, 2);
+
+  // solve the eigenvalue problem (multiply by 2pi to get the right frequencies)
+  VertexData<Vector2> parameterization =
+      computeParameterization(gluedGeometry, branchIndices, omega);
+  
+  // compute the final corner-based values, along with singularities of the stripe pattern
+  CornerData<double> textureCoordinates;
+  FaceData<int> zeroIndices;
+  std::tie(textureCoordinates, zeroIndices) =
+      computeTextureCoordinates(gluedGeometry, omega, parameterization);
+
+  return std::tie(textureCoordinates, zeroIndices);
 
 }

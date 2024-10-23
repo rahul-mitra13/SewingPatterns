@@ -46,7 +46,6 @@ polyscope::SurfaceMesh *globalPSMesh;
 //global boundary conditions
 globalBoundaryConditions globalBdyConditions;
 
-
 //1-form optimization period
 float period = 1;
 //threshold for constraining wale boundary edges 
@@ -61,11 +60,13 @@ float lambda = 0.0;
 std::vector<size_t> perm;
 std::vector<bool> orientations;
 
+//singularities from Knoppel's stripes
+//singularities placed on faces
+std::vector<int> knoppelSingularities;
+
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
   
-  //drawMeshCurveNetwork(*globalGeometry, *globalPSMesh);
-
   //require the DEC operators
   gluedELG->requireDECOperators();
   //time function on the glued mesh 
@@ -86,6 +87,16 @@ void showStripePatterns(){
   //find boundary edges in the wale direction 
   //doing this here cause the gradient gets rotated later
   //std::vector<int> waleBdyEdges = getWaleBdyEdgesInGluedMesh(*globalGeometry, *gluedELG, timeFunctionGradientGlobal, edgeMap, threshold, *globalPSMesh);
+
+  //find Knöppel singularities in the wale direction 
+  if (globalMesh->nConnectedComponents() == 1){
+    std::cout << "In a 3D mesh! " << std::endl;
+    double angle = 90.;
+    //just run Knoppel's algorithm on these models 
+    //and then run our 1-form optimization with the singularities
+    VertexData<Vector3> vertexVectorField = computeVertexValuedField(*globalGeometry, timeFunctionGlobal, angle);
+    globalPSMesh -> addVertexVectorQuantity("rotated vertex vector", vertexVectorField);
+  }
   
   //set up the course optimization 
   Model modelCourse;
@@ -95,8 +106,8 @@ void showStripePatterns(){
   std::vector<std::array<double, 3>> modelFaceGradientsCourse;
   for (Face f : globalMesh->faces()){
     //normalize the gradients first
-    timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
-    std::array<double, 3> gradient = {timeFunctionGradientGlobal[f][0], timeFunctionGradientGlobal[f][1], timeFunctionGradientGlobal[f][2]}; 
+    std::array<double, 3> gradient = {timeFunctionGradientGlobalNormalized[f][0], timeFunctionGradientGlobalNormalized[f][1], 
+                                    timeFunctionGradientGlobalNormalized[f][2]}; 
     modelFaceGradientsCourse.push_back(gradient);
   }
   modelCourse.setFaceGradients(modelFaceGradientsCourse);
@@ -118,20 +129,7 @@ void showStripePatterns(){
   // EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, edgeMap, *globalPSMesh);
   //EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
   //HalfedgeData<double> sigmaCourseGlued = computeVertexSingularityField(*globalGeometry, *gluedELG, modelCourse, *globalPSMesh, vertexMap, gluedOneRingMap);
-
-  VertexData<Vector2> lineField = computeSmoothestBoundaryAlignedVertexDirectionField(*globalGeometry, 2);
-  std::vector<Vector3> pos; 
-  std::vector<std::array<size_t, 2>> edges; 
-  VertexData<double> frequencies(*globalMesh, 25 * PI);
-  std::tie(pos, edges) = computeStripePatternPolylines(*globalGeometry,frequencies, lineField, true);
-  polyscope::registerCurveNetwork("stripe patterns", pos, edges);
   
-  //global data
-  CornerData<double> stripeValuesSigmaCourse;
-  //global data
-  FaceData<int> stripeIndicesSigmaCourse;
-  std::vector<Vector3> positionsCourse;
-  std::vector<std::array<int, 2>> edgesCourse;
   //std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, *gluedELG, sigmaCourseGlued, period);
   //std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
   //auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns no sings (sigma)", positionsCourse, edgesCourse);
@@ -156,6 +154,34 @@ void showStripePatterns(){
   std::tie(sigmaTilde, edgeSingularities) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
                                                             vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
 
+
+  //computing Knoppel's stripes
+  // VertexData<Vector2> lineField = computeSmoothestBoundaryAlignedVertexDirectionField(*globalGeometry, 2);
+  
+  // VertexData<double> frequencies(*globalMesh, 25 * PI);
+  // std::tie(pos, edges) = computeStripePatternPolylines(*globalGeometry,frequencies, lineField, true);
+  // polyscope::registerCurveNetwork("stripe patterns", pos, edges);
+  //computing Knoppels stripes by specifying 1-form directly
+  std::vector<Vector3> positionsCourse;
+  std::vector<std::array<int, 2>> edgesCourse;
+  CornerData<double> stripeValuesGlued(gluedELG->mesh);
+  CornerData<double> stripeValuesGlobal(*globalMesh);
+  FaceData<int> zeroIndicesGlued(gluedELG->mesh);
+  FaceData<int> zeroIndicesGlobal(*globalMesh);
+  std::tie(stripeValuesGlued, zeroIndicesGlued) = computeStripePattern(*globalGeometry, *gluedELG, edgeMap, edgeMappingsPairs, 1, timeFunctionGradientGlobalNormalized, 
+                                                  *globalPSMesh, orientations);
+  for (Corner c : (gluedELG->mesh).corners()){
+    stripeValuesGlobal[c.getIndex()] = stripeValuesGlued[c];
+  }
+  for (Face f : (gluedELG->mesh).faces()){
+    zeroIndicesGlobal[f.getIndex()] = zeroIndicesGlued[f];
+  }
+  // std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesGlobal, zeroIndicesGlobal, 2 * PI);
+  // polyscope::registerCurveNetwork("Stripe Patterns", positionsCourse, edgesCourse);
+  //knoppel singularities look okay in the patch setting? 
+  globalPSMesh->addFaceScalarQuantity("knoppel singularities", zeroIndicesGlobal);
+  
+
   //KNIT GRAPH GENERATION 
   //first rotate the gradients by 
   // VertexData<Vector3> vertexValuedFieldRotated = computeVertexValuedField(*globalGeometry, timeFunctionGlobal, PI/2.);
@@ -168,6 +194,8 @@ void showStripePatterns(){
   // std::tie(gluedStripeValues, gluedSingularityIndices, gluedBranchIndices) = computeStripePattern(*gluedELG, gluedFreq, vertexLineField);
   // //FaceData<int> globalSingularityIndices = gluedSingularityIndices.reinterpretTo(globalGeometry->mesh);
   // globalPSMesh->addFaceScalarQuantity("Knoppel wale singularities", gluedSingularityIndices);
+
+
 }
 
 // A user-defined callback, for creating control panels (etc)
@@ -204,7 +232,6 @@ int main(int argc, char **argv) {
     std::cout << "Error: Mesh is not triangular" << std::endl;
     throw std::exception();
   }
-  fixDelaunay(*globalMesh, *globalGeometry);
   globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(data["model_path"]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
   vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(data["vertex_mappings"]);
   edgeMappingsPairs = buildPairOfStitchedEdges(*globalGeometry, vertexMappingsPairs);
