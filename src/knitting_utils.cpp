@@ -879,10 +879,6 @@ HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globa
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     HalfedgeData<double> oneForm(gluedMesh);
 
-
-    std::cout << "Solving the vertex singularity model " << std::endl; 
-    std::cout << "------------------------" << std::endl;
-
     //query information from the model 
     std::vector<int> bdyEdges = model.getBdyEdges();
     std::vector<std::vector<double>> waleBdyPathConstraints = model.getWaleBdyPathConstraints();
@@ -1071,7 +1067,114 @@ HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globa
         std::cout << "Exception during optimization" << std::endl;
     }
 
+    return oneForm;
+}
 
+
+//@clean 
+HalfedgeData<double> computeWaleOneForm(EdgeLengthGeometry& gluedGeometry, Model& model){
+
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    double period = model.getPeriod();
+    std::vector<double> omega = model.getMatchingTerms();
+    std::vector<int> faceIndices = model.getFaceIndices();
+    std::vector<std::pair<int , int>> singularEdges = model.getSingularEdges();
+    std::vector<std::vector<double>> waleBdyPathConstraints = model.getWaleBdyPathConstraints();
+
+    HalfedgeData<double> oneForm(gluedMesh);
+
+    try {
+        //reformulate the problem in terms of halfedges 
+        // Create an environment
+        GRBEnv env = GRBEnv(true);
+        env.set("LogFile", "1-form computation.log");
+        env.start();
+
+        // Create an empty model
+        GRBModel model = GRBModel(env);
+
+        //defined over halfedges
+        std::vector<GRBVar> sigma;
+        for (size_t i = 0; i < gluedMesh.nHalfedges(); i++){
+            GRBVar sigma_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS);
+            //add gurobi vars
+            sigma.push_back(sigma_i);//decision variables
+        }
+
+        //add boundary integral value for wale direction stripes
+        std::vector<GRBVar> waleBdyIntegerConstraints;
+        for (size_t i = 0; i < waleBdyPathConstraints.size(); i++){
+            GRBVar k_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_INTEGER);
+            waleBdyIntegerConstraints.push_back(k_i);
+        }
+
+        //first constraint - (d1*sigma) == kP, P is period of optimization, k \in \mathbb{Z}
+        for (Face f : gluedMesh.faces()){
+            GRBLinExpr lhs = 0.0;
+            Halfedge hij = f.halfedge();
+            Halfedge hjk = hij.next();
+            Halfedge hki = hjk.next();
+            lhs = sigma[hij.getIndex()] + sigma[hjk.getIndex()] + sigma[hki.getIndex()];
+            model.addConstr(lhs == period * faceIndices[f.getIndex()]);
+        }
+
+        //second constraint 
+        //ensure that values are opposite sign across halfedges
+        EdgeData<int> handled(gluedMesh, 0);
+        for (std::pair<int, int> p : singularEdges){
+            //invert the sign of the constraint
+            model.addConstr(sigma[gluedMesh.edge(p.first).halfedge().getIndex()] 
+                                    + sigma[gluedMesh.edge(p.first).halfedge().twin().getIndex()] == -1.0 * p.second * period);
+            handled[gluedMesh.edge(p.first)] = 1;
+        }
+        for (Halfedge he : gluedMesh.halfedges()){
+            if (handled[he.edge()]) continue; //if the halfedge is already handled, continue
+            model.addConstr(sigma[he.getIndex()] == -1.0 * sigma[he.twin().getIndex()]);
+        }
+
+        //third constraint 
+        //add constraints in the wale direction
+        for (int i = 0; i < waleBdyPathConstraints.size(); i++){
+            std::vector<double> path = waleBdyPathConstraints[i];
+            GRBLinExpr pathIntegral = 0;
+            std::vector<double> hePath(gluedMesh.nHalfedges(), 0.0);
+            for (int j = 0; j < gluedMesh.nEdges(); j++){
+                if (path[j] > 0){
+                    hePath[gluedMesh.edge(j).halfedge().getIndex()] = path[j];
+                }
+                else if (path[j] < 0){
+                    hePath[gluedMesh.edge(j).halfedge().twin().getIndex()] = path[j];
+                }
+            }
+            for (int k = 0; k < gluedMesh.nHalfedges(); k++){
+                pathIntegral += hePath[k] * sigma[k];
+            }
+            model.addConstr(pathIntegral == period * waleBdyIntegerConstraints[i]);
+        }
+
+        GRBQuadExpr obj;
+
+        for (Halfedge he : gluedMesh.halfedges()){
+            double matchingTerm = he.orientation() ? omega[he.edge().getIndex()] : -1.0 * omega[he.edge().getIndex()];
+            obj += (sigma[he.getIndex()] - matchingTerm) * (sigma[he.getIndex()] - matchingTerm);
+        }
+
+        model.setObjective(obj, GRB_MINIMIZE);
+        model.optimize(); 
+        std::cout << "Obj: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
+
+        //put the computed one-form into an halfedge vector
+        for (Halfedge he : gluedMesh.halfedges()){
+            oneForm[he] = sigma[he.getIndex()].get(GRB_DoubleAttr_X);
+        }
+    }
+    catch(GRBException e) {
+        std::cout << "Error code = " << e.getErrorCode() << std::endl;
+        std::cout << e.getMessage() << std::endl;
+    } catch(...) {
+        std::cout << "Exception during optimization" << std::endl;
+    }
 
     return oneForm;
+
 }

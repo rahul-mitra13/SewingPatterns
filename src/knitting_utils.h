@@ -110,3 +110,16 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
 //@param[in]    edgeMappingsPairs       std::vector<std::pair<int, int>>    vector of pairs where each pair stores edges that are stitched together
 EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, int direction, FaceData<Vector3>& faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs);
 
+//-------------------------------------------------------------------------------------------//
+
+//@clean: tag represents code that should be written cleanly and change minimally going forward :D 
+
+//@clean 
+//compute a 1-form that will be used to generate the wale stripes 
+//@param[in]    gluedGeometry       EdgeLengthGeometry      edge length geometry in the glued setting 
+//@param[in]    model               Model                   model we will be solving using gurobi (specifies the wale constraints)
+//
+//@return       sigma               HalfedgeData<double>    1-form value per halfedge representing the wale stripes
+HalfedgeData<double> computeWaleOneForm(EdgeLengthGeometry& gluedGeometry, Model& model);
+
+

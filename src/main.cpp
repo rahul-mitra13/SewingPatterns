@@ -145,33 +145,8 @@ void showStripePatterns(){
   globalPSMesh -> addEdgeScalarQuantity("final edge singulrities", edgeSingularities);
 
 
-  //computing Knoppel's stripes
-  // VertexData<Vector2> lineField = computeSmoothestBoundaryAlignedVertexDirectionField(*globalGeometry, 2);
-  
-  // VertexData<double> frequencies(*globalMesh, 25 * PI);
-  // std::tie(pos, edges) = computeStripePatternPolylines(*globalGeometry,frequencies, lineField, true);
-  // polyscope::registerCurveNetwork("stripe patterns", pos, edges);
-  //computing Knoppels stripes by specifying 1-form directly
-  std::vector<Vector3> positionsCourse;
-  std::vector<std::array<int, 2>> edgesCourse;
-  CornerData<double> stripeValuesGlued(gluedELG->mesh);
-  CornerData<double> stripeValuesGlobal(*globalMesh);
-  FaceData<int> zeroIndicesGlued(gluedELG->mesh);
-  FaceData<int> zeroIndicesGlobal(*globalMesh);
-  std::tie(stripeValuesGlued, zeroIndicesGlued) = computeStripePattern(*globalGeometry, *gluedELG, edgeMap, edgeMappingsPairs, 1, timeFunctionGradientGlobalNormalized, 
-                                                  *globalPSMesh, orientations);
-  for (Corner c : (gluedELG->mesh).corners()){
-    stripeValuesGlobal[c.getIndex()] = stripeValuesGlued[c];
-  }
-  for (Face f : (gluedELG->mesh).faces()){
-    zeroIndicesGlobal[f.getIndex()] = zeroIndicesGlued[f];
-  }
-  // std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesGlobal, zeroIndicesGlobal, 2 * PI);
-  // polyscope::registerCurveNetwork("Stripe Patterns", positionsCourse, edgesCourse);
-  //knoppel singularities look okay in the patch setting? 
-  globalPSMesh->addFaceScalarQuantity("knoppel singularities", zeroIndicesGlobal);
-  
-  //find Knöppel singularities in the wale direction 
+  //WALE STRIPES
+  //find Knöppel singularities in the WALE DIRECTION 
   //just run Knoppel's algorithm on these models 
   //and then run our 1-form optimization with the singularities
   VertexData<Vector3> vertexVectorField = computeVertexValuedField(*globalGeometry, timeFunctionGlobal, PI/2.);
@@ -181,12 +156,34 @@ void showStripePatterns(){
   std::vector<std::array<size_t, 2>> edges; 
   VertexData<double> freq(globalGeometry->mesh, 1/period);
   std::tie(positions, edges) = computeStripePatternPolylines(*globalGeometry, freq, lineField, false); 
-  polyscope::registerCurveNetwork("Knöppel stripes", positions, edges);
   CornerData<double> stripeValues(globalGeometry -> mesh);
   FaceData<int> stripeSingularities(globalGeometry -> mesh);
   FaceData<int> fieldSingularities(globalGeometry -> mesh);
   std::tie(stripeValues, stripeSingularities, fieldSingularities) = computeStripePattern(*globalGeometry, freq, lineField);
-  globalPSMesh->addFaceScalarQuantity("3D Knoppel singularities", stripeSingularities);
+  globalPSMesh->addFaceScalarQuantity("knoppel singularities", stripeSingularities);
+  polyscope::registerCurveNetwork("knöppel stripes", positions, edges);
+  EdgeData<double> omegaWaleGlobal = computeMatchingOneForm(*globalGeometry, *globalPSMesh, 1, timeFunctionGradientGlobal, edgeMappingsPairs);
+  globalPSMesh->addOneFormTangentVectorQuantity("wale omega", omegaWaleGlobal, orientations);
+  EdgeData<double> omegaWaleGlued = convertGlobalToGluedEdgeFunction(*globalGeometry, *gluedELG, omegaWaleGlobal, edgeMap);
+  Eigen::Map<Eigen::VectorXd> omegaWaleGluedEig(omegaWaleGlued.raw().data(), (gluedELG->mesh).nEdges());
+  std::vector<double> modelMatchingTermsWale(omegaWaleGluedEig.data(), omegaWaleGluedEig.data() + omegaWaleGluedEig.rows());
+  Eigen::Map<Eigen::VectorXi> faceIndicesWaleEig(stripeSingularities.raw().data(), (gluedELG->mesh).nFaces());
+  std::vector<int> faceIndicesWaleModel(faceIndicesWaleEig.data(), faceIndicesWaleEig.data() + faceIndicesWaleEig.rows());
+  Model modelWale; 
+  modelWale.setPeriod(period);
+  modelWale.setMatchingTerms(modelMatchingTermsWale);
+  modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
+  modelWale.setFaceIndices(faceIndicesWaleModel);
+  HalfedgeData<double> sigmaWaleGlued = computeWaleOneForm(*gluedELG, modelWale);
+  CornerData<double> stripeValuesOneFormGlued;
+  FaceData<int> stripeIndicesOneFormGlued;
+  std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(*globalGeometry, *gluedELG, sigmaWaleGlued, period);
+  std::vector<Vector3> positionsWale;
+  std::vector<std::array<int, 2>> edgesWale;
+  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, stripeValuesOneFormGlued, stripeIndicesOneFormGlued, period);
+  auto waleStripes = polyscope::registerCurveNetwork("wale stripes", positionsWale, edgesWale);
+  waleStripes -> setRadius(0.001);
+  waleStripes -> setEnabled(false);
 
 }
 
