@@ -5,6 +5,7 @@
 #include "geometrycentral/surface/direction_fields.h"
 #include "geometrycentral/surface/edge_length_geometry.h"
 #include "geometrycentral/surface/remeshing.h"
+#include "geometrycentral/surface/stripe_patterns.h"
 
 //polyscope includes 
 #include "polyscope/polyscope.h"
@@ -60,9 +61,7 @@ float lambda = 0.0;
 std::vector<size_t> perm;
 std::vector<bool> orientations;
 
-//singularities from Knoppel's stripes
-//singularities placed on faces
-std::vector<int> knoppelSingularities;
+
 
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
@@ -88,16 +87,6 @@ void showStripePatterns(){
   //doing this here cause the gradient gets rotated later
   //std::vector<int> waleBdyEdges = getWaleBdyEdgesInGluedMesh(*globalGeometry, *gluedELG, timeFunctionGradientGlobal, edgeMap, threshold, *globalPSMesh);
 
-  //find Knöppel singularities in the wale direction 
-  if (globalMesh->nConnectedComponents() == 1){
-    std::cout << "In a 3D mesh! " << std::endl;
-    double angle = 90.;
-    //just run Knoppel's algorithm on these models 
-    //and then run our 1-form optimization with the singularities
-    VertexData<Vector3> vertexVectorField = computeVertexValuedField(*globalGeometry, timeFunctionGlobal, angle);
-    globalPSMesh -> addVertexVectorQuantity("rotated vertex vector", vertexVectorField);
-  }
-  
   //set up the course optimization 
   Model modelCourse;
   modelCourse.setIntegrabilityConstraint(true); 
@@ -153,6 +142,7 @@ void showStripePatterns(){
   EdgeData<double> edgeSingularities(globalGeometry -> mesh);
   std::tie(sigmaTilde, edgeSingularities) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
                                                             vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
+  globalPSMesh -> addEdgeScalarQuantity("final edge singulrities", edgeSingularities);
 
 
   //computing Knoppel's stripes
@@ -181,20 +171,22 @@ void showStripePatterns(){
   //knoppel singularities look okay in the patch setting? 
   globalPSMesh->addFaceScalarQuantity("knoppel singularities", zeroIndicesGlobal);
   
-
-  //KNIT GRAPH GENERATION 
-  //first rotate the gradients by 
-  // VertexData<Vector3> vertexValuedFieldRotated = computeVertexValuedField(*globalGeometry, timeFunctionGlobal, PI/2.);
-  // globalPSMesh -> addVertexVectorQuantity("rotated time function per vertex", vertexValuedFieldRotated);
-  // VertexData<Vector2> vertexLineField = vertexDirectionField(*globalGeometry, vertexValuedFieldRotated);
-  // CornerData<double> gluedStripeValues(gluedELG -> mesh);
-  // FaceData<int> gluedSingularityIndices(gluedELG -> mesh);
-  // FaceData<int> gluedBranchIndices(gluedELG -> mesh);
-  // VertexData<double> gluedFreq(gluedELG -> mesh, 1./period);
-  // std::tie(gluedStripeValues, gluedSingularityIndices, gluedBranchIndices) = computeStripePattern(*gluedELG, gluedFreq, vertexLineField);
-  // //FaceData<int> globalSingularityIndices = gluedSingularityIndices.reinterpretTo(globalGeometry->mesh);
-  // globalPSMesh->addFaceScalarQuantity("Knoppel wale singularities", gluedSingularityIndices);
-
+  //find Knöppel singularities in the wale direction 
+  //just run Knoppel's algorithm on these models 
+  //and then run our 1-form optimization with the singularities
+  VertexData<Vector3> vertexVectorField = computeVertexValuedField(*globalGeometry, timeFunctionGlobal, PI/2.);
+  globalPSMesh -> addVertexVectorQuantity("rotated vertex vector", vertexVectorField);
+  VertexData<Vector2> lineField = vertexDirectionField(*globalGeometry, vertexVectorField);
+  std::vector<Vector3> positions;
+  std::vector<std::array<size_t, 2>> edges; 
+  VertexData<double> freq(globalGeometry->mesh, 1/period);
+  std::tie(positions, edges) = computeStripePatternPolylines(*globalGeometry, freq, lineField, false); 
+  polyscope::registerCurveNetwork("Knöppel stripes", positions, edges);
+  CornerData<double> stripeValues(globalGeometry -> mesh);
+  FaceData<int> stripeSingularities(globalGeometry -> mesh);
+  FaceData<int> fieldSingularities(globalGeometry -> mesh);
+  std::tie(stripeValues, stripeSingularities, fieldSingularities) = computeStripePattern(*globalGeometry, freq, lineField);
+  globalPSMesh->addFaceScalarQuantity("3D Knoppel singularities", stripeSingularities);
 
 }
 
