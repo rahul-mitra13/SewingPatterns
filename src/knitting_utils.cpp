@@ -1212,13 +1212,13 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
             difference[f.getIndex()] = currArea * (diffX + diffY + diffZ);
         }
 
-        GRBQuadExpr obj;
-
+        GRBQuadExpr edgeDiff = 0;
         // for (Halfedge he : gluedMesh.halfedges()){
         //     double matchingTerm = he.orientation() ? omega[he.edge().getIndex()] : -1.0 * omega[he.edge().getIndex()];
-        //     obj += (sigma[he.getIndex()] - matchingTerm) * (sigma[he.getIndex()] - matchingTerm);
+        //     edgeDiff += (sigma[he.getIndex()] - matchingTerm) * (sigma[he.getIndex()] - matchingTerm);
         // }
 
+        GRBQuadExpr obj;
         obj = gradDiff;
 
         model.setObjective(obj, GRB_MINIMIZE);

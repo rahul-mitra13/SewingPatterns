@@ -82,62 +82,8 @@ void showStripePatterns(){
     timeFunctionGradientGlobalNormalized[f] = timeFunctionGradientGlobal[f].normalize();
   }
   globalPSMesh -> addFaceVectorQuantity("normalized time function gradient", timeFunctionGradientGlobalNormalized);
-  //globalPSMesh -> addFaceVectorQuantity("gradient (unnormalized)", timeFunctionGradientGlobal);
-  //find boundary edges in the wale direction 
-  //doing this here cause the gradient gets rotated later
-  //std::vector<int> waleBdyEdges = getWaleBdyEdgesInGluedMesh(*globalGeometry, *gluedELG, timeFunctionGradientGlobal, edgeMap, threshold, *globalPSMesh);
-
-  //set up the course optimization 
-  Model modelCourse;
-  modelCourse.setIntegrabilityConstraint(true); 
-  modelCourse.useFaceDifferenceViz = true;
-  //set the face gradients 
-  std::vector<std::array<double, 3>> modelFaceGradientsCourse;
-  for (Face f : globalMesh->faces()){
-    //normalize the gradients first
-    std::array<double, 3> gradient = {timeFunctionGradientGlobalNormalized[f][0], timeFunctionGradientGlobalNormalized[f][1], 
-                                    timeFunctionGradientGlobalNormalized[f][2]}; 
-    modelFaceGradientsCourse.push_back(gradient);
-  }
-  modelCourse.setFaceGradients(modelFaceGradientsCourse);
-  modelCourse.setPeriod(period);
-  modelCourse.setBdyEdges(globalBdyConditions.courseBdyEdges);
-  //visualize the normalized gradients 
-  //globalPSMesh -> addFaceVectorQuantity("gradient (normalized)", timeFunctionGradientGlobal);
-
-  EdgeData<double> omegaCourseGlobal = computeMatchingOneForm(*globalGeometry, 0, timeFunctionGradientGlobal, edgeMappingsPairs);
-  EdgeData<double> omegaCourseGlued = convertGlobalToGluedEdgeFunction(*globalGeometry, *gluedELG, omegaCourseGlobal, edgeMap);
-  Eigen::Map<Eigen::VectorXd> omegaEig(omegaCourseGlued.raw().data(), (gluedELG->mesh).nEdges());
-  std::vector<double> modelMatchingTermsCourse(omegaEig.data(), omegaEig.data() + omegaEig.rows());
-  modelCourse.setMatchingTerms(modelMatchingTermsCourse);
-  Eigen::VectorXd d1Omega = gluedELG->d1 * omegaEig;
-  //globalPSMesh->addFaceScalarQuantity("d1(omega0)", d1Omega);
-  //visualize the 1-form \omega using Whitney interpolation 
-  //globalPSMesh->addOneFormTangentVectorQuantity("omega0(Whitney)", omegaCourseGlobal, orientations);
-  //the 1-form in the glued mesh setting 
-  // EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, edgeMap, *globalPSMesh);
-  //EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
-  //HalfedgeData<double> sigmaCourseGlued = computeVertexSingularityField(*globalGeometry, *gluedELG, modelCourse, *globalPSMesh, vertexMap, gluedOneRingMap);
   
-  //std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, *gluedELG, sigmaCourseGlued, period);
-  //std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
-  //auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns no sings (sigma)", positionsCourse, edgesCourse);
-  //courseStripes -> setRadius(0.001);
-  //VertexData<int> vertexCurl = computeCurlOnVertex(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations, gluedOneRingMap);
-
-  //-------experiment 1---------------//
-  // HalfedgeData<double> sigmaTilde(globalGeometry -> mesh);
-  // EdgeData<double> edgeSingularities(globalGeometry -> mesh);
-  // std::tie(sigmaTilde, edgeSingularities) = strategy1Impl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
-  //                                                           vertexMap, edgeMap, *globalPSMesh, globalBdyConditions, period);
-
-  // //-----experiment 2---------------//
-  // vizEdgeDifference(*globalGeometry, *gluedELG,
-  //                   timeFunctionGradientGlobalNormalized, *globalPSMesh, 
-  //                   globalBdyConditions, period, lambda,
-  //                   edgeMap);
-  
-  //-------experiment 3----------//
+  //-------iteratively find course stripes and course singularities----------//
   HalfedgeData<double> sigmaTilde(globalGeometry -> mesh);
   EdgeData<double> edgeSingularities(globalGeometry -> mesh);
   std::tie(sigmaTilde, edgeSingularities) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
