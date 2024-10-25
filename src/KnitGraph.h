@@ -1,5 +1,6 @@
 //geometry-central includes 
 #include "geometrycentral/surface/vertex_position_geometry.h"
+#include "geometrycentral/surface/edge_length_geometry.h"
 #include "geometrycentral/surface/surface_point.h"
 
 //polyscope includes 
@@ -15,7 +16,8 @@ using namespace geometrycentral::surface;
 
 struct knitGraphVertex{
     int id;
-    Vector3 position;
+    Vector3 position;//position embedded in R^3 (if position information is available)
+    Vector3 baryCoords;//barycentric coordinates of the vertex if position information is not available
     int row_in = -1;
     int row_out = -1;
     int col_in[2] = {-1, -1};
@@ -39,7 +41,10 @@ class KnitGraph{
         double period; 
 
         //geometry on which this graph lives 
-        VertexPositionGeometry *geometry; 
+        VertexPositionGeometry *globalGeometry;
+
+        //edge length geometry if we want to do this in the embedded setting 
+        EdgeLengthGeometry *gluedGeometry;
 
         //polyscope object for this geometry 
         polyscope::SurfaceMesh *psMesh; 
@@ -62,7 +67,7 @@ class KnitGraph{
         public: 
 
             //Constructor
-            KnitGraph(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, double period, EdgeData<double>& courseOneForm, EdgeData<double>& waleOneForm);
+            KnitGraph(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, double period, EdgeData<double>& courseOneForm, EdgeData<double>& waleOneForm);
 
             //build the knit graph 
             void buildGraph();
