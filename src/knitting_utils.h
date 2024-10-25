@@ -24,6 +24,7 @@
 
 //helper files
 #include "helpers.h"
+#include "stripe_patterns_helpers.h"
 
 //includes to solve the optimization problem
 #include "gurobi_c++.h"
@@ -107,8 +108,8 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
 //compute matching 1-form while taking into account "stitched together" edges
 //same parameters and return type as the function above 
 //additional parameter 
-//@param[in]    edgeMappingsPairs       std::vector<std::pair<int, int>>    vector of pairs where each pair stores edges that are stitched together
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, int direction, FaceData<Vector3>& faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs);
+//@param[in]    edgeMappingsPairs       std::vector<std::pair<int, int>>   vector of pairs where each pair stores edges that are stitched together
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry,  int direction, FaceData<Vector3>& faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs);
 
 //-------------------------------------------------------------------------------------------//
 
@@ -120,6 +121,19 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polysc
 //@param[in]    model               Model                   model we will be solving using gurobi (specifies the wale constraints)
 //
 //@return       sigma               HalfedgeData<double>    1-form value per halfedge representing the wale stripes
-HalfedgeData<double> computeWaleOneForm(EdgeLengthGeometry& gluedGeometry, Model& model);
+HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& vertexMap);
+
+//@clean 
+//return information for wale stripes in the glued mesh setting
+//@param[in]    globalGeometry      VertexPositionGeometry                      global geometry embedded in R^3
+//@param[in]    gluedGeometry       EdgeLengthGeometry                          edge length geometry in the glued setting 
+//@param[in]    timeFunctionGlobal  VertexData<double>                          global time function
+//@param[in]    period              double                                      period for 1-form optimization
+//
+//@return       striping info       tuple<CornerData<double, FaceData<int>>     striping info in the glued mesh setting 
+std::tuple<CornerData<double>, FaceData<int>> computeWaleStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+                                                                    std::vector<std::pair<int, int>>& edgeMappingsPairs, std::map<int, int>& edgeMap, 
+                                                                    std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, 
+                                                                    double period, globalBoundaryConditions& globalBdyConditions);
 
 

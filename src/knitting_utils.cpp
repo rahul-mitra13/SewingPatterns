@@ -796,7 +796,7 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
     return d0_f_avg;
 }
 //compute matching 1-form while taking into account "stitched together" edges
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, int direction, FaceData<Vector3>& faceGradients, 
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int direction, FaceData<Vector3>& faceGradients, 
                                     std::vector<std::pair<int, int>>& edgeMappingsPairs){
 
     SurfaceMesh& mesh = geometry.mesh;
@@ -1072,7 +1072,7 @@ HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globa
 
 
 //@clean 
-HalfedgeData<double> computeWaleOneForm(EdgeLengthGeometry& gluedGeometry, Model& model){
+HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& vertexMap){
 
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     double period = model.getPeriod();
@@ -1080,6 +1080,20 @@ HalfedgeData<double> computeWaleOneForm(EdgeLengthGeometry& gluedGeometry, Model
     std::vector<int> faceIndices = model.getFaceIndices();
     std::vector<std::pair<int , int>> singularEdges = model.getSingularEdges();
     std::vector<std::vector<double>> waleBdyPathConstraints = model.getWaleBdyPathConstraints();
+    std::vector<std::array<double, 3>> gradients = model.getFaceGradients();
+
+    //find the gradient operator on the mesh 
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    std::tie(V, F) = getVertexPositionsandFaceLists(globalGeometry);
+    // Compute the global gradient operator: #F*3 by #V
+    Eigen::SparseMatrix<double> grad;
+    igl::grad(V,F,grad);
+    Eigen::SparseMatrix<double, Eigen::RowMajor> G(grad);
+    //require the face areas
+    gluedGeometry.requireFaceAreas();
+
+
 
     HalfedgeData<double> oneForm(gluedMesh);
 
@@ -1109,12 +1123,15 @@ HalfedgeData<double> computeWaleOneForm(EdgeLengthGeometry& gluedGeometry, Model
         }
 
         //first constraint - (d1*sigma) == kP, P is period of optimization, k \in \mathbb{Z}
+        //also compute nP 
+        std::vector<GRBLinExpr> nP(gluedMesh.nFaces());
         for (Face f : gluedMesh.faces()){
             GRBLinExpr lhs = 0.0;
             Halfedge hij = f.halfedge();
             Halfedge hjk = hij.next();
             Halfedge hki = hjk.next();
             lhs = sigma[hij.getIndex()] + sigma[hjk.getIndex()] + sigma[hki.getIndex()];
+            nP[f.getIndex()] = sigma[hij.getIndex()] + sigma[hjk.getIndex()] + sigma[hki.getIndex()];
             model.addConstr(lhs == period * faceIndices[f.getIndex()]);
         }
 
@@ -1152,12 +1169,57 @@ HalfedgeData<double> computeWaleOneForm(EdgeLengthGeometry& gluedGeometry, Model
             model.addConstr(pathIntegral == period * waleBdyIntegerConstraints[i]);
         }
 
+        //compute a piecewise linear function over the vertices of the mesh 
+        std::vector<GRBLinExpr> u(gluedMesh.nVertices());
+        std::vector<std::vector<GRBLinExpr>> gradU(gluedMesh.nFaces(), std::vector<GRBLinExpr>(3));
+        for (Face f : gluedMesh.faces()){
+
+            u[f.halfedge().vertex().getIndex()] = 0.0;
+            u[f.halfedge().next().vertex().getIndex()] = (sigma[f.halfedge().getIndex()]) - (nP[f.getIndex()]/3.0);
+            u[f.halfedge().next().next().vertex().getIndex()] = (sigma[f.halfedge().getIndex()] + sigma[f.halfedge().next().getIndex()]) - ((2.0 * nP[f.getIndex()])/3.0);
+
+            GRBLinExpr currGradU = 0.0;
+            //X component
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex()); it; ++it){
+                currGradU += it.value() * u[vertexMap[it.col()]];
+            }
+            gradU[f.getIndex()][0] = currGradU;
+            currGradU = 0.0;
+            //Y component
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex() + F.rows()); it; ++it){
+                currGradU += it.value() * u[vertexMap[it.col()]];
+            }
+            gradU[f.getIndex()][1] = currGradU;
+            currGradU = 0.0;
+            //Z component 
+            for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(G, f.getIndex() + 2 * F.rows()); it; ++it){
+                currGradU += it.value() * u[vertexMap[it.col()]];
+            }
+            gradU[f.getIndex()][2] = currGradU;
+        }
+
+        //set up the difference
+        GRBQuadExpr gradDiff = 0;
+        std::vector<std::array<double, 3>> grads;
+        //store the per face difference 
+        std::vector<GRBQuadExpr> difference(gluedMesh.nFaces());
+        for (Face f : gluedMesh.faces()){
+            GRBQuadExpr diffX = (gradU[f.getIndex()][0] - gradients[f.getIndex()][0]) * (gradU[f.getIndex()][0] - gradients[f.getIndex()][0]);
+            GRBQuadExpr diffY = (gradU[f.getIndex()][1] - gradients[f.getIndex()][1]) * (gradU[f.getIndex()][1] - gradients[f.getIndex()][1]);
+            GRBQuadExpr diffZ = (gradU[f.getIndex()][2] - gradients[f.getIndex()][2]) * (gradU[f.getIndex()][2] - gradients[f.getIndex()][2]);
+            double currArea = gluedGeometry.faceAreas[f];
+            gradDiff += currArea * (diffX + diffY + diffZ);
+            difference[f.getIndex()] = currArea * (diffX + diffY + diffZ);
+        }
+
         GRBQuadExpr obj;
 
-        for (Halfedge he : gluedMesh.halfedges()){
-            double matchingTerm = he.orientation() ? omega[he.edge().getIndex()] : -1.0 * omega[he.edge().getIndex()];
-            obj += (sigma[he.getIndex()] - matchingTerm) * (sigma[he.getIndex()] - matchingTerm);
-        }
+        // for (Halfedge he : gluedMesh.halfedges()){
+        //     double matchingTerm = he.orientation() ? omega[he.edge().getIndex()] : -1.0 * omega[he.edge().getIndex()];
+        //     obj += (sigma[he.getIndex()] - matchingTerm) * (sigma[he.getIndex()] - matchingTerm);
+        // }
+
+        obj = gradDiff;
 
         model.setObjective(obj, GRB_MINIMIZE);
         model.optimize(); 
@@ -1177,4 +1239,48 @@ HalfedgeData<double> computeWaleOneForm(EdgeLengthGeometry& gluedGeometry, Model
 
     return oneForm;
 
+}
+
+
+//@clean 
+std::tuple<CornerData<double>, FaceData<int>> computeWaleStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+                                                                    std::vector<std::pair<int, int>>& edgeMappingsPairs, std::map<int, int>& edgeMap, 
+                                                                    std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, 
+                                                                    double period, globalBoundaryConditions& globalBdyConditions){
+
+
+    VertexData<Vector3> vertexVectorField = computeVertexValuedField(globalGeometry, timeFunctionGlobal, PI/2.);
+    VertexData<Vector2> lineField = vertexDirectionField(globalGeometry, vertexVectorField);
+    VertexData<double> freq(globalGeometry.mesh, 1/period);
+    CornerData<double> stripeValues(globalGeometry.mesh);
+    FaceData<int> stripeSingularities(globalGeometry.mesh);
+    FaceData<int> fieldSingularities(globalGeometry.mesh);
+    std::tie(stripeValues, stripeSingularities, fieldSingularities) = computeStripePattern(globalGeometry, freq, lineField);
+    FaceData<Vector3> timeFunctionGradientGlobal = computeTimeFunctionFaceGrad(globalGeometry, timeFunctionGlobal);
+    EdgeData<double> omegaWaleGlobal = computeMatchingOneForm(globalGeometry, 1, timeFunctionGradientGlobal, edgeMappingsPairs);
+    EdgeData<double> omegaWaleGlued = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, omegaWaleGlobal, edgeMap);
+    Eigen::Map<Eigen::VectorXd> omegaWaleGluedEig(omegaWaleGlued.raw().data(), (gluedGeometry.mesh).nEdges());
+    std::vector<double> modelMatchingTermsWale(omegaWaleGluedEig.data(), omegaWaleGluedEig.data() + omegaWaleGluedEig.rows());
+    Eigen::Map<Eigen::VectorXi> faceIndicesWaleEig(stripeSingularities.raw().data(), (gluedGeometry.mesh).nFaces());
+    std::vector<int> faceIndicesWaleModel(faceIndicesWaleEig.data(), faceIndicesWaleEig.data() + faceIndicesWaleEig.rows());
+    std::vector<std::array<double, 3>> modelFaceGradients;
+    globalGeometry.requireFaceNormals();
+    for (Face f : globalGeometry.mesh.faces()){
+        //rotate and normalize the gradients 
+        timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
+        timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].rotateAround(globalGeometry.faceNormals[f], PI/2);
+        modelFaceGradients.push_back(std::array{timeFunctionGradientGlobal[f][0], timeFunctionGradientGlobal[f][1], timeFunctionGradientGlobal[f][2]});
+    } 
+    Model modelWale; 
+    modelWale.setPeriod(period);
+    modelWale.setMatchingTerms(modelMatchingTermsWale);
+    modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
+    modelWale.setFaceIndices(faceIndicesWaleModel);
+    modelWale.setFaceGradients(modelFaceGradients);
+    HalfedgeData<double> sigmaWaleGlued = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, vertexMap);
+    CornerData<double> stripeValuesOneFormGlued;
+    FaceData<int> stripeIndicesOneFormGlued;
+    std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
+
+    return std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued);
 }
