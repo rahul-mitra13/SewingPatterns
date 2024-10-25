@@ -404,8 +404,11 @@ std::unique_ptr<EdgeLengthGeometry> createGluedEdgeLengthGeometry(VertexPosition
     //find original index to glued mesh index for vertices
     int numUniqueVertices = 0;
     //store another map from glued mesh index to original mesh index 
+    // (it's the inverse of vertexMap)
     std::map<int, int> gluedMeshVertexIndexToOriginalMeshIndex;
 
+    // Setup vertexMap and its inverse gluedMeshVertexIndexToOriginalMeshIndex
+    // TODO: currently this is O(#vertices x #mappings), can be improved
     for (Vertex v : mesh.vertices()){
         size_t iV = v.getIndex();
         //iterate over the mappings 
@@ -438,6 +441,8 @@ std::unique_ptr<EdgeLengthGeometry> createGluedEdgeLengthGeometry(VertexPosition
             numUniqueVertices++;
         }
     }
+
+    // Copy triangulation with new vertex indices, and create the glued mesh
     std::vector<std::vector<size_t>> polygons;
     geometry.requireEdgeLengths();
     for (Face f : mesh.faces()){
@@ -530,6 +535,7 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
     if (courseUseBdyLoops){//just use the boundary loops of the glued mesh to specify the boundary conditions 
         std::vector<int> startVertices = data["boundaries"]["course"]["startVertices"];
         std::vector<int> endVertices = data["boundaries"]["course"]["endVertices"];
+                
         //knitting start conditions
         for (int i = 0; i < startVertices.size(); i++){
             knittingStartVertices.push_back(startVertices[i]);
@@ -541,6 +547,7 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
             for (Edge e : bLoop.adjacentEdges()){
                 toReturn.courseBdyEdges.push_back(e.getIndex());
             }
+            
             //build weights for wale boundary conditions 
             std::vector<double> weights(gluedMesh.nEdges(), 0.0);
             for (Halfedge he : bLoop.adjacentHalfedges()){
