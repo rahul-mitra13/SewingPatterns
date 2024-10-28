@@ -8,6 +8,9 @@
 #include "polyscope/surface_mesh.h"
 #include "polyscope/curve_network.h"
 
+//file includes 
+#include "helpers.h"
+
 #pragma once 
 #include <vector> 
 
@@ -28,7 +31,6 @@ struct knitGraphVertex{
     SurfacePoint surfacePoint;//used for intersections on singular faces
     bool isBaryCenter = false;//if this is a vertex at the barycenter
     bool hasBeenHandled = false;//if this vertex has been handled by a merge
-
     bool isVirtual = false;//if this is a virtual vertex
     bool isAlphaVirtual = false;//is a virtual vertex in the course direction
     bool isBetaVirtual = false;//is a virtual vertex in the wale direction 
@@ -36,7 +38,11 @@ struct knitGraphVertex{
 
 class KnitGraph{
 
-    private: 
+    private:
+        
+        //id counter of vertices 
+        int vertexID = 0;
+
         //period for sampling the knit graph 
         double period; 
 
@@ -48,11 +54,20 @@ class KnitGraph{
 
         //polyscope object for this geometry 
         polyscope::SurfaceMesh *psMesh; 
-    
+
+        //edge map from global mesh to glued mesh 
+        std::map<int, int> *globalToGluedEdgeMap;
+
         //course stripe 1-form 
-        EdgeData<double> courseOneForm; 
+        CornerData<double> courseOneForm; 
         //wale stripe 1-form
-        EdgeData<double> waleOneForm;
+        CornerData<double> waleOneForm;
+
+        //course singular edges (in the glued setting)
+        EdgeData<double> courseSingularEdges; 
+
+        //wale singular edges (in the glued setting)
+        EdgeData<double> waleSingularEdges;
 
         //vertices in the graph 
         std::vector<knitGraphVertex> vertices;
@@ -67,9 +82,17 @@ class KnitGraph{
         public: 
 
             //Constructor
-            KnitGraph(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, double period, EdgeData<double>& courseOneForm, EdgeData<double>& waleOneForm);
+            KnitGraph(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, double period, 
+                      CornerData<double>& courseOneForm, EdgeData<double>& courseSingularEdges, CornerData<double>& waleOneForm, EdgeData<double>& waleSingularEdges,
+                      std::map<int, int>& globalToGluedEdgeMap);
 
             //build the knit graph 
             void buildGraph();
+
+            //find knit graph vertices on faces that are smooth in both directions
+            void handleCourseNonSingularFaceWaleNonSingularFace(Face &f);
+
+            //render the knit graph 
+            void renderGraph();
 };
 
