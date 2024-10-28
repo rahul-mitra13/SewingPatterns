@@ -1132,7 +1132,8 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
             Halfedge hki = hjk.next();
             lhs = sigma[hij.getIndex()] + sigma[hjk.getIndex()] + sigma[hki.getIndex()];
             nP[f.getIndex()] = sigma[hij.getIndex()] + sigma[hjk.getIndex()] + sigma[hki.getIndex()];
-            model.addConstr(lhs == period * faceIndices[f.getIndex()]);
+            //model.addConstr(lhs == period * faceIndices[f.getIndex()]);
+            model.addConstr(lhs == 0);
         }
 
         //second constraint 
@@ -1141,7 +1142,7 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
         for (std::pair<int, int> p : singularEdges){
             //invert the sign of the constraint
             model.addConstr(sigma[gluedMesh.edge(p.first).halfedge().getIndex()] 
-                                    + sigma[gluedMesh.edge(p.first).halfedge().twin().getIndex()] == -1.0 * p.second * period);
+                                    + sigma[gluedMesh.edge(p.first).halfedge().twin().getIndex()] ==  p.second * period);
             handled[gluedMesh.edge(p.first)] = 1;
         }
         for (Halfedge he : gluedMesh.halfedges()){
@@ -1243,15 +1244,16 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
 
 
 //@clean 
-std::tuple<CornerData<double>, FaceData<int>> computeWaleStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
                                                                     std::vector<std::pair<int, int>>& edgeMappingsPairs, std::map<int, int>& edgeMap, 
                                                                     std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, 
                                                                     double period, globalBoundaryConditions& globalBdyConditions){
 
-
+    //compute a line field in the tangent space of the vertex
     VertexData<Vector3> vertexVectorField = computeVertexValuedField(globalGeometry, timeFunctionGlobal, PI/2.);
     VertexData<Vector2> lineField = vertexDirectionField(globalGeometry, vertexVectorField);
-    VertexData<double> freq(globalGeometry.mesh, 1/period);
+    EdgeData<double> edgeSingularities(globalGeometry.mesh);
+    VertexData<double> freq(globalGeometry.mesh, 1./(2. * PI * period));
     CornerData<double> stripeValues(globalGeometry.mesh);
     FaceData<int> stripeSingularities(globalGeometry.mesh);
     FaceData<int> fieldSingularities(globalGeometry.mesh);
@@ -1262,14 +1264,23 @@ std::tuple<CornerData<double>, FaceData<int>> computeWaleStripeInfo(VertexPositi
     Eigen::Map<Eigen::VectorXd> omegaWaleGluedEig(omegaWaleGlued.raw().data(), (gluedGeometry.mesh).nEdges());
     std::vector<double> modelMatchingTermsWale(omegaWaleGluedEig.data(), omegaWaleGluedEig.data() + omegaWaleGluedEig.rows());
     Eigen::Map<Eigen::VectorXi> faceIndicesWaleEig(stripeSingularities.raw().data(), (gluedGeometry.mesh).nFaces());
+    //place wale singularities at edges 
     std::vector<int> faceIndicesWaleModel(faceIndicesWaleEig.data(), faceIndicesWaleEig.data() + faceIndicesWaleEig.rows());
     std::vector<std::array<double, 3>> modelFaceGradients;
+    std::vector<std::pair<int, int>> singularEdges;
     globalGeometry.requireFaceNormals();
     for (Face f : globalGeometry.mesh.faces()){
         //rotate and normalize the gradients 
         timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
         timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].rotateAround(globalGeometry.faceNormals[f], PI/2);
         modelFaceGradients.push_back(std::array{timeFunctionGradientGlobal[f][0], timeFunctionGradientGlobal[f][1], timeFunctionGradientGlobal[f][2]});
+        //place wale singularities at edges
+        if (stripeSingularities[f] != 0){
+            int edge = findSingularEdgeFromSingularFace(globalGeometry, gluedGeometry, f.getIndex(), timeFunctionGradientGlobal[f]);
+            //pass it to the model in the glued setting
+            singularEdges.push_back(std::make_pair(edgeMap[edge], stripeSingularities[f]));
+            edgeSingularities[edge] = stripeSingularities[f];
+        }
     } 
     Model modelWale; 
     modelWale.setPeriod(period);
@@ -1277,10 +1288,11 @@ std::tuple<CornerData<double>, FaceData<int>> computeWaleStripeInfo(VertexPositi
     modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
     modelWale.setFaceIndices(faceIndicesWaleModel);
     modelWale.setFaceGradients(modelFaceGradients);
+    modelWale.setSingularEdges(singularEdges);
     HalfedgeData<double> sigmaWaleGlued = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, vertexMap);
     CornerData<double> stripeValuesOneFormGlued;
     FaceData<int> stripeIndicesOneFormGlued;
     std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
 
-    return std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued);
+    return std::tie(stripeValuesOneFormGlued, edgeSingularities);
 }

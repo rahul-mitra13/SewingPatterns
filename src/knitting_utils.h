@@ -130,8 +130,8 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
 //@param[in]    timeFunctionGlobal  VertexData<double>                          global time function
 //@param[in]    period              double                                      period for 1-form optimization
 //
-//@return       striping info       tuple<CornerData<double, FaceData<int>>     striping info in the glued mesh setting 
-std::tuple<CornerData<double>, FaceData<int>> computeWaleStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+//@return       striping info       tuple<CornerData<double, EdgeData<double>>     striping info in the glued mesh setting 
+std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
                                                                     std::vector<std::pair<int, int>>& edgeMappingsPairs, std::map<int, int>& edgeMap, 
                                                                     std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, 
                                                                     double period, globalBoundaryConditions& globalBdyConditions);
