@@ -77,7 +77,7 @@ void vizEdgeDifference(VertexPositionGeometry& globalGeometry, EdgeLengthGeometr
 //enforce face-based curl of zero, and an integral of 1 along some path from either boundary to optimize 
 //for a harmonic (half-edge) one-form subject to the singularity placements; do this at each 
 //iteration and then normalize to find edge-based curl
-std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction,
+std::tuple<CornerData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction,
                                                                     FaceData<Vector3>& globalFaceGradients, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
                                                                     std::map<int, int>& globalToGluedVertexMap, std::map<int, int>& globalToGluedEdgeMap, std::vector<std::pair<int, int>>& edgeMappingsPairs,
                                                                     polyscope::SurfaceMesh& psMesh, globalBoundaryConditions& boundaryConditions, double period);
@@ -96,9 +96,6 @@ std::pair<int, int> findFaceSingularityPair(VertexPositionGeometry& globalGeomet
                                             VertexData<double>& gluedTimeFunction, polyscope::SurfaceMesh& psMesh, std::map<int, int>& globalToGluedVertexMap,
                                             std::vector<double>& usedIsoVals, double isoVal, int numPairs, bool useAllFaces);
 
-//after finding a face singularity, find a singular edge in that face 
-//edge that is most aligned with the gradient of the time function
-int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, int singFaceIndex, Vector3 globalFaceGradient);
 
 //find the isoval with max average curl in the face setting
 double findIsoValWithMaxAvgFaceCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, FaceData<double>& curl, 
