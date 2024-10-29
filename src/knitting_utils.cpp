@@ -1079,9 +1079,9 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
     std::vector<double> omega = model.getMatchingTerms();
     std::vector<int> faceIndices = model.getFaceIndices();
     std::vector<std::pair<int , int>> singularEdges = model.getSingularEdges();
+    //print out the singular edges 
     std::vector<std::vector<double>> waleBdyPathConstraints = model.getWaleBdyPathConstraints();
     std::vector<std::array<double, 3>> gradients = model.getFaceGradients();
-
     //find the gradient operator on the mesh 
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
@@ -1092,9 +1092,6 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
     Eigen::SparseMatrix<double, Eigen::RowMajor> G(grad);
     //require the face areas
     gluedGeometry.requireFaceAreas();
-
-
-
     HalfedgeData<double> oneForm(gluedMesh);
 
     try {
@@ -1199,6 +1196,7 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
             gradU[f.getIndex()][2] = currGradU;
         }
 
+
         //set up the difference
         GRBQuadExpr gradDiff = 0;
         std::vector<std::array<double, 3>> grads;
@@ -1246,20 +1244,29 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
 //@clean 
 std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
                                                                     std::vector<std::pair<int, int>>& edgeMappingsPairs, std::map<int, int>& edgeMap, 
-                                                                    std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, 
-                                                                    double period, globalBoundaryConditions& globalBdyConditions){
+                                                                    std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, FaceData<Vector3>& timeFunctionGradientGlobalNormalized, 
+                                                                    double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions){
 
     //compute a line field in the tangent space of the vertex
     VertexData<Vector3> vertexVectorField = computeVertexValuedField(globalGeometry, timeFunctionGlobal, PI/2.);
     VertexData<Vector2> lineField = vertexDirectionField(globalGeometry, vertexVectorField);
     EdgeData<double> edgeSingularities(globalGeometry.mesh);
-    VertexData<double> freq(globalGeometry.mesh, 1./(2. * PI * period));
+    //VertexData<double> freq(globalGeometry.mesh, 1./(2. * PI * period));
+    VertexData<double> freq(globalGeometry.mesh, knoppelFrequency);
     CornerData<double> stripeValues(globalGeometry.mesh);
     FaceData<int> stripeSingularities(globalGeometry.mesh);
     FaceData<int> fieldSingularities(globalGeometry.mesh);
     std::tie(stripeValues, stripeSingularities, fieldSingularities) = computeStripePattern(globalGeometry, freq, lineField);
-    FaceData<Vector3> timeFunctionGradientGlobal = computeTimeFunctionFaceGrad(globalGeometry, timeFunctionGlobal);
-    EdgeData<double> omegaWaleGlobal = computeMatchingOneForm(globalGeometry, 1, timeFunctionGradientGlobal, edgeMappingsPairs);
+    
+    std::vector<Vector3> knoppelPos; 
+    std::vector<std::array<size_t, 2>> knoppelEdges; 
+    std::tie(knoppelPos, knoppelEdges) = extractPolylinesFromStripePattern(globalGeometry, stripeValues, stripeSingularities,
+                                            fieldSingularities, lineField, false);
+    auto knoppelStripes = polyscope::registerCurveNetwork("knoppel stripes", knoppelPos, knoppelEdges);
+    knoppelStripes -> setRadius(0.001);
+    knoppelStripes -> setEnabled(false);
+
+    EdgeData<double> omegaWaleGlobal = computeMatchingOneForm(globalGeometry, 1, timeFunctionGradientGlobalNormalized, edgeMappingsPairs);
     EdgeData<double> omegaWaleGlued = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, omegaWaleGlobal, edgeMap);
     Eigen::Map<Eigen::VectorXd> omegaWaleGluedEig(omegaWaleGlued.raw().data(), (gluedGeometry.mesh).nEdges());
     std::vector<double> modelMatchingTermsWale(omegaWaleGluedEig.data(), omegaWaleGluedEig.data() + omegaWaleGluedEig.rows());
@@ -1269,17 +1276,19 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     std::vector<std::array<double, 3>> modelFaceGradients;
     std::vector<std::pair<int, int>> singularEdges;
     globalGeometry.requireFaceNormals();
-    for (Face f : globalGeometry.mesh.faces()){
-        //rotate and normalize the gradients 
-        timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
-        timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].rotateAround(globalGeometry.faceNormals[f], PI/2);
-        modelFaceGradients.push_back(std::array{timeFunctionGradientGlobal[f][0], timeFunctionGradientGlobal[f][1], timeFunctionGradientGlobal[f][2]});
+    for (Face f : globalGeometry.mesh.faces()){ 
+        //rotate the gradients 
+        timeFunctionGradientGlobalNormalized[f] = timeFunctionGradientGlobalNormalized[f].rotateAround(globalGeometry.faceNormals[f], PI/2);
+        modelFaceGradients.push_back(std::array{timeFunctionGradientGlobalNormalized[f][0], timeFunctionGradientGlobalNormalized[f][1], 
+                                                    timeFunctionGradientGlobalNormalized[f][2]});
         //place wale singularities at edges
         if (stripeSingularities[f] != 0){
-            int edge = findSingularEdgeFromSingularFace(globalGeometry, gluedGeometry, f.getIndex(), timeFunctionGradientGlobal[f]);
-            //pass it to the model in the glued setting
-            singularEdges.push_back(std::make_pair(edgeMap[edge], stripeSingularities[f]));
-            edgeSingularities[edge] = stripeSingularities[f];
+            int edge = findSingularEdgeFromSingularFace(globalGeometry, gluedGeometry, f.getIndex(), timeFunctionGradientGlobalNormalized[f]);
+            if (!globalGeometry.mesh.edge(edge).isBoundary()){//don't place increases and decreases on boundary edges
+                //pass it to the model in the glued setting
+                singularEdges.push_back(std::make_pair(edgeMap[edge], stripeSingularities[f]));
+                edgeSingularities[edge] = stripeSingularities[f];
+            }
         }
     } 
     Model modelWale; 
@@ -1289,6 +1298,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     modelWale.setFaceIndices(faceIndicesWaleModel);
     modelWale.setFaceGradients(modelFaceGradients);
     modelWale.setSingularEdges(singularEdges);
+
     HalfedgeData<double> sigmaWaleGlued = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, vertexMap);
     CornerData<double> stripeValuesOneFormGlued;
     FaceData<int> stripeIndicesOneFormGlued;
