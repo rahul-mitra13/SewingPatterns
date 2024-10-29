@@ -1098,7 +1098,7 @@ std::tuple<CornerData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositio
     //number of singularity pairs  
     int numPairs = 0;
     //max number of singularity pairs to insert 
-    int maxPairs = 5;
+    int maxPairs = 20;
     //gurobi model we will be solving 
     Model model;
 
@@ -1758,7 +1758,7 @@ double findIsoValWithMaxAvgFaceCurl(VertexPositionGeometry& globalGeometry, Edge
         std::cout << "used iso vals = " << usedIsoVals[i] << std::endl;
     }
 
-    double stepSize = 0.1;
+    double stepSize = 0.01;
     double end = 1.0;
     double curr = stepSize;
     double maxDeviation = -DBL_MAX;
