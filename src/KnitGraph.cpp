@@ -245,7 +245,7 @@ void KnitGraph::renderGraph(){
     }
 
     auto graph = polyscope::registerCurveNetwork("knit graph vertices", pos, edges);
-    graph -> setRadius(0.001);
+    graph -> setRadius(0.004);
     graph -> setEnabled(false);
 
 }
