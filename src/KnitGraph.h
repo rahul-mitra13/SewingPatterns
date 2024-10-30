@@ -79,6 +79,14 @@ class KnitGraph{
         //faces in this knit graph 
         std::vector<std::vector<int>> faces;//or std::vector<std::vector<std::array<int, 4>> faces?
 
+        private: 
+
+            //hashing floating point numbers 
+            int hashFloat(double val);
+
+            //get a knit graph vertex by id
+            knitGraphVertex& get(int id);
+
         public: 
 
             //Constructor
@@ -91,6 +99,9 @@ class KnitGraph{
 
             //find knit graph vertices on faces that are smooth in both directions
             void handleCourseNonSingularFaceWaleNonSingularFace(Face &f);
+
+            //update connections on the vertices of a smooth face 
+            void connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices);
 
             //render the knit graph 
             void renderGraph();

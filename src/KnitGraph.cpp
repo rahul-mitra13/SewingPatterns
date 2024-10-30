@@ -26,6 +26,7 @@ void KnitGraph::buildGraph(){
         //make the connections on a non-singular face in both directions
         handleCourseNonSingularFaceWaleNonSingularFace(f);
     }
+    renderGraph();
 
 }
 
@@ -226,8 +227,63 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
         }
     }
 
-    renderGraph();
-    //connectOnSmoothFace(faceVertices);
+    connectOnSmoothFace(faceVertices);
+}
+
+//update connections on the vertices of a smooth face 
+void KnitGraph::connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices){
+
+    //3 cases: 
+    //a. Connecting real vertices to real vertices
+    //b. Connecting real vertices to virtual vertices 
+    //c. Connecting virtual vertices to virtual vertices
+
+    std::set<int> uniqueAlphas;
+    std::set<int> uniqueBetas;
+
+    for (knitGraphVertex v : faceVertices){
+        if (!v.isBetaVirtual) uniqueAlphas.insert(hashFloat(v.alpha_tag));
+        if (!v.isAlphaVirtual) uniqueBetas.insert(hashFloat(v.beta_tag));
+    }
+    for (int currHashedAlphaVal : uniqueAlphas){
+        //make an ordered map to store beta values for the current alpha value
+        std::map<int, int> currAlphaRow;
+        for (knitGraphVertex v : faceVertices){
+            if (hashFloat(v.alpha_tag) == currHashedAlphaVal){
+                //if a vertex has the same alpha_tag as the current alpha val, place them in currAlphaRow and order them according to their beta
+                currAlphaRow[hashFloat(v.beta_tag)] = v.id;
+            }
+        }
+        //set the course connections using the map (skip the last element)
+        for (auto it = currAlphaRow.begin(); it != std::prev(currAlphaRow.end()); it++){
+            knitGraphVertex& currVertex = vertices[it->second];
+            knitGraphVertex& nextVertex = vertices[std::next(it)->second]; 
+
+            currVertex.row_out = nextVertex.id;
+            nextVertex.row_in = currVertex.id;
+        }
+    }
+
+
+    for (int currHashedBetaVal : uniqueBetas){
+        //make an ordered map to store alpha values for the current beta value
+        std::map<int, int> currBetaCol;
+        for (knitGraphVertex v : faceVertices){
+            if (hashFloat(v.beta_tag) == currHashedBetaVal){
+                //if a vertex has the same beta_tag as the current beta val, place them in currBetaCol and order them according to their alpha
+                currBetaCol[hashFloat(v.alpha_tag)] = v.id;
+            }
+        }
+        //set the wale connections using the map
+        for (auto it = currBetaCol.begin(); it != std::prev(currBetaCol.end()); it++){
+            knitGraphVertex& currVertex = vertices[it->second];
+            knitGraphVertex& nextVertex = vertices[std::next(it)->second];
+
+            currVertex.col_out[0] = nextVertex.id;
+            nextVertex.col_in[0] = currVertex.id;
+        }
+    }
+
 }
 
 void KnitGraph::renderGraph(){
@@ -236,16 +292,38 @@ void KnitGraph::renderGraph(){
     std::vector<Vector3> pos;
     //query the vertex positons from the barycentric coordinates
     for (knitGraphVertex v : vertices){
-        if (v.isVirtual) continue;
+        //if (v.isVirtual) continue;
         Face f = globalGeometry->mesh.face(v.face.getIndex());
         Vector3 i = globalGeometry->vertexPositions[f.halfedge().corner().vertex()];
         Vector3 j = globalGeometry->vertexPositions[f.halfedge().next().corner().vertex()];
         Vector3 k = globalGeometry->vertexPositions[f.halfedge().next().next().corner().vertex()];
         pos.push_back(v.baryCoords[0] * i + v.baryCoords[1] * j + v.baryCoords[2] * k);
+        
+        if (v.row_out != -1)//row out is set
+        edges.push_back(std::array<int, 2>{v.id, v.row_out});
+        if (v.col_out[0] != -1)//col out is set 
+        edges.push_back(std::array<int, 2>{v.id, v.col_out[0]});
     }
 
+    std::cout << "size of edges " << edges.size() << std::endl;
     auto graph = polyscope::registerCurveNetwork("knit graph vertices", pos, edges);
     graph -> setRadius(0.004);
     graph -> setEnabled(false);
+
+}
+
+
+//----------------------helper functions----------------------//
+//hash function for a floating point number
+int KnitGraph::hashFloat(double value) {
+    // Reinterpret the double as an integer and hash it
+    std::uint64_t intValue = *reinterpret_cast<std::uint64_t*>(&value);
+    return std::hash<std::uint64_t>()(intValue);
+}
+
+//get a knitgraph vertex by id
+knitGraphVertex& KnitGraph::get(int id){
+        
+    return vertices[id];
 
 }
