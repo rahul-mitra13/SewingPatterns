@@ -206,3 +206,9 @@ void drawMeshCurveNetwork(VertexPositionGeometry& globalGeometry, polyscope::Sur
 //
 //@return           maxEdge             int                         index of the singular edge in the global mesh setting
 int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, int singFaceIndex, Vector3 globalFaceGradient);
+
+
+//@clean 
+//hash a floating point number
+//still causes collision when numbers are extremely close
+int hashFloatQuantized(double f);

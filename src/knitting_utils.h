@@ -117,18 +117,26 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry,  int d
 
 //@clean 
 //compute a 1-form that will be used to generate the wale stripes 
+//@param[in]    globalGeometry      VertexPositionGeometry  geometry of the object in the global setting
 //@param[in]    gluedGeometry       EdgeLengthGeometry      edge length geometry in the glued setting 
 //@param[in]    model               Model                   model we will be solving using gurobi (specifies the wale constraints)
+//@param[in]    vertexMap           std::map<int, int>      a map from global vertex indices to glued vertex indices
 //
 //@return       sigma               HalfedgeData<double>    1-form value per halfedge representing the wale stripes
 HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& vertexMap);
 
 //@clean 
 //return information for wale stripes in the glued mesh setting
-//@param[in]    globalGeometry      VertexPositionGeometry                      global geometry embedded in R^3
-//@param[in]    gluedGeometry       EdgeLengthGeometry                          edge length geometry in the glued setting 
-//@param[in]    timeFunctionGlobal  VertexData<double>                          global time function
-//@param[in]    period              double                                      period for 1-form optimization
+//@param[in]    globalGeometry                          VertexPositionGeometry                      global geometry embedded in R^3
+//@param[in]    gluedGeometry                           EdgeLengthGeometry                          edge length geometry in the glued setting
+//@param[in]    edgeMappingsPaits                       std::vector<std::pair<int, int>>            vector of pairs where each pair stores edges that are stitched together
+//@param[in]    edgeMap                                 std::map<int,int>                           a map from edges in the global mesh to edges in the glued mesh
+//@param[in]    vertexMap                               std::map<int, int>                          a map from global vertex indices to glued vertex indices
+//@param[in]    timeFunctionGlobal                      VertexData<int>                             time function in the global setting
+//@param[in]    timeFunctionGradientGlobalNormalized    FaceData<Vector3>                           normalized gradient of the time function
+//@param[in]    period                                  double                                      period for 1-form optimization
+//@param[in]    knoppelFrequency                        double                                      period to be used when generating Knoppel stripes
+//@param[in]    globalBdyConditions                     globalBoundaryConditions                    boundary conditions specified in the glued mesh setting
 //
 //@return       striping info       tuple<CornerData<double, EdgeData<double>>     striping info in the glued mesh setting 
 std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
@@ -136,4 +144,17 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                                                                     std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, FaceData<Vector3>& timeFunctionGradientGlobalNormalized, 
                                                                     double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions);
 
+
+//@clean 
+//implement the harmonic 1-form 
+std::tuple<CornerData<double>, EdgeData<double>> implHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& globalTimeFunction,
+                                                                    FaceData<Vector3>& globalTimeFunctionGradientsNormalized,
+                                                                    std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
+                                                                    globalBoundaryConditions& boundaryConditions, double period,
+                                                                    Eigen::MatrixXd V, Eigen::MatrixXi F, Eigen::SparseMatrix<double>& grad);
+
+//@clean
+//compute course harmonic 1-form
+std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
+                                                        std::map<int, int>& vertexMap, Eigen::SparseMatrix<double>& grad, polyscope::SurfaceMesh& psMesh);
 

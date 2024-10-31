@@ -1098,7 +1098,7 @@ std::tuple<CornerData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositio
     //number of singularity pairs  
     int numPairs = 0;
     //max number of singularity pairs to insert 
-    int maxPairs = 20;
+    int maxPairs = 5;
     //gurobi model we will be solving 
     Model model;
 

@@ -84,6 +84,7 @@ class KnitGraph{
             //hashing floating point numbers 
             int hashFloat(double val);
 
+
             //get a knit graph vertex by id
             knitGraphVertex& get(int id);
 

@@ -242,16 +242,16 @@ void KnitGraph::connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices){
     std::set<int> uniqueBetas;
 
     for (knitGraphVertex v : faceVertices){
-        if (!v.isBetaVirtual) uniqueAlphas.insert(hashFloat(v.alpha_tag));
-        if (!v.isAlphaVirtual) uniqueBetas.insert(hashFloat(v.beta_tag));
+        if (!v.isBetaVirtual) uniqueAlphas.insert(hashFloatQuantized(v.alpha_tag));
+        if (!v.isAlphaVirtual) uniqueBetas.insert(hashFloatQuantized(v.beta_tag));
     }
     for (int currHashedAlphaVal : uniqueAlphas){
         //make an ordered map to store beta values for the current alpha value
         std::map<int, int> currAlphaRow;
         for (knitGraphVertex v : faceVertices){
-            if (hashFloat(v.alpha_tag) == currHashedAlphaVal){
+            if (hashFloatQuantized(v.alpha_tag) == currHashedAlphaVal){
                 //if a vertex has the same alpha_tag as the current alpha val, place them in currAlphaRow and order them according to their beta
-                currAlphaRow[hashFloat(v.beta_tag)] = v.id;
+                currAlphaRow[hashFloatQuantized(v.beta_tag)] = v.id;
             }
         }
         //set the course connections using the map (skip the last element)
@@ -269,9 +269,9 @@ void KnitGraph::connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices){
         //make an ordered map to store alpha values for the current beta value
         std::map<int, int> currBetaCol;
         for (knitGraphVertex v : faceVertices){
-            if (hashFloat(v.beta_tag) == currHashedBetaVal){
+            if (hashFloatQuantized(v.beta_tag) == currHashedBetaVal){
                 //if a vertex has the same beta_tag as the current beta val, place them in currBetaCol and order them according to their alpha
-                currBetaCol[hashFloat(v.alpha_tag)] = v.id;
+                currBetaCol[hashFloatQuantized(v.alpha_tag)] = v.id;
             }
         }
         //set the wale connections using the map
@@ -305,9 +305,8 @@ void KnitGraph::renderGraph(){
         edges.push_back(std::array<int, 2>{v.id, v.col_out[0]});
     }
 
-    std::cout << "size of edges " << edges.size() << std::endl;
     auto graph = polyscope::registerCurveNetwork("knit graph vertices", pos, edges);
-    graph -> setRadius(0.004);
+    graph -> setRadius(0.001);
     graph -> setEnabled(false);
 
 }

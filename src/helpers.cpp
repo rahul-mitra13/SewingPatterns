@@ -772,7 +772,7 @@ void drawMeshCurveNetwork(VertexPositionGeometry& globalGeometry, polyscope::Sur
     meshNetwork -> addEdgeVectorQuantity("Canonical Edge Directions", edgeVectors);
 }
 
-
+//@clean
 //after finding a face singularity, find a singular edge in that face 
 //edge that is most aligned with the gradient (or rotated gradient in the wale case) of the time function 
 int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, int singFaceIndex, Vector3 globalFaceGradient){
@@ -798,4 +798,12 @@ int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, Edg
         }
     }
     return maxEdge.getIndex();
+}
+
+//@clean
+//hash a floating point number
+int hashFloatQuantized(double f) {
+    int precision = 1e5;
+    int quantized = static_cast<int>(std::round(f * precision));
+    return std::hash<int>{}(quantized);
 }
