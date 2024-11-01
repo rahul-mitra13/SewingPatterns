@@ -59,7 +59,14 @@ float knoppelFrequency = 0.0;
 std::vector<size_t> perm;
 std::vector<bool> orientations;
 
-
+//eigen matrix vertex positions
+Eigen::MatrixXd V;
+//eigen matrix face lists
+Eigen::MatrixXi F;
+// Compute the global gradient operator: #F*3 by #V
+Eigen::SparseMatrix<double> grad;
+//gradient operator in the row major format
+Eigen::SparseMatrix<double, Eigen::RowMajor> G;
 
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
@@ -82,10 +89,16 @@ void showStripePatterns(){
   globalPSMesh -> addFaceVectorQuantity("normalized time function gradient", timeFunctionGradientGlobalNormalized);
   
   //-------iteratively find course stripes and course singularities----------//
-  CornerData<double> courseStripeValuesGlued(globalGeometry -> mesh);
+  CornerData<double> courseStripeValues(globalGeometry -> mesh);
   EdgeData<double> courseSingularEdgesGlobal(globalGeometry -> mesh);
-  std::tie(courseStripeValuesGlued, courseSingularEdgesGlobal) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
-                                                            vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
+  // std::tie(courseStripeValues, courseSingularEdgesGlobal) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
+  //                                                            vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
+
+  std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
+                                                                    timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
+                                                                    globalBdyConditions, period, V, F);
+
+  std::tie(courseStripeValues, courseSingularEdgesGlobal);
   globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
 
 
@@ -93,15 +106,16 @@ void showStripePatterns(){
   //find Knöppel singularities in the WALE DIRECTION 
   //just run Knoppel's algorithm on these models 
   //and then run our 1-form optimization with the singularities
-  CornerData<double> waleStripeValuesGlued;
+  G = grad;
+  CornerData<double> waleStripeValues;
   EdgeData<double> waleSingularEdgesGlobal;
   FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
-  std::tie(waleStripeValuesGlued, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
+  std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
                                                                     edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
-                                                                    timeFunctionGradientGlobalNormalized, period, knoppelFrequency, globalBdyConditions);
+                                                                    timeFunctionGradientGlobalNormalized, G, period, knoppelFrequency, globalBdyConditions);
   std::vector<Vector3> positionsWale;
   std::vector<std::array<int, 2>> edgesWale;
-  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValuesGlued, waleSingularFaces, period);
+  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, period);
   auto waleStripes = polyscope::registerCurveNetwork("wale stripes", positionsWale, edgesWale);
   globalPSMesh -> addEdgeScalarQuantity("wale singularities", waleSingularEdgesGlobal);
   waleStripes -> setRadius(0.001);
@@ -109,7 +123,7 @@ void showStripePatterns(){
 
   //generate the knit graph
   KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
-                      courseStripeValuesGlued, courseSingularEdgesGlobal, waleStripeValuesGlued, waleSingularEdgesGlobal,
+                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
                       edgeMap);
   graph.buildGraph();
 
@@ -137,6 +151,9 @@ int main(int argc, char **argv) {
   nlohmann::json data = nlohmann::json::parse(jsonFile);
   //run sanity checks
   std::tie(globalMesh, globalGeometry) = readManifoldSurfaceMesh(data["model_path"]);
+  std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometry);
+  igl::grad(V,F,grad);
+
   if (!(globalMesh -> isManifold())){
     std::cout << "Error: Mesh is not manifold" << std::endl;
     throw std::exception();

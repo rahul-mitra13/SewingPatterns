@@ -1098,7 +1098,7 @@ std::tuple<CornerData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositio
     //number of singularity pairs  
     int numPairs = 0;
     //max number of singularity pairs to insert 
-    int maxPairs = 5;
+    int maxPairs = 0;
     //gurobi model we will be solving 
     Model model;
 
@@ -1146,8 +1146,8 @@ std::tuple<CornerData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositio
     faceSingularities[singFacePair.second] = -1.0;
     faceIndices[singFacePair.first] = 1.0;
     faceIndices[singFacePair.second] = -1.0;
-    int negEdge = findSingularEdgeFromSingularFace(globalGeometry, gluedGeometry, singFacePair.first, globalFaceGradients[singFacePair.first]);
-    int posEdge = findSingularEdgeFromSingularFace(globalGeometry, gluedGeometry, singFacePair.second, globalFaceGradients[singFacePair.second]);
+    int negEdge = findSingularEdgeFromSingularFace(globalGeometry, singFacePair.first, globalFaceGradients[singFacePair.first]);
+    int posEdge = findSingularEdgeFromSingularFace(globalGeometry, singFacePair.second, globalFaceGradients[singFacePair.second]);
     edgeSingularities[globalMesh.edge(posEdge)] = 1.0;
     edgeSingularities[globalMesh.edge(negEdge)] = -1.0;
     //first pair of singular edges (edge-curl approach)
@@ -1215,8 +1215,8 @@ std::tuple<CornerData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositio
         faceSingularities[singFacePair.second] = -1.0;
         faceIndices[singFacePair.first] = 1.0;
         faceIndices[singFacePair.second] = -1.0;
-        int posEdge = findSingularEdgeFromSingularFace(globalGeometry, gluedGeometry, singFacePair.first, globalFaceGradients[singFacePair.first]);
-        int negEdge = findSingularEdgeFromSingularFace(globalGeometry, gluedGeometry, singFacePair.second, globalFaceGradients[singFacePair.second]);
+        int posEdge = findSingularEdgeFromSingularFace(globalGeometry, singFacePair.first, globalFaceGradients[singFacePair.first]);
+        int negEdge = findSingularEdgeFromSingularFace(globalGeometry, singFacePair.second, globalFaceGradients[singFacePair.second]);
         //don't select edges we've seen before 
         if ((std::find(singularEdges.begin(), singularEdges.end(), std::make_pair(globalToGluedEdgeMap[posEdge], 1)) != singularEdges.end())
             || std::find(singularEdges.begin(), singularEdges.end(), std::make_pair(globalToGluedEdgeMap[negEdge], -1)) != singularEdges.end()){

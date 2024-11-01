@@ -123,7 +123,8 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry,  int d
 //@param[in]    vertexMap           std::map<int, int>      a map from global vertex indices to glued vertex indices
 //
 //@return       sigma               HalfedgeData<double>    1-form value per halfedge representing the wale stripes
-HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& vertexMap);
+HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, 
+                                        Eigen::SparseMatrix<double, Eigen::RowMajor>& G, std::map<int, int>& vertexMap);
 
 //@clean 
 //return information for wale stripes in the glued mesh setting
@@ -142,19 +143,42 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
 std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
                                                                     std::vector<std::pair<int, int>>& edgeMappingsPairs, std::map<int, int>& edgeMap, 
                                                                     std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, FaceData<Vector3>& timeFunctionGradientGlobalNormalized, 
-                                                                    double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions);
+                                                                    Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions);
 
 
 //@clean 
 //implement the harmonic 1-form 
-std::tuple<CornerData<double>, EdgeData<double>> implHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& globalTimeFunction,
+std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& globalTimeFunction,
                                                                     FaceData<Vector3>& globalTimeFunctionGradientsNormalized,
                                                                     std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
                                                                     globalBoundaryConditions& boundaryConditions, double period,
-                                                                    Eigen::MatrixXd V, Eigen::MatrixXi F, Eigen::SparseMatrix<double>& grad);
+                                                                    Eigen::MatrixXd& V, Eigen::MatrixXi& F);
 
 //@clean
 //compute course harmonic 1-form
 std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
-                                                        std::map<int, int>& vertexMap, Eigen::SparseMatrix<double>& grad, polyscope::SurfaceMesh& psMesh);
+                                                        std::map<int, int>& vertexMap, polyscope::SurfaceMesh& psMesh);
+
+//@clean 
+//compute the edge curl in the global setting
+EdgeData<double> computeEdgeCurl(VertexPositionGeometry& globalGeometry,
+                                FaceData<Vector3>& globalFaceGradients);
+
+//@clean
+//compute face curl by averaging edge curl over the edges in a face 
+FaceData<double> computeAverageEdgeCurlonFaces(VertexPositionGeometry& globalGeometry, EdgeData<double>& edgeCurl);
+
+
+//@clean
+//find max/min curl face for a given isoline of the TIME FUNCTION 
+//would probably want to change tracing the level sets of the time function with level sets of the harmonic 1-form
+std::pair<int, int> findFaceSingularityPair(VertexPositionGeometry& globalGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, FaceData<double>& curl,
+                                            VertexData<double>& globalTimeFunction, polyscope::SurfaceMesh& psMesh,
+                                            std::map<int, int>& hashedUsedIsoVals, double isoVal, int numPairs, bool useAllFaces);
+
+
+//@clean
+//get the vertices (of a curve network), edges (of a curve network) and faces that a particular isovalue of the time function passes through 
+//generate isolines for the time function given a specific isoVal
+std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, std::vector<int>> getIsoLine(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& timeFunction, double isoVal);
 
