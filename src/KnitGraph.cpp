@@ -17,6 +17,7 @@ KnitGraph::KnitGraph(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry&
 
 void KnitGraph::buildGraph(){
 
+    std::cout << "Building knit graph..." << std::endl;
     SurfaceMesh& gluedMesh = this->gluedGeometry->mesh;
     //convert global edges to glued edge indices 
     EdgeData<double> courseSingularEdgesGlued = convertGlobalToGluedEdgeFunction(*globalGeometry, *gluedGeometry, courseSingularEdges, *globalToGluedEdgeMap);

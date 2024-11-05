@@ -91,12 +91,13 @@ void showStripePatterns(){
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
   EdgeData<double> courseSingularEdgesGlobal(globalGeometry -> mesh);
-  // std::tie(courseStripeValues, courseSingularEdgesGlobal) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
-  //                                                            vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
+  std::tie(courseStripeValues, courseSingularEdgesGlobal) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
+                                                             vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
 
-  std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
-                                                                    timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
-                                                                    globalBdyConditions, period, V, F);
+  G = grad;
+  // std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
+  //                                                                   timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
+  //                                                                   globalBdyConditions, period, V, F, G);
 
   std::tie(courseStripeValues, courseSingularEdgesGlobal);
   globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
@@ -106,7 +107,6 @@ void showStripePatterns(){
   //find Knöppel singularities in the WALE DIRECTION 
   //just run Knoppel's algorithm on these models 
   //and then run our 1-form optimization with the singularities
-  G = grad;
   CornerData<double> waleStripeValues;
   EdgeData<double> waleSingularEdgesGlobal;
   FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities

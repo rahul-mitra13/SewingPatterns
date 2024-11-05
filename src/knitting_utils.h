@@ -115,6 +115,10 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry,  int d
 
 //@clean: tag represents code that should be written cleanly and change minimally going forward :D 
 
+//@clean
+//compute the per-face gradient of a 1-form (in global setting)
+FaceData<Vector3> computeOneFormFaceGrad(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde);
+
 //@clean 
 //compute a 1-form that will be used to generate the wale stripes 
 //@param[in]    globalGeometry      VertexPositionGeometry  geometry of the object in the global setting
@@ -148,16 +152,16 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
 //@clean 
 //implement the harmonic 1-form 
-std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& globalTimeFunction,
-                                                                    FaceData<Vector3>& globalTimeFunctionGradientsNormalized,
+std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+                                                                    VertexData<double>& globalTimeFunction, FaceData<Vector3>& globalTimeFunctionGradientsNormalized,
                                                                     std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
                                                                     globalBoundaryConditions& boundaryConditions, double period,
-                                                                    Eigen::MatrixXd& V, Eigen::MatrixXi& F);
+                                                                    Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G);
 
 //@clean
 //compute course harmonic 1-form
 std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
-                                                        std::map<int, int>& vertexMap, polyscope::SurfaceMesh& psMesh);
+                                                        std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh);
 
 //@clean 
 //compute the edge curl in the global setting
@@ -172,7 +176,7 @@ FaceData<double> computeAverageEdgeCurlonFaces(VertexPositionGeometry& globalGeo
 //@clean
 //find max/min curl face for a given isoline of the TIME FUNCTION 
 //would probably want to change tracing the level sets of the time function with level sets of the harmonic 1-form
-std::pair<int, int> findFaceSingularityPair(VertexPositionGeometry& globalGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, FaceData<double>& curl,
+std::pair<int, int> findFaceSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, FaceData<double>& curl,
                                             VertexData<double>& globalTimeFunction, polyscope::SurfaceMesh& psMesh,
                                             std::map<int, int>& hashedUsedIsoVals, double isoVal, int numPairs, bool useAllFaces);
 
@@ -181,4 +185,9 @@ std::pair<int, int> findFaceSingularityPair(VertexPositionGeometry& globalGeomet
 //get the vertices (of a curve network), edges (of a curve network) and faces that a particular isovalue of the time function passes through 
 //generate isolines for the time function given a specific isoVal
 std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, std::vector<int>> getIsoLine(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& timeFunction, double isoVal);
+
+
+//@clean
+//find the isoval with max average curl in the face setting
+double findIsoValWithMaxFaceCurl(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& globalTimeFunction, FaceData<double>& curl, std::map<int, int>& hashedUsedIsoVals);
 

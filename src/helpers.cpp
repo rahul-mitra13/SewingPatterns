@@ -784,6 +784,7 @@ int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int
     Edge maxEdge;
     
     for (Edge e : globalMesh.face(singFaceIndex).adjacentEdges()){
+        if (e.isBoundary()) continue;//skip boundary edges
         Halfedge he1 = e.halfedge();
         Halfedge he2 = e.halfedge().twin();
         double p1 = dot(globalGeometry.vertexPositions[he1.tipVertex()] - globalGeometry.vertexPositions[he1.tailVertex()], globalFaceGradient);
@@ -806,4 +807,17 @@ int hashFloatQuantized(double f) {
     int precision = 1e5;
     int quantized = static_cast<int>(std::round(f * precision));
     return std::hash<int>{}(quantized);
+}
+
+
+//@clean 
+std::vector<std::vector<int>> findConnectedComponents(EdgeLengthGeometry& gluedGeometry, std::vector<int>& faces){
+
+    std::vector<std::vector<int>> connectedComponents;
+    //put the faces in this isoline in a map
+    std::map<int, int> seenFaces;
+    for (int f : faces){
+        seenFaces.insert({f, 0});
+    }
+
 }
