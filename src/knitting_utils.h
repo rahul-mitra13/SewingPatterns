@@ -111,6 +111,18 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
 //@param[in]    edgeMappingsPairs       std::vector<std::pair<int, int>>   vector of pairs where each pair stores edges that are stitched together
 EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry,  int direction, FaceData<Vector3>& faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs);
 
+//implement the harmonic 1-form 
+//the below two function use the energy min cot_e ||\sigma_e||^2
+// std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+//                                                                     VertexData<double>& globalTimeFunction, FaceData<Vector3>& globalTimeFunctionGradientsNormalized,
+//                                                                     std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
+//                                                                     globalBoundaryConditions& boundaryConditions, double period,
+//                                                                     Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G);
+
+//compute course harmonic 1-form
+// std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
+//                                                         std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh);
+
 //-------------------------------------------------------------------------------------------//
 
 //@clean: tag represents code that should be written cleanly and change minimally going forward :D 
@@ -118,6 +130,10 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry,  int d
 //@clean
 //compute the per-face gradient of a 1-form (in global setting)
 FaceData<Vector3> computeOneFormFaceGrad(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde);
+
+//@clean 
+//same function as above but just returns a different object
+std::vector<std::array<double, 3>> vectorOneFormFaceGrad(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde);
 
 //@clean 
 //compute a 1-form that will be used to generate the wale stripes 
@@ -147,26 +163,18 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
 std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
                                                                     std::vector<std::pair<int, int>>& edgeMappingsPairs, std::map<int, int>& edgeMap, 
                                                                     std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, FaceData<Vector3>& timeFunctionGradientGlobalNormalized, 
-                                                                    Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions);
+                                                                    Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions,
+                                                                    EdgeData<double>& courseSingularEdgesGlobal);
 
-
-//@clean 
-//implement the harmonic 1-form 
-std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
-                                                                    VertexData<double>& globalTimeFunction, FaceData<Vector3>& globalTimeFunctionGradientsNormalized,
-                                                                    std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
-                                                                    globalBoundaryConditions& boundaryConditions, double period,
-                                                                    Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G);
-
-//@clean
-//compute course harmonic 1-form
-std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
-                                                        std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh);
 
 //@clean 
 //compute the edge curl in the global setting
 EdgeData<double> computeEdgeCurl(VertexPositionGeometry& globalGeometry,
                                 FaceData<Vector3>& globalFaceGradients);
+
+//compute edge curl in the global setting 
+//compute curl per edge in the global setting 
+EdgeData<double> computeEdgeCurl(VertexPositionGeometry& globalGeometry, FaceData<Vector3>& globalFaceGradients);
 
 //@clean
 //compute face curl by averaging edge curl over the edges in a face 
@@ -189,5 +197,18 @@ std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, std::vector<int>> getIsoLine(Eigen:
 
 //@clean
 //find the isoval with max average curl in the face setting
-double findIsoValWithMaxFaceCurl(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& globalTimeFunction, FaceData<double>& curl, std::map<int, int>& hashedUsedIsoVals);
+double findIsoValWithMaxFaceCurl(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& globalTimeFunction, FaceData<double>& curl, std::map<int, int>& hashedUsedIsoVals,
+                                double stepSize);
 
+//@clean 
+//the below two functions use the energy min ||\del sigma - \nabla \sigma_{i - 1} / ||\nabla \sigma_{i - 1}|| ||^2
+std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+                                                                    VertexData<double>& globalTimeFunction, FaceData<Vector3>& globalTimeFunctionGradientsNormalized,
+                                                                    std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
+                                                                    globalBoundaryConditions& boundaryConditions, double period,
+                                                                    Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G);
+
+//@clean
+//compute course harmonic 1-form
+std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
+                                                        std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh);

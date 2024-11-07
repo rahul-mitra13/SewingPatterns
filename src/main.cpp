@@ -71,8 +71,6 @@ Eigen::SparseMatrix<double, Eigen::RowMajor> G;
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
   
-  //require the DEC operators
-  gluedELG->requireDECOperators();
   //time function on the glued mesh 
   VertexData<double> timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
   //time function on the global mesh 
@@ -91,13 +89,13 @@ void showStripePatterns(){
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
   EdgeData<double> courseSingularEdgesGlobal(globalGeometry -> mesh);
-  std::tie(courseStripeValues, courseSingularEdgesGlobal) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
-                                                             vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
+  // std::tie(courseStripeValues, courseSingularEdgesGlobal) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
+  //                                                            vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
 
   G = grad;
-  // std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
-  //                                                                   timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
-  //                                                                   globalBdyConditions, period, V, F, G);
+  std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
+                                                                    timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
+                                                                    globalBdyConditions, period, V, F, G);
 
   std::tie(courseStripeValues, courseSingularEdgesGlobal);
   globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
@@ -112,7 +110,8 @@ void showStripePatterns(){
   FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
   std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
                                                                     edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
-                                                                    timeFunctionGradientGlobalNormalized, G, period, knoppelFrequency, globalBdyConditions);
+                                                                    timeFunctionGradientGlobalNormalized, G, period, knoppelFrequency, globalBdyConditions, 
+                                                                    courseSingularEdgesGlobal);
   std::vector<Vector3> positionsWale;
   std::vector<std::array<int, 2>> edgesWale;
   std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, period);

@@ -1077,6 +1077,9 @@ std::tuple<CornerData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositio
     //show the level set of the time function 
     VertexData<double> globalTimeFunction = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, gluedTimeFunction, globalToGluedVertexMap);
 
+    //distance from norm 
+    double oldDistance = DBL_MAX;
+    double newDistance = 0.;
     //curl per edge
     EdgeData<double> edgeCurl(globalMesh);
     //curl per face 
@@ -1098,7 +1101,7 @@ std::tuple<CornerData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositio
     //number of singularity pairs  
     int numPairs = 0;
     //max number of singularity pairs to insert 
-    int maxPairs = 10;
+    int maxPairs = 0;
     //gurobi model we will be solving 
     Model model;
 
@@ -1168,8 +1171,8 @@ std::tuple<CornerData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositio
     faceSingularities[singFacePair.second] = -1.0;
     faceIndices[singFacePair.first] = 1.0;
     faceIndices[singFacePair.second] = -1.0;
-    int negEdge = findSingularEdgeFromSingularFace(globalGeometry, singFacePair.first, globalFaceGradients[singFacePair.first]);
-    int posEdge = findSingularEdgeFromSingularFace(globalGeometry, singFacePair.second, globalFaceGradients[singFacePair.second]);
+    int negEdge = findSingularEdgeFromSingularFace(globalGeometry, singFacePair.first, globalFaceGradients[singFacePair.first], 0.75, globalTimeFunction, 0.);
+    int posEdge = findSingularEdgeFromSingularFace(globalGeometry, singFacePair.second, globalFaceGradients[singFacePair.second], 0.75, globalTimeFunction, 0.);
     edgeSingularities[globalMesh.edge(posEdge)] = 1.0;
     edgeSingularities[globalMesh.edge(negEdge)] = -1.0;
     //first pair of singular edges (edge-curl approach)
@@ -1201,6 +1204,23 @@ std::tuple<CornerData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositio
     while(numPairs < maxPairs){
         //gradient of sigmaTilde in the global setting 
         FaceData<Vector3> gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, oldGluedSigmaTilde);
+        std::cout << "after " << numPairs << " insertions...." << std::endl;
+        newDistance = 0;
+        for (Face f : globalMesh.faces()){
+            double norm = gradSigmaTilde[f].norm();
+            newDistance += pow(norm - 1., 2);
+            gradSigmaTilde[f] = gradSigmaTilde[f].normalize();
+        }
+        std::cout << "distance from norm = " << newDistance << std::endl;
+        if (newDistance > oldDistance){
+            std::cout << "(breaking) new distance from norm = " << newDistance << std::endl;
+            std::cout << "(breaking) old distance from norm = " << oldDistance << std::endl;
+            break;
+        }
+        std::cout << "(not breaking) new distance from norm = " << newDistance << std::endl;
+        std::cout << "(not breaking) old distance from norm = " << oldDistance << std::endl;
+        oldDistance = newDistance;
+        std::cout << "----------------------" << std::endl;
         psMesh.addFaceVectorQuantity("grad sigmaTilde after placing " + std::to_string(numPairs) + " singularity pairs", gradSigmaTilde);
         //recompute edge curl using gradSigmaTilde
         edgeCurl = computeEdgeCurl(globalGeometry, gluedGeometry, gradSigmaTilde, globalToGluedEdgeMap);
@@ -1230,8 +1250,8 @@ std::tuple<CornerData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositio
         faceSingularities[singFacePair.second] = -1.0;
         faceIndices[singFacePair.first] = 1.0;
         faceIndices[singFacePair.second] = -1.0;
-        int posEdge = findSingularEdgeFromSingularFace(globalGeometry, singFacePair.first, globalFaceGradients[singFacePair.first]);
-        int negEdge = findSingularEdgeFromSingularFace(globalGeometry, singFacePair.second, globalFaceGradients[singFacePair.second]);
+        int posEdge = findSingularEdgeFromSingularFace(globalGeometry, singFacePair.first, globalFaceGradients[singFacePair.first], 0.75, globalTimeFunction, 0.);
+        int negEdge = findSingularEdgeFromSingularFace(globalGeometry, singFacePair.second, globalFaceGradients[singFacePair.second], 0.75, globalTimeFunction, 0.);
         //don't select edges we've seen before 
         if ((std::find(singularEdges.begin(), singularEdges.end(), std::make_pair(globalToGluedEdgeMap[posEdge], 1)) != singularEdges.end())
             || std::find(singularEdges.begin(), singularEdges.end(), std::make_pair(globalToGluedEdgeMap[negEdge], -1)) != singularEdges.end()){
@@ -1775,9 +1795,9 @@ double findIsoValWithMaxAvgFaceCurl(VertexPositionGeometry& globalGeometry, Edge
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     SurfaceMesh& globalMesh = globalGeometry.mesh; 
 
-    for (int i = 0; i < usedIsoVals.size(); i++){
-        std::cout << "used iso vals = " << usedIsoVals[i] << std::endl;
-    }
+    // for (int i = 0; i < usedIsoVals.size(); i++){
+    //     std::cout << "used iso vals = " << usedIsoVals[i] << std::endl;
+    // }
 
     double stepSize = 0.01;
     double end = 1.0;

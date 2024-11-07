@@ -1,0 +1,2 @@
+std::vector<double>, double>> edgePath(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+                                        Edge e1, Edge e2, EdgeData<double> edgeCosts);
