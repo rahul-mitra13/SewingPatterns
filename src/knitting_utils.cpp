@@ -1908,7 +1908,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
-
+    
     //curl per edge
     EdgeData<double> edgeCurl(globalMesh);
     //curl per face - average the edge curl onto faces
@@ -1929,6 +1929,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<std::pair<int, int>> singularEdges;
     //make a map of singular edges we've seen so far 
     std::map<int, int> seenEdges;
+    //path constraints
+    std::vector<double> globalPath;
+    std::vector<double> gluedPath;
     //number of runs of the optimization
     int numRuns = 0;
     //max number of singularity pairs to insert 
@@ -1937,6 +1940,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     double threshold = 0.85;
     //gurobi model we will be solving 
     Model model;
+    //edge path constraints in the optimization 
+    std::vector<std::pair<std::vector<double>, double>> edgePathConstraints;
     //objective values
     double oldObj, currObj;
     //distance from unit norm 
@@ -1985,10 +1990,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             }
         }
         avgSum += sum/ctr;
-        psMesh.addEdgeScalarQuantity("bdy bdy path " + std::to_string(i), bdyBdyPath);
+        //psMesh.addEdgeScalarQuantity("bdy bdy path " + std::to_string(i), bdyBdyPath);
     }
     stepSize = avgSum / boundaryConditions.bdyBdyPathConstraints.size();
-    std::cout << "step size = " << stepSize << std::endl;
 
     //solve the model without any singularities 
     std::tie(gluedSigmaTilde, currObj) = computeHarmonicCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
@@ -2001,6 +2005,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     oldStripeValuesSigmaCourse = newStripeValuesSigmaCourse;
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
+
+    FaceData<Vector3> rotatedFaceGradients = clockWiseRotatedGradients(globalGeometry, globalTimeFunctionGradientsNormalized);
+    double maxDotProd = maximumDotProduct(globalGeometry, rotatedFaceGradients);
+    HalfedgeData<double> gluedHeWeights = constructGluedHalfedgeWeights(globalGeometry, gluedGeometry, rotatedFaceGradients, maxDotProd);
 
     while(true){
         gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
@@ -2041,6 +2049,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         int negEdge = findSingularEdgeFromSingularFace(globalGeometry, singFacePair.second, globalTimeFunctionGradientsNormalized[singFacePair.second], threshold, globalTimeFunction, isoVal);
         //don't select edges we've seen before
         if (seenEdges.count(edgeMap[posEdge]) > 0 || seenEdges.count(edgeMap[negEdge]) > 0){
+            std::cout << "skipping edge " << edgeMap[posEdge] << std::endl;
+            std::cout << "skipping edge " << edgeMap[negEdge] << std::endl;
             hashedUsedIsoVals.insert({hashFloatQuantized(isoVal), 1});
             continue;
         }
@@ -2057,6 +2067,12 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //pair of singular edges
         singularEdges.push_back(std::make_pair(edgeMap[negEdge], -1));
         singularEdges.push_back(std::make_pair(edgeMap[posEdge], 1));
+        //the problem here is that we need to sort over the space of halfedges
+        std::tie(globalPath, gluedPath) = constructEdgePath(globalGeometry, gluedGeometry, globalMesh.edge(negEdge), globalMesh.edge(posEdge),
+                                        vertexMap, edgeMap, globalTimeFunctionGradientsNormalized, gluedHeWeights);
+        psMesh.addEdgeScalarQuantity("path after " + std::to_string(numRuns) + " runs", globalPath);
+        edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
+        model.setEdgePathConstraints(edgePathConstraints);
         //add it to the map 
         seenEdges[edgeMap[negEdge]] = 1;
         seenEdges[edgeMap[posEdge]] = 1;

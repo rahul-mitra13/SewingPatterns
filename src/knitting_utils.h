@@ -25,6 +25,7 @@
 //helper files
 #include "helpers.h"
 #include "stripe_patterns_helpers.h"
+#include "path_constraints.h"
 
 //includes to solve the optimization problem
 #include "gurobi_c++.h"
