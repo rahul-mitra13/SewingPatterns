@@ -6,6 +6,7 @@
 #include "geometrycentral/surface/edge_length_geometry.h"
 #include "geometrycentral/surface/signpost_intrinsic_triangulation.h"
 #include "geometrycentral/surface/remeshing.h"
+#include "geometrycentral/surface/stripe_patterns.h"
 
 //polyscope includes 
 #include "polyscope/polyscope.h"
@@ -47,28 +48,30 @@ polyscope::SurfaceMesh *globalPSMesh;
 //global boundary conditions
 globalBoundaryConditions globalBdyConditions;
 
-
 //1-form optimization period
 float period = 1;
 //threshold for constraining wale boundary edges 
 //I don't really like this and need to figure out a better way of doing this
 float threshold = 0.6;
-//optimizing min \sum_{{ij} \in E}||\omegaTilde_{ij} - \sigmaTild_{ij}||^2 + \lambda \sum{e \in E}||\sigma_{ij} + \sigma_{ji}||^2
-//visualizing where ||\sigma_{ij} + \sigma_{ji}||^2 is highest
-//regularization term, \lambda 
-float lambda = 0.0;
+//knoppel frequency in the stripe patterns
+float knoppelFrequency = 0.0;
 
 //set the permutation of edges and orientations for 1-form viz
 std::vector<size_t> perm;
 std::vector<bool> orientations;
 
+//eigen matrix vertex positions
+Eigen::MatrixXd V;
+//eigen matrix face lists
+Eigen::MatrixXi F;
+// Compute the global gradient operator: #F*3 by #V
+Eigen::SparseMatrix<double> grad;
+//gradient operator in the row major format
+Eigen::SparseMatrix<double, Eigen::RowMajor> G;
+
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
   
-  //drawMeshCurveNetwork(*globalGeometry, *globalPSMesh);
-
-  //require the DEC operators
-  gluedELG->requireDECOperators();
   //time function on the glued mesh 
   VertexData<double> timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
   //time function on the global mesh 
@@ -83,85 +86,47 @@ void showStripePatterns(){
     timeFunctionGradientGlobalNormalized[f] = timeFunctionGradientGlobal[f].normalize();
   }
   globalPSMesh -> addFaceVectorQuantity("normalized time function gradient", timeFunctionGradientGlobalNormalized);
-  //globalPSMesh -> addFaceVectorQuantity("gradient (unnormalized)", timeFunctionGradientGlobal);
-  //find boundary edges in the wale direction 
-  //doing this here cause the gradient gets rotated later
-  //std::vector<int> waleBdyEdges = getWaleBdyEdgesInGluedMesh(*globalGeometry, *gluedELG, timeFunctionGradientGlobal, edgeMap, threshold, *globalPSMesh);
   
-  //set up the course optimization 
-  Model modelCourse;
-  modelCourse.setIntegrabilityConstraint(true); 
-  modelCourse.useFaceDifferenceViz = true;
-  //set the face gradients 
-  std::vector<std::array<double, 3>> modelFaceGradientsCourse;
-  for (Face f : globalMesh->faces()){
-    //normalize the gradients first
-    timeFunctionGradientGlobal[f] = timeFunctionGradientGlobal[f].normalize();
-    std::array<double, 3> gradient = {timeFunctionGradientGlobal[f][0], timeFunctionGradientGlobal[f][1], timeFunctionGradientGlobal[f][2]}; 
-    modelFaceGradientsCourse.push_back(gradient);
-  }
-  modelCourse.setFaceGradients(modelFaceGradientsCourse);
-  modelCourse.setPeriod(period);
-  modelCourse.setBdyEdges(globalBdyConditions.courseBdyEdges);
-  //visualize the normalized gradients 
-  //globalPSMesh -> addFaceVectorQuantity("gradient (normalized)", timeFunctionGradientGlobal);
+  //-------iteratively find course stripes and course singularities----------//
+  CornerData<double> courseStripeValues(globalGeometry -> mesh);
+  EdgeData<double> courseSingularEdgesGlobal(globalGeometry -> mesh);
+  // std::tie(courseStripeValues, courseSingularEdgesGlobal) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
+  //                                                            vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
 
-  EdgeData<double> omegaCourseGlobal = computeMatchingOneForm(*globalGeometry, *globalPSMesh, 0, timeFunctionGradientGlobal, edgeMappingsPairs);
-  EdgeData<double> omegaCourseGlued = convertGlobalToGluedEdgeFunction(*globalGeometry, *gluedELG, omegaCourseGlobal, edgeMap);
-  Eigen::Map<Eigen::VectorXd> omegaEig(omegaCourseGlued.raw().data(), (gluedELG->mesh).nEdges());
-  std::vector<double> modelMatchingTermsCourse(omegaEig.data(), omegaEig.data() + omegaEig.rows());
-  modelCourse.setMatchingTerms(modelMatchingTermsCourse);
-  Eigen::VectorXd d1Omega = gluedELG->d1 * omegaEig;
-  //globalPSMesh->addFaceScalarQuantity("d1(omega0)", d1Omega);
-  //visualize the 1-form \omega using Whitney interpolation 
-  //globalPSMesh->addOneFormTangentVectorQuantity("omega0(Whitney)", omegaCourseGlobal, orientations);
-  //the 1-form in the glued mesh setting 
-  // EdgeData<double> sigmaCourseGlued = computeOneForm(*globalGeometry, *gluedELG, modelCourse, vertexMap, edgeMap, *globalPSMesh);
-  //EdgeData<double> sigmaCourseGlobal = convertGluedToGlobalEdgeFunction(*globalGeometry, *gluedELG, sigmaCourseGlued, edgeMap);
-  //HalfedgeData<double> sigmaCourseGlued = computeVertexSingularityField(*globalGeometry, *gluedELG, modelCourse, *globalPSMesh, vertexMap, gluedOneRingMap);
-  
-  //global data
-  CornerData<double> stripeValuesSigmaCourse;
-  //global data
-  FaceData<int> stripeIndicesSigmaCourse;
-  std::vector<Vector3> positionsCourse;
-  std::vector<std::array<int, 2>> edgesCourse;
-  //std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(*globalGeometry, *gluedELG, sigmaCourseGlued, period);
-  //std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
-  //auto courseStripes = polyscope::registerCurveNetwork("course stripe patterns no sings (sigma)", positionsCourse, edgesCourse);
-  //courseStripes -> setRadius(0.001);
-  //VertexData<int> vertexCurl = computeCurlOnVertex(*globalGeometry, *gluedELG, *globalPSMesh, modelCourse, timeFunctionGlued, vertexMap, edgeMap, orientations, gluedOneRingMap);
+  G = grad;
+  std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
+                                                                    timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
+                                                                    globalBdyConditions, period, V, F, G);
 
-  //-------experiment 1---------------//
-  // HalfedgeData<double> sigmaTilde(globalGeometry -> mesh);
-  // EdgeData<double> edgeSingularities(globalGeometry -> mesh);
-  // std::tie(sigmaTilde, edgeSingularities) = strategy1Impl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
-  //                                                           vertexMap, edgeMap, *globalPSMesh, globalBdyConditions, period);
+  std::tie(courseStripeValues, courseSingularEdgesGlobal);
+  globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
 
-  // //-----experiment 2---------------//
-  // vizEdgeDifference(*globalGeometry, *gluedELG,
-  //                   timeFunctionGradientGlobalNormalized, *globalPSMesh, 
-  //                   globalBdyConditions, period, lambda,
-  //                   edgeMap);
-  
-  //-------experiment 3----------//
-  HalfedgeData<double> sigmaTilde(globalGeometry -> mesh);
-  EdgeData<double> edgeSingularities(globalGeometry -> mesh);
-  std::tie(sigmaTilde, edgeSingularities) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
-                                                            vertexMap, edgeMap, *globalPSMesh, globalBdyConditions, period);
 
-  //KNIT GRAPH GENERATION 
-  //first rotate the gradients by 
-  // VertexData<Vector3> vertexValuedFieldRotated = computeVertexValuedField(*globalGeometry, timeFunctionGlobal, PI/2.);
-  // globalPSMesh -> addVertexVectorQuantity("rotated time function per vertex", vertexValuedFieldRotated);
-  // VertexData<Vector2> vertexLineField = vertexDirectionField(*globalGeometry, vertexValuedFieldRotated);
-  // CornerData<double> gluedStripeValues(gluedELG -> mesh);
-  // FaceData<int> gluedSingularityIndices(gluedELG -> mesh);
-  // FaceData<int> gluedBranchIndices(gluedELG -> mesh);
-  // VertexData<double> gluedFreq(gluedELG -> mesh, 1./period);
-  // std::tie(gluedStripeValues, gluedSingularityIndices, gluedBranchIndices) = computeStripePattern(*gluedELG, gluedFreq, vertexLineField);
-  // //FaceData<int> globalSingularityIndices = gluedSingularityIndices.reinterpretTo(globalGeometry->mesh);
-  // globalPSMesh->addFaceScalarQuantity("Knoppel wale singularities", gluedSingularityIndices);
+  //WALE STRIPES
+  //find Knöppel singularities in the WALE DIRECTION 
+  //just run Knoppel's algorithm on these models 
+  //and then run our 1-form optimization with the singularities
+  CornerData<double> waleStripeValues;
+  EdgeData<double> waleSingularEdgesGlobal;
+  FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
+  std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
+                                                                    edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
+                                                                    timeFunctionGradientGlobalNormalized, G, period, knoppelFrequency, globalBdyConditions, 
+                                                                    courseSingularEdgesGlobal);
+  std::vector<Vector3> positionsWale;
+  std::vector<std::array<int, 2>> edgesWale;
+  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, period);
+  auto waleStripes = polyscope::registerCurveNetwork("wale stripes", positionsWale, edgesWale);
+  globalPSMesh -> addEdgeScalarQuantity("wale singularities", waleSingularEdgesGlobal);
+  waleStripes -> setRadius(0.001);
+  waleStripes -> setEnabled(false);
+
+  //generate the knit graph
+  KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
+                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+                      edgeMap);
+  graph.buildGraph();
+
 }
 
 // A user-defined callback, for creating control panels (etc)
@@ -172,8 +137,8 @@ void callBacks() {
   ImGui::InputFloat("1-form period", &period);
   //there needs to be a better way to constrain wale edges
   ImGui::InputFloat("Threshold", &threshold);
-  //lambda as regularization term in the optimization 
-  ImGui::InputFloat("Regularization term, lambda", &lambda);
+  //frequency for knoppel stripes
+  ImGui::InputFloat("Knoppel frequency", &knoppelFrequency);
 
   if (ImGui::Button("Show Stripe Patterns")){
     showStripePatterns();
@@ -186,6 +151,9 @@ int main(int argc, char **argv) {
   nlohmann::json data = nlohmann::json::parse(jsonFile);
   //run sanity checks
   std::tie(globalMesh, globalGeometry) = readManifoldSurfaceMesh(data["model_path"]);
+  std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometry);
+  igl::grad(V,F,grad);
+
   if (!(globalMesh -> isManifold())){
     std::cout << "Error: Mesh is not manifold" << std::endl;
     throw std::exception();

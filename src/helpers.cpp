@@ -420,7 +420,6 @@ std::unique_ptr<EdgeLengthGeometry> createGluedEdgeLengthGeometry(VertexPosition
                     vertexMap.insert({p.second, numUniqueVertices});
                     //put in the other other map 
                     gluedMeshVertexIndexToOriginalMeshIndex.insert({numUniqueVertices, p.first});
-                    
                     numUniqueVertices++;
                 }
                 if (vertexMap.find(p.first) != vertexMap.end()&&
@@ -780,3 +779,90 @@ void drawMeshCurveNetwork(VertexPositionGeometry& globalGeometry, polyscope::Sur
     meshNetwork -> addEdgeVectorQuantity("Canonical Edge Directions", edgeVectors);
 }
 
+//@clean
+//after finding a face singularity, find a singular edge in that face 
+//edge that is most aligned with the gradient (or rotated gradient in the wale case) of the time function 
+//return the index of the edge in the global setting
+int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int singFaceIndex, Vector3 globalFaceGradient, double threshold, VertexData<double>& globalTimeFunction,
+                                        double isoVal){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh; 
+
+    double max = -DBL_MAX;
+    Edge maxEdge;
+    double p1, p2;
+    //normalize the global face gradient
+    globalFaceGradient = globalFaceGradient.normalize();
+     
+    for (Edge e : globalMesh.face(singFaceIndex).adjacentEdges()){
+        if (e.isBoundary()) continue;//skip boundary edges
+        Halfedge he1 = e.halfedge();
+        Halfedge he2 = e.halfedge().twin();
+        double p1 = dot((globalGeometry.vertexPositions[he1.tipVertex()] - globalGeometry.vertexPositions[he1.tailVertex()]).normalize(), globalFaceGradient);
+        double p2 = dot((globalGeometry.vertexPositions[he2.tipVertex()] - globalGeometry.vertexPositions[he2.tailVertex()]).normalize(), globalFaceGradient);
+        if (p1 > max){
+            max = p1;
+            maxEdge = he1.edge();
+        }
+        else if (p2 > max){
+            max = p2;
+            maxEdge = he2.edge();
+        }
+    }
+    //check if the selected edges are highly aligned 
+    if (max > threshold){
+        return maxEdge.getIndex();
+    }
+    else{
+        std::cout << "searching in adjacent faces..." << std::endl;
+        //search in the 1-ring of the selected face to find a highly aligned edge 
+        for (Halfedge he : globalMesh.face(singFaceIndex).adjacentHalfedges()){
+            if ((isoVal > globalTimeFunction[he.tailVertex()] && isoVal < globalTimeFunction[he.tipVertex()]) || 
+                (isoVal > globalTimeFunction[he.tipVertex()] && isoVal < globalTimeFunction[he.tailVertex()])){//halfedge contains isoval
+                Face neighborFace = he.twin().face();
+                for (Edge e : neighborFace.adjacentEdges()){
+                    if (e.isBoundary()) continue;//skip boundary edges
+                    Halfedge he1 = e.halfedge();
+                    Halfedge he2 = e.halfedge().twin();
+                    double p1 = dot((globalGeometry.vertexPositions[he1.tipVertex()] - globalGeometry.vertexPositions[he1.tailVertex()]).normalize(), globalFaceGradient);
+                    double p2 = dot((globalGeometry.vertexPositions[he2.tipVertex()] - globalGeometry.vertexPositions[he2.tailVertex()]).normalize(), globalFaceGradient);
+                    if (p1 > max){
+                        max = p1;
+                        maxEdge = he1.edge();
+                    }
+                    else if (p2 > max){
+                        max = p2;
+                        maxEdge = he2.edge();
+                    }
+                }
+            }
+        }
+        if (max > threshold){
+            return maxEdge.getIndex();
+        }
+    }
+    std::cout << "skipping face selection..." << std::endl;
+    //couldn't find a very well-aligned edge, skip
+    return -1;
+}
+
+//@clean
+//hash a floating point number
+int hashFloatQuantized(double f) {
+    int precision = 1e5;
+    int quantized = static_cast<int>(std::round(f * precision));
+    return std::hash<int>{}(quantized);
+}
+
+
+//@clean 
+std::vector<std::vector<int>> findConnectedComponents(EdgeLengthGeometry& gluedGeometry, std::vector<int>& faces){
+
+    std::vector<std::vector<int>> connectedComponents;
+    //put the faces in this isoline in a map
+    std::map<int, int> seenFaces;
+    for (int f : faces){
+        seenFaces.insert({f, 0});
+    }
+
+}

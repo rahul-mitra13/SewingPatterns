@@ -6,11 +6,17 @@
 #include "geometrycentral/utilities/utilities.h"
 #include "geometrycentral/surface/stripe_patterns.h"
 #include "geometrycentral/surface/edge_length_geometry.h"
+#include "geometrycentral/numerical/linear_solvers.h"
 
 #include "polyscope/surface_mesh.h"
 
+//utility helper functions
+#include "helpers.h"
+
 #include <vector>
 #include <queue>
+
+#include <Eigen/Sparse>
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -59,3 +65,36 @@ HalfedgeData<std::vector<double>> getHalfEdgeIsoValues(IntrinsicGeometryInterfac
 std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLines(EmbeddedGeometryInterface& geometry,
                                                       const CornerData<double>& stripeValues,
                                                       const FaceData<int>& stripesIndices, double period);
+
+//---------------------------re-implementing Knoppel's stripes-------------------------//
+//setting \omega per edge directly
+
+// Compute the 1-form \omega_{ij} such as defined in eq.7 of [Knoppel et al. 2015]
+//this returns omega per edge in the glued mesh (intrinsic) setting 
+EdgeData<double> computeOmega(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
+                    std::map<int, int>& globalToGluedEdgeMap, std::vector<std::pair<int, int>>& edgeMappingsPairs, int direction, FaceData<Vector3>& gradient);
+
+// Build a Laplace-like matrix with double entries (necessary to represent complex conjugation)
+SparseMatrix<double> buildVertexEnergyMatrix(EdgeLengthGeometry& geometry, const FaceData<int>& branchIndices, const EdgeData<double>& omega);
+
+// Build a lumped mass matrix with double entries
+SparseMatrix<double> computeRealVertexMassMatrix(EdgeLengthGeometry& gluedGeometry);
+
+
+// Solve the generalized eigenvalue problem in equation 9 [Knoppel et al. 2015]
+VertexData<Vector2> computeParameterization(EdgeLengthGeometry& gluedGeometry,
+                                            const FaceData<int>& branchIndices, const EdgeData<double>& omega); 
+
+
+// extract the final texture coordinates from the parameterization
+std::tuple<CornerData<double>, FaceData<int>> computeTextureCoordinates(EdgeLengthGeometry& gluedGeometry,
+                                                                        const EdgeData<double>& omega,
+                                                                        const VertexData<Vector2>& parameterization);
+
+// Isolines of this function are stripes perpendicular to the direction field spaced according to the target frequencies
+std::tuple<CornerData<double>, FaceData<int>>
+computeStripePattern(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, std::map<int, int>& globalToGluedEdgeMap, 
+                        std::vector<std::pair<int, int>>& edgeMappingsPairs, int direction, FaceData<Vector3>& gradient,
+                        polyscope::SurfaceMesh& psMesh, std::vector<bool>& orientations);
+
+

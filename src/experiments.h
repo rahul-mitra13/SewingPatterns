@@ -28,7 +28,7 @@ std::tuple<HalfedgeData<double>, double> computeEquallySpacedOneForm(VertexPosit
                                                                 std::map<int, int>& globalToGluedVertexMap);
 
 //compute the per-face gradient of a 1-form
-FaceData<Vector3> computeOneFormFaceGrad(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde);
+//FaceData<Vector3> computeOneFormFaceGrad(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde);
 
 //compute curl per vertex using the curl discretization from De Goes SIGGRAPH notes
 VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
@@ -77,14 +77,14 @@ void vizEdgeDifference(VertexPositionGeometry& globalGeometry, EdgeLengthGeometr
 //enforce face-based curl of zero, and an integral of 1 along some path from either boundary to optimize 
 //for a harmonic (half-edge) one-form subject to the singularity placements; do this at each 
 //iteration and then normalize to find edge-based curl
-std::tuple<HalfedgeData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction,
+std::tuple<CornerData<double>, EdgeData<double>> harmonic1FormImpl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, VertexData<double>& gluedTimeFunction,
                                                                     FaceData<Vector3>& globalFaceGradients, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
-                                                                    std::map<int, int>& globalToGluedVertexMap, std::map<int, int>& globalToGluedEdgeMap, 
+                                                                    std::map<int, int>& globalToGluedVertexMap, std::map<int, int>& globalToGluedEdgeMap, std::vector<std::pair<int, int>>& edgeMappingsPairs,
                                                                     polyscope::SurfaceMesh& psMesh, globalBoundaryConditions& boundaryConditions, double period);
 
 //solve the optimization problem for the harmonic 1-form
 std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, std::map<int, int>& globalToGluedVertexMap, 
-                                                                polyscope::SurfaceMesh& psMesh);
+                                                            std::vector<std::pair<int, int>>& edgeMappingsPairs, polyscope::SurfaceMesh& psMesh);
 
 //compute face curl by averaging edge curl over the edges in a face 
 FaceData<double> computeAverageEdgeCurlonFaces(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
@@ -95,3 +95,9 @@ FaceData<double> computeAverageEdgeCurlonFaces(VertexPositionGeometry& globalGeo
 std::pair<int, int> findFaceSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, FaceData<double>& curl,
                                             VertexData<double>& gluedTimeFunction, polyscope::SurfaceMesh& psMesh, std::map<int, int>& globalToGluedVertexMap,
                                             std::vector<double>& usedIsoVals, double isoVal, int numPairs, bool useAllFaces);
+
+
+//find the isoval with max average curl in the face setting
+double findIsoValWithMaxAvgFaceCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, FaceData<double>& curl, 
+                                            VertexData<double>& gluedTimeFunction, std::vector<double>& usedIsoVals, 
+                                            std::map<int, int>& globalToGluedVertexMap);

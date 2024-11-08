@@ -24,6 +24,8 @@
 
 //helper files
 #include "helpers.h"
+#include "stripe_patterns_helpers.h"
+#include "path_constraints.h"
 
 //includes to solve the optimization problem
 #include "gurobi_c++.h"
@@ -107,6 +109,107 @@ EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, int di
 //compute matching 1-form while taking into account "stitched together" edges
 //same parameters and return type as the function above 
 //additional parameter 
-//@param[in]    edgeMappingsPairs       std::vector<std::pair<int, int>>    vector of pairs where each pair stores edges that are stitched together
-EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry, polyscope::SurfaceMesh& psMesh, int direction, FaceData<Vector3>& faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs);
+//@param[in]    edgeMappingsPairs       std::vector<std::pair<int, int>>   vector of pairs where each pair stores edges that are stitched together
+EdgeData<double> computeMatchingOneForm(VertexPositionGeometry& geometry,  int direction, FaceData<Vector3>& faceGradients, std::vector<std::pair<int, int>>& edgeMappingsPairs);
 
+//implement the harmonic 1-form 
+//the below two function use the energy min cot_e ||\sigma_e||^2
+// std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+//                                                                     VertexData<double>& globalTimeFunction, FaceData<Vector3>& globalTimeFunctionGradientsNormalized,
+//                                                                     std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
+//                                                                     globalBoundaryConditions& boundaryConditions, double period,
+//                                                                     Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G);
+
+//compute course harmonic 1-form
+// std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
+//                                                         std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh);
+
+//-------------------------------------------------------------------------------------------//
+
+//@clean: tag represents code that should be written cleanly and change minimally going forward :D 
+
+//@clean
+//compute the per-face gradient of a 1-form (in global setting)
+FaceData<Vector3> computeOneFormFaceGrad(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde);
+
+//@clean 
+//same function as above but just returns a different object
+std::vector<std::array<double, 3>> vectorOneFormFaceGrad(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde);
+
+//@clean 
+//compute a 1-form that will be used to generate the wale stripes 
+//@param[in]    globalGeometry      VertexPositionGeometry  geometry of the object in the global setting
+//@param[in]    gluedGeometry       EdgeLengthGeometry      edge length geometry in the glued setting 
+//@param[in]    model               Model                   model we will be solving using gurobi (specifies the wale constraints)
+//@param[in]    vertexMap           std::map<int, int>      a map from global vertex indices to glued vertex indices
+//
+//@return       sigma               HalfedgeData<double>    1-form value per halfedge representing the wale stripes
+HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, 
+                                        Eigen::SparseMatrix<double, Eigen::RowMajor>& G, std::map<int, int>& vertexMap);
+
+//@clean 
+//return information for wale stripes in the glued mesh setting
+//@param[in]    globalGeometry                          VertexPositionGeometry                      global geometry embedded in R^3
+//@param[in]    gluedGeometry                           EdgeLengthGeometry                          edge length geometry in the glued setting
+//@param[in]    edgeMappingsPaits                       std::vector<std::pair<int, int>>            vector of pairs where each pair stores edges that are stitched together
+//@param[in]    edgeMap                                 std::map<int,int>                           a map from edges in the global mesh to edges in the glued mesh
+//@param[in]    vertexMap                               std::map<int, int>                          a map from global vertex indices to glued vertex indices
+//@param[in]    timeFunctionGlobal                      VertexData<int>                             time function in the global setting
+//@param[in]    timeFunctionGradientGlobalNormalized    FaceData<Vector3>                           normalized gradient of the time function
+//@param[in]    period                                  double                                      period for 1-form optimization
+//@param[in]    knoppelFrequency                        double                                      period to be used when generating Knoppel stripes
+//@param[in]    globalBdyConditions                     globalBoundaryConditions                    boundary conditions specified in the glued mesh setting
+//
+//@return       striping info       tuple<CornerData<double, EdgeData<double>>     striping info in the glued mesh setting 
+std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+                                                                    std::vector<std::pair<int, int>>& edgeMappingsPairs, std::map<int, int>& edgeMap, 
+                                                                    std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, FaceData<Vector3>& timeFunctionGradientGlobalNormalized, 
+                                                                    Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions,
+                                                                    EdgeData<double>& courseSingularEdgesGlobal);
+
+
+//@clean 
+//compute the edge curl in the global setting
+EdgeData<double> computeEdgeCurl(VertexPositionGeometry& globalGeometry,
+                                FaceData<Vector3>& globalFaceGradients);
+
+//compute edge curl in the global setting 
+//compute curl per edge in the global setting 
+EdgeData<double> computeEdgeCurl(VertexPositionGeometry& globalGeometry, FaceData<Vector3>& globalFaceGradients);
+
+//@clean
+//compute face curl by averaging edge curl over the edges in a face 
+FaceData<double> computeAverageEdgeCurlonFaces(VertexPositionGeometry& globalGeometry, EdgeData<double>& edgeCurl);
+
+
+//@clean
+//find max/min curl face for a given isoline of the TIME FUNCTION 
+//would probably want to change tracing the level sets of the time function with level sets of the harmonic 1-form
+std::pair<int, int> findFaceSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, FaceData<double>& curl,
+                                            VertexData<double>& globalTimeFunction, polyscope::SurfaceMesh& psMesh,
+                                            std::map<int, int>& hashedUsedIsoVals, double isoVal, int numPairs, bool useAllFaces);
+
+
+//@clean
+//get the vertices (of a curve network), edges (of a curve network) and faces that a particular isovalue of the time function passes through 
+//generate isolines for the time function given a specific isoVal
+std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, std::vector<int>> getIsoLine(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& timeFunction, double isoVal);
+
+
+//@clean
+//find the isoval with max average curl in the face setting
+double findIsoValWithMaxFaceCurl(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& globalTimeFunction, FaceData<double>& curl, std::map<int, int>& hashedUsedIsoVals,
+                                double stepSize);
+
+//@clean 
+//the below two functions use the energy min ||\del sigma - \nabla \sigma_{i - 1} / ||\nabla \sigma_{i - 1}|| ||^2
+std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+                                                                    VertexData<double>& globalTimeFunction, FaceData<Vector3>& globalTimeFunctionGradientsNormalized,
+                                                                    std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
+                                                                    globalBoundaryConditions& boundaryConditions, double period,
+                                                                    Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G);
+
+//@clean
+//compute course harmonic 1-form
+std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
+                                                        std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh);

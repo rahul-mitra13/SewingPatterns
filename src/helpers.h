@@ -22,6 +22,7 @@
 #include "geometrycentral/surface/edge_length_geometry.h"
 #include "geometrycentral/surface/mesh_graph_algorithms.h"
 #include "geometrycentral/surface/direction_fields.h"
+#include "geometrycentral/utilities/disjoint_sets.h"
 
 //json include
 #include "nlohmann/json.hpp"
@@ -206,3 +207,29 @@ HalfedgeData<double> convertGluedToGlobalHalfedgeFunction(VertexPositionGeometry
 
 //draw the mesh curve network 
 void drawMeshCurveNetwork(VertexPositionGeometry& globalGeometry, polyscope::SurfaceMesh& psMesh);
+
+//@clean
+//after finding a face singularity, find a singular edge in that face 
+//edge that is most aligned with the gradient (or rotated gradient in the wale case) of the time function 
+//@param[in]        globalGeometry      VertexPositionGeometry      the global geometry 
+//@param[in]        gluedGeometry       EdgeLengthGeometry          glued edge length geometry 
+//@param[in]        singFaceIndex       int                         index of the singular face
+//@param[in]        globalFaceGradient  Vector3                     the gradient vector at the singular face 
+//
+//@return           maxEdge             int                         index of the singular edge in the global mesh setting
+int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int singFaceIndex, Vector3 globalFaceGradient, double threshold, VertexData<double>& timeFunction,
+                                        double isoVal);
+
+
+//@clean 
+//hash a floating point number
+//still causes collision when numbers are extremely close (hopefully we won't run into this too much)
+//@param[in]    f           double      floating point number to hash 
+//
+//@return       hashed[f]    int         hashed floating point number
+int hashFloatQuantized(double f);
+
+//@clean 
+//find the number of connected components in a set of faces 
+//a single isoline of the time function passes through all these faces
+std::vector<std::vector<int>> findConnectedComponents(EdgeLengthGeometry& gluedGeometry, std::vector<int>& faces);
