@@ -2018,13 +2018,22 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns) + " runs", edgeCurl);
         psMesh.addFaceScalarQuantity("face curl after " + std::to_string(numRuns) + " runs", faceCurl);
         newDistance = 0.;
+        FaceData<double> gradSigmaTildeMinusOne(globalMesh);
         //this is very expensive, ugh
         for (Face f : globalMesh.faces()){
             newDistance += pow(gradSigmaTilde[f].norm() - 1., 2.);
+            gradSigmaTildeMinusOne[f] = gradSigmaTilde[f].norm() - 1;
             //normalize before we pass to the model
             gradSigmaTilde[f] = gradSigmaTilde[f].normalize();
             grads.push_back(std::array<double, 3>{gradSigmaTilde[f][0], gradSigmaTilde[f][1], gradSigmaTilde[f][2]});
         }
+        
+        // Plot |grad(sigma)|-1
+        auto quantity = psMesh.addFaceScalarQuantity("|grad(sigma)|-1 after " + std::to_string(numRuns) + " runs", gradSigmaTildeMinusOne);
+        auto range = quantity->getMapRange(); double limit = fmax(abs(range.first), abs(range.second));
+        quantity->setColorMap("coolwarm");
+        quantity->setMapRange({-limit, limit}); // center around 0
+
         if (newDistance > oldDistance){
             std::cout << "number of runs = " << numRuns << std::endl;
             std::cout << "(breaking) oldDistance = " << oldDistance << std::endl;

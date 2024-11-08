@@ -543,10 +543,12 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
             for (Vertex v : bLoop.adjacentVertices()){
                 toReturn.courseStartBoundaryVertices.push_back(v.getIndex());
             }
+            double pathLength = 0;
             for (Edge e : bLoop.adjacentEdges()){
                 toReturn.courseBdyEdges.push_back(e.getIndex());
+                pathLength += gluedGeometry.edgeLengths[e];
             }
-            
+            std::cout << "Knitting start boundary loop length: " << pathLength << std::endl;
             //build weights for wale boundary conditions 
             std::vector<double> weights(gluedMesh.nEdges(), 0.0);
             for (Halfedge he : bLoop.adjacentHalfedges()){
@@ -567,9 +569,12 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
             for (Vertex v : bLoop.adjacentVertices()){
                 toReturn.courseEndBoundaryVertices.push_back(v.getIndex());
             }
+            double pathLength = 0;
             for (Edge e : bLoop.adjacentEdges()){
                 toReturn.courseBdyEdges.push_back(e.getIndex());
+                pathLength += gluedGeometry.edgeLengths[e];
             }
+            std::cout << "Knitting end boundary loop length: " << pathLength << std::endl;
             //build weights for wale boundary conditions 
             std::vector<double> weights(gluedMesh.nEdges(), 0.0);
             for (Halfedge he : bLoop.adjacentHalfedges()){

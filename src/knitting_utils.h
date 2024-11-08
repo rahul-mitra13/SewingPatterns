@@ -1,3 +1,6 @@
+#ifndef KNITTING_UTILS_H
+#define KNITTING_UTILS_H
+
 //eigen includes
 #include <Eigen/Dense>
 
@@ -33,7 +36,6 @@
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
-
 
 //compute time function using a vector of pairs of vertex mappings instead of the map because we miss stitches then 
 //
@@ -213,3 +215,5 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 //compute course harmonic 1-form
 std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
                                                         std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh);
+
+#endif
