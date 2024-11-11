@@ -185,9 +185,10 @@ FaceData<double> computeAverageEdgeCurlonFaces(VertexPositionGeometry& globalGeo
 //@clean
 //find max/min curl face for a given isoline of the TIME FUNCTION 
 //would probably want to change tracing the level sets of the time function with level sets of the harmonic 1-form
-std::pair<int, int> findFaceSingularityPair(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, FaceData<double>& curl,
+std::vector<std::pair<int, int>> findFaceSingularityPairs(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, FaceData<double>& curl,
                                             VertexData<double>& globalTimeFunction, polyscope::SurfaceMesh& psMesh,
-                                            std::map<int, int>& hashedUsedIsoVals, double isoVal, int numPairs, bool useAllFaces);
+                                            std::map<int, int>& hashedUsedIsoVals, std::vector<double>& usedIsoVals, FaceData<double>& faceSingularities,
+                                            double isoVal, int numPairs, bool useAllFaces);
 
 
 //@clean
@@ -198,8 +199,8 @@ std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, std::vector<int>> getIsoLine(Eigen:
 
 //@clean
 //find the isoval with max average curl in the face setting
-double findIsoValWithMaxFaceCurl(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& globalTimeFunction, FaceData<double>& curl, std::map<int, int>& hashedUsedIsoVals,
-                                double stepSize);
+double findIsoValWithMaxFaceCurl(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& globalTimeFunction, 
+                                FaceData<double>& curl, std::map<int, int>& hashedUsedIsoVals, std::vector<double>& usedIsoVals, double stepSize);
 
 //@clean 
 //the below two functions use the energy min ||\del sigma - \nabla \sigma_{i - 1} / ||\nabla \sigma_{i - 1}|| ||^2
