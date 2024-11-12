@@ -86,14 +86,24 @@ void showStripePatterns(){
     timeFunctionGradientGlobalNormalized[f] = timeFunctionGradientGlobal[f].normalize();
   }
   globalPSMesh -> addFaceVectorQuantity("normalized time function gradient", timeFunctionGradientGlobalNormalized);
-  
+
+  G = grad;
+
+
+  // // Call Matteo's revealCurl
+  // Model model;
+  // model.setPeriod(period);
+  // model.setBdyEdges(globalBdyConditions.courseBdyEdges);
+  // revealCurl(*globalGeometry, *gluedELG, model, vertexMap, G);
+  // P("revealCurl done");
+  // polyscope::show();
+
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
   EdgeData<double> courseSingularEdgesGlobal(globalGeometry -> mesh);
   // std::tie(courseStripeValues, courseSingularEdgesGlobal) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
   //                                                            vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
 
-  G = grad;
   std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
                                                                     globalBdyConditions, period, V, F, G);
@@ -209,6 +219,12 @@ int main(int argc, char **argv) {
   polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::None;
   // Set the callback function
   polyscope::state::userCallback = callBacks;
+
+  // Force showStripPatterns for debug
+  period = 0.0125;
+  knoppelFrequency = 80;
+  showStripePatterns();
+
   polyscope::show();
 
   return EXIT_SUCCESS; 
