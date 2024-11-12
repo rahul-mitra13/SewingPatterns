@@ -36,6 +36,11 @@
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
+// Some useful macros :-)
+#define P(x) {if (debug) std::cout << x << std::endl;} 
+#define H(x) P(#x << ": " << (x))
+const bool debug = 1;
+
 // To print vectors easily
 template<class T> std::ostream &operator<<(std::ostream &os, std::vector<T> v) {
   os << "["; if (v.size() > 0) os << v[0];
@@ -43,6 +48,7 @@ template<class T> std::ostream &operator<<(std::ostream &os, std::vector<T> v) {
   os << "]";
   return os;
 }
+
 
 //boundary conditions on the glued mesh
 struct globalBoundaryConditions{
