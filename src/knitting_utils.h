@@ -165,7 +165,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                                                                     std::vector<std::pair<int, int>>& edgeMappingsPairs, std::map<int, int>& edgeMap, 
                                                                     std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, FaceData<Vector3>& timeFunctionGradientGlobalNormalized, 
                                                                     Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions,
-                                                                    EdgeData<double>& courseSingularEdgesGlobal);
+                                                                    EdgeData<double>& courseSingularEdgesGlobal, polyscope::SurfaceMesh& psMesh);
 
 
 //@clean 

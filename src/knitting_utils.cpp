@@ -1305,7 +1305,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                                                                     std::vector<std::pair<int, int>>& edgeMappingsPairs, std::map<int, int>& edgeMap, 
                                                                     std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, FaceData<Vector3>& timeFunctionGradientGlobalNormalized, 
                                                                     Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions,
-                                                                    EdgeData<double>& courseSingularEdgesGlobal){
+                                                                    EdgeData<double>& courseSingularEdgesGlobal, polyscope::SurfaceMesh& psMesh){
 
     //compute a line field in the tangent space of the vertex
     VertexData<Vector3> vertexVectorField = computeVertexValuedField(globalGeometry, timeFunctionGlobal, PI/2.);
@@ -1316,7 +1316,12 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     CornerData<double> stripeValues(globalGeometry.mesh);
     FaceData<int> stripeSingularities(globalGeometry.mesh);
     FaceData<int> fieldSingularities(globalGeometry.mesh);
-    std::tie(stripeValues, stripeSingularities, fieldSingularities) = computeStripePattern(globalGeometry, freq, lineField);
+    std::tie(stripeValues, stripeSingularities, fieldSingularities) = computeStripePattern(globalGeometry, freq, lineField); // this is a GC call
+
+    // Do some visualization
+    psMesh.addVertexVectorQuantity("vertexVectorField", vertexVectorField);
+    psMesh.addFaceScalarQuantity("knoppel face singularities", stripeSingularities);
+    psMesh.addFaceScalarQuantity("knoppel field singularities", fieldSingularities);
     
     std::vector<Vector3> knoppelPos; 
     std::vector<std::array<size_t, 2>> knoppelEdges; 
@@ -1327,6 +1332,28 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     knoppelStripes -> setEnabled(false);
 
     EdgeData<double> omegaWaleGlobal = computeMatchingOneForm(globalGeometry, 1, timeFunctionGradientGlobalNormalized, edgeMappingsPairs);
+
+    // Fix the singularity indices
+    for (Face f : globalGeometry.mesh.faces()) {
+        if (stripeSingularities[f] != 0) {
+            double orient = 0; // sigma . omega
+            for (Halfedge he : f.adjacentHalfedges()) {
+                
+                double sigma = stripeValues[he.next().corner()] - stripeValues[he.corner()]; // stripe 1-form
+                if (he.next() == f.halfedge())
+                    sigma += 2 * stripeSingularities[f] * PI;
+
+                double omega = omegaWaleGlobal[he.edge()]; // input vector field 1-form
+                if (!he.orientation()) // if half-edge does not share orientation of its edge
+                    omega *= -1;
+                
+                orient += omega * sigma;
+            }
+            if (orient > 0)
+                stripeSingularities[f] *= -1;
+        }
+    }    
+
     EdgeData<double> omegaWaleGlued = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, omegaWaleGlobal, edgeMap);
     Eigen::Map<Eigen::VectorXd> omegaWaleGluedEig(omegaWaleGlued.raw().data(), (gluedGeometry.mesh).nEdges());
     std::vector<double> modelMatchingTermsWale(omegaWaleGluedEig.data(), omegaWaleGluedEig.data() + omegaWaleGluedEig.rows());
