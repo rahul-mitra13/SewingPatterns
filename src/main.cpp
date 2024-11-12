@@ -165,17 +165,29 @@ int main(int argc, char **argv) {
     std::cout << "Error: Mesh is not triangular" << std::endl;
     throw std::exception();
   }
+  fixDelaunay(*globalMesh, *globalGeometry); // we make the mesh approximately Delaunay
+
   globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(data["model_path"]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
+
+  // Internally, Polyscope numbers the edges by looping over faces.
+  // Since our numbering is different than that after fixDelaunay, we need to specify the new numbering by providing a perturbation.
+  // Note that this is only useful for EdgeData visualization; apart from that everything works fine.
+  std::set<Edge> visited;
+  for (Face f : globalMesh->faces()) {
+    for (Edge e : f.adjacentEdges()) {
+      if (visited.count(e) == 0)
+        perm.push_back(e.getIndex());
+        visited.insert(e);
+    }
+  }
   vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(data["vertex_mappings"]);
   edgeMappingsPairs = buildPairOfStitchedEdges(*globalGeometry, vertexMappingsPairs);
   //set up the orientations for the 1-form viz while we're here
   for (Edge e : globalMesh->edges()){
     if (e.halfedge().tailVertex().getIndex() < e.halfedge().tipVertex().getIndex()){
-      perm.push_back(e.getIndex());
       orientations.push_back(true);
     }
     else{
-      perm.push_back(e.getIndex());
       orientations.push_back(false);
     }
   }
