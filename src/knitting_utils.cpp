@@ -1345,9 +1345,9 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
                 double omega = omegaWaleGlobal[he.edge()]; // input vector field 1-form
                 if (!he.orientation()) // if half-edge does not share orientation of its edge
-                    omega_he *= -1;
+                    omega *= -1;
                 
-                orient += omega_he * sigma.back();
+                orient += omega * sigma;
             }
             if (orient > 0)
                 stripeSingularities[f] *= -1;
