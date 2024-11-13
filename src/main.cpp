@@ -150,6 +150,7 @@ int main(int argc, char **argv) {
   nlohmann::json data = nlohmann::json::parse(jsonFile);
   //run sanity checks
   std::tie(globalMesh, globalGeometry) = readManifoldSurfaceMesh(data["model_path"]);
+  fixDelaunay(*globalMesh, *globalGeometry); // we make the mesh approximately Delaunay
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometry);
   igl::grad(V,F,grad);
 
@@ -165,12 +166,11 @@ int main(int argc, char **argv) {
     std::cout << "Error: Mesh is not triangular" << std::endl;
     throw std::exception();
   }
-  //fixDelaunay(*globalMesh, *globalGeometry); // we make the mesh approximately Delaunay
 
   globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(data["model_path"]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
 
   // Internally, Polyscope numbers the edges by looping over faces.
-  // Since our numbering is different than that after fixDelaunay, we need to specify the new numbering by providing a perturbation.
+  // Since our numbering is different than that after fixDelaunay, we need to specify the new numbering by providing a permutation.
   // Note that this is only useful for EdgeData visualization; apart from that everything works fine.
   std::set<Edge> visited;
   for (Face f : globalMesh->faces()) {
