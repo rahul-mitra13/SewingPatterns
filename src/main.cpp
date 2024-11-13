@@ -122,7 +122,7 @@ void showStripePatterns(){
   std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
                                                                     edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
                                                                     timeFunctionGradientGlobalNormalized, G, period, knoppelFrequency, globalBdyConditions, 
-                                                                    courseSingularEdgesGlobal);
+                                                                    courseSingularEdgesGlobal, *globalPSMesh);
   std::vector<Vector3> positionsWale;
   std::vector<std::array<int, 2>> edgesWale;
   std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, period);

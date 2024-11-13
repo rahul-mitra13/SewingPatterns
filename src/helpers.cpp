@@ -798,7 +798,7 @@ int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int
     double p1, p2;
     //normalize the global face gradient
     globalFaceGradient = globalFaceGradient.normalize();
-     
+
     for (Edge e : globalMesh.face(singFaceIndex).adjacentEdges()){
         if (e.isBoundary()) continue;//skip boundary edges
         Halfedge he1 = e.halfedge();
@@ -820,7 +820,8 @@ int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int
     }
     else{
         std::cout << "searching in adjacent faces..." << std::endl;
-        //search in the 1-ring of the selected face to find a highly aligned edge 
+        //search in the 1-ring of the selected face to find an edge that is highly aligned
+        //with the time function gradient
         for (Halfedge he : globalMesh.face(singFaceIndex).adjacentHalfedges()){
             if ((isoVal > globalTimeFunction[he.tailVertex()] && isoVal < globalTimeFunction[he.tipVertex()]) || 
                 (isoVal > globalTimeFunction[he.tipVertex()] && isoVal < globalTimeFunction[he.tailVertex()])){//halfedge contains isoval
@@ -846,7 +847,7 @@ int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int
             return maxEdge.getIndex();
         }
     }
-    std::cout << "skipping face selection..." << std::endl;
+    std::cout << "skipping edge selection..." << std::endl;
     //couldn't find a very well-aligned edge, skip
     return -1;
 }
@@ -859,15 +860,54 @@ int hashFloatQuantized(double f) {
     return std::hash<int>{}(quantized);
 }
 
-
 //@clean 
+//find the connected components in a time function isoline 
 std::vector<std::vector<int>> findConnectedComponents(EdgeLengthGeometry& gluedGeometry, std::vector<int>& faces){
 
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     std::vector<std::vector<int>> connectedComponents;
-    //put the faces in this isoline in a map
-    std::map<int, int> seenFaces;
-    for (int f : faces){
-        seenFaces.insert({f, 0});
+    FaceData<int> componentLabels(gluedMesh, -1);
+    int componentIndex = 0;
+
+    for (int val : faces){
+        Face f = gluedMesh.face(val);
+        if (componentLabels[f] != -1 || std::find(faces.begin(), faces.end(), f.getIndex()) == faces.end()) continue;
+        // Perform BFS to find all faces in this connected component
+        std::queue<Face> queue;
+        queue.push(f);
+        componentLabels[f] = componentIndex;
+
+        while (!queue.empty()) {
+            Face currentFace = queue.front();
+            queue.pop();
+
+            // Explore all neighboring faces across edges
+            for (Halfedge he : currentFace.adjacentHalfedges()) {
+                Face neighborFace = he.twin().face();
+                if (componentLabels[neighborFace] == -1 && std::find(faces.begin(), faces.end(), neighborFace.getIndex()) != faces.end()) {
+                    componentLabels[neighborFace] = componentIndex;
+                    queue.push(neighborFace);
+                }
+            }
+        }
+
+        // Increment component index for the next component
+        componentIndex++;
     }
 
+    //extract the faces 
+    std::unordered_map<int, std::vector<int>> components;
+    for (int val : faces){
+        Face f = gluedMesh.face(val);
+        int label = componentLabels[f];
+        if (label != -1) {
+            components[label].push_back(f.getIndex());
+        }
+    }
+    std::vector<std::vector<int>> faceComponents(componentIndex);
+    for (auto component : components){
+        faceComponents[component.first] = component.second;
+    }
+    return faceComponents;
 }
+    
