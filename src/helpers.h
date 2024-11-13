@@ -10,9 +10,6 @@
 #include <map>
 #include <set>
 
-#define P(x) {std::cout << x << std::endl;}
-#define H(x) P(#x << ": " << (x))
-
 //Eigen includes
 #include <Eigen/Sparse>
 
