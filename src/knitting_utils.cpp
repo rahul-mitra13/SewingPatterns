@@ -1983,7 +1983,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                                                     std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
                                                                     globalBoundaryConditions& boundaryConditions, double period,
                                                                     Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G){
-
+    
+    
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     
@@ -2051,9 +2052,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //set it for the model 
     model.setPeriod(period);
     model.setBdyEdges(boundaryConditions.courseBdyEdges);
-    //set it for the harmonic model
-    harmonicModel.setPeriod(period);
-    harmonicModel.setBdyEdges(boundaryConditions.courseBdyEdges);
     //gradients to use for curl computation 
     gradSigmaTilde = globalTimeFunctionGradientsNormalized;
     //this is very expensive, ugh
@@ -2063,6 +2061,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
     model.setFaceGradients(grads);
 
+    //find the step size to sample level sets at
     //find the step size to sample level sets at
     double avgSum = 0.;
     double stepSize = 0.;
@@ -2084,29 +2083,30 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             }
         }
         avgSum += sum/ctr;
-        // psMesh.addEdgeScalarQuantity("bdy bdy path " + std::to_string(i), bdyBdyPath);
+        //psMesh.addEdgeScalarQuantity("bdy bdy path " + std::to_string(i), bdyBdyPath);
     }
     stepSize = avgSum / boundaryConditions.bdyBdyPathConstraints.size();
 
+
     //set up the boundary->boundary path information 
     //require edge lengths 
-    globalGeometry.requireEdgeLengths();
-    std::vector<std::pair<std::vector<double>, double>> harmonicPathConstraints;
-    for (int i = 0; i < boundaryConditions.bdyBdyPathConstraints.size(); i++){
-        //visualizing bdy-bdy edge constraints
-        EdgeData<double> bdyBdyPath(globalMesh);
-        double pathLength = 0.;
-        for (Edge e : globalMesh.edges()){
-            bdyBdyPath[e] = boundaryConditions.bdyBdyPathConstraints[i][edgeMap[e.getIndex()]];
-            if (std::fabs(bdyBdyPath[e]) > 0 && !e.isBoundary()){
-                pathLength += globalGeometry.edgeLengths[e];
-            } 
-        }
-        psMesh.addEdgeScalarQuantity("bdy bdy path " + std::to_string(i), bdyBdyPath);
-        harmonicPathConstraints.push_back(std::make_pair(boundaryConditions.bdyBdyPathConstraints[i], ((pathLength)/period)));
-    }
-    //set non-collapse constraint
-    harmonicModel.setEdgePathConstraints(harmonicPathConstraints);
+    // globalGeometry.requireEdgeLengths();
+    // std::vector<std::pair<std::vector<double>, double>> harmonicPathConstraints;
+    // for (int i = 0; i < boundaryConditions.bdyBdyPathConstraints.size(); i++){
+    //     //visualizing bdy-bdy edge constraints
+    //     EdgeData<double> bdyBdyPath(globalMesh);
+    //     double pathLength = 0.;
+    //     for (Edge e : globalMesh.edges()){
+    //         bdyBdyPath[e] = boundaryConditions.bdyBdyPathConstraints[i][edgeMap[e.getIndex()]];
+    //         if (std::fabs(bdyBdyPath[e]) > 0 && !e.isBoundary()){
+    //             pathLength += globalGeometry.edgeLengths[e];
+    //         } 
+    //     }
+    //     psMesh.addEdgeScalarQuantity("bdy bdy path " + std::to_string(i), bdyBdyPath);
+    //     harmonicPathConstraints.push_back(std::make_pair(boundaryConditions.bdyBdyPathConstraints[i], ((pathLength)/period)));
+    // }
+    // //set non-collapse constraint
+    // harmonicModel.setEdgePathConstraints(harmonicPathConstraints);
 
     //solve the model without any singularities 
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
@@ -2121,19 +2121,20 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     courseStripes -> setEnabled(false);
 
     //solve the harmonic model without any singularities 
-    std::tie(harmonicSigmaTilde, harmonicSigmaObj) = computeHarmonicCourseOneForm(globalGeometry, gluedGeometry, harmonicModel, vertexMap, G, psMesh);
-    std::tie(newStripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, harmonicSigmaTilde, period);
-    std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, newStripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
-    auto harmonicCourseStripes = polyscope::registerCurveNetwork("harmonic sigma tilde stripes after " + std::to_string(numRuns - 1) + 
-                                                    " singularity insertions", positionsCourse, edgesCourse);
-    harmonicCourseStripes -> setRadius(0.001);
-    harmonicCourseStripes -> setEnabled(false);
+    // std::tie(harmonicSigmaTilde, harmonicSigmaObj) = computeHarmonicCourseOneForm(globalGeometry, gluedGeometry, harmonicModel, vertexMap, G, psMesh);
+    // std::tie(newStripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, harmonicSigmaTilde, period);
+    // std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, newStripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
+    // auto harmonicCourseStripes = polyscope::registerCurveNetwork("harmonic sigma tilde stripes after " + std::to_string(numRuns - 1) + 
+    //                                                 " singularity insertions", positionsCourse, edgesCourse);
+    // harmonicCourseStripes -> setRadius(0.001);
+    // harmonicCourseStripes -> setEnabled(false);
 
     FaceData<Vector3> rotatedFaceGradients = clockWiseRotatedGradients(globalGeometry, globalTimeFunctionGradientsNormalized);
     double maxDotProd = maximumDotProduct(globalGeometry, rotatedFaceGradients);
     HalfedgeData<double> gluedHeWeights = constructGluedHalfedgeWeights(globalGeometry, gluedGeometry, rotatedFaceGradients, maxDotProd);
 
-    while(numRuns < 2){
+    
+    while(numRuns < 5){
         skipFlag = false;
 
         //non-harmonic sigma tilde
@@ -2243,7 +2244,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             psMesh.addEdgeScalarQuantity("path after " + std::to_string(numRuns) + " runs", globalPath);
             edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
             //add to the harmonic model
-            harmonicPathConstraints.push_back(std::make_pair(gluedPath, 0.));
+            //harmonicPathConstraints.push_back(std::make_pair(gluedPath, 0.));
             //add it to the map 
             seenEdges[edgeMap[negEdge]] = 1;
             seenEdges[edgeMap[posEdge]] = 1;
@@ -2253,8 +2254,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numRuns) + " runs", edgeSingularities);
         model.setEdgePathConstraints(edgePathConstraints);
         model.setSingularEdges(singularEdges);
-        harmonicModel.setEdgePathConstraints(harmonicPathConstraints);
-        harmonicModel.setSingularEdges(singularEdges);
+        //harmonicModel.setEdgePathConstraints(harmonicPathConstraints);
+        //harmonicModel.setSingularEdges(singularEdges);
         numRuns++;
 
         //solve the optimization problem 
@@ -2285,9 +2286,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         psMesh.addFaceVectorQuantity("grad virtual sigma tilde after " + std::to_string(numRuns) + " runs", gradVirtualSigmaTilde);
 
     }
-
+    
 
     return std::tie(oldStripeValuesSigmaCourse, edgeSingularities);
+    
 
 }
 

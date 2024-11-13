@@ -165,7 +165,7 @@ int main(int argc, char **argv) {
     std::cout << "Error: Mesh is not triangular" << std::endl;
     throw std::exception();
   }
-  fixDelaunay(*globalMesh, *globalGeometry); // we make the mesh approximately Delaunay
+  //fixDelaunay(*globalMesh, *globalGeometry); // we make the mesh approximately Delaunay
 
   globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(data["model_path"]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
 
