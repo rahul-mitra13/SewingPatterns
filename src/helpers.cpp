@@ -776,11 +776,13 @@ void drawMeshCurveNetwork(VertexPositionGeometry& globalGeometry, polyscope::Sur
 //after finding a face singularity, find a singular edge in that face 
 //edge that is most aligned with the gradient (or rotated gradient in the wale case) of the time function 
 //return the index of the edge in the global setting
-int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int singFaceIndex, Vector3 globalFaceGradient, double threshold, VertexData<double>& globalTimeFunction,
-                                        double isoVal){
+int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int singFaceIndex, Vector3 globalFaceGradient, double threshold, 
+                                    VertexData<double>& globalTimeFunction,
+                                    double isoVal){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh; 
 
+    double eps = 1e-8;
     double max = -DBL_MAX;
     Edge maxEdge;
     double p1, p2;
@@ -803,6 +805,8 @@ int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int
         }
     }
     //check if the selected edges are highly aligned 
+    //don't take edges that already have a singularity on them 
+    //or are on faces that have singularities
     if (max > threshold){
         return maxEdge.getIndex();
     }
@@ -831,6 +835,9 @@ int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int
                 }
             }
         }
+        //check if the selected edges are highly aligned 
+        //don't take edges that already have a singularity on them 
+        //or are on faces that have singularities
         if (max > threshold){
             return maxEdge.getIndex();
         }

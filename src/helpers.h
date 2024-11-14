@@ -206,8 +206,9 @@ void drawMeshCurveNetwork(VertexPositionGeometry& globalGeometry, polyscope::Sur
 //@param[in]        globalFaceGradient  Vector3                     the gradient vector at the singular face 
 //
 //@return           maxEdge             int                         index of the singular edge in the global mesh setting
-int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int singFaceIndex, Vector3 globalFaceGradient, double threshold, VertexData<double>& timeFunction,
-                                        double isoVal);
+int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int singFaceIndex, Vector3 globalFaceGradient, double threshold, 
+                                    VertexData<double>& globalTimeFunction,
+                                    double isoVal);
 
 
 //@clean 
