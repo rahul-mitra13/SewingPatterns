@@ -812,7 +812,7 @@ int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int
         //with the time function gradient
         for (Halfedge he : globalMesh.face(singFaceIndex).adjacentHalfedges()){
             if ((isoVal > globalTimeFunction[he.tailVertex()] && isoVal < globalTimeFunction[he.tipVertex()]) || 
-                (isoVal > globalTimeFunction[he.tipVertex()] && isoVal < globalTimeFunction[he.tailVertex()])){//halfedge contains isoval
+                (isoVal > globalTimeFunction[he.tipVertex()] && isoVal < globalTimeFunction[he.tailVertex()])){//only search in halfedges that contain isoval
                 Face neighborFace = he.twin().face();
                 for (Edge e : neighborFace.adjacentEdges()){
                     if (e.isBoundary()) continue;//skip boundary edges
@@ -837,6 +837,7 @@ int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int
     }
     std::cout << "skipping edge selection..." << std::endl;
     //couldn't find a very well-aligned edge, skip
+    //probably not the most principled thing to do here
     return -1;
 }
 

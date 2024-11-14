@@ -39,3 +39,9 @@ HalfedgeData<double> constructGluedHalfedgeWeights(VertexPositionGeometry& globa
 //e1, e2 are in the global setting 
 std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Edge e1, Edge e2, 
                                         std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, FaceData<Vector3>& globalFaceGradients, HalfedgeData<double>& gluedHeWeights);
+
+
+//update glued halfedge weights 
+//set the halfedges that have been take by some edge path i.e., gluedPath to infinity 
+void updateGluedHalfedgeWeights(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, std::vector<double>& gluedPath,
+                                HalfedgeData<double>& gluedHeWeights);

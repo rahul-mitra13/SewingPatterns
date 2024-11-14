@@ -2134,7 +2134,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     HalfedgeData<double> gluedHeWeights = constructGluedHalfedgeWeights(globalGeometry, gluedGeometry, rotatedFaceGradients, maxDotProd);
 
     
-    while(numRuns < 5){
+    while(numRuns < 3){
         skipFlag = false;
 
         //non-harmonic sigma tilde
@@ -2241,6 +2241,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             singularEdges.push_back(std::make_pair(edgeMap[posEdge], 1));
             std::tie(globalPath, gluedPath) = constructEdgePath(globalGeometry, gluedGeometry, globalMesh.edge(negEdge), globalMesh.edge(posEdge),
                                         vertexMap, edgeMap, globalTimeFunctionGradientsNormalized, gluedHeWeights);
+            //don't retake edges from another path
+            updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, gluedHeWeights);
             psMesh.addEdgeScalarQuantity("path after " + std::to_string(numRuns) + " runs", globalPath);
             edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
             //add to the harmonic model
