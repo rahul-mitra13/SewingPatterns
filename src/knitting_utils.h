@@ -187,7 +187,7 @@ FaceData<double> computeAverageEdgeCurlonFaces(VertexPositionGeometry& globalGeo
 //would probably want to change tracing the level sets of the time function with level sets of the harmonic 1-form
 std::vector<std::pair<int, int>> findFaceSingularityPairs(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, FaceData<double>& curl,
                                             VertexData<double>& globalTimeFunction, polyscope::SurfaceMesh& psMesh,
-                                            std::map<int, int>& hashedUsedIsoVals, std::vector<double>& usedIsoVals, FaceData<double>& faceSingularities,
+                                            std::map<int, int>& hashedUsedIsoVals, FaceData<double>& faceSingularities, FaceData<int>& forbiddenFaces,
                                             double isoVal, int numPairs, bool useAllFaces);
 
 
@@ -200,7 +200,7 @@ std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, std::vector<int>> getIsoLine(Eigen:
 //@clean
 //find the isoval with max average curl in the face setting
 double findIsoValWithMaxFaceCurl(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& globalTimeFunction, 
-                                FaceData<double>& curl, std::map<int, int>& hashedUsedIsoVals, std::vector<double>& usedIsoVals, double stepSize);
+                                FaceData<double>& curl, std::map<int, int>& hashedUsedIsoVals, FaceData<int>& forbiddenFaces, double stepSize);
 
 //@clean 
 //the below two functions use the energy min ||\del sigma - \nabla \sigma_{i - 1} / ||\nabla \sigma_{i - 1}|| ||^2
@@ -215,6 +215,11 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
                                                         std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh);
 
+//@clean
+//update forbidden faces 
+//in particular, if some isoline passes through a set of faces ensure we don't select another pair of faces 
+//on the same isoline
+void updateForbiddenFaces(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& timeFunction, double isoVal, FaceData<int>& forbiddenFaces);
 
 
 //@debugging

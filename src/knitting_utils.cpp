@@ -1779,7 +1779,7 @@ FaceData<double> computeAverageEdgeCurlonFaces(VertexPositionGeometry& globalGeo
 //would probably want to change tracing the level sets of the time function with level sets of the harmonic 1-form
 std::vector<std::pair<int, int>> findFaceSingularityPairs(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, FaceData<double>& curl,
                                             VertexData<double>& globalTimeFunction, polyscope::SurfaceMesh& psMesh,
-                                            std::map<int, int>& hashedUsedIsoVals, std::vector<double>& usedIsoVals, FaceData<double>& faceSingularities,
+                                            std::map<int, int>& hashedUsedIsoVals, FaceData<double>& faceSingularities, FaceData<int>& forbiddenFaces,
                                             double isoVal, int numPairs, bool useAllFaces){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
@@ -1802,7 +1802,6 @@ std::vector<std::pair<int, int>> findFaceSingularityPairs(VertexPositionGeometry
         double isoVal = (globalTimeFunction[globalMesh.face(maxFace).halfedge().tailVertex()] + globalTimeFunction[globalMesh.face(maxFace).halfedge().next().tailVertex()]
                             + globalTimeFunction[globalMesh.face(maxFace).halfedge().next().next().tailVertex()])/3.0;
         hashedUsedIsoVals.insert({hashFloatQuantized(isoVal), 1});
-        usedIsoVals.push_back(isoVal);
         Eigen::MatrixXd iV;
         Eigen::MatrixXd iE;
         std::vector<int> f;
@@ -1818,9 +1817,19 @@ std::vector<std::pair<int, int>> findFaceSingularityPairs(VertexPositionGeometry
             minCurl = DBL_MAX;
             for (int i = 0; i < facesInComponent.size(); i++){
                 Face currFace = globalMesh.face(facesInComponent[i]);
+                //ignore faces where the current face or an adjacent face is singular
+                if (std::abs(faceSingularities[currFace]) > eps
+                    || (std::abs(faceSingularities[currFace.halfedge().twin().face()]) > eps
+                    || std::abs(faceSingularities[currFace.halfedge().next().twin().face()]) > eps
+                    || std::abs(faceSingularities[currFace.halfedge().next().next().twin().face()]) > eps)) continue;
+                //igore faces that are forbidden 
+                if (forbiddenFaces[currFace] > 0){
+                    continue;   
+                }
                 if (curl[currFace] > maxCurl){
+                    //only select faces where the current face and adjacent face is not singular
                     maxCurl = curl[currFace];
-                    maxFace = currFace.getIndex();
+                    maxFace = currFace.getIndex();  
                 }
                 if (curl[currFace] < minCurl){
                     minCurl = curl[currFace];
@@ -1846,27 +1855,28 @@ std::vector<std::pair<int, int>> findFaceSingularityPairs(VertexPositionGeometry
             int maxFace, minFace = -1;
             for (int i = 0; i < facesInComponent.size(); i++){
                 Face currFace = globalMesh.face(facesInComponent[i]);
+                //ignore faces where the current face or an adjacent face is singular
+                if (std::abs(faceSingularities[currFace]) > eps
+                    || (std::abs(faceSingularities[currFace.halfedge().twin().face()]) > eps
+                    || std::abs(faceSingularities[currFace.halfedge().next().twin().face()]) > eps
+                    || std::abs(faceSingularities[currFace.halfedge().next().next().twin().face()]) > eps)) continue;
+                //igore faces that are forbidden 
+                if (forbiddenFaces[currFace] > 0){
+                    continue;   
+                }
                 if (curl[currFace] > maxCurl){
-                    if (std::abs(faceSingularities[currFace]) < eps
-                        && (std::abs(faceSingularities[currFace.halfedge().twin().face()]) < eps
-                        && std::abs(faceSingularities[currFace.halfedge().next().twin().face()]) < eps
-                        && std::abs(faceSingularities[currFace.halfedge().next().next().twin().face()]) < eps)){
-                        //only select faces where the current face and adjacent face is not singular
-                        maxCurl = curl[currFace];
-                        maxFace = currFace.getIndex();
-                    }
+                    //only select faces where the current face and adjacent face is not singular
+                    maxCurl = curl[currFace];
+                    maxFace = currFace.getIndex();
+                    
                 }
                 if (curl[currFace] < minCurl){
-                    if (std::abs(faceSingularities[currFace]) < eps
-                        && std::abs(faceSingularities[currFace.halfedge().twin().face()]) < eps
-                        && std::abs(faceSingularities[currFace.halfedge().next().twin().face()]) < eps
-                        && std::abs(faceSingularities[currFace.halfedge().next().next().twin().face()]) < eps){
-                        //only select faces where the current face and adjacent face is not singular
-                        minCurl = curl[currFace];
-                        minFace = currFace.getIndex();
-                    }        
-                }
+                    //only select faces where the current face and adjacent face is not singular
+                    minCurl = curl[currFace];
+                    minFace = currFace.getIndex();
+                }       
             }
+            
             singFacePairs.push_back(std::make_pair(maxFace, minFace));
         }
     }
@@ -1911,40 +1921,43 @@ std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, std::vector<int>> getIsoLine(Eigen:
 
 //find the isoval with max average curl in the face setting
 double findIsoValWithMaxFaceCurl(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& globalTimeFunction, 
-                                FaceData<double>& curl, std::map<int, int>& hashedUsedIsoVals, std::vector<double>& usedIsoVals, double stepSize){
+                                FaceData<double>& curl, std::map<int, int>& hashedUsedIsoVals, FaceData<int>& forbiddenFaces, double stepSize){
 
     double end = 1.0;
     double curr = stepSize;
     double maxDeviation = -DBL_MAX;
     double maxDeviationIsoVal = -1.0;
-    double eps = 1e-5;
+    double eps = 1e-2;
     bool skipFlag = false;
     double currAvgDeviation = 0.0;
     double currDeviationSum = 0.0;
 
-    while (curr < end){
+    std::cout << "step size = " << stepSize << std::endl;
+
+    while (curr < (end - eps)){
 
         if (hashedUsedIsoVals.count(hashFloatQuantized(curr)) > 0){
             curr += stepSize;
             continue;
         }
     
-        //don't use isovals we've used before
-        // for (int i = 0; i < usedIsoVals.size(); i++){
-        //     //std::cout << "usedIsoVals[i] " << usedIsoVals[i] << std::endl;
-        //     if (std::fabs(usedIsoVals[i] - curr) < eps){
-        //         skipFlag = true;
-        //         break;
-        //     }
-        // }
-
         Eigen::MatrixXd iV;
         Eigen::MatrixXd iE;
         std::vector<int> f;
         std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, curr);
-        // auto isoline = polyscope::registerCurveNetwork("Sampled isoline " + std::to_string(curr), iV, iE);
-        // isoline->setRadius(0.004);
-        // isoline->setEnabled(false);
+
+        auto isoline = polyscope::registerCurveNetwork("sampled isoline " + std::to_string(curr) , iV, iE);
+        isoline->setRadius(0.001);
+
+        //if the isoval contains a single forbidden face
+        //skip it and continue 
+        for (int i = 0; i < f.size(); i++){
+            if (forbiddenFaces[f[i]] > 0){
+                curr += stepSize;
+                continue;
+            }
+        }
+
         //reset values
         currDeviationSum = 0.0;
         currAvgDeviation = 0.0;
@@ -1960,16 +1973,7 @@ double findIsoValWithMaxFaceCurl(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexD
         curr += stepSize;
     }
 
-    std::cout << "using isoval " << maxDeviationIsoVal << std::endl;
-    usedIsoVals.push_back(maxDeviationIsoVal);
     hashedUsedIsoVals[hashFloatQuantized(maxDeviationIsoVal)] = 1;
-    Eigen::MatrixXd iV;
-    Eigen::MatrixXd iE;
-    std::vector<int> f;
-    std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, maxDeviationIsoVal);
-    auto isoline = polyscope::registerCurveNetwork("Sampled isoline " + std::to_string(maxDeviationIsoVal), iV, iE);
-    isoline->setRadius(0.001);
-    isoline->setEnabled(false);
     return maxDeviationIsoVal;
 }
 
@@ -2016,8 +2020,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //hashed iso values we've already used
     //map: hashedIsoVal -> count
     std::map<int, int> hashedUsedIsoVals;
-    //isovals we've used 
-    std::vector<double> usedIsoVals;
     //singular edges in the gurobi optimization
     std::vector<std::pair<int, int>> singularEdges;
     //make a map of singular edges we've seen so far 
@@ -2195,14 +2197,14 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         std::cout << "-----------------------------" << std::endl;
         oldDistance = newDistance;
         model.setFaceGradients(grads);
-        isoVal = findIsoValWithMaxFaceCurl(V, F, globalTimeFunction, faceCurl, hashedUsedIsoVals, usedIsoVals, stepSize);
+        isoVal = findIsoValWithMaxFaceCurl(V, F, globalTimeFunction, faceCurl, hashedUsedIsoVals, forbiddenFaces, stepSize);
         if (std::fabs(isoVal - (-1.0) < 1e-15)){//our function couldn't find anymore isovals
             std::cout << "Breaking cause we can't find any more sensible isovalues " << std::endl;
             return std::tie(oldStripeValuesSigmaCourse, edgeSingularities);
         } 
         singFacePairs = findFaceSingularityPairs(globalGeometry, gluedGeometry, V, F, faceCurl,
                                                 globalTimeFunction, psMesh,
-                                                hashedUsedIsoVals, usedIsoVals, faceSingularities,
+                                                hashedUsedIsoVals, faceSingularities, forbiddenFaces,
                                                 isoVal, numRuns, false);
         //handle every pair returned 
         for (std::pair<int, int> singFacePair : singFacePairs){
@@ -2211,7 +2213,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 std::cout << "skipping face " << singFacePair.second << std::endl;
                 continue;
             }
-            std::cout << "sing face pair = " << singFacePair.first << ", " << singFacePair.second << std::endl;
             //ensure to not pick edges that pass through another isoline
             int posEdge = findSingularEdgeFromSingularFace(globalGeometry, singFacePair.first, globalTimeFunctionGradientsNormalized[singFacePair.first], threshold, globalTimeFunction, isoVal);
             int negEdge = findSingularEdgeFromSingularFace(globalGeometry, singFacePair.second, globalTimeFunctionGradientsNormalized[singFacePair.second], threshold, globalTimeFunction, isoVal);
@@ -2219,23 +2220,30 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             if (seenEdges.count(edgeMap[posEdge]) > 0 || seenEdges.count(edgeMap[negEdge]) > 0){
                 std::cout << "skipping edge " << edgeMap[posEdge] << std::endl;
                 std::cout << "skipping edge " << edgeMap[negEdge] << std::endl;
-                usedIsoVals.push_back(isoVal);
                 hashedUsedIsoVals.insert({hashFloatQuantized(isoVal), 1});
                 skipFlag = true;
                 continue;
             }
             if (posEdge == negEdge){//could happen if two singular faces are adjacent to each other
-                usedIsoVals.push_back(isoVal);
                 hashedUsedIsoVals.insert({hashFloatQuantized(isoVal), 1});
                 skipFlag = true;
                 continue;
             }
             if (posEdge == -1 || negEdge == -1){
-                usedIsoVals.push_back(isoVal);
                 hashedUsedIsoVals.insert({hashFloatQuantized(isoVal), 1});
                 skipFlag = true;
                 continue;//couldn't find a very well aligned edge
             }
+            //we're definitely using this isoval so update forbidden faces 
+            //updateForbiddenFaces(V, F, globalTimeFunction, isoVal, forbiddenFaces);
+            //view the isoline 
+            Eigen::MatrixXd iV;
+            Eigen::MatrixXd iE;
+            std::vector<int> f;
+            std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, isoVal);
+            auto isoline = polyscope::registerCurveNetwork("Isoline after " + std::to_string(numRuns) + " runs", iV, iE);
+            isoline -> setRadius(0.001);
+            isoline -> setEnabled(false);
             faceSingularities[singFacePair.first] = 1.0;
             faceSingularities[singFacePair.second] = -1.0;
             edgeSingularities[globalMesh.edge(posEdge)] = 1.0;
@@ -2255,7 +2263,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             seenEdges[edgeMap[negEdge]] = 1;
             seenEdges[edgeMap[posEdge]] = 1;
         }
-        if (skipFlag) continue;//if any of the conditions are met, skip the outer iteration as well
+        if (skipFlag) continue;//if any of the skipping conditions are met, skip the outer iteration as well
         psMesh.addFaceScalarQuantity("face singularities after " + std::to_string(numRuns) + " runs", faceSingularities);
         psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numRuns) + " runs", edgeSingularities);
         model.setEdgePathConstraints(edgePathConstraints);
@@ -2292,6 +2300,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         psMesh.addFaceVectorQuantity("grad virtual sigma tilde after " + std::to_string(numRuns) + " runs", gradVirtualSigmaTilde);
 
     }
+
+    psMesh.addFaceScalarQuantity("forbidden faces", forbiddenFaces);
     
 
     return std::tie(oldStripeValuesSigmaCourse, edgeSingularities);
@@ -2707,5 +2717,33 @@ std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPosi
 
     return std::tie(gluedOneForm, objectiveVal);
 
-    
+}
+
+//update forbidden faces 
+//in particular, if some isoline passes through a set of faces ensure we don't select another pair of faces 
+//on the same isoline
+void updateForbiddenFaces(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& timeFunction, double isoVal, FaceData<int>& forbiddenFaces){
+
+    Eigen::MatrixXd S(V.size(), 1);
+    for (int i = 0; i < V.size(); i++){
+        S(i, 0) = timeFunction[i];
+    }
+
+    //std::vector<int> passes;
+    for(int f = 0;f<F.rows();f++)
+    {
+        if(( 
+        S(F(f,0))<isoVal ||
+        S(F(f,1))<isoVal ||
+        S(F(f,2))<isoVal)
+        &&
+        (
+        S(F(f,0))>isoVal ||
+        S(F(f,1))>isoVal ||
+        S(F(f,2))>isoVal))
+        {
+            //passes.push_back(f);
+            forbiddenFaces[f] = 1;
+        }
+    }
 }
