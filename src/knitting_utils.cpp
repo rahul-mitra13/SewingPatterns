@@ -1072,7 +1072,7 @@ HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globa
 
 //@clean
 //compute the per-face gradient of a 1-form (in global setting)
-//the gradients are not normalized
+//the gradeints ARE NOT NORMALIZED
 FaceData<Vector3> computeOneFormFaceGrad(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde){
     
     SurfaceMesh& globalMesh = globalGeometry.mesh;
@@ -1303,7 +1303,7 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
 //@clean 
 std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
                                                                     std::vector<std::pair<int, int>>& edgeMappingsPairs, std::map<int, int>& edgeMap, 
-                                                                    std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, FaceData<Vector3>& timeFunctionGradientGlobalNormalized, 
+                                                                    std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, FaceData<Vector3>& courseOneFormGrad, 
                                                                     Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions,
                                                                     EdgeData<double>& courseSingularEdgesGlobal, polyscope::SurfaceMesh& psMesh){
 
@@ -1330,7 +1330,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     knoppelStripes -> setRadius(0.001);
     knoppelStripes -> setEnabled(false);
 
-    EdgeData<double> omegaWaleGlobal = computeMatchingOneForm(globalGeometry, 1, timeFunctionGradientGlobalNormalized, edgeMappingsPairs);
+    EdgeData<double> omegaWaleGlobal = computeMatchingOneForm(globalGeometry, 1, courseOneFormGrad, edgeMappingsPairs);
 
     // Fix the singularity indices
     for (Face f : globalGeometry.mesh.faces()) {
@@ -1353,9 +1353,9 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         }
     }    
 
-    EdgeData<double> omegaWaleGlued = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, omegaWaleGlobal, edgeMap);
-    Eigen::Map<Eigen::VectorXd> omegaWaleGluedEig(omegaWaleGlued.raw().data(), (gluedGeometry.mesh).nEdges());
-    std::vector<double> modelMatchingTermsWale(omegaWaleGluedEig.data(), omegaWaleGluedEig.data() + omegaWaleGluedEig.rows());
+    //EdgeData<double> omegaWaleGlued = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, omegaWaleGlobal, edgeMap);
+    //Eigen::Map<Eigen::VectorXd> omegaWaleGluedEig(omegaWaleGlued.raw().data(), (gluedGeometry.mesh).nEdges());
+    //std::vector<double> modelMatchingTermsWale(omegaWaleGluedEig.data(), omegaWaleGluedEig.data() + omegaWaleGluedEig.rows());
     Eigen::Map<Eigen::VectorXi> faceIndicesWaleEig(stripeSingularities.raw().data(), (gluedGeometry.mesh).nFaces());
     //place wale singularities at edges 
     std::vector<int> faceIndicesWaleModel(faceIndicesWaleEig.data(), faceIndicesWaleEig.data() + faceIndicesWaleEig.rows());
@@ -1363,10 +1363,11 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     std::vector<std::pair<int, int>> singularEdges;
     globalGeometry.requireFaceNormals();
     for (Face f : globalGeometry.mesh.faces()){ 
-        //rotate the gradients 
-        timeFunctionGradientGlobalNormalized[f] = timeFunctionGradientGlobalNormalized[f].rotateAround(globalGeometry.faceNormals[f], PI/2);
-        modelFaceGradients.push_back(std::array{timeFunctionGradientGlobalNormalized[f][0], timeFunctionGradientGlobalNormalized[f][1], 
-                                                    timeFunctionGradientGlobalNormalized[f][2]});
+        courseOneFormGrad[f] = courseOneFormGrad[f].normalize();
+        //rotate the final course gradients 
+        courseOneFormGrad[f] = courseOneFormGrad[f].rotateAround(globalGeometry.faceNormals[f], PI/2);
+        modelFaceGradients.push_back(std::array{courseOneFormGrad[f][0], courseOneFormGrad[f][1], 
+                                                    courseOneFormGrad[f][2]});
         //place wale singularities at edges
         if (stripeSingularities[f] != 0){
             bool toSkip = false;
@@ -1375,7 +1376,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 if (e.isBoundary() || waleSingularEdgesGlobal[e] != 0 || courseSingularEdgesGlobal[e] != 0) toSkip = true;
             }
             if (toSkip) continue;
-            int edge = findSingularEdgeFromSingularFace(globalGeometry, f.getIndex(), timeFunctionGradientGlobalNormalized[f], 0., timeFunctionGlobal, 0.);
+            int edge = findSingularEdgeFromSingularFace(globalGeometry, f.getIndex(), courseOneFormGrad[f], 0., timeFunctionGlobal, 0.);
             if (edge == -1) continue;//couldn't find a very well-aligned edge
             int index = stripeSingularities[f] > 0 ? 1 : -1;
             //reduce the singular index to +/- 1 (cause of Autoknit constraints)
@@ -1386,7 +1387,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     } 
     Model modelWale; 
     modelWale.setPeriod(period);
-    modelWale.setMatchingTerms(modelMatchingTermsWale);
+    //modelWale.setMatchingTerms(modelMatchingTermsWale);
     modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
     modelWale.setFaceIndices(faceIndicesWaleModel);
     modelWale.setFaceGradients(modelFaceGradients);
@@ -1946,8 +1947,9 @@ double findIsoValWithMaxFaceCurl(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexD
         std::vector<int> f;
         std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, curr);
 
-        auto isoline = polyscope::registerCurveNetwork("sampled isoline " + std::to_string(curr) , iV, iE);
-        isoline->setRadius(0.001);
+        // auto isoline = polyscope::registerCurveNetwork("sampled isoline " + std::to_string(curr) , iV, iE);
+        // isoline->setRadius(0.001);
+        // isoline->setEnabled(false);
 
         //if the isoval contains a single forbidden face
         //skip it and continue 
@@ -1985,7 +1987,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                                                     VertexData<double>& globalTimeFunction, FaceData<Vector3>& globalTimeFunctionGradientsNormalized,
                                                                     std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
                                                                     globalBoundaryConditions& boundaryConditions, double period,
-                                                                    Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G){
+                                                                    Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G,
+                                                                    FaceData<Vector3>& courseOneFormGrad){
     
     
     SurfaceMesh& globalMesh = globalGeometry.mesh;
@@ -2142,23 +2145,23 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     HalfedgeData<double> gluedHeWeights = constructGluedHalfedgeWeights(globalGeometry, gluedGeometry, rotatedFaceGradients, maxDotProd);
 
     
-    while(numRuns < 6){
+    while(numRuns < 5){
         skipFlag = false;
         //non-harmonic sigma tilde
         gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
         edgeCurl = computeEdgeCurl(globalGeometry, gradSigmaTilde);
         faceCurl = computeAverageEdgeCurlonFaces(globalGeometry, edgeCurl);
-        psMesh.addFaceVectorQuantity("non-harmonic grad(sigma) after " + std::to_string(numRuns) + " runs before subtracting", gradSigmaTilde);
-        psMesh.addEdgeScalarQuantity("non-harmonic edge curl after " + std::to_string(numRuns) + " runs before subtracting", edgeCurl);
-        psMesh.addFaceScalarQuantity("non-harmonic face curl after " + std::to_string(numRuns) + " runs before subtracting", faceCurl);
+        psMesh.addFaceVectorQuantity("non-harmonic grad(sigma) after " + std::to_string(numRuns - 1) + " singularities (before subtracting)", gradSigmaTilde);
+        psMesh.addEdgeScalarQuantity("non-harmonic edge curl after " + std::to_string(numRuns - 1) + " singularities (before subtracting)", edgeCurl);
+        psMesh.addFaceScalarQuantity("non-harmonic face curl after " + std::to_string(numRuns - 1) + " singularities (before subtracting)", faceCurl);
         //subtract off the virtual sigma from the non-harmonic sigma
         gluedSigmaTilde = gluedSigmaTilde - virtualSigmaTilde;
         gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
         edgeCurl = computeEdgeCurl(globalGeometry, gradSigmaTilde);
         faceCurl = computeAverageEdgeCurlonFaces(globalGeometry, edgeCurl);
-        psMesh.addFaceVectorQuantity("non-harmonic grad(sigma) after " + std::to_string(numRuns) + " runs after subtracting", gradSigmaTilde);
-        psMesh.addEdgeScalarQuantity("non-harmonic edge curl after " + std::to_string(numRuns) + " runs after subtracting", edgeCurl);
-        psMesh.addFaceScalarQuantity("non-harmonic face curl after " + std::to_string(numRuns) + " runs after subtracting", faceCurl);
+        psMesh.addFaceVectorQuantity("non-harmonic grad(sigma) after " + std::to_string(numRuns - 1) + " singularities (after subtracting)", gradSigmaTilde);
+        psMesh.addEdgeScalarQuantity("non-harmonic edge curl after " + std::to_string(numRuns - 1) + " singularities (after subtracting)", edgeCurl);
+        psMesh.addFaceScalarQuantity("non-harmonic face curl after " + std::to_string(numRuns - 1) + " singularities (after subtracting)", faceCurl);
 
         // harmonic sigma tilde
         // gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, harmonicSigmaTilde);
@@ -2200,6 +2203,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         isoVal = findIsoValWithMaxFaceCurl(V, F, globalTimeFunction, faceCurl, hashedUsedIsoVals, forbiddenFaces, stepSize);
         if (std::fabs(isoVal - (-1.0) < 1e-15)){//our function couldn't find anymore isovals
             std::cout << "Breaking cause we can't find any more sensible isovalues " << std::endl;
+            courseOneFormGrad = gradSigmaTilde;
             return std::tie(oldStripeValuesSigmaCourse, edgeSingularities);
         } 
         singFacePairs = findFaceSingularityPairs(globalGeometry, gluedGeometry, V, F, faceCurl,
@@ -2241,7 +2245,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             Eigen::MatrixXd iE;
             std::vector<int> f;
             std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, isoVal);
-            auto isoline = polyscope::registerCurveNetwork("Isoline after " + std::to_string(numRuns) + " runs", iV, iE);
+            auto isoline = polyscope::registerCurveNetwork("Isoline for " + std::to_string(numRuns) + " singularity", iV, iE);
             isoline -> setRadius(0.001);
             isoline -> setEnabled(false);
             faceSingularities[singFacePair.first] = 1.0;
@@ -2255,7 +2259,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                         vertexMap, edgeMap, globalTimeFunctionGradientsNormalized, gluedHeWeights);
             //don't retake edges from another path
             updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, gluedHeWeights);
-            psMesh.addEdgeScalarQuantity("path after " + std::to_string(numRuns) + " runs", globalPath);
+            psMesh.addEdgeScalarQuantity("path for " + std::to_string(numRuns) + " singularity", globalPath);
             edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
             //add to the harmonic model
             //harmonicPathConstraints.push_back(std::make_pair(gluedPath, 0.));
@@ -2264,8 +2268,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             seenEdges[edgeMap[posEdge]] = 1;
         }
         if (skipFlag) continue;//if any of the skipping conditions are met, skip the outer iteration as well
-        psMesh.addFaceScalarQuantity("face singularities after " + std::to_string(numRuns) + " runs", faceSingularities);
-        psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numRuns) + " runs", edgeSingularities);
+        psMesh.addFaceScalarQuantity("face singularities after " + std::to_string(numRuns) + " singularities", faceSingularities);
+        psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numRuns) + " singularities", edgeSingularities);
         model.setEdgePathConstraints(edgePathConstraints);
         model.setSingularEdges(singularEdges);
         //harmonicModel.setEdgePathConstraints(harmonicPathConstraints);
@@ -2290,20 +2294,34 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //compute virtual sigma
         std::tie(virtualSigmaTilde, virtualSigmaObj) = computeVirtualSigma(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
         std::tie(newStripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, virtualSigmaTilde, period);
-        //std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, newStripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
-        // auto virtualStripes = polyscope::registerCurveNetwork("virtual sigma tilde stripes after " + std::to_string(numRuns) + 
-        //                                             " runs", positionsCourse, edgesCourse);
-        // virtualStripes -> setRadius(0.001);
-        // virtualStripes -> setEnabled(false);
+        std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, newStripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
+        auto virtualStripes = polyscope::registerCurveNetwork("virtual sigma tilde stripes after " + std::to_string(numRuns - 1) + 
+                                                    " runs", positionsCourse, edgesCourse);
+        virtualStripes -> setRadius(0.001);
+        virtualStripes -> setEnabled(false);
         // gradient of the harmonic virtual sigma
         FaceData<Vector3> gradVirtualSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, virtualSigmaTilde);
         psMesh.addFaceVectorQuantity("grad virtual sigma tilde after " + std::to_string(numRuns) + " runs", gradVirtualSigmaTilde);
 
     }
 
-    psMesh.addFaceScalarQuantity("forbidden faces", forbiddenFaces);
-    
-
+    //psMesh.addFaceScalarQuantity("forbidden faces", forbiddenFaces);
+    //non-harmonic sigma tilde
+    gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
+    edgeCurl = computeEdgeCurl(globalGeometry, gradSigmaTilde);
+    faceCurl = computeAverageEdgeCurlonFaces(globalGeometry, edgeCurl);
+    psMesh.addFaceVectorQuantity("non-harmonic grad(sigma) after " + std::to_string(numRuns - 1) + " singularities (before subtracting)", gradSigmaTilde);
+    psMesh.addEdgeScalarQuantity("non-harmonic edge curl after " + std::to_string(numRuns - 1) + " singularities (before subtracting)", edgeCurl);
+    psMesh.addFaceScalarQuantity("non-harmonic face curl after " + std::to_string(numRuns - 1) + " singularities (before subtracting)", faceCurl);
+    //subtract off the virtual sigma from the non-harmonic sigma
+    gluedSigmaTilde = gluedSigmaTilde - virtualSigmaTilde;
+    gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
+    edgeCurl = computeEdgeCurl(globalGeometry, gradSigmaTilde);
+    faceCurl = computeAverageEdgeCurlonFaces(globalGeometry, edgeCurl);
+    psMesh.addFaceVectorQuantity("non-harmonic grad(sigma) after " + std::to_string(numRuns - 1) + " singularities (after subtracting)", gradSigmaTilde);
+    psMesh.addEdgeScalarQuantity("non-harmonic edge curl after " + std::to_string(numRuns - 1) + " singularities (after subtracting)", edgeCurl);
+    psMesh.addFaceScalarQuantity("non-harmonic face curl after " + std::to_string(numRuns - 1) + " singularities (after subtracting)", faceCurl);
+    courseOneFormGrad = gradSigmaTilde;
     return std::tie(oldStripeValuesSigmaCourse, edgeSingularities);
     
 
@@ -2526,12 +2544,9 @@ std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeome
             model.addConstr(sigma[gluedMesh.edge(bdy_edge_index).halfedge().twin().getIndex()] == 0.0, "Boundary Constraint");
         }
 
-        
-        //compute nP over every face 
         //add the second constraint while we're here
         //constraint - (d1*sigma) == kP, P is period of optimization, k \in \mathbb{Z}
         //here it will (d1 * sigma) == 0
-        std::vector<GRBLinExpr> nP(gluedMesh.nFaces());
         for (Face f : gluedMesh.faces()){
             GRBLinExpr lhs = 0.0;
             Halfedge hij = f.halfedge();
@@ -2539,7 +2554,6 @@ std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeome
             Halfedge hki = hjk.next();
             lhs = sigma[hij.getIndex()] + sigma[hjk.getIndex()] + sigma[hki.getIndex()];
             model.addConstr(lhs == 0);
-            nP[f.getIndex()] = 0.;
         }
 
         //constraint: 

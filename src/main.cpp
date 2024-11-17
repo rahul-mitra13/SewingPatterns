@@ -93,9 +93,10 @@ void showStripePatterns(){
   //                                                            vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
 
   G = grad;
+  FaceData<Vector3> courseOneFormGrad(globalGeometry -> mesh);
   std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
-                                                                    globalBdyConditions, period, V, F, G);
+                                                                    globalBdyConditions, period, V, F, G, courseOneFormGrad);
 
   std::tie(courseStripeValues, courseSingularEdgesGlobal);
   globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
@@ -110,7 +111,7 @@ void showStripePatterns(){
   FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
   std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
                                                                     edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
-                                                                    timeFunctionGradientGlobalNormalized, G, period, knoppelFrequency, globalBdyConditions, 
+                                                                    courseOneFormGrad, G, period, knoppelFrequency, globalBdyConditions, 
                                                                     courseSingularEdgesGlobal, *globalPSMesh);
   std::vector<Vector3> positionsWale;
   std::vector<std::array<int, 2>> edgesWale;

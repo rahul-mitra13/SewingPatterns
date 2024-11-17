@@ -106,5 +106,8 @@ class KnitGraph{
 
             //render the knit graph 
             void renderGraph();
+
+            //mkae obj out of knit graph 
+            void makeObj();
 };
 

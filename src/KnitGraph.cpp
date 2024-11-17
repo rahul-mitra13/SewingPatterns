@@ -312,6 +312,13 @@ void KnitGraph::renderGraph(){
 
 }
 
+//make obj for yarn-level rendering
+void KnitGraph::makeObj(){
+
+    std::cout << "In making obj function " << std::endl;
+
+}
+
 
 //----------------------helper functions----------------------//
 //hash function for a floating point number
