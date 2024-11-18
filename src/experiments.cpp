@@ -214,27 +214,6 @@ std::tuple<HalfedgeData<double>, EdgeData<double>> strategy1Impl(VertexPositionG
 //     return gradients;
 // }
 
-//compute curl per vertex using the curl discretization from De Goes SIGGRAPH notes (in global setting)
-VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
-                                        FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
-
-    SurfaceMesh& globalMesh = globalGeometry.mesh;
-    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
-    VertexData<double> curl(globalMesh);
-    for (Vertex vi : globalMesh.vertices()){
-        double sum = 0.0;
-        for (Halfedge he : gluedOneRingMap[vi.getIndex()]){
-            Halfedge hjk = he.next();
-            if (!hjk.isInterior()) continue;
-            Vector3 hjkVec = globalGeometry.vertexPositions[hjk.tipVertex()] - globalGeometry.vertexPositions[hjk.tailVertex()];
-            sum += dot(hjkVec, field[he.face()]);
-        }
-        curl[vi] = sum;
-    }
-
-
-    return curl;
-}
 
 //compute curl per edge in the global setting 
 EdgeData<double> computeEdgeCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,

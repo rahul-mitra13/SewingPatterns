@@ -99,6 +99,7 @@ void showStripePatterns(){
                                                                     globalBdyConditions, period, V, F, G, courseOneFormGrad);
 
   std::tie(courseStripeValues, courseSingularEdgesGlobal);
+
   globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
 
 
@@ -122,10 +123,19 @@ void showStripePatterns(){
   waleStripes -> setEnabled(false);
 
   //generate the knit graph
-  KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
-                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-                      edgeMap);
-  graph.buildGraph();
+  // KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
+  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+  //                     edgeMap);
+  // graph.buildGraph();
+
+  //------------------//
+  //visualize vertex curl 
+  //compute curl per vertex of gradient field (in the global setting)
+  VertexData<double> vertexCurl = computeVertexCurl(*globalGeometry, *gluedELG, timeFunctionGradientGlobalNormalized, gluedOneRingMap);
+  globalPSMesh->addVertexScalarQuantity("vertex curl", vertexCurl);
+  //visualize edge curl from vertex curl
+  EdgeData<double> edgeCurl = computeVertexAveragedEdgeCurl(*globalGeometry, vertexCurl);
+  globalPSMesh->addEdgeScalarQuantity("edge curl by averaging vertex curl", edgeCurl);
 
 }
 
@@ -151,7 +161,8 @@ int main(int argc, char **argv) {
   nlohmann::json data = nlohmann::json::parse(jsonFile);
   //run sanity checks
   std::tie(globalMesh, globalGeometry) = readManifoldSurfaceMesh(data["model_path"]);
-  fixDelaunay(*globalMesh, *globalGeometry); // we make the mesh approximately Delaunay
+  //messes up edge indexing
+  //fixDelaunay(*globalMesh, *globalGeometry); // we make the mesh approximately Delaunay
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometry);
   igl::grad(V,F,grad);
 

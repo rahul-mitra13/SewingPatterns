@@ -2010,6 +2010,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     EdgeData<double> edgeSingularities(globalMesh, 0.0);
     FaceData<double> faceSingularities(globalMesh, 0.0);
     //forbidden faces - faces touched by some isoline can't be used again
+    //this is too restrictive
     FaceData<int> forbiddenFaces(globalMesh, 0.0);
     //set the boundary loops to 0 as well
     for (BoundaryLoop b : globalMesh.boundaryLoops()){
@@ -2072,7 +2073,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
     model.setFaceGradients(grads);
 
-    //find the step size to sample level sets at
     //find the step size to sample level sets at
     double avgSum = 0.;
     double stepSize = 0.;
@@ -2145,7 +2145,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     HalfedgeData<double> gluedHeWeights = constructGluedHalfedgeWeights(globalGeometry, gluedGeometry, rotatedFaceGradients, maxDotProd);
 
     
-    while(numRuns < 5){
+    while(numRuns < 1){
         skipFlag = false;
         //non-harmonic sigma tilde
         gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
@@ -2760,4 +2760,44 @@ void updateForbiddenFaces(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<dou
             forbiddenFaces[f] = 1;
         }
     }
+}
+
+//@debuggin
+//compute curl per vertex using the curl discretization from De Goes SIGGRAPH notes (in global setting)
+VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+                                        FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    VertexData<double> curl(globalMesh);
+    globalGeometry.requireFaceAreas();
+    for (Vertex vi : globalMesh.vertices()){
+        double sum = 0.0;
+        for (Halfedge he : gluedOneRingMap[vi.getIndex()]){
+            Halfedge hjk = he.next();
+            if (!hjk.isInterior()) continue;
+            Vector3 hjkVec = globalGeometry.vertexPositions[hjk.tipVertex()] - globalGeometry.vertexPositions[hjk.tailVertex()];
+            //normalize by the face areas
+            sum += dot(hjkVec, field[he.face()]);
+        }
+        curl[vi] = sum;
+    }
+
+    return curl;
+}
+
+//@debugging
+//average vertex curl onto edges
+EdgeData<double> computeVertexAveragedEdgeCurl(VertexPositionGeometry& globalGeometry, VertexData<double>& vertexCurl){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    globalGeometry.requireEdgeLengths();
+    EdgeData<double> edgeCurl(globalMesh);
+    for (Edge e : globalMesh.edges()){
+        double c1 = vertexCurl[e.halfedge().tailVertex()];
+        double c2 = vertexCurl[e.halfedge().tipVertex()];
+        edgeCurl[e] = (c1 + c2) /(2. * globalGeometry.edgeLengths[e]);
+    }
+    return edgeCurl;
+
 }

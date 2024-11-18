@@ -223,6 +223,14 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
 //on the same isoline
 void updateForbiddenFaces(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& timeFunction, double isoVal, FaceData<int>& forbiddenFaces);
 
+//@debugging 
+//compute curl per vertex using the curl discretization from De Goes SIGGRAPH notes
+VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+                                        FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
+
+//@debugging
+//average vertex curl onto edges
+EdgeData<double> computeVertexAveragedEdgeCurl(VertexPositionGeometry& globalGeometry, VertexData<double>& vertexCurl);
 
 //@debugging
 std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
