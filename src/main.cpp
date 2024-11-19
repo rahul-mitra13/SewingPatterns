@@ -175,6 +175,12 @@ int main(int argc, char **argv) {
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometry);
   igl::grad(V,F,grad);
 
+  // Parse stripe period, if available
+  if (argc > 2) {
+    sscanf(argv[2], "%f", &period);
+    knoppelFrequency = 1.0 / period; // to match course and wale periods
+  }
+
   if (!(globalMesh -> isManifold())){
     std::cout << "Error: Mesh is not manifold" << std::endl;
     throw std::exception();
@@ -230,10 +236,8 @@ int main(int argc, char **argv) {
   // Set the callback function
   polyscope::state::userCallback = callBacks;
 
-  // Force showStripPatterns for debug
-  period = 0.0125;
-  knoppelFrequency = 80;
-  showStripePatterns();
+  if (argc > 2) // period was provided
+    showStripePatterns();
 
   polyscope::show();
 
