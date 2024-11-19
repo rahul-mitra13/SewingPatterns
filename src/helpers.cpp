@@ -919,3 +919,10 @@ std::vector<std::vector<int>> findConnectedComponents(EdgeLengthGeometry& gluedG
     return faceComponents;
 }
     
+std::vector<double> prepareCornerData(CornerData<double> cornerData) {
+  std::vector<double> preparedData;
+  for (Face f : cornerData.getMesh()->faces())
+    for (Corner co : f.adjacentCorners())
+      preparedData.push_back(cornerData[co]);
+  return preparedData;
+}

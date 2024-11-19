@@ -237,3 +237,10 @@ int hashFloatQuantized(double f);
 //find the number of connected components in a set of faces 
 //a single isoline of the time function passes through all these faces
 std::vector<std::vector<int>> findConnectedComponents(EdgeLengthGeometry& gluedGeometry, std::vector<int>& faces);
+
+// For some reason I cannot find the right permutation to make addCornerScalarQuantity work correctly.
+// I think there is something wrong with CornerData (e.g., note how cornerData.size() != mesh.nCorners()),
+// but I don't have the time to look into it.
+// In the meantime, here's a wrapper that correctly prepares corner data;
+// just call it and feed the output to addCornerScalarQuantity.
+std::vector<double> prepareCornerData(CornerData<double> cornerData);

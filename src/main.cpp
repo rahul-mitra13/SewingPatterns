@@ -202,9 +202,10 @@ int main(int argc, char **argv) {
   std::set<Edge> visited;
   for (Face f : globalMesh->faces()) {
     for (Edge e : f.adjacentEdges()) {
-      if (visited.count(e) == 0)
+      if (visited.count(e) == 0) {
         perm.push_back(e.getIndex());
         visited.insert(e);
+      }
     }
   }
   vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(data["vertex_mappings"]);
@@ -227,6 +228,17 @@ int main(int argc, char **argv) {
   globalPSMesh -> setEdgePermutation(perm);
   //create the glued edge length geometry
   gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, vertexMap, edgeMap, gluedOneRingMap);
+
+  // Halfedge permutation (global -> glued)
+  // Note: this works as long as the global and glued faces have the same order.
+  // If not, you should iterate over global mesh halfedges and find the corresponding half-edge in the glued mesh.
+  // I was just too lazy to implement that.
+  std::vector<size_t> halfedgePerm;
+  for (Face f : gluedELG->mesh.faces())
+    for (Halfedge he : f.adjacentHalfedges())
+      halfedgePerm.push_back(he.getIndex());  
+  globalPSMesh->setHalfedgePermutation(halfedgePerm);
+
   //process boundary conditions in the glued mesh setting 
   globalBdyConditions = parseJson(*gluedELG, data, vertexMap, edgeMap);
   //render the stitched vertices
