@@ -2101,9 +2101,9 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Eige
         std::vector<int> f;
         std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, curr);
 
-        auto isoline = polyscope::registerCurveNetwork("sampled isoline " + std::to_string(curr) , iV, iE);
-        isoline->setRadius(0.001);
-        isoline->setEnabled(true);
+        // auto isoline = polyscope::registerCurveNetwork("sampled isoline " + std::to_string(curr) , iV, iE);
+        // isoline->setRadius(0.001);
+        // isoline->setEnabled(true);
 
         //reset values
         currDeviationSum = 0.0;
@@ -2323,6 +2323,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     isoVal = findIsoValWithMaxAvgEdgeCurl(globalGeometry, V, F, globalTimeFunction, edgeCurl, hashedUsedIsoVals, stepSize);
     std::cout << "next isoVal = " << isoVal << std::endl;
 
+    /** 
     //find edge singularity pair 
     singEdgePairs = findEdgeSingularityPairs(globalGeometry, gluedGeometry,  V,  F,  edgeCurl,
                                             globalTimeFunction, psMesh,
@@ -2387,8 +2388,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                     adjustedGradSigmaTilde, gluedOneRingMap);
     edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
     psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (after subtracting)", edgeCurl);
+    */
     
-    while(numRuns < 7){
+    while(numRuns < 5){
         //new singularity pair iteration
         isoVal = findIsoValWithMaxAvgEdgeCurl(globalGeometry, V, F, globalTimeFunction, edgeCurl, hashedUsedIsoVals, stepSize);
         std::cout << "next isoVal = " << isoVal << std::endl;
