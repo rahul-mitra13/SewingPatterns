@@ -788,11 +788,13 @@ void drawMeshCurveNetwork(VertexPositionGeometry& globalGeometry, polyscope::Sur
 //after finding a face singularity, find a singular edge in that face 
 //edge that is most aligned with the gradient (or rotated gradient in the wale case) of the time function 
 //return the index of the edge in the global setting
-int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int singFaceIndex, Vector3 globalFaceGradient, double threshold, VertexData<double>& globalTimeFunction,
-                                        double isoVal){
+int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int singFaceIndex, Vector3 globalFaceGradient, double threshold, 
+                                    VertexData<double>& globalTimeFunction,
+                                    double isoVal){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh; 
 
+    double eps = 1e-8;
     double max = -DBL_MAX;
     Edge maxEdge;
     double p1, p2;
@@ -815,6 +817,8 @@ int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int
         }
     }
     //check if the selected edges are highly aligned 
+    //don't take edges that already have a singularity on them 
+    //or are on faces that have singularities
     if (max > threshold){
         return maxEdge.getIndex();
     }
@@ -824,7 +828,7 @@ int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int
         //with the time function gradient
         for (Halfedge he : globalMesh.face(singFaceIndex).adjacentHalfedges()){
             if ((isoVal > globalTimeFunction[he.tailVertex()] && isoVal < globalTimeFunction[he.tipVertex()]) || 
-                (isoVal > globalTimeFunction[he.tipVertex()] && isoVal < globalTimeFunction[he.tailVertex()])){//halfedge contains isoval
+                (isoVal > globalTimeFunction[he.tipVertex()] && isoVal < globalTimeFunction[he.tailVertex()])){//only search in halfedges that contain isoval
                 Face neighborFace = he.twin().face();
                 for (Edge e : neighborFace.adjacentEdges()){
                     if (e.isBoundary()) continue;//skip boundary edges
@@ -843,12 +847,16 @@ int findSingularEdgeFromSingularFace(VertexPositionGeometry& globalGeometry, int
                 }
             }
         }
+        //check if the selected edges are highly aligned 
+        //don't take edges that already have a singularity on them 
+        //or are on faces that have singularities
         if (max > threshold){
             return maxEdge.getIndex();
         }
     }
     std::cout << "skipping edge selection..." << std::endl;
     //couldn't find a very well-aligned edge, skip
+    //probably not the most principled thing to do here
     return -1;
 }
 

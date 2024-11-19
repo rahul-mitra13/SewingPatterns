@@ -30,9 +30,6 @@ std::tuple<HalfedgeData<double>, double> computeEquallySpacedOneForm(VertexPosit
 //compute the per-face gradient of a 1-form
 //FaceData<Vector3> computeOneFormFaceGrad(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde);
 
-//compute curl per vertex using the curl discretization from De Goes SIGGRAPH notes
-VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
-                                        FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
 
 //compute curl per edge in the global setting 
 EdgeData<double> computeEdgeCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,

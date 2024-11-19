@@ -87,8 +87,6 @@ void showStripePatterns(){
   }
   globalPSMesh -> addFaceVectorQuantity("normalized time function gradient", timeFunctionGradientGlobalNormalized);
 
-  G = grad;
-
 
   // // Call Matteo's revealCurl
   // Model model;
@@ -104,11 +102,14 @@ void showStripePatterns(){
   // std::tie(courseStripeValues, courseSingularEdgesGlobal) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
   //                                                            vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
 
+  G = grad;
+  FaceData<Vector3> courseOneFormGrad(globalGeometry -> mesh);
   std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
-                                                                    globalBdyConditions, period, V, F, G);
+                                                                    globalBdyConditions, period, V, F, G, courseOneFormGrad);
 
   std::tie(courseStripeValues, courseSingularEdgesGlobal);
+
   globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
 
 
@@ -121,7 +122,7 @@ void showStripePatterns(){
   FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
   std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
                                                                     edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
-                                                                    timeFunctionGradientGlobalNormalized, G, period, knoppelFrequency, globalBdyConditions, 
+                                                                    courseOneFormGrad, G, period, knoppelFrequency, globalBdyConditions, 
                                                                     courseSingularEdgesGlobal, *globalPSMesh);
   std::vector<Vector3> positionsWale;
   std::vector<std::array<int, 2>> edgesWale;
@@ -132,10 +133,19 @@ void showStripePatterns(){
   waleStripes -> setEnabled(false);
 
   //generate the knit graph
-  KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
-                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-                      edgeMap);
-  graph.buildGraph();
+  // KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
+  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+  //                     edgeMap);
+  // graph.buildGraph();
+
+  //------------------//
+  //visualize vertex curl 
+  //compute curl per vertex of gradient field (in the global setting)
+  VertexData<double> vertexCurl = computeVertexCurl(*globalGeometry, *gluedELG, timeFunctionGradientGlobalNormalized, gluedOneRingMap);
+  globalPSMesh->addVertexScalarQuantity("vertex curl", vertexCurl);
+  //visualize edge curl from vertex curl
+  EdgeData<double> edgeCurl = computeVertexAveragedEdgeCurl(*globalGeometry, vertexCurl);
+  globalPSMesh->addEdgeScalarQuantity("edge curl by averaging vertex curl", edgeCurl);
 
 }
 

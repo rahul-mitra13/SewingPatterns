@@ -13,6 +13,7 @@
 
 #pragma once 
 #include <vector> 
+#include <optional>
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -28,6 +29,7 @@ struct knitGraphVertex{
     double alpha_tag = -1;
     double beta_tag = -1;
     Face face;//associated face of a vertex (on the underlying mesh)
+    std::optional<Edge> edge;//associated edge of a vertex
     SurfacePoint surfacePoint;//used for intersections on singular faces
     bool isBaryCenter = false;//if this is a vertex at the barycenter
     bool hasBeenHandled = false;//if this vertex has been handled by a merge
@@ -106,5 +108,18 @@ class KnitGraph{
 
             //render the knit graph 
             void renderGraph();
+
+            //make obj out of knit graph 
+            void makeObj();
+
+            //perform epsilon merging to 
+            //merge connections across faces
+            void epsilonMerging();
+
+            //find a cluster of vertices to merge
+            std::vector<knitGraphVertex> findCluster(const knitGraphVertex &v, double eps);
+
+            //merge a cluster
+            void mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps);
 };
 

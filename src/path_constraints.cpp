@@ -57,6 +57,7 @@ HalfedgeData<double> constructGluedHalfedgeWeights(VertexPositionGeometry& globa
     return heWeights;
 }
 
+//construct an edge path between two vertices 
 //e1, e2 are in the global setting 
 std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Edge e1, Edge e2, 
                                         std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, FaceData<Vector3>& globalFaceGradients, HalfedgeData<double>& gluedHeWeights){
@@ -144,7 +145,6 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
             for (Halfedge he : path){
             toReturnGlued[he.edge().getIndex()] = he.orientation() ? 1.0 : -1.0;
             }
-            //toReturnGlobal = convertGluedToGlobalEdgeFunction(globalGeometry, gluedGeometry, toReturnGlued, edgeMap);
             for (Edge e : globalMesh.edges()){
                 toReturnGlobal[e.getIndex()] = toReturnGlued[gluedMesh.edge(edgeMap[e.getIndex()]).getIndex()];
             }
@@ -155,4 +155,23 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
     }
 
     return std::tie(toReturnGlobal, toReturnGlued);
+}
+
+//update glued halfedge weights 
+//set the halfedges that have been take by some edge path i.e., gluedPath to infinity 
+void updateGluedHalfedgeWeights(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, std::vector<double>& gluedPath,
+                                HalfedgeData<double>& gluedHeWeights){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+
+    for (Edge e : gluedMesh.edges()){
+        if (gluedPath[e.getIndex()] > 0){
+            gluedHeWeights[e.halfedge().getIndex()] = DBL_MAX;
+        }
+        else if (gluedPath[e.getIndex()] < 0){
+            gluedHeWeights[e.halfedge().twin().getIndex()] = DBL_MAX;
+        }
+    }
+
 }
