@@ -63,6 +63,13 @@ void Model::setFaceGradients(std::vector<std::array<double, 3>>& faceGradients){
 
 }
 
+void Model::setFaceGradients(FaceData<Vector3>& faceGradients){
+
+    for (int i = 0; i < faceGradients.size(); i++){
+        this->faceGradients[i] = std::array<double, 3>{faceGradients[i][0], faceGradients[i][1], faceGradients[i][2]};
+    }
+}
+
 void Model::setEdgeMappingsPairs(std::vector<std::pair<int, int>>& edgeMappingsPairs){
 
     this->edgeMappingsPairs = edgeMappingsPairs;

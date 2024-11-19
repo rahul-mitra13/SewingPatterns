@@ -1,5 +1,14 @@
 #include <vector>
 #pragma once
+
+//geometry central includes
+#include "geometrycentral/surface/meshio.h"
+#include "geometrycentral/surface/vertex_position_geometry.h"
+#include "geometrycentral/surface/edge_length_geometry.h"
+
+using namespace geometrycentral;
+using namespace geometrycentral::surface;
+
 class Model{
 
     private:
@@ -91,6 +100,9 @@ class Model{
 
         //set face gradients 
         void setFaceGradients(std::vector<std::array<double, 3>>& faceGradients);
+
+        //set face gradients using gc FaceData<Vector3>
+        void setFaceGradients(FaceData<Vector3>& faceGradients);
 
         //set edge mappings 
         void setEdgeMappingsPairs(std::vector<std::pair<int, int>>& edgeMappingsPairs);
