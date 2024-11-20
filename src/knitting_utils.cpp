@@ -2025,7 +2025,7 @@ double findIsoValWithMaxFaceCurl(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexD
     double currAvgDeviation = 0.0;
     double currDeviationSum = 0.0;
 
-    std::cout << "step size = " << stepSize << std::endl;
+    //std::cout << "step size = " << stepSize << std::endl;
 
     while (curr < (end - eps)){
 
@@ -2086,7 +2086,7 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Eige
     bool skipFlag = false;
     double currAvgDeviation = 0.0;
     double currDeviationSum = 0.0;
-    std::cout << "step size = " << stepSize << std::endl;
+    //std::cout << "step size = " << stepSize << std::endl;
     //stepSize = 0.01;
     
     while (curr < (end - eps)){
@@ -2321,7 +2321,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     
     //new singularity pair iteration
     isoVal = findIsoValWithMaxAvgEdgeCurl(globalGeometry, V, F, globalTimeFunction, edgeCurl, hashedUsedIsoVals, stepSize);
-    std::cout << "next isoVal = " << isoVal << std::endl;
+    //std::cout << "next isoVal = " << isoVal << std::endl;
 
     /** 
     //find edge singularity pair 
@@ -2390,7 +2390,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (after subtracting)", edgeCurl);
     */
     
-    while(numRuns < 5){
+    while(numRuns < 1){
         //new singularity pair iteration
         isoVal = findIsoValWithMaxAvgEdgeCurl(globalGeometry, V, F, globalTimeFunction, edgeCurl, hashedUsedIsoVals, stepSize);
         std::cout << "next isoVal = " << isoVal << std::endl;

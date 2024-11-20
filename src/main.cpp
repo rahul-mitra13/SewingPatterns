@@ -123,10 +123,10 @@ void showStripePatterns(){
   waleStripes -> setEnabled(false);
 
   //generate the knit graph
-  // KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
-  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-  //                     edgeMap);
-  // graph.buildGraph();
+  KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
+                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+                      edgeMap);
+  graph.buildGraph();
 
   //------------------//
   //visualize vertex curl 
