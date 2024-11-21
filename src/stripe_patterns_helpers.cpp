@@ -103,7 +103,8 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
 
 //carry out the integration in the glued mesh setting
 //sigma is defined over the EDGES of glued mesh 
-std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& sigma, float period){
+std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& globalGeometry, 
+                                                              EdgeLengthGeometry& gluedGeometry, EdgeData<double>& sigma, float period){
 
   SurfaceMesh& globalMesh = globalGeometry.mesh; 
   SurfaceMesh& gluedMesh = gluedGeometry.mesh;
@@ -409,7 +410,6 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
 
   std::vector<PolyLinePoint> isoline_points;
 
-  FaceData<std::vector<double>> faceIsoValues = getFaceIsoValues(geometry, stripeValues, stripesIndices, period);
   HalfedgeData<std::vector<double>> halfedgeIsoValues = getHalfEdgeIsoValues(geometry, stripeValues, stripesIndices, period);
 
   //first generate all the points
@@ -428,6 +428,7 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
         PolyLinePoint currPoint;
         currPoint.position = pos;
         currPoint.f = h.face();
+        currPoint.e = h.edge();
         currPoint.isoval = heSet[i];
 
         isoline_points.push_back(currPoint);
@@ -459,6 +460,87 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
   }
 
   return std::tie(points, edges);
+}
+
+std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> removeCurveNetworkDuplicatedVertices(VertexPositionGeometry& globalGeometry, 
+                                                                                                          std::vector<Vector3>& vertices, std::vector<std::array<int, 2>>& edges){
+
+
+  SurfaceMesh& globalMesh = globalGeometry.mesh;
+  // Map to store unique vertices and their indices
+  std::unordered_map<Vector3, size_t> uniqueVertices;
+  std::vector<size_t> vertexMapping(vertices.size(), -1);
+  std::vector<Vector3> newVertices;
+
+  // Identify unique vertices and build the mapping
+  for (size_t i = 0; i < vertices.size(); ++i) {
+      Vector3 pos = vertices[i];
+
+      if (uniqueVertices.find(pos) == uniqueVertices.end()) {
+          // New unique vertex
+          uniqueVertices[pos] = newVertices.size();
+          vertexMapping[i] = newVertices.size();
+          newVertices.push_back(pos);
+        } else {
+          // Duplicate vertex, map to the unique one
+          vertexMapping[i] = uniqueVertices[pos];
+        }
+    }
+
+    // Create new edges with updated vertex indices
+    std::vector<std::array<int, 2>> newEdges;
+    for (auto e : edges) {
+        int v1 = vertexMapping[e[0]];
+        int v2 = vertexMapping[e[1]];
+
+        // Avoid duplicate edges
+        if (v1 != v2) {
+            if (v1 > v2) std::swap(v1, v2); // Ensure consistent ordering
+            newEdges.emplace_back(std::array<int, 2>{v1, v2});
+        }
+    }
+
+    // Remove duplicate edges
+    std::sort(newEdges.begin(), newEdges.end());
+    newEdges.erase(std::unique(newEdges.begin(), newEdges.end()), newEdges.end());
+
+    return std::tie(newVertices, newEdges);
+
+}
+
+//find connected components of a curve network
+void findCurveNetworkConnectedComponents(VertexPositionGeometry& globalGeometry,
+                            std::vector<Vector3>& vertices, std::vector<std::array<int, 2>>& edges){
+  
+  SurfaceMesh& globalMesh = globalGeometry.mesh;
+
+  // Initialize disjoint set for vertices
+  DisjointSets vertexSets(vertices.size());
+
+  // Union-find: process each edge to connect the vertices
+  for (auto e : edges) {
+      auto v1 = e[0];
+      auto v2 = e[1];
+      vertexSets.merge(v1, v2);
+  }
+
+    // Map each set leader to its component
+    std::unordered_map<size_t, std::vector<size_t>> components;
+    for (size_t v = 0; v < vertices.size(); ++v) {
+        size_t leader = vertexSets.find(v);
+        components[leader].push_back(v);
+    }
+
+    // Print the connected components
+    size_t componentIndex = 0;
+    for (const auto& comp : components) {
+        std::cout << "Component " << componentIndex++ << ": ";
+        for (size_t v : comp.second) {
+            std::cout << v << " ";
+        }
+        std::cout << std::endl;
+    }
+
 }
 
 //-------------------------re-impleminting Knoppel's stripes-----------------------//

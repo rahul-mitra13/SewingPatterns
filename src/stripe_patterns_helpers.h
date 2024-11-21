@@ -4,6 +4,7 @@
 #include "geometrycentral/surface/meshio.h"
 #include "geometrycentral/surface/vertex_position_geometry.h"
 #include "geometrycentral/utilities/utilities.h"
+#include <geometrycentral/utilities/disjoint_sets.h>
 #include "geometrycentral/surface/stripe_patterns.h"
 #include "geometrycentral/surface/edge_length_geometry.h"
 #include "geometrycentral/numerical/linear_solvers.h"
@@ -15,6 +16,7 @@
 
 #include <vector>
 #include <queue>
+#include <unordered_map>
 
 #include <Eigen/Sparse>
 
@@ -30,6 +32,7 @@ struct Isoline {
 struct PolyLinePoint{
   Vector3 position;//the position of the point in space 
   Face f;//the face this point belongs to
+  Edge e;//the edge this point belongs to
   double isoval;//the isoval (modulo P of this point)
 };
 
@@ -65,6 +68,16 @@ HalfedgeData<std::vector<double>> getHalfEdgeIsoValues(IntrinsicGeometryInterfac
 std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLines(EmbeddedGeometryInterface& geometry,
                                                       const CornerData<double>& stripeValues,
                                                       const FaceData<int>& stripesIndices, double period);
+
+
+//remove duplicate vertices in a curve network
+std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> removeCurveNetworkDuplicatedVertices(VertexPositionGeometry& globalGeometry, 
+                                                                                                          std::vector<Vector3>& vertices, std::vector<std::array<int, 2>>& edges);
+
+
+//find connected components of a curve network
+void findCurveNetworkConnectedComponents(VertexPositionGeometry& globalGeometry,
+                            std::vector<Vector3>& vertices, std::vector<std::array<int, 2>>& edges);
 
 //---------------------------re-implementing Knoppel's stripes-------------------------//
 //setting \omega per edge directly
