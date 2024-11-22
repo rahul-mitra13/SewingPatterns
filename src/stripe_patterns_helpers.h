@@ -69,7 +69,11 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
                                                       const CornerData<double>& stripeValues,
                                                       const FaceData<int>& stripesIndices, double period);
 
-
+//find the set of edges that a given isovalue of the stripes crosses
+EdgeData<int> stripeIsoValEdges(EmbeddedGeometryInterface& geometry,
+                                                      const CornerData<double>& stripeValues,
+                                                      const FaceData<int>& stripesIndices, double period);
+                                        
 //remove duplicate vertices in a curve network
 std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> removeCurveNetworkDuplicatedVertices(VertexPositionGeometry& globalGeometry, 
                                                                                                           std::vector<Vector3>& vertices, std::vector<std::array<int, 2>>& edges);

@@ -1312,7 +1312,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     VertexData<Vector2> lineField = vertexDirectionField(globalGeometry, vertexVectorField);
     EdgeData<double> waleSingularEdgesGlobal(globalGeometry.mesh, 0);
     VertexData<double> freq(globalGeometry.mesh, 1./(period));
-    //VertexData<double> freq(globalGeometry.mesh, knoppelFrequency);
     CornerData<double> stripeValues(globalGeometry.mesh);
     FaceData<int> stripeSingularities(globalGeometry.mesh);
     FaceData<int> fieldSingularities(globalGeometry.mesh);
@@ -1326,7 +1325,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     std::vector<std::array<size_t, 2>> knoppelEdges; 
     std::tie(knoppelPos, knoppelEdges) = extractPolylinesFromStripePattern(globalGeometry, stripeValues, stripeSingularities,
                                             fieldSingularities, lineField, false);
-    auto knoppelStripes = polyscope::registerCurveNetwork("knoppel stripes", knoppelPos, knoppelEdges);
+    auto knoppelStripes = polyscope::registerCurveNetwork("knoppel wale stripes stripes", knoppelPos, knoppelEdges);
     knoppelStripes -> setRadius(0.001);
     knoppelStripes -> setEnabled(false);
 
@@ -2149,6 +2148,25 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    
+    //show Knöppel course stripes
+    //compute a line field in the tangent space of the vertex
+    VertexData<Vector3> vertexVectorField = computeVertexValuedField(globalGeometry, globalTimeFunction, 0.);
+    VertexData<Vector2> lineField = vertexDirectionField(globalGeometry, vertexVectorField);
+    VertexData<double> freq(globalGeometry.mesh, 1./(2 * period));
+    CornerData<double> stripeValues(globalGeometry.mesh);
+    FaceData<int> stripeSingularities(globalGeometry.mesh);
+    FaceData<int> fieldSingularities(globalGeometry.mesh);
+    std::tie(stripeValues, stripeSingularities, fieldSingularities) = computeStripePattern(globalGeometry, freq, lineField);
+    std::vector<Vector3> knoppelPos; 
+    std::vector<std::array<size_t, 2>> knoppelEdges; 
+    std::tie(knoppelPos, knoppelEdges) = extractPolylinesFromStripePattern(globalGeometry, stripeValues, stripeSingularities,
+                                            fieldSingularities, lineField, false);
+    auto knoppelStripes = polyscope::registerCurveNetwork("knoppel course stripes stripes", knoppelPos, knoppelEdges);
+    knoppelStripes -> setRadius(0.001);
+    knoppelStripes -> setEnabled(false);
+
+
 
     //curl per vertex 
     VertexData<double> vertexCurl(globalMesh, 0.0);
@@ -2304,29 +2322,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //update the gradients for the next iteration of the model 
     model.setFaceGradients(gradSigmaTilde);
     std::cout << "distance from unit norm after " << std::to_string(numRuns - 1) << " singularity insertions " << computeDistanceFromUnitNorm(globalGeometry, gradSigmaTilde) << std::endl;
-    //sample at double the period
-    std::tie(newStripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, 3.0 * period);
-    std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, newStripeValuesSigmaCourse, stripeIndicesSigmaCourse, 3.0 * period);
-    courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numRuns - 1) + 
-                                                    " singularity insertions at 3 * period", positionsCourse, edgesCourse);
-    courseStripes -> setRadius(0.001);
-    courseStripes -> setEnabled(false);
-
-    //trying some stuff to extract stripe isolines 
-    // std::vector<Vector3> points;
-    // std::vector<std::array<size_t, 2>> edges;
-    // EdgeData<std::vector<size_t>> indicesPerEdge;
-    // FaceData<int> stripeIndices(globalMesh, 0);
-    // FaceData<int> fieldIndices(globalMesh, 0);
-    // CornerData<double> values(globalMesh);
-    // for (Face f : gluedMesh.faces()){
-    //     values[globalMesh.face(f.getIndex()).halfedge().corner()] = newStripeValuesSigmaCourse[f.halfedge().corner()];
-    //     values[globalMesh.face(f.getIndex()).halfedge().next().corner()] = newStripeValuesSigmaCourse[f.halfedge().next().corner()];
-    //     values[globalMesh.face(f.getIndex()).halfedge().next().next().corner()] = newStripeValuesSigmaCourse[f.halfedge().next().next().corner()];
-
-    // }
-    // std::tie(points, edges, indicesPerEdge) =
-    //   extractCrossingsFromStripePattern(globalGeometry, values, stripeIndices, fieldIndices);
 
     //compute curl quantities without impulse function
     vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
@@ -2348,74 +2343,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     isoVal = findIsoValWithMaxAvgEdgeCurl(globalGeometry, V, F, globalTimeFunction, edgeCurl, hashedUsedIsoVals, stepSize);
     //std::cout << "next isoVal = " << isoVal << std::endl;
 
-    /** 
-    //find edge singularity pair 
-    singEdgePairs = findEdgeSingularityPairs(globalGeometry, gluedGeometry,  V,  F,  edgeCurl,
-                                            globalTimeFunction, psMesh,
-                                            hashedUsedIsoVals, usedEdges, faceSingularities, 
-                                            isoVal, numRuns, false);
-    for (std::pair<int, int> singEdgePair : singEdgePairs){
-        Eigen::MatrixXd iV;
-        Eigen::MatrixXd iE;
-        std::vector<int> f;
-        std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, isoVal);
-        auto isoline = polyscope::registerCurveNetwork("Isoline for " + std::to_string(numRuns) + " singularity", iV, iE);
-        isoline -> setRadius(0.001);
-        isoline -> setEnabled(false);
-        edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
-        edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
-        //pair of singular edges
-        singularEdges.push_back(std::make_pair(edgeMap[singEdgePair.first], -1));
-        singularEdges.push_back(std::make_pair(edgeMap[singEdgePair.second], 1));
-        std::tie(globalPath, gluedPath) = constructEdgePath(globalGeometry, gluedGeometry, globalMesh.edge(singEdgePair.first), globalMesh.edge(singEdgePair.second),
-                                        vertexMap, edgeMap, globalTimeFunctionGradientsNormalized, gluedHeWeights);
-        //don't retake edges from another path
-        updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, gluedHeWeights);
-        psMesh.addEdgeScalarQuantity("path for " + std::to_string(numRuns) + " singularity", globalPath);
-        edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
-        model.setEdgePathConstraints(edgePathConstraints);
-        //add the edges we've used to the map
-        usedEdges[singEdgePair.first] = 1;
-        usedEdges[singEdgePair.second] = 1;
-    }
-    //add the isovalue we've used to the map
-    hashedUsedIsoVals.insert({hashFloatQuantized(isoVal), 1});
-    //set the singular edges we've just found
-    model.setSingularEdges(singularEdges);
-    //solve the model with 1 pair of  singularities 
-    std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
-    numRuns++;
-    std::tie(newStripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
-    std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, newStripeValuesSigmaCourse, stripeIndicesSigmaCourse, period);
-    courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numRuns - 1) + 
-                                                    " singularity insertions", positionsCourse, edgesCourse);
-    oldObj = currObj;
-    oldStripeValuesSigmaCourse = newStripeValuesSigmaCourse;
-    courseStripes -> setRadius(0.001);
-    courseStripes -> setEnabled(false);
-    gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
-
-    //update the gradients for the next round of the model 
-    model.setFaceGradients(gradSigmaTilde);
-    std::cout << "distance from unit norm after " << std::to_string(numRuns - 1) << " singularity insertions " << computeDistanceFromUnitNorm(globalGeometry, gradSigmaTilde) << std::endl;
-    //compute curl quantities without accounting for impulse function
-    vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
-                                    gradSigmaTilde, gluedOneRingMap);
-    edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
-    psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (before subtracting)", edgeCurl);
-    //compute virtual sigma
-    std::tie(virtualSigmaTilde, virtualSigmaObj) = computeVirtualSigma(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
-    //subtract off the impulse function
-    gluedSigmaTilde = gluedSigmaTilde - virtualSigmaTilde;
-    adjustedGradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
-    //compute curl quantities after accounting for impulse function
-    vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
-                                    adjustedGradSigmaTilde, gluedOneRingMap);
-    edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
-    psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (after subtracting)", edgeCurl);
-    */
-    
-    while(numRuns < 2){
+    while(numRuns < 3){
         //new singularity pair iteration
         isoVal = findIsoValWithMaxAvgEdgeCurl(globalGeometry, V, F, globalTimeFunction, edgeCurl, hashedUsedIsoVals, stepSize);
         std::cout << "next isoVal = " << isoVal << std::endl;
@@ -2460,13 +2388,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             //update the gradients for the next round of the model 
             model.setFaceGradients(gradSigmaTilde);
             std::cout << "distance from unit norm after " << std::to_string(numRuns - 1) << " singularity insertions " << computeDistanceFromUnitNorm(globalGeometry, gradSigmaTilde) << std::endl;
-            //sample at double the period
-            std::tie(newStripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, 3.0 * period);
-            std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, newStripeValuesSigmaCourse, stripeIndicesSigmaCourse, 3.0 * period);
-            courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numRuns - 1) + 
-                                                    " singularity insertions at 3 * period", positionsCourse, edgesCourse);
-            courseStripes -> setRadius(0.001);
-            courseStripes -> setEnabled(false);
             //compute curl quantities without accounting for impulse function
             vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
                                     gradSigmaTilde, gluedOneRingMap);

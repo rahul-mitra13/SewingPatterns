@@ -395,6 +395,27 @@ bool halfedgeContainsLevelSet(double val1, double val2, double& bary, double cur
 
 }
 
+//find the set of edges that a given isovalue of the stripes crosses
+EdgeData<int> stripeIsoValEdges(EmbeddedGeometryInterface& geometry,
+                                  const CornerData<double>& stripeValues,
+                                  const FaceData<int>& stripesIndices, double period){
+  
+  SurfaceMesh& mesh = geometry.mesh;
+  HalfedgeData<std::vector<double>> halfedgeIsoValues = getHalfEdgeIsoValues(geometry, stripeValues, stripesIndices, period);
+  EdgeData<int> result(mesh, 0);
+  
+  //find all the faces that a given isovalue passes through
+  for (Halfedge h : mesh.halfedges()){
+    if (result[h.edge()]) continue;
+    if (h.face().isBoundaryLoop() || stripesIndices[h.face()] != 0) continue;//skip singular faces and boundary faces
+    std::vector<double> heSet = halfedgeIsoValues[h];
+    for (int i = 0; i < heSet.size(); i++){
+      result[h.edge()] = 1;
+    }
+  }
+  return result;
+}
+
 //extract isolines when multiple isolines may pass through a face (using face-based matching)
 std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLines(EmbeddedGeometryInterface& geometry,
                                                       const CornerData<double>& stripeValues,
@@ -462,6 +483,100 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
   return std::tie(points, edges);
 }
 
+// lists all the k's \in \mathbb{Z} such that val1 < 2 k \pi < val2 or val2 < 2 k \pi < val1
+std::vector<double> crossingsModuloPeriod(double val1, double val2, double period) {
+  std::vector<double> barys;
+  if (val1 == val2) return barys;
+
+  int maxCrossings = std::ceil(std::abs(val1 - val2) / (period));
+
+  if (val1 < val2) {
+    for (int i = 0; i < maxCrossings; ++i) {
+      int k = std::ceil(val1 / (period)) + i;
+      double isoval = 2 * PI * k;
+
+      if (isoval < val2) {
+        barys.push_back((isoval - val2) / (val1 - val2));
+      }
+    }
+  } else {
+    for (int i = maxCrossings - 1; i >= 0; --i) {
+      int k = std::ceil(val2 / (period)) + i;
+      double isoval = 2 * PI * k;
+
+      if (isoval < val1) {
+        barys.push_back((isoval - val2) / (val1 - val2));
+      }
+    }
+  }
+
+  return barys;
+}
+
+// Matches crossings based on a strategy proposed in "Navigating intrinsic triangulations" [Sharp et al. 2019].
+// See https://github.com/nmwsharp/geometry-central/pull/89#issuecomment-936150222 for more details
+std::vector<std::array<int, 2>> matchCrossings(const std::vector<std::vector<int>>& crossings) {
+  assert(crossings.size() == 3);
+
+  int idxIJ = 2;
+  if (crossings[0].size() >= crossings[1].size() && crossings[0].size() >= crossings[2].size()) {
+    idxIJ = 0;
+  } else if (crossings[1].size() >= crossings[2].size() && crossings[1].size() >= crossings[0].size()) {
+    idxIJ = 1;
+  }
+  int idxJK = (idxIJ + 1) % 3;
+  int idxKI = (idxIJ + 2) % 3;
+
+  const std::vector<int>& IJ = crossings[idxIJ];
+  const std::vector<int>& JK = crossings[idxJK];
+  const std::vector<int>& KI = crossings[idxKI];
+
+  int nIJ = IJ.size();
+  int nJK = JK.size();
+  int nKI = KI.size();
+
+  assert(nIJ >= nJK && nIJ >= nKI);
+  assert(nIJ <= nJK + nKI);
+  assert((nIJ + nJK + nKI) % 2 == 0);
+
+  std::vector<std::array<int, 2>> matchings;
+  if (nIJ == nJK + nKI) { // Case 1: all edges intersecting ijk cross a common edge ij
+    // match IJ with IK
+    for (int m = 0; m < nKI; ++m) {
+      matchings.push_back({IJ[m], KI[nKI - m - 1]});
+    }
+    // match IJ with KJ
+    for (int m = 0; m < nJK; ++m) {
+      matchings.push_back({IJ[nKI + m], JK[nJK - m - 1]});
+    }
+  } else { // Case 2: there is no common edge
+    int nRemainingCrossings = (nIJ + nJK + nKI) / 2;
+    int m = 0;
+    while (nRemainingCrossings > nJK) {
+      matchings.push_back({IJ[m], KI[nKI - m - 1]});
+      ++m;
+      nRemainingCrossings -= 1;
+    }
+
+    int l = 0;
+    while (nRemainingCrossings > nKI - m) {
+      matchings.push_back({IJ[nIJ - 1 - l], JK[l]});
+      nRemainingCrossings -= 1;
+      ++l;
+    }
+
+    int p = 0;
+    while (nRemainingCrossings > 0) {
+      matchings.push_back({JK[nJK - 1 - p], KI[p]});
+      ++p;
+      nRemainingCrossings -= 1;
+    }
+  }
+
+  return matchings;
+}
+
+
 std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> removeCurveNetworkDuplicatedVertices(VertexPositionGeometry& globalGeometry, 
                                                                                                           std::vector<Vector3>& vertices, std::vector<std::array<int, 2>>& edges){
 
@@ -471,21 +586,21 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> removeCurveNet
   std::unordered_map<Vector3, size_t> uniqueVertices;
   std::vector<size_t> vertexMapping(vertices.size(), -1);
   std::vector<Vector3> newVertices;
+  double eps = 1e-8;
 
   // Identify unique vertices and build the mapping
   for (size_t i = 0; i < vertices.size(); ++i) {
-      Vector3 pos = vertices[i];
-
-      if (uniqueVertices.find(pos) == uniqueVertices.end()) {
-          // New unique vertex
-          uniqueVertices[pos] = newVertices.size();
-          vertexMapping[i] = newVertices.size();
-          newVertices.push_back(pos);
-        } else {
-          // Duplicate vertex, map to the unique one
-          vertexMapping[i] = uniqueVertices[pos];
-        }
-    }
+    Vector3 pos = vertices[i];
+    if (uniqueVertices.find(pos) == uniqueVertices.end()) {
+        // New unique vertex
+        uniqueVertices[pos] = newVertices.size();
+        vertexMapping[i] = newVertices.size();
+        newVertices.push_back(pos);
+      } else {
+        // Duplicate vertex, map to the unique one
+        vertexMapping[i] = uniqueVertices[pos];
+      }
+  }
 
     // Create new edges with updated vertex indices
     std::vector<std::array<int, 2>> newEdges;
