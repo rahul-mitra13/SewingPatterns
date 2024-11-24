@@ -89,9 +89,6 @@ void showStripePatterns(){
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
   EdgeData<double> courseSingularEdgesGlobal(globalGeometry -> mesh);
-  // std::tie(courseStripeValues, courseSingularEdgesGlobal) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
-  //                                                            vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
-
   G = grad;
   FaceData<Vector3> courseOneFormGrad(globalGeometry -> mesh);
   std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
@@ -121,6 +118,14 @@ void showStripePatterns(){
   globalPSMesh -> addEdgeScalarQuantity("wale singularities", waleSingularEdgesGlobal);
   waleStripes -> setRadius(0.001);
   waleStripes -> setEnabled(false);
+
+
+  //show vertex curl and edge curl of normalized time function gradient
+  // VertexData<double> vertexCurl = computeVertexCurl(*globalGeometry, *gluedELG, 
+  //                                   timeFunctionGradientGlobalNormalized, gluedOneRingMap);
+  // EdgeData<double> edgeCurl = computeVertexAveragedEdgeCurl(*globalGeometry, vertexCurl);
+  // globalPSMesh->addVertexScalarQuantity("normalized time function gradient vertex curl", vertexCurl);
+  // globalPSMesh->addEdgeScalarQuantity("normalized time function gradient edge curl", edgeCurl);
 
   //generate the knit graph
   // KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 

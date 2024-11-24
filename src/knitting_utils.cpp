@@ -2165,6 +2165,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     auto knoppelStripes = polyscope::registerCurveNetwork("knoppel course stripes stripes", knoppelPos, knoppelEdges);
     knoppelStripes -> setRadius(0.001);
     knoppelStripes -> setEnabled(false);
+    //------------end of Knöppel stripes------------//
 
 
 
@@ -2343,7 +2344,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     isoVal = findIsoValWithMaxAvgEdgeCurl(globalGeometry, V, F, globalTimeFunction, edgeCurl, hashedUsedIsoVals, stepSize);
     //std::cout << "next isoVal = " << isoVal << std::endl;
 
-    while(numRuns < 3){
+    while(numRuns < 5){
         //new singularity pair iteration
         isoVal = findIsoValWithMaxAvgEdgeCurl(globalGeometry, V, F, globalTimeFunction, edgeCurl, hashedUsedIsoVals, stepSize);
         std::cout << "next isoVal = " << isoVal << std::endl;
