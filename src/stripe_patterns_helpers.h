@@ -33,6 +33,7 @@ struct PolyLinePoint{
   Vector3 position;//the position of the point in space 
   Face f;//the face this point belongs to
   Edge e;//the edge this point belongs to
+  Halfedge he;//the halfedge this point belongs to
   double isoval;//the isoval (modulo P of this point)
 };
 
@@ -71,8 +72,8 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
 
 //find the set of edges that a given isovalue of the stripes crosses
 EdgeData<int> stripeIsoValEdges(EmbeddedGeometryInterface& geometry,
-                                                      const CornerData<double>& stripeValues,
-                                                      const FaceData<int>& stripesIndices, double period);
+                                  const CornerData<double>& stripeValues,
+                                  const FaceData<int>& stripesIndices, double period, polyscope::SurfaceMesh& psMesh);
                                         
 //remove duplicate vertices in a curve network
 std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> removeCurveNetworkDuplicatedVertices(VertexPositionGeometry& globalGeometry, 

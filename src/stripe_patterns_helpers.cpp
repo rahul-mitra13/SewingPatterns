@@ -398,10 +398,17 @@ bool halfedgeContainsLevelSet(double val1, double val2, double& bary, double cur
 //find the set of edges that a given isovalue of the stripes crosses
 EdgeData<int> stripeIsoValEdges(EmbeddedGeometryInterface& geometry,
                                   const CornerData<double>& stripeValues,
-                                  const FaceData<int>& stripesIndices, double period){
+                                  const FaceData<int>& stripesIndices, double period, polyscope::SurfaceMesh& psMesh){
   
   SurfaceMesh& mesh = geometry.mesh;
   HalfedgeData<std::vector<double>> halfedgeIsoValues = getHalfEdgeIsoValues(geometry, stripeValues, stripesIndices, period);
+  //decalare a custom comparator for floating point values 
+  auto customComparator = [](const double a, const double b){
+    double epsilon = 1e-9;
+    return ((a < b) && (std::fabs(a - b) >= epsilon));
+  };
+  std::set<double, decltype(customComparator)> uniqueIsoVals(customComparator);
+  //std::set<double> uniqueIsoVals;
   EdgeData<int> result(mesh, 0);
   
   //find all the faces that a given isovalue passes through
@@ -411,8 +418,86 @@ EdgeData<int> stripeIsoValEdges(EmbeddedGeometryInterface& geometry,
     std::vector<double> heSet = halfedgeIsoValues[h];
     for (int i = 0; i < heSet.size(); i++){
       result[h.edge()] = 1;
+      uniqueIsoVals.insert(heSet[i]);
     }
   }
+
+  //a visited edges map where the key is 
+  //(leader edge, isoval) -> set of edges on that isovalue visited from that leader
+  std::map<std::pair<int, double>, std::vector<int>> visitedEdges;
+  //a used edges map where the key is 
+  //(edge index, isoval) -> whether or not that edge has been visited by that isovalue
+  std::map<std::pair<int, double>, int> usedEdges;
+  double bary;
+  EdgeData<int> leaders(mesh, 0);
+
+  //this approach will have some repitions since isolines take on 
+  //different values depending on the edges they're on 
+  //but if the isoline hits the same edges it shouldn't matter in the long run
+  for (double isoVal : uniqueIsoVals){
+    std::cout << "unique isoval = " << isoVal << std::endl;
+    for (Halfedge he : mesh.halfedges()){
+      if (halfedgeContainsLevelSet(stripeValues[he.corner()], stripeValues[he.next().corner()], bary, isoVal) && 
+        usedEdges.find(std::make_pair(he.edge().getIndex(), isoVal)) == usedEdges.end()){//this edge has not been visited for isoVal
+        std::cout << "leader for isovalue " << isoVal << " is edge " << he.edge().getIndex() << std::endl;
+        leaders[he.edge()] = 1;
+        usedEdges[std::make_pair(he.edge().getIndex(), isoVal)] = 1;
+        visitedEdges[std::make_pair(he.edge().getIndex(), isoVal)] = std::vector<int>{static_cast<int>(he.edge().getIndex())};
+
+        //walk along this isovalue starting from the leader
+        Halfedge startHe = he;
+        Halfedge currHe = startHe;
+        while(true){
+          Halfedge jk = currHe.next();
+          Halfedge ki = currHe.next().next();
+          if (halfedgeContainsLevelSet(stripeValues[jk.corner()], stripeValues[jk.next().corner()], bary, isoVal) && 
+          usedEdges.find(std::make_pair(jk.edge().getIndex(), isoVal)) == usedEdges.end()){//this edge has not been visited for this isoval
+            
+            usedEdges[std::make_pair(jk.edge().getIndex(), isoVal)] = 1;
+            visitedEdges[std::make_pair(he.edge().getIndex(), isoVal)].push_back(jk.edge().getIndex());
+            currHe = jk;
+          }
+
+          else if (halfedgeContainsLevelSet(stripeValues[ki.corner()], stripeValues[ki.next().corner()], bary, isoVal) && 
+          usedEdges.find(std::make_pair(ki.edge().getIndex(), isoVal)) == usedEdges.end()){//this edge has not been visited for this isoval
+            
+            usedEdges[std::make_pair(ki.edge().getIndex(), isoVal)] = 1;
+            visitedEdges[std::make_pair(he.edge().getIndex(), isoVal)].push_back(ki.edge().getIndex());
+            currHe = ki;
+          }
+
+          else{//isoline ends
+            std::cout << "iso line is ending! " << std::endl;
+            break;
+          }
+
+          if (currHe == startHe){//made a closed loop
+            std::cout << "isoline made a closed! " << std::endl;
+            break;
+          }
+
+          //otherwise keep walking
+          currHe = currHe.twin();
+
+        }
+      }
+    }
+  }
+
+  std::cout << "size of visited edges = " << visitedEdges.size() << std::endl;
+
+  for (auto entry : visitedEdges){
+    std::cout << "for pair " << entry.first.first << ", " << entry.first.second << std::endl;
+    for (int i = 0; i < entry.second.size(); i++){
+      std::cout << "edge it hits = " << entry.second[i] << std::endl;
+    }
+    std::cout << "-----------------------------" << std::endl;
+  }
+
+  psMesh.addEdgeScalarQuantity("edge leaders", leaders);
+
+  
+
   return result;
 }
 
@@ -450,6 +535,7 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
         currPoint.position = pos;
         currPoint.f = h.face();
         currPoint.e = h.edge();
+        currPoint.he = h;
         currPoint.isoval = heSet[i];
 
         isoline_points.push_back(currPoint);
@@ -471,7 +557,6 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
 
     //search for the point p1 should connect to
     for (int j = 0; j < isoline_points.size(); j++){
-
       PolyLinePoint p2 = isoline_points[j];
       if (p1.f == p2.f && std::abs(p1.isoval - p2.isoval) < pert && i != j){
         std::array<int, 2> edge = {i, j};
@@ -577,13 +662,57 @@ std::vector<std::array<int, 2>> matchCrossings(const std::vector<std::vector<int
 }
 
 
-std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> removeCurveNetworkDuplicatedVertices(VertexPositionGeometry& globalGeometry, 
-                                                                                                          std::vector<Vector3>& vertices, std::vector<std::array<int, 2>>& edges){
+//utility function to find level sets of stripes
+bool existsInVertexList(std::vector<Vector3>& vertices, Vector3& newVertex){
 
+  for (Vector3 v : vertices){
+    if (norm(v - newVertex) < 1e-8)
+      return true;
+  }
+  return false;
+
+}
+
+int find(std::vector<Vector3>& vertices, Vector3& newVertex){
+
+  for (int i = 0; i < vertices.size(); i++){
+    if (norm(vertices[i] - newVertex) < 1e-8){
+      return i;
+    }
+  }
+
+  return -1;
+
+}
+
+
+std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> removeCurveNetworkDuplicatedVertices(VertexPositionGeometry& globalGeometry, 
+                                                                                                std::vector<Vector3>& vertices, std::vector<std::array<int, 2>>& edges){
+
+                                                                                  
+  // SurfaceMesh& globalMesh = globalGeometry.mesh;
+  // // Map to store unique vertices and their indices
+  // std::unordered_map<Vector3, size_t> uniqueVertices;
+  // std::vector<size_t> vertexMapping(vertices.size(), -1);
+  // std::vector<Vector3> newVertices;
+  // double eps = 1e-8;
+
+  // // Identify unique vertices and build the mapping
+  // for (size_t i = 0; i < vertices.size(); ++i) {
+  //   Vector3 pos = vertices[i];
+  //   if (uniqueVertices.find(pos) == uniqueVertices.end()) {
+  //       // New unique vertex
+  //       uniqueVertices[pos] = newVertices.size();
+  //       vertexMapping[i] = newVertices.size();
+  //       newVertices.push_back(pos);
+  //     } else {
+  //       // Duplicate vertex, map to the unique one
+  //       vertexMapping[i] = uniqueVertices[pos];
+  //     }
+  // }
 
   SurfaceMesh& globalMesh = globalGeometry.mesh;
-  // Map to store unique vertices and their indices
-  std::unordered_map<Vector3, size_t> uniqueVertices;
+  std::vector<Vector3> uniqueVertices;
   std::vector<size_t> vertexMapping(vertices.size(), -1);
   std::vector<Vector3> newVertices;
   double eps = 1e-8;
@@ -591,15 +720,17 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> removeCurveNet
   // Identify unique vertices and build the mapping
   for (size_t i = 0; i < vertices.size(); ++i) {
     Vector3 pos = vertices[i];
-    if (uniqueVertices.find(pos) == uniqueVertices.end()) {
-        // New unique vertex
-        uniqueVertices[pos] = newVertices.size();
-        vertexMapping[i] = newVertices.size();
-        newVertices.push_back(pos);
-      } else {
-        // Duplicate vertex, map to the unique one
-        vertexMapping[i] = uniqueVertices[pos];
-      }
+    if (!existsInVertexList(uniqueVertices, pos)){
+      //New unique vertex
+      uniqueVertices.push_back(pos);
+      vertexMapping[i] = newVertices.size();
+      newVertices.push_back(pos);
+    } 
+    else {
+      // Duplicate vertex, map to the unique one
+      //vertexMapping[i] = uniqueVertices[pos];
+      vertexMapping[i] = find(uniqueVertices, pos);
+    }
   }
 
     // Create new edges with updated vertex indices
@@ -648,14 +779,14 @@ void findCurveNetworkConnectedComponents(VertexPositionGeometry& globalGeometry,
 
     // Print the connected components
     size_t componentIndex = 0;
-    for (const auto& comp : components) {
-        std::cout << "Component " << componentIndex++ << ": ";
-        for (size_t v : comp.second) {
-            std::cout << v << " ";
-        }
-        std::cout << std::endl;
-    }
-
+    std::cout << "number of components = " << components.size() << std::endl;
+    // for (const auto& comp : components) {
+    //     std::cout << "Component " << componentIndex++ << ": ";
+    //     for (size_t v : comp.second) {
+    //         std::cout << v << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
 }
 
 //-------------------------re-impleminting Knoppel's stripes-----------------------//
