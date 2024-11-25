@@ -2325,7 +2325,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
     psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (after subtracting)", edgeCurl);
     
-    while(numRuns < 3){
+    while(numRuns < 1){
         //new singularity pair iteration
         isoVal = findIsoValWithMaxAvgEdgeCurl(globalGeometry, V, F, globalTimeFunction, edgeCurl, hashedUsedIsoVals, stepSize);
         std::cout << "next isoVal = " << isoVal << std::endl;
@@ -2360,8 +2360,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             numRuns++;
             std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, 1.0 * period);
             std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, 1.0 * period);
-            courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numRuns - 1) + 
-                                                    " singularity insertions", positionsCourse, edgesCourse);
             //remove the duplicates from the curve network
             std::tie(uniquePos, uniqueEdges) = removeCurveNetworkDuplicatedVertices(globalGeometry, positionsCourse, edgesCourse);
             courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after duplicate removal " + std::to_string(numRuns - 1) + 
