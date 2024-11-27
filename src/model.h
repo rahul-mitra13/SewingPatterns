@@ -40,6 +40,9 @@ class Model{
         //b - constrained value of the edge
         std::vector<std::pair<int , int>> singularEdges; 
 
+        //edge singularities 
+        std::vector<int> edgeIndices;
+
         //specify all face indices (both smooth and singular)
         std::vector<int> faceIndices;
 
@@ -84,7 +87,10 @@ class Model{
         void setSingularVertexIndices(std::vector<std::pair<int, int>>& singularVertices);
 
         //set singular edge indices 
-        void setSingularEdges(std::vector<std::pair<int, int>> singularEdges);
+        void setSingularEdges(std::vector<std::pair<int, int>>& singularEdges);
+
+        //set edge indices 
+        void setEdgeIndices(std::vector<int>& edgeIndices);
 
         //set smooth face indices 
         void setSmoothFaceIndices(std::vector<int>& smoothFaces);
@@ -133,6 +139,9 @@ class Model{
 
         //get singular edges 
         std::vector<std::pair<int, int>> getSingularEdges();
+
+        //get edge indices 
+        std::vector<int> getEdgeIndices();
 
         //get all face indices
         std::vector<int> getFaceIndices();

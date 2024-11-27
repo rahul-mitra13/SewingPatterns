@@ -30,9 +30,14 @@ void Model::setSingularVertexIndices(std::vector<std::pair<int, int>>& singularV
     this->singularVertices = singularVertices;
 }
 
-void Model::setSingularEdges(std::vector<std::pair<int, int>> singularEdges){
+void Model::setSingularEdges(std::vector<std::pair<int, int>>& singularEdges){
 
     this->singularEdges = singularEdges;
+}
+
+void Model::setEdgeIndices(std::vector<int>& edgeIndices){
+
+    this->edgeIndices = edgeIndices;
 }
 
 void Model::setSmoothFaceIndices(std::vector<int>& smoothFaces){
@@ -117,6 +122,11 @@ std::vector<std::pair<int, int>> Model::getSingularVertices(){
 std::vector<std::pair<int, int>> Model::getSingularEdges(){
 
     return this->singularEdges;
+}
+
+std::vector<int> Model::getEdgeIndices(){
+
+    return this->edgeIndices;
 }
 
 std::vector<int> Model::getFaceIndices(){

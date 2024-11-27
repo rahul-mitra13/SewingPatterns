@@ -74,11 +74,26 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
 EdgeData<int> stripeIsoValEdges(EmbeddedGeometryInterface& geometry,
                                   const CornerData<double>& stripeValues,
                                   const FaceData<int>& stripesIndices, double period, polyscope::SurfaceMesh& psMesh);
+
+
+//find the connected components in a stripe pattern
+std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> findStripeConnectedComponents(VertexPositionGeometry& globalGeometry, 
+                                  EdgeLengthGeometry& gluedGeometry, 
+                                  const CornerData<double>& stripeValues,
+                                  const FaceData<int>& stripesIndices, double period,
+                                  std::map<int, int>& edgeMap,
+                                  std::unordered_map<size_t, std::vector<PolyLinePoint>>& 
+                                  components);
+
+//find a set of edge singularity pairs on the same isoline as the stripe patterns
+std::vector<std::pair<int, int>> findEdgeSingularityPairFromStripeIsoVals(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
+                                                            EdgeData<double>& edgeCurl, std::map<int, int>& edgeMap,
+                                                            std::unordered_map<size_t, std::vector<PolyLinePoint>>& components, int numPairs);
+
                                         
 //remove duplicate vertices in a curve network
 std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> removeCurveNetworkDuplicatedVertices(VertexPositionGeometry& globalGeometry, 
                                                                                                           std::vector<Vector3>& vertices, std::vector<std::array<int, 2>>& edges);
-
 
 //find connected components of a curve network
 void findCurveNetworkConnectedComponents(VertexPositionGeometry& globalGeometry,

@@ -662,11 +662,20 @@ std::vector<std::array<int, 2>> matchCrossings(const std::vector<std::vector<int
 }
 
 
-//utility function to find level sets of stripes
+//utility functions to find level sets of stripes
 bool existsInVertexList(std::vector<Vector3>& vertices, Vector3& newVertex){
 
   for (Vector3 v : vertices){
     if (norm(v - newVertex) < 1e-8)
+      return true;
+  }
+  return false;
+
+}
+bool existsInVertexList(std::vector<PolyLinePoint>& vertices, PolyLinePoint& p){
+
+  for (PolyLinePoint v : vertices){
+    if (norm(v.position - p.position) < 1e-8)
       return true;
   }
   return false;
@@ -685,9 +694,21 @@ int find(std::vector<Vector3>& vertices, Vector3& newVertex){
 
 }
 
+int find(std::vector<PolyLinePoint>& vertices, PolyLinePoint& p){
+
+  for (int i = 0; i < vertices.size(); i++){
+    if (norm(vertices[i].position - p.position) < 1e-8){
+      return i;
+    }
+  }
+
+  return -1;
+
+}
+
 
 std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> removeCurveNetworkDuplicatedVertices(VertexPositionGeometry& globalGeometry, 
-                                                                                                std::vector<Vector3>& vertices, std::vector<std::array<int, 2>>& edges){
+                                                                        std::vector<Vector3>& vertices, std::vector<std::array<int, 2>>& edges){
 
                                                                                   
   // SurfaceMesh& globalMesh = globalGeometry.mesh;
@@ -787,6 +808,200 @@ void findCurveNetworkConnectedComponents(VertexPositionGeometry& globalGeometry,
     //     }
     //     std::cout << std::endl;
     // }
+}
+
+std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> findStripeConnectedComponents(VertexPositionGeometry& globalGeometry, 
+                                  EdgeLengthGeometry& gluedGeometry, 
+                                  const CornerData<double>& stripeValues,
+                                  const FaceData<int>& stripesIndices, double period,
+                                  std::map<int, int>& edgeMap,
+                                  std::unordered_map<size_t, std::vector<PolyLinePoint>>& components){
+  
+  SurfaceMesh& globalMesh = globalGeometry.mesh; 
+  SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+  //clear out the map first 
+  components.clear();
+
+  globalGeometry.requireFaceIndices();
+  globalGeometry.requireVertexPositions();
+
+  //pertubation
+  double pert = 1e-8;
+
+  std::vector<PolyLinePoint> isoLinePoints;
+
+  HalfedgeData<std::vector<double>> halfedgeIsoValues = getHalfEdgeIsoValues(globalGeometry, stripeValues, stripesIndices, period);
+
+  //first generate all the points
+  for (Halfedge h : globalMesh.halfedges()){
+
+    if (h.face().isBoundaryLoop() || stripesIndices[h.face()] != 0) continue;//skip singular faces and boundary faces
+    std::vector<double> heSet = halfedgeIsoValues[h];
+
+    for (int i = 0; i < heSet.size(); i++){
+      double bary;
+      if (halfedgeContainsLevelSet(stripeValues[h.corner()], stripeValues[h.next().corner()], bary, heSet[i])){//this will always be true
+        //interpolating from tip to tail
+        Vector3 pos = (bary * globalGeometry.vertexPositions[h.tailVertex()] +
+                       (1 - bary) * globalGeometry.vertexPositions[h.tipVertex()]);
+        
+        PolyLinePoint currPoint;
+        currPoint.position = pos;
+        currPoint.f = h.face();
+        currPoint.e = h.edge();
+        currPoint.he = h;
+        currPoint.isoval = heSet[i];
+
+        isoLinePoints.push_back(currPoint);
+      }
+    }
+  }
+
+  std::vector<std::array<int, 2>> edges;
+  //now make the polyline 
+  for (int i = 0; i < isoLinePoints.size(); i++){
+    PolyLinePoint p1 = isoLinePoints[i];
+    //search for the point p1 should connect to
+    for (int j = 0; j < isoLinePoints.size(); j++){
+      PolyLinePoint p2 = isoLinePoints[j];
+      if (p1.f == p2.f && std::abs(p1.isoval - p2.isoval) < pert && i != j){
+        std::array<int, 2> edge = {i, j};
+        edges.push_back(edge);
+      }
+    }
+  }
+
+  //now remove all the duplicate points 
+  std::vector<PolyLinePoint> uniqueVertices;
+  std::vector<size_t> vertexMapping(isoLinePoints.size(), -1);
+  std::vector<PolyLinePoint> newVertices;
+  std::vector<Vector3> newVertexPositions;
+
+  // Identify unique vertices and build the mapping
+  for (size_t i = 0; i < isoLinePoints.size(); ++i) {
+    PolyLinePoint p = isoLinePoints[i];
+    if (!existsInVertexList(uniqueVertices, p)){
+      //New unique vertex
+      uniqueVertices.push_back(p);
+      vertexMapping[i] = newVertices.size();
+      newVertices.push_back(p);
+    } 
+    else {
+      vertexMapping[i] = find(uniqueVertices, p);
+    }
+  }
+
+  // Create new edges with updated vertex indices
+  std::vector<std::array<int, 2>> newEdges;
+  for (auto e : edges) {
+      int v1 = vertexMapping[e[0]];
+      int v2 = vertexMapping[e[1]];
+
+      // Avoid duplicate edges
+      if (v1 != v2) {
+          if (v1 > v2) std::swap(v1, v2); // Ensure consistent ordering
+          newEdges.emplace_back(std::array<int, 2>{v1, v2});
+      }
+  }
+
+  // Remove duplicate edges
+  std::sort(newEdges.begin(), newEdges.end());
+  newEdges.erase(std::unique(newEdges.begin(), newEdges.end()), newEdges.end());
+
+
+  //finally find the connected components
+  // Initialize disjoint set for vertices
+  DisjointSets vertexSets(newVertices.size());
+
+  // Union-find: process each edge to connect the vertices
+  for (auto e : newEdges) {
+    auto v1 = e[0];
+    auto v2 = e[1];
+    vertexSets.merge(v1, v2);
+  }
+  
+  // Map each set leader to its component
+  std::unordered_map<size_t, std::vector<size_t>> indexedComponents;
+
+  for (size_t v = 0; v < newVertices.size(); ++v) {
+    newVertexPositions.push_back(newVertices[v].position);
+    size_t leader = vertexSets.find(v);
+    indexedComponents[leader].push_back(v);
+  }
+
+  //reset the component index
+  size_t componentIndex = 0;
+  // std::cout << "number of components = " << indexedComponents.size() << std::endl;
+  for (const auto& comp : indexedComponents) {
+      //std::cout << "Component " << componentIndex++ << ": ";
+      componentIndex++;
+      for (size_t v : comp.second) {
+      //    std::cout << v << " ";
+          components[componentIndex].push_back(newVertices[v]);
+      }
+      //std::cout << std::endl;
+  }
+
+  return std::tie(newVertexPositions, newEdges);
+
+}
+
+//find a set of edge singularity pairs on the same isoline as the stripe patterns
+std::vector<std::pair<int, int>> findEdgeSingularityPairFromStripeIsoVals(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
+                                                            EdgeData<double>& edgeCurl, std::map<int, int>& edgeMap,
+                                                            std::unordered_map<size_t, std::vector<PolyLinePoint>>& components, int numPairs){
+  
+  //causing some malloc errors
+  //edge curl is in the global setting (maybe should do it in the glued setting)
+  //return top 3 pairs here?
+  SurfaceMesh& globalMesh = globalGeometry.mesh;
+  SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+  double eps = 1e-8;
+
+  //a map from edge curl to component id
+  std::vector<double> componentCurl(components.size());
+  std::map<int, size_t> edgeCurlToComponentId;
+
+  for (const auto &c : components){
+    std::vector<PolyLinePoint> vertices = c.second;
+    double curlSum = 0.0;
+    for (const auto &v : vertices){
+      curlSum += std::fabs(edgeCurl[v.e]);
+    }
+    double avgCurl = curlSum / vertices.size();
+    edgeCurlToComponentId[hashFloatQuantized(avgCurl)] = c.first;
+    componentCurl[c.first - 1] = avgCurl;
+    //componentCurl[c.first - 1] = curlSum;
+  }
+
+  std::sort(componentCurl.begin(), componentCurl.end(), std::greater<double>()); // Sort in descending order
+  componentCurl.resize(numPairs); // Keep only the top numPairs
+
+  for (double c : componentCurl){
+    std::cout << "component with max curl = " << edgeCurlToComponentId[hashFloatQuantized(c)] << std::endl;
+  }
+
+  std::vector<std::pair<int, int>> edgeSingularityPairs;
+
+  //now find the max and min curl edges on those components
+  for (const auto &c : componentCurl){
+    auto vertices = components[edgeCurlToComponentId[hashFloatQuantized(c)]];
+    double maxCurl = -DBL_MAX;
+    double minCurl = DBL_MAX;
+    int maxEdge, minEdge = -1;
+    for (const auto &v : vertices){
+      if (edgeCurl[v.e] > maxCurl){
+        maxCurl = edgeCurl[v.e];
+        maxEdge = v.e.getIndex();
+      }
+      if (edgeCurl[v.e] < minCurl){
+        minCurl = edgeCurl[v.e];
+        minEdge = v.e.getIndex();
+      }
+    }
+    edgeSingularityPairs.push_back(std::make_pair(maxEdge, minEdge));
+  }
+  return edgeSingularityPairs; 
 }
 
 //-------------------------re-impleminting Knoppel's stripes-----------------------//

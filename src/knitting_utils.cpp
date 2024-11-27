@@ -2185,6 +2185,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::map<int, int> hashedUsedIsoVals;
     //singular edges in the gurobi optimization
     std::vector<std::pair<int, int>> singularEdges;
+    //singular edges in the gurobi optimization (in a better representation)
+    std::vector<int> edgeIndices(gluedMesh.nEdges(), 0);
     //sing edge pairs (max/min curl edges)
     std::vector<std::pair<int, int>> singEdgePairs;
     //make a map of singular edges we've used so far 
@@ -2215,11 +2217,12 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     CornerData<double> stripeValuesSigmaCourse(gluedMesh);
     FaceData<int> stripeIndicesSigmaCourse(globalMesh);
     //stripe curve network information
-    std::vector<Vector3> positionsCourse;
-    std::vector<std::array<int, 2>> edgesCourse;
     //unique vertices and unique edges
     std::vector<Vector3> uniquePos;
     std::vector<std::array<int, 2>> uniqueEdges;
+    //conencted components identified by their component id 
+    std::unordered_map<size_t, std::vector<PolyLinePoint>> components;
+
 
     //isoval we'll be tracing
     double isoVal;
@@ -2237,6 +2240,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         grads.push_back(std::array<double, 3>{gradSigmaTilde[f][0], gradSigmaTilde[f][1], gradSigmaTilde[f][2]});
     }
     model.setFaceGradients(grads);
+    model.setEdgeIndices(edgeIndices);
 
     //find the step size to sample level sets at
     double avgSum = 0.;
@@ -2294,17 +2298,16 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //solve the model without any singularities 
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
     numRuns++;
-    std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, 1.0 * period);
-    std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, 1.0 * period);
-    //remove the duplicate vertices in the curve network
-    std::tie(uniquePos, uniqueEdges) = removeCurveNetworkDuplicatedVertices(globalGeometry, positionsCourse, edgesCourse);
-    auto courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after duplicate removal " + std::to_string(numRuns - 1) + 
+    std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
+    std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
+                                                                    edgeMap, components);
+    std::cout << "Size of components = " << components.size() << std::endl;
+    auto courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes " + std::to_string(numRuns - 1) + 
                                                     " singularity insertions", uniquePos, uniqueEdges);
-    //find the connected components in the unique graph
-    findCurveNetworkConnectedComponents(globalGeometry, uniquePos, uniqueEdges);
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
     gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
+
     //update the gradients for the next iteration of the model 
     model.setFaceGradients(gradSigmaTilde);
     std::cout << "distance from unit norm after " << std::to_string(numRuns - 1) << " singularity insertions " << computeDistanceFromUnitNorm(globalGeometry, gradSigmaTilde) << std::endl;
@@ -2324,29 +2327,35 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                     adjustedGradSigmaTilde, gluedOneRingMap);
     edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
     psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (after subtracting)", edgeCurl);
+
     
-    while(numRuns < 1){
+    
+    while(numRuns < 4){
         //new singularity pair iteration
-        isoVal = findIsoValWithMaxAvgEdgeCurl(globalGeometry, V, F, globalTimeFunction, edgeCurl, hashedUsedIsoVals, stepSize);
-        std::cout << "next isoVal = " << isoVal << std::endl;
-        //find edge singularity pair 
-        singEdgePairs = findEdgeSingularityPairs(globalGeometry, gluedGeometry,  V,  F,  edgeCurl,
-                                            globalTimeFunction, psMesh,
-                                            hashedUsedIsoVals, usedEdges, faceSingularities, 
-                                            isoVal, numRuns, false);
+        // isoVal = findIsoValWithMaxAvgEdgeCurl(globalGeometry, V, F, globalTimeFunction, edgeCurl, hashedUsedIsoVals, stepSize);
+        // std::cout << "next isoVal = " << isoVal << std::endl;
+        // //find edge singularity pair 
+        // singEdgePairs = findEdgeSingularityPairs(globalGeometry, gluedGeometry,  V,  F,  edgeCurl,
+        //                                     globalTimeFunction, psMesh,
+        //                                     hashedUsedIsoVals, usedEdges, faceSingularities, 
+        //                                     isoVal, numRuns, false);
+
+        //finding edge singularity pair
+        singEdgePairs = findEdgeSingularityPairFromStripeIsoVals(globalGeometry, gluedGeometry, 
+                                                                edgeCurl, edgeMap, components, 1);
+                
         for (std::pair<int, int> singEdgePair : singEdgePairs){
             Eigen::MatrixXd iV;
             Eigen::MatrixXd iE;
             std::vector<int> f;
-            std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, isoVal);
-            auto isoline = polyscope::registerCurveNetwork("Isoline for " + std::to_string(numRuns) + " singularity", iV, iE);
-            isoline -> setRadius(0.001);
-            isoline -> setEnabled(false);
             edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
             edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
+            edgeIndices[edgeMap[singEdgePair.first]] = -1;
+            edgeIndices[edgeMap[singEdgePair.second]] = 1;
             //pair of singular edges
             singularEdges.push_back(std::make_pair(edgeMap[singEdgePair.first], -1));
             singularEdges.push_back(std::make_pair(edgeMap[singEdgePair.second], 1));
+
             std::tie(globalPath, gluedPath) = constructEdgePath(globalGeometry, gluedGeometry, globalMesh.edge(singEdgePair.first), globalMesh.edge(singEdgePair.second),
                                         vertexMap, edgeMap, globalTimeFunctionGradientsNormalized, gluedHeWeights);
             //don't retake edges from another path
@@ -2355,14 +2364,15 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
             model.setEdgePathConstraints(edgePathConstraints);
             model.setSingularEdges(singularEdges);
+            model.setEdgeIndices(edgeIndices);
             //solve the model with 1 pair of  singularities 
             std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
             numRuns++;
-            std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, 1.0 * period);
-            std::tie(positionsCourse, edgesCourse) = generateIsoLines(globalGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, 1.0 * period);
-            //remove the duplicates from the curve network
-            std::tie(uniquePos, uniqueEdges) = removeCurveNetworkDuplicatedVertices(globalGeometry, positionsCourse, edgesCourse);
-            courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after duplicate removal " + std::to_string(numRuns - 1) + 
+            std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
+            std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
+                                                edgeMap, components);
+            std::cout << "Number of components after " << std::to_string(numRuns - 1) << " singularity insertions is " << components.size() << std::endl;
+            courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numRuns - 1) + 
                                                     " singularity insertions", uniquePos, uniqueEdges);
             courseStripes -> setRadius(0.001);
             courseStripes -> setEnabled(false);
@@ -2370,9 +2380,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             //update the gradients for the next round of the model 
             model.setFaceGradients(gradSigmaTilde);
             std::cout << "distance from unit norm after " << std::to_string(numRuns - 1) << " singularity insertions " << computeDistanceFromUnitNorm(globalGeometry, gradSigmaTilde) << std::endl;
-            //find the connected components in the unique graph
-            findCurveNetworkConnectedComponents(globalGeometry, uniquePos, uniqueEdges);
-
+    
             //compute curl quantities without accounting for impulse function
             vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
                                     gradSigmaTilde, gluedOneRingMap);
@@ -2388,6 +2396,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                     adjustedGradSigmaTilde, gluedOneRingMap);
             edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
             psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (after subtracting)", edgeCurl);
+            psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numRuns - 1) + " singularity insertion", edgeSingularities);
         }
         //add the isovalue we've used to the map
         hashedUsedIsoVals.insert({hashFloatQuantized(isoVal), 1});
@@ -2617,6 +2626,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
     double period = gbModel.getPeriod();
     std::vector<std::pair<int, int>> singularEdges = gbModel.getSingularEdges();
+    std::vector<int> edgeIndices = gbModel.getEdgeIndices();
     std::vector<std::array<double, 3>> comparisonGrad = gbModel.getFaceGradients();
     //require the face areas
     gluedGeometry.requireFaceAreas();
@@ -2673,16 +2683,13 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
 
         //constraint: 
         //specify singular halfedges and also specify that form values 
-        //are equal across non-singular halfedges
-        EdgeData<int> handled(gluedMesh, 0);
-        for (std::pair<int, int> p : singularEdges){
-            model.addConstr(sigma[gluedMesh.edge(p.first).halfedge().getIndex()] 
-                                    + sigma[gluedMesh.edge(p.first).halfedge().twin().getIndex()] ==  p.second * period);
-            handled[gluedMesh.edge(p.first)] = 1;
-        }
         for (Halfedge he : gluedMesh.halfedges()){
-            if (handled[he.edge()]) continue; //if the halfedge is already handled, continue
-            model.addConstr(sigma[he.getIndex()] == -1.0 * sigma[he.twin().getIndex()]);
+            if (edgeIndices[he.edge().getIndex()] != 0){
+                model.addConstr(sigma[he.getIndex()] + sigma[he.twin().getIndex()] == edgeIndices[he.edge().getIndex()] * period);
+            }
+            else{
+                model.addConstr(sigma[he.getIndex()] == -1.0 * sigma[he.twin().getIndex()]);
+            }
         }
 
         //constraint: add bdy-bdy path constraint 
@@ -2775,14 +2782,15 @@ std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeome
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
-    HalfedgeData<double> gluedOneForm(gluedMesh);;
+    HalfedgeData<double> gluedOneForm(gluedMesh);
     double objectiveVal;
     //query information from the model 
     std::vector<int> bdyEdges = gbModel.getBdyEdges();
     gluedGeometry.requireDECOperators();
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
     double period = gbModel.getPeriod();
-    std::vector<std::pair<int, int>> singularEdges = gbModel.getSingularEdges();
+    //std::vector<std::pair<int, int>> singularEdges = gbModel.getSingularEdges();
+    std::vector<int> edgeIndices = gbModel.getEdgeIndices();
     //require the face areas
     gluedGeometry.requireFaceAreas();
     //require edge lengths 
@@ -2834,16 +2842,13 @@ std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeome
 
         //constraint: 
         //specify singular halfedges and also specify that form values 
-        //are equal across non-singular halfedges
-        EdgeData<int> handled(gluedMesh, 0);
-        for (std::pair<int, int> p : singularEdges){
-            model.addConstr(sigma[gluedMesh.edge(p.first).halfedge().getIndex()] 
-                                    + sigma[gluedMesh.edge(p.first).halfedge().twin().getIndex()] ==  p.second * period);
-            handled[gluedMesh.edge(p.first)] = 1;
-        }
         for (Halfedge he : gluedMesh.halfedges()){
-            if (handled[he.edge()]) continue; //if the halfedge is already handled, continue
-            model.addConstr(sigma[he.getIndex()] == -1.0 * sigma[he.twin().getIndex()]);
+            if (edgeIndices[he.edge().getIndex()] != 0){
+                model.addConstr(sigma[he.getIndex()] + sigma[he.twin().getIndex()] == edgeIndices[he.edge().getIndex()] * period);
+            }
+            else{
+                model.addConstr(sigma[he.getIndex()] == -1.0 * sigma[he.twin().getIndex()]);
+            }
         }
 
     
@@ -3064,6 +3069,7 @@ VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, Edg
 
 //@debugging
 //average vertex curl onto edges
+//this should probably be in the glued mesh setting
 EdgeData<double> computeVertexAveragedEdgeCurl(VertexPositionGeometry& globalGeometry, VertexData<double>& vertexCurl){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
