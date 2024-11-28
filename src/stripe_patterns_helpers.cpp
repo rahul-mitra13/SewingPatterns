@@ -977,11 +977,11 @@ std::vector<std::pair<int, int>> findEdgeSingularityPairFromStripeIsoVals(Vertex
   std::sort(componentCurl.begin(), componentCurl.end(), std::greater<double>()); // Sort in descending order
   componentCurl.resize(numPairs); // Keep only the top numPairs
 
-  for (double c : componentCurl){
-    std::cout << "component with max curl = " << edgeCurlToComponentId[hashFloatQuantized(c)] << std::endl;
-  }
-
   std::vector<std::pair<int, int>> edgeSingularityPairs;
+  std::cout << "numPairs = " << numPairs << std::endl;
+  std::cout << "size of component curl = " << componentCurl.size() << std::endl;
+  std::cout << "number of components = " << components.size() << std::endl;
+  std::cout << "size of edge curl to component Id = " << edgeCurlToComponentId.size() << std::endl;
 
   //now find the max and min curl edges on those components
   for (const auto &c : componentCurl){

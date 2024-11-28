@@ -2132,6 +2132,17 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Eige
     return maxDeviationIsoVal;
 }
 
+//@clean 
+//check if an edge pair is valid or not given a list of edge singularity pairs 
+bool isValidEdgePair(VertexPositionGeometry& globalGeometry, EdgeData<double>& edgeSingularities, std::pair<int, int>& p){
+    
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    if (edgeSingularities[p.first] != 0 || edgeSingularities[p.second] != 0){
+        return false;
+    }
+    return true;
+}
+
 
 
 
@@ -2209,8 +2220,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<std::pair<std::vector<double>, double>> edgePathConstraints;
     //objective values
     double oldObj, currObj;
+    //epsilon values 
+    double eps = 1e-8;
     //distance from unit norm 
-    double oldDistance = DBL_MAX;
+    double oldDistance = 0.;
     double newDistance = 0.;
     //striping information 
     //global data
@@ -2226,8 +2239,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     //isoval we'll be tracing
     double isoVal;
-    //skip flag - to skip the current iteration
-    bool skipFlag = false;
+    //break flag - to stop searching for singularities
+    bool toBreak = false;
 
     //set the period for the model 
     model.setPeriod(period);
@@ -2310,8 +2323,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     //update the gradients for the next iteration of the model 
     model.setFaceGradients(gradSigmaTilde);
-    std::cout << "distance from unit norm after " << std::to_string(numRuns - 1) << " singularity insertions " << computeDistanceFromUnitNorm(globalGeometry, gradSigmaTilde) << std::endl;
-    
+    newDistance = computeDistanceFromUnitNorm(globalGeometry, gradSigmaTilde);
+    std::cout << "distance from unit norm after " << std::to_string(numRuns - 1) << " singularity insertion " << newDistance << std::endl;
+    oldDistance = newDistance;
+
     //compute curl quantities without impulse function
     vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
                                     gradSigmaTilde, gluedOneRingMap);
@@ -2327,10 +2342,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                     adjustedGradSigmaTilde, gluedOneRingMap);
     edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
     psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (after subtracting)", edgeCurl);
-
-    
-    
-    while(numRuns < 4){
+    int numSingularities = 0;
+    while(true){
         //new singularity pair iteration
         // isoVal = findIsoValWithMaxAvgEdgeCurl(globalGeometry, V, F, globalTimeFunction, edgeCurl, hashedUsedIsoVals, stepSize);
         // std::cout << "next isoVal = " << isoVal << std::endl;
@@ -2342,64 +2355,110 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
         //finding edge singularity pair
         singEdgePairs = findEdgeSingularityPairFromStripeIsoVals(globalGeometry, gluedGeometry, 
-                                                                edgeCurl, edgeMap, components, 1);
-                
+                                                                edgeCurl, edgeMap, components, 15);
+        std::cout << "All edge pairs:  " << std::endl;
         for (std::pair<int, int> singEdgePair : singEdgePairs){
-            Eigen::MatrixXd iV;
-            Eigen::MatrixXd iE;
-            std::vector<int> f;
-            edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
-            edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
-            edgeIndices[edgeMap[singEdgePair.first]] = -1;
-            edgeIndices[edgeMap[singEdgePair.second]] = 1;
-            //pair of singular edges
-            singularEdges.push_back(std::make_pair(edgeMap[singEdgePair.first], -1));
-            singularEdges.push_back(std::make_pair(edgeMap[singEdgePair.second], 1));
-
+            std::cout << "pair: " << singEdgePair.first << ", " << singEdgePair.second << std::endl;
+        }
+        std::cout << "------------------------" << std::endl;
+        int numSkips = 0;
+        int maxSkips = 15;
+        std::cout << "size of components = " << components.size() << std::endl;
+        for (std::pair<int, int> singEdgePair : singEdgePairs){
+            if (!isValidEdgePair(globalGeometry, edgeSingularities, singEdgePair)){
+                std::cout << "pair = " << singEdgePair.first << ", " << singEdgePair.second << std::endl;
+                std::cout << "Invalid edge pair. Trying next pair...." << std::endl;
+                //try the top pairs
+                numSkips++;
+                if (numSkips == maxSkips){//we've exhausted all possible pairs and there is no valid pair left
+                    toBreak = true;
+                    break;
+                }
+                else{
+                    continue;//skip edge singularity pairs that are invalid
+                }
+            }
+            //test model 
+            //to test a new pair of singularities
+            Model testModel = model; 
+            std::vector<std::pair<std::vector<double>, double>> testEdgePathConstraints = edgePathConstraints;
+            std::vector<int> testEdgeIndices = edgeIndices;
+            testEdgeIndices[edgeMap[singEdgePair.first]] = -1;
+            testEdgeIndices[edgeMap[singEdgePair.second]] = 1;
             std::tie(globalPath, gluedPath) = constructEdgePath(globalGeometry, gluedGeometry, globalMesh.edge(singEdgePair.first), globalMesh.edge(singEdgePair.second),
                                         vertexMap, edgeMap, globalTimeFunctionGradientsNormalized, gluedHeWeights);
-            //don't retake edges from another path
-            updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, gluedHeWeights);
-            psMesh.addEdgeScalarQuantity("path for " + std::to_string(numRuns) + " singularity", globalPath);
-            edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
-            model.setEdgePathConstraints(edgePathConstraints);
-            model.setSingularEdges(singularEdges);
-            model.setEdgeIndices(edgeIndices);
-            //solve the model with 1 pair of  singularities 
-            std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
+            testEdgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
+            testModel.setEdgePathConstraints(edgePathConstraints);
+            testModel.setEdgeIndices(testEdgeIndices);
+            
+            //solve the model with singularities
+            std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, testModel, vertexMap, G, psMesh);
             numRuns++;
-            std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
-            std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
-                                                edgeMap, components);
-            std::cout << "Number of components after " << std::to_string(numRuns - 1) << " singularity insertions is " << components.size() << std::endl;
-            courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numRuns - 1) + 
-                                                    " singularity insertions", uniquePos, uniqueEdges);
-            courseStripes -> setRadius(0.001);
-            courseStripes -> setEnabled(false);
             gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
-            //update the gradients for the next round of the model 
-            model.setFaceGradients(gradSigmaTilde);
-            std::cout << "distance from unit norm after " << std::to_string(numRuns - 1) << " singularity insertions " << computeDistanceFromUnitNorm(globalGeometry, gradSigmaTilde) << std::endl;
-    
-            //compute curl quantities without accounting for impulse function
-            vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
+            newDistance = computeDistanceFromUnitNorm(globalGeometry, gradSigmaTilde);
+            if (newDistance > oldDistance){
+                std::cout << "norm is not improving. Trying the next top pair... " << std::endl;
+                numSkips++;
+                if (numSkips == maxSkips){//we've exhausted all possible pairs and nothing is improving the objective
+                    std::cout << "breaking after " << std::to_string(numRuns - 2) << " singularity insertions " << std::endl;
+                    std::cout << "newDistance = " << newDistance << std::endl;
+                    std::cout << "oldDistance = " << oldDistance << std::endl;
+                    toBreak = true;
+                    break;
+                }
+                continue;
+            }
+            else{
+                numSingularities++;
+                //gotten to a valid pair of edge indices that improves the objective
+                //pair of singular edges
+                edgeIndices[edgeMap[singEdgePair.first]] = -1;
+                edgeIndices[edgeMap[singEdgePair.second]] = 1;
+                //don't retake edges from another path
+                updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, gluedHeWeights);
+                psMesh.addEdgeScalarQuantity("path for " + std::to_string(numSingularities) + " singularity", globalPath);
+                edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
+                //model.setEdgePathConstraints(edgePathConstraints);
+                model.setEdgeIndices(edgeIndices);
+                std::cout << "not breaking after " << std::to_string(numSingularities) << " singularity insertions " << std::endl;
+                std::cout << "newDistance = " << newDistance << std::endl;
+                std::cout << "oldDistance = " << oldDistance << std::endl;
+                oldDistance = newDistance;
+                edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
+                edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
+                courseOneFormGrad = gradSigmaTilde;
+                std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
+                std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
+                                                edgeMap, components);
+                std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
+                courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numSingularities) + 
+                                                    " singularity insertions", uniquePos, uniqueEdges);
+                courseStripes -> setRadius(0.001);
+                courseStripes -> setEnabled(false);
+                //update the gradients for the next round of the model 
+                model.setFaceGradients(gradSigmaTilde);
+                //compute curl quantities without accounting for impulse function
+                vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
                                     gradSigmaTilde, gluedOneRingMap);
-            edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
-            psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (before subtracting)", edgeCurl);
-            //compute virtual sigma
-            std::tie(virtualSigmaTilde, virtualSigmaObj) = computeVirtualSigma(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
-            //subtract off the impulse function
-            gluedSigmaTilde = gluedSigmaTilde - virtualSigmaTilde;
-            adjustedGradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
-            //compute curl quantities after accounting for impulse function
-            vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
+                edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
+                psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (before subtracting)", edgeCurl);
+                //compute virtual sigma
+                std::tie(virtualSigmaTilde, virtualSigmaObj) = computeVirtualSigma(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
+                //subtract off the impulse function
+                gluedSigmaTilde = gluedSigmaTilde - virtualSigmaTilde;
+                adjustedGradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
+                //compute curl quantities after accounting for impulse function
+                vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
                                     adjustedGradSigmaTilde, gluedOneRingMap);
-            edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
-            psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (after subtracting)", edgeCurl);
-            psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numRuns - 1) + " singularity insertion", edgeSingularities);
+                edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
+                psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (after subtracting)", edgeCurl);
+                psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numSingularities) + " singularity insertion", edgeSingularities);
+                break;
+            }
         }
         //add the isovalue we've used to the map
-        hashedUsedIsoVals.insert({hashFloatQuantized(isoVal), 1});
+        //hashedUsedIsoVals.insert({hashFloatQuantized(isoVal), 1});
+        if (toBreak) break;//we are no longer improving the distance to unit norm
 
     }
 
@@ -2606,7 +2665,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //psMesh.addFaceScalarQuantity("non-harmonic face curl after " + std::to_string(numRuns - 1) + " singularities (after subtracting)", faceCurl);
     */
 
-    courseOneFormGrad = gradSigmaTilde;
+    std::cout << "Number of singularities inserted = " << numSingularities << std::endl;
     return std::tie(stripeValuesSigmaCourse, edgeSingularities);
     
 
@@ -2719,6 +2778,13 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
         std::vector<std::vector<GRBLinExpr>> gradU(gluedMesh.nFaces(), std::vector<GRBLinExpr>(3));
         for (Face f : gluedMesh.faces()){
 
+            //normalize the comparison gradient
+            // double length = sqrt(pow(comparisonGrad[f.getIndex()][0], 2) + pow(comparisonGrad[f.getIndex()][1], 2) + 
+            //                         pow(comparisonGrad[f.getIndex()][2], 2));
+            // comparisonGrad[f.getIndex()][0] = comparisonGrad[f.getIndex()][0]/length;
+            // comparisonGrad[f.getIndex()][1] = comparisonGrad[f.getIndex()][1]/length;
+            // comparisonGrad[f.getIndex()][2] = comparisonGrad[f.getIndex()][2]/length;
+            
             u[f.halfedge().vertex().getIndex()] = 0.0;
             u[f.halfedge().next().vertex().getIndex()] = (sigma[f.halfedge().getIndex()]) - (nP[f.getIndex()]/3.0);
             u[f.halfedge().next().next().vertex().getIndex()] = (sigma[f.halfedge().getIndex()] + sigma[f.halfedge().next().getIndex()]) - ((2.0 * nP[f.getIndex()])/3.0);
@@ -2748,8 +2814,10 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
         GRBQuadExpr obj = 0;        
     
 
-        //setting the objective to be min ||\delta sigma - \nabla h / ||\nabla h|| ||^2
+        //setting the objective to be min ||\delta sigma - \nabla h||^2
         for (Face f : gluedMesh.faces()){
+            //this is comparing to the non-normalized previous iterate 
+            //how is it getting closer to unit norm?
             obj +=  ((gradU[f.getIndex()][0] - comparisonGrad[f.getIndex()][0]) * (gradU[f.getIndex()][0] - comparisonGrad[f.getIndex()][0])) 
                     + ((gradU[f.getIndex()][1] - comparisonGrad[f.getIndex()][1]) * (gradU[f.getIndex()][1] - comparisonGrad[f.getIndex()][1])) 
                     + ((gradU[f.getIndex()][2] - comparisonGrad[f.getIndex()][2]) * (gradU[f.getIndex()][2] - comparisonGrad[f.getIndex()][2]));  
