@@ -1878,7 +1878,28 @@ std::vector<std::pair<int, int>> findFaceSingularityPairs(VertexPositionGeometry
     return singFacePairs;
 }
 
-//find edge singularity pair 
+//find edge singularity pairs 
+//this method finds the max curl edges and finds an edge on the same isoline of the time function 
+//of the opposite sign
+std::vector<std::pair<int, int>> findEdgeSingularityPairs(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, EdgeData<double>& curl,
+                                            VertexData<double>& globalTimeFunction, std::map<int, int>& hashedUsedIsoVals, 
+                                            std::map<int, int>& usedEdges, int numSingularityPairs){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+  
+    std::map<double, int> curlToEdgeIndex;
+    for (Edge e : globalMesh.edges()){
+        curlToEdgeIndex[curl[e]] = e.getIndex();
+    }
+    //find top edges here
+    //then average iso value on that edge
+    //find another edge on the same time function isovalue (and on the same connected component)
+
+}
+
+//find edge singularity pairs 
+//this method samples isolines of the time function 
 std::vector<std::pair<int, int>> findEdgeSingularityPairs(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, EdgeData<double>& curl,
                                             VertexData<double>& globalTimeFunction, polyscope::SurfaceMesh& psMesh,
                                             std::map<int, int>& hashedUsedIsoVals, std::map<int, int>& usedEdges, FaceData<double>& faceSingularities, 
@@ -2355,14 +2376,14 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
         //finding edge singularity pair
         singEdgePairs = findEdgeSingularityPairFromStripeIsoVals(globalGeometry, gluedGeometry, 
-                                                                edgeCurl, edgeMap, components, 15);
+                                                                edgeCurl, edgeMap, components, 5);
         std::cout << "All edge pairs:  " << std::endl;
         for (std::pair<int, int> singEdgePair : singEdgePairs){
             std::cout << "pair: " << singEdgePair.first << ", " << singEdgePair.second << std::endl;
         }
         std::cout << "------------------------" << std::endl;
         int numSkips = 0;
-        int maxSkips = 15;
+        int maxSkips = 5;
         std::cout << "size of components = " << components.size() << std::endl;
         for (std::pair<int, int> singEdgePair : singEdgePairs){
             if (!isValidEdgePair(globalGeometry, edgeSingularities, singEdgePair)){

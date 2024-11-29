@@ -200,6 +200,15 @@ std::vector<std::pair<int, int>> findEdgeSingularityPairs(VertexPositionGeometry
                                             double isoVal, int numPairs, bool useAllEdges);
 
 
+//@debugging
+//find edge singularity pairs 
+//this method finds the max curl edges and finds an edge on the same isoline of the time function 
+//of the opposite sign
+std::vector<std::pair<int, int>> findEdgeSingularityPairs(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, EdgeData<double>& curl,
+                                            VertexData<double>& globalTimeFunction, std::map<int, int>& hashedUsedIsoVals, 
+                                            std::map<int, int>& usedEdges, int numSingularityPairs);
+
+
 //@clean
 //get the vertices (of a curve network), edges (of a curve network) and faces that a particular isovalue of the time function passes through 
 //generate isolines for the time function given a specific isoVal

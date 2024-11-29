@@ -158,7 +158,7 @@ int main(int argc, char **argv) {
   //run sanity checks
   std::tie(globalMesh, globalGeometry) = readManifoldSurfaceMesh(data["model_path"]);
   //messes up edge indexing
-  fixDelaunay(*globalMesh, *globalGeometry); // we make the mesh approximately Delaunay
+  //fixDelaunay(*globalMesh, *globalGeometry); // we make the mesh approximately Delaunay
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometry);
   igl::grad(V,F,grad);
 
