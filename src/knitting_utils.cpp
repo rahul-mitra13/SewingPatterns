@@ -1986,10 +1986,10 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
 
     while (curr < end){
 
-        if (hashedUsedIsoVals.count(hashFloatQuantized(curr)) > 0){
-            curr += stepSize;
-            continue;
-        }
+        // if (hashedUsedIsoVals.count(hashFloatQuantized(curr)) > 0){
+        //     curr += stepSize;
+        //     continue;
+        // }
 
         Eigen::MatrixXd iV;
         Eigen::MatrixXd iE;
@@ -2587,9 +2587,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             if (!isValidEdgePair(globalGeometry, edgeSingularities, singEdgePair)){
                 std::cout << "pair = " << singEdgePair.first << ", " << singEdgePair.second << std::endl;
                 std::cout << "Invalid edge pair. Trying next pair...." << std::endl;
+                std::cout << "numSkips = " << numSkips << std::endl;
                 //try the top pairs
                 numSkips++;
-                if (numSkips == maxSkips){//we've exhausted all possible pairs and there is no valid pair left
+                if (numSkips >= maxSkips){//we've exhausted all possible pairs and there is no valid pair left
                     toBreak = true;
                     break;
                 }
@@ -2620,7 +2621,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 std::cout << "oldDistance = " << oldDistance << std::endl;
                 std::cout << "norm is not improving. Trying the next top pair... " << std::endl;
                 numSkips++;
-                if (numSkips == maxSkips){//we've exhausted all possible pairs and nothing is improving the objective
+                if (numSkips >= maxSkips){//we've exhausted all possible pairs and nothing is improving the objective
                     std::cout << "breaking after " << std::to_string(numRuns - 2) << " singularity attempts " << std::endl;
                     std::cout << "newDistance = " << newDistance << std::endl;
                     std::cout << "oldDistance = " << oldDistance << std::endl;
