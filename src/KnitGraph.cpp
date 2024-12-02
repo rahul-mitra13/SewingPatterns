@@ -31,7 +31,14 @@ void KnitGraph::buildGraph(){
     //merge vertices together 
     epsilonMerging();
 
+    //reorder vertex indices
+    makeRealVertices();
+    
+    //render the knit graph
     renderGraph();
+
+    //make the obj
+    makeObj();
 
 }
 
@@ -332,47 +339,29 @@ void KnitGraph::connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices){
 }
 
 void KnitGraph::renderGraph(){
-
-    std::vector<std::array<int, 2>> edgesVirtual;
-    std::vector<Vector3> positionsVirtual;
-    //query the vertex positons from the barycentric coordinates
-    for (knitGraphVertex &v : vertices){
-        //if (v.isVirtual) continue;
-        positionsVirtual.push_back(v.position);
-        
-        if (v.row_out != -1)//row out is set
-        edgesVirtual.push_back(std::array<int, 2>{v.id, v.row_out});
-        if (v.col_out[0] != -1)//col out is set 
-        edgesVirtual.push_back(std::array<int, 2>{v.id, v.col_out[0]});
-    }
-
-    auto graph = polyscope::registerCurveNetwork("Virtual knit graph vertices", positionsVirtual, edgesVirtual);
-    graph -> setRadius(0.001);
-    graph -> setEnabled(false);
-
-    std::vector<Vector3> positionsReal;
-    std::vector<std::array<int,2>> edgesReal;
-    std::vector<int> faces;
-
+    
     //gonna be a lot of repetition but it's okay I guess
-    for (auto &v : vertices){
-        if (v.isVirtual) continue;
-        if (v.row_out != -1 && vertices[v.row_out].row_in == v.id && !vertices[v.row_out].isVirtual){
-            positionsReal.push_back(v.position);
-            positionsReal.push_back(vertices[v.row_out].position);
-            
+    for (auto &v : realVertices){
+        if (v.row_out != -1 && realVertices[v.row_out].row_in == v.id){
+            vertexPositions.push_back(v.position);
+            vertexPositions.push_back(realVertices[v.row_out].position);
         }
-        if (v.col_out[0] != -1 && vertices[v.col_out[0]].col_in[0] == v.id && !vertices[v.col_out[0]].isVirtual){
-            positionsReal.push_back(v.position);
-            positionsReal.push_back(vertices[v.col_out[0]].position);
-           
+        if (v.col_out[0] != -1 && realVertices[v.col_out[0]].col_in[0] == v.id){
+            vertexPositions.push_back(v.position);
+            vertexPositions.push_back(realVertices[v.col_out[0]].position);
         }
-    }
-    for (int i = 0; i < positionsReal.size(); i+=2){
-        edgesReal.push_back({i, i + 1});
+
+        if (v.col_out[1] != -1 && realVertices[v.col_out[1]].col_in[1] == v.id){
+            vertexPositions.push_back(v.position);
+            vertexPositions.push_back(realVertices[v.col_out[1]].position);
+
+        }
     }
 
-    polyscope::registerCurveNetwork("Real knit graph vertices ", positionsReal, edgesReal);
+    for (int i = 0; i < vertexPositions.size(); i+=2){
+        edges.push_back({i, i + 1});
+    }
+    polyscope::registerCurveNetwork("Real knit graph vertices ", vertexPositions, edges);
 }
 
 //perform epsilon merging to 
@@ -383,10 +372,11 @@ void KnitGraph::epsilonMerging(){
     const double eps = 1e-5 * period;
     for (knitGraphVertex &v : vertices) {
         //skip singular edges in the intial merging
-        if (v.edge.has_value() && (std::fabs(courseSingularEdges[v.edge.value()]) > 0 || std::fabs(waleSingularEdges[v.edge.value()]) > 0)){ 
-            std::cout << "skipping singular edge " << v.edge.value() << std::endl;
-            continue;
-        }
+        //skip singular edges in the intial merging
+        // if (v.edge.has_value() && (std::fabs(courseSingularEdges[v.edge.value()]) > 0 || std::fabs(waleSingularEdges[v.edge.value()]) > 0)){ 
+        //     std::cout << "skipping singular edge " << v.edge.value() << std::endl;
+        //     continue;
+        // }
         // find clusters for all vertices that have not been handled
         if (!v.hasBeenHandled) {
             auto vCluster = findCluster(v, eps);
@@ -522,13 +512,138 @@ void KnitGraph::mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps)
 
     }
 
+    //finally, removing any lingering connections to virtual vertices for the real vertices 
+    for (auto &v : vertices){
+        if (!v.isVirtual){
+            if (vertices[v.row_out].isVirtual) v.row_out = -1;
+            if (vertices[v.row_in].isVirtual) v.row_in = -1;
+            if (vertices[v.col_out[0]].isVirtual) v.col_out[0] = -1;
+            if (vertices[v.col_in[0]].isVirtual) v.col_in[0] = -1;
+        }
+    }
+
 }
+
+void KnitGraph::makeRealVertices(){
+
+    //first re-order indices in the graph
+    //convert graph indices to autoknit txt format 
+    std::map<int, int> mp;
+    int i = 0;
+    for (knitGraphVertex& v: vertices){
+        if (v.isVirtual) continue;//only handle real vertices
+        //insert real vertices into the map
+        mp.insert({v.id, i++});
+    }
+
+    int id = -1;
+    int row_in = -1;
+    int row_out = -1;
+    int col_in_1 = -1;
+    int col_in_2 = -1;
+    int col_out_1 = -1;
+    int col_out_2 = -1;
+
+    //resize the real vertices
+    realVertices.resize(mp.size());
+
+    //update the ids in the knit graph
+    for (knitGraphVertex& v : vertices){
+        if (v.isVirtual) continue;//only handle real vertices
+        auto it = mp.find(v.id);
+        id = it -> second;//new id
+
+        if (v.row_in == -1){//row_in is unset
+            row_in = -1;
+        }
+        else{
+            it = mp.find(v.row_in);//find the row_in from the original graph
+            row_in = it -> second;
+        }
+
+        if (v.row_out == -1){//row_out is unset
+            row_out = -1;
+        }
+        else{
+            it = mp.find(v.row_out);//find the row out from the original graph
+            row_out = it -> second;
+        }
+
+        if (v.col_in[0] == -1){//col_in_1 is unset
+            col_in_1 = -1;
+        }
+        else{
+            it = mp.find(v.col_in[0]);//find the col_in_1 from the orginal graph
+            col_in_1 = it -> second;
+        }
+
+        if (v.col_in[1] == -1){//col_in_2 is unset
+            col_in_2 = -1;
+        }
+        else{
+            it = mp.find(v.col_in[1]);//find the col_in_1 from the orginal graph
+            col_in_2 = it -> second;
+        }
+
+        if (v.col_out[0] == -1){//col_out_1 is unset
+            col_out_1 = -1;
+        }
+        else{
+            it = mp.find(v.col_out[0]);//find the col_out_1 from the orginal graph
+            col_out_1 = it -> second;
+        }
+
+        if (v.col_out[1] == -1){//col_out_2 is unset
+            col_out_2 = -1;
+        }
+        else{
+            it = mp.find(v.col_out[1]);//find the col_out_1 from the orginal graph
+            col_out_2 = it -> second;
+        }
+
+        //update the info
+        v.id = id;
+        v.row_in = row_in;
+        v.row_out = row_out;
+        v.col_in[0] = col_in_1;
+        v.col_in[1] = col_in_2;
+        v.col_out[0] = col_out_1;
+        v.col_out[1] = col_out_2;
+        //add the updated id vertex to the vector of real vertices
+        realVertices[v.id] = v;
+    }
+}
+
 
 //make obj for yarn-level rendering
 void KnitGraph::makeObj(){
 
-    std::cout << "In making obj function " << std::endl;
+    std::vector<Vector3> positions;
+    std::vector<std::vector<int>> faces;
+    std::vector<std::vector<int>> edges;
+    for (knitGraphVertex v : realVertices){
+        positions.push_back(v.position);
+        //skip short-rows for now
+        if (v.row_out == -1) continue;
+        //skip increas/decreases for now
+        if (v.col_out[0] == -1) continue;
+        //this is your standard quad face
+        std::vector<int> currFace = std::vector<int>{v.id + 1, v.row_in + 1, realVertices[v.row_in].col_out[0] + 1, v.col_out[0] + 1};
+        edges.push_back(std::vector<int>{0, 1, 2, 1});
+        faces.push_back(currFace);
+    }
 
+    std::ofstream outfile("render.obj");
+    
+    for (auto p : positions){
+        outfile << "v " << p.x << " " << p.y << " " << p.z << std::endl;
+    }
+    for (auto f : faces){
+        outfile << "f " << f[0] << " " << f[1] << " " << f[2] << " " << f[3] << std::endl;
+    }
+    for (auto e : edges){
+        outfile << "e " << e[0] << " " << e[1] << " " << e[2] << " " << e[3] << std::endl;            
+    }
 }
 
 
@@ -543,6 +658,6 @@ int KnitGraph::hashFloat(double value) {
 //get a knitgraph vertex by id
 knitGraphVertex& KnitGraph::get(int id){
         
-    return vertices[id];
+   return vertices[id];
 
 }

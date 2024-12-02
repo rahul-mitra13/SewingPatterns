@@ -1,5 +1,14 @@
 #include <vector>
 #pragma once
+
+//geometry central includes
+#include "geometrycentral/surface/meshio.h"
+#include "geometrycentral/surface/vertex_position_geometry.h"
+#include "geometrycentral/surface/edge_length_geometry.h"
+
+using namespace geometrycentral;
+using namespace geometrycentral::surface;
+
 class Model{
 
     private:
@@ -30,6 +39,9 @@ class Model{
         //a - index of the edge 
         //b - constrained value of the edge
         std::vector<std::pair<int , int>> singularEdges; 
+
+        //edge singularities 
+        std::vector<int> edgeIndices;
 
         //specify all face indices (both smooth and singular)
         std::vector<int> faceIndices;
@@ -75,7 +87,10 @@ class Model{
         void setSingularVertexIndices(std::vector<std::pair<int, int>>& singularVertices);
 
         //set singular edge indices 
-        void setSingularEdges(std::vector<std::pair<int, int>> singularEdges);
+        void setSingularEdges(std::vector<std::pair<int, int>>& singularEdges);
+
+        //set edge indices 
+        void setEdgeIndices(std::vector<int>& edgeIndices);
 
         //set smooth face indices 
         void setSmoothFaceIndices(std::vector<int>& smoothFaces);
@@ -91,6 +106,9 @@ class Model{
 
         //set face gradients 
         void setFaceGradients(std::vector<std::array<double, 3>>& faceGradients);
+
+        //set face gradients using gc FaceData<Vector3>
+        void setFaceGradients(FaceData<Vector3>& faceGradients);
 
         //set edge mappings 
         void setEdgeMappingsPairs(std::vector<std::pair<int, int>>& edgeMappingsPairs);
@@ -121,6 +139,9 @@ class Model{
 
         //get singular edges 
         std::vector<std::pair<int, int>> getSingularEdges();
+
+        //get edge indices 
+        std::vector<int> getEdgeIndices();
 
         //get all face indices
         std::vector<int> getFaceIndices();

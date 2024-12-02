@@ -99,14 +99,11 @@ void showStripePatterns(){
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
   EdgeData<double> courseSingularEdgesGlobal(globalGeometry -> mesh);
-  // std::tie(courseStripeValues, courseSingularEdgesGlobal) = harmonic1FormImpl(*globalGeometry, *gluedELG, timeFunctionGlued, timeFunctionGradientGlobalNormalized, gluedOneRingMap,
-  //                                                            vertexMap, edgeMap, edgeMappingsPairs, *globalPSMesh, globalBdyConditions, period);
-
   G = grad;
   FaceData<Vector3> courseOneFormGrad(globalGeometry -> mesh);
   std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
-                                                                    globalBdyConditions, period, V, F, G, courseOneFormGrad);
+                                                                    globalBdyConditions, period, V, F, G, courseOneFormGrad, gluedOneRingMap);
 
   std::tie(courseStripeValues, courseSingularEdgesGlobal);
 
@@ -132,20 +129,19 @@ void showStripePatterns(){
   waleStripes -> setRadius(0.001);
   waleStripes -> setEnabled(false);
 
-  //generate the knit graph
-  // KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
-  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-  //                     edgeMap);
-  // graph.buildGraph();
 
-  //------------------//
-  //visualize vertex curl 
-  //compute curl per vertex of gradient field (in the global setting)
-  VertexData<double> vertexCurl = computeVertexCurl(*globalGeometry, *gluedELG, timeFunctionGradientGlobalNormalized, gluedOneRingMap);
-  globalPSMesh->addVertexScalarQuantity("vertex curl", vertexCurl);
-  //visualize edge curl from vertex curl
-  EdgeData<double> edgeCurl = computeVertexAveragedEdgeCurl(*globalGeometry, vertexCurl);
-  globalPSMesh->addEdgeScalarQuantity("edge curl by averaging vertex curl", edgeCurl);
+  //show vertex curl and edge curl of normalized time function gradient
+  // VertexData<double> vertexCurl = computeVertexCurl(*globalGeometry, *gluedELG, 
+  //                                   timeFunctionGradientGlobalNormalized, gluedOneRingMap);
+  // EdgeData<double> edgeCurl = computeVertexAveragedEdgeCurl(*globalGeometry, vertexCurl);
+  // globalPSMesh->addVertexScalarQuantity("normalized time function gradient vertex curl", vertexCurl);
+  // globalPSMesh->addEdgeScalarQuantity("normalized time function gradient edge curl", edgeCurl);
+
+  //generate the knit graph
+  KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
+                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+                      edgeMap);
+  graph.buildGraph();
 
 }
 

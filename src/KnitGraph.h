@@ -14,12 +14,14 @@
 #pragma once 
 #include <vector> 
 #include <optional>
+#include <iostream>
+#include <fstream>
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
 struct knitGraphVertex{
-    int id;
+    int id = -1;
     Vector3 position;//position embedded in R^3 (if position information is available)
     Vector3 baryCoords;//barycentric coordinates of the vertex if position information is not available
     int row_in = -1;
@@ -71,8 +73,12 @@ class KnitGraph{
         //wale singular edges (in the glued setting)
         EdgeData<double> waleSingularEdges;
 
-        //vertices in the graph 
+        //vertices in the graph (including virtuals)
         std::vector<knitGraphVertex> vertices;
+
+        std::vector<knitGraphVertex> realVertices;
+
+
 
         //vertex positions of this knit graph 
         std::vector<Vector3> vertexPositions; 
@@ -115,6 +121,9 @@ class KnitGraph{
             //perform epsilon merging to 
             //merge connections across faces
             void epsilonMerging();
+
+            //reorder indices of knit graph
+            void makeRealVertices();
 
             //find a cluster of vertices to merge
             std::vector<knitGraphVertex> findCluster(const knitGraphVertex &v, double eps);

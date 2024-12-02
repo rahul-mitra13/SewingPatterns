@@ -193,6 +193,31 @@ std::vector<std::pair<int, int>> findFaceSingularityPairs(VertexPositionGeometry
                                             double isoVal, int numPairs, bool useAllFaces);
 
 
+//@debugging
+//find max/min curl edge for a given isoline of the time function 
+//find edge singularity pair 
+std::vector<std::pair<int, int>> findEdgeSingularityPairs(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, EdgeData<double>& curl,
+                                            VertexData<double>& globalTimeFunction, polyscope::SurfaceMesh& psMesh,
+                                            std::map<int, int>& hashedUsedIsoVals, std::map<int, int>& usedEdges, FaceData<double>& faceSingularities, 
+                                            double isoVal, int numPairs, bool useAllEdges);
+
+
+//@debugging
+//find edge singularity pairs 
+//this method finds the max curl edges and finds an edge on the same isoline of the time function 
+//of the opposite sign
+std::vector<std::pair<int, int>> findEdgeSingularityPairsUsingMaxCurls(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, EdgeData<double>& curl,
+                                            VertexData<double>& globalTimeFunction, std::map<int, int>& hashedUsedIsoVals, int numSingularityPairs);
+
+//@debugging
+//find edge singularity pairs 
+//this method find the max average edge curl by sampling the isolines of the time function 
+std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsingTimeFunctionIsoVals(VertexPositionGeometry& globalGeometry, 
+                                                        EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, 
+                                                        EdgeData<double>& curl, VertexData<double>& globalTimeFunction, 
+                                                        double stepSize, std::map<int, int>& hashedUsedIsoVals, int numSingularityPairs);
+
+
 //@clean
 //get the vertices (of a curve network), edges (of a curve network) and faces that a particular isovalue of the time function passes through 
 //generate isolines for the time function given a specific isoVal
@@ -206,6 +231,11 @@ double findIsoValWithMaxFaceCurl(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexD
 
 void revealCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& vertexMap,  Eigen::SparseMatrix<double, Eigen::RowMajor>& G);
 
+//@debugging 
+//find isoval with maximum average edge curl 
+double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& globalTimeFunction, 
+                                    EdgeData<double>& curl, std::map<int, int>& hashedUsedIsoVals, double stepSize);
+
 //@clean 
 //the below two functions use the energy min ||\del sigma - \nabla \sigma_{i - 1} / ||\nabla \sigma_{i - 1}|| ||^2
 //@out  courseOneFormGrad - gradient of the final course 1-form
@@ -214,7 +244,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                                                     std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
                                                                     globalBoundaryConditions& boundaryConditions, double period,
                                                                     Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G,
-                                                                    FaceData<Vector3>& courseOneFormGrad);
+                                                                    FaceData<Vector3>& courseOneFormGrad, std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
 
 //@clean
 //compute course 1-form
@@ -235,6 +265,10 @@ VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, Edg
 //@debugging
 //average vertex curl onto edges
 EdgeData<double> computeVertexAveragedEdgeCurl(VertexPositionGeometry& globalGeometry, VertexData<double>& vertexCurl);
+
+//@debugging
+//compute distance from unit norm of a per-face vector field
+double computeDistanceFromUnitNorm(VertexPositionGeometry& globalGeometry, FaceData<Vector3>& gradients);
 
 //@debugging
 std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 

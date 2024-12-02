@@ -103,7 +103,8 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
 
 //carry out the integration in the glued mesh setting
 //sigma is defined over the EDGES of glued mesh 
-std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& globalGeometry, EdgeLengthGeometry& gluedGeometry, EdgeData<double>& sigma, float period){
+std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& globalGeometry, 
+                                                              EdgeLengthGeometry& gluedGeometry, EdgeData<double>& sigma, float period){
 
   SurfaceMesh& globalMesh = globalGeometry.mesh; 
   SurfaceMesh& gluedMesh = gluedGeometry.mesh;
@@ -394,6 +395,112 @@ bool halfedgeContainsLevelSet(double val1, double val2, double& bary, double cur
 
 }
 
+//find the set of edges that a given isovalue of the stripes crosses
+EdgeData<int> stripeIsoValEdges(EmbeddedGeometryInterface& geometry,
+                                  const CornerData<double>& stripeValues,
+                                  const FaceData<int>& stripesIndices, double period, polyscope::SurfaceMesh& psMesh){
+  
+  SurfaceMesh& mesh = geometry.mesh;
+  HalfedgeData<std::vector<double>> halfedgeIsoValues = getHalfEdgeIsoValues(geometry, stripeValues, stripesIndices, period);
+  //decalare a custom comparator for floating point values 
+  auto customComparator = [](const double a, const double b){
+    double epsilon = 1e-9;
+    return ((a < b) && (std::fabs(a - b) >= epsilon));
+  };
+  std::set<double, decltype(customComparator)> uniqueIsoVals(customComparator);
+  //std::set<double> uniqueIsoVals;
+  EdgeData<int> result(mesh, 0);
+  
+  //find all the faces that a given isovalue passes through
+  for (Halfedge h : mesh.halfedges()){
+    if (result[h.edge()]) continue;
+    if (h.face().isBoundaryLoop() || stripesIndices[h.face()] != 0) continue;//skip singular faces and boundary faces
+    std::vector<double> heSet = halfedgeIsoValues[h];
+    for (int i = 0; i < heSet.size(); i++){
+      result[h.edge()] = 1;
+      uniqueIsoVals.insert(heSet[i]);
+    }
+  }
+
+  //a visited edges map where the key is 
+  //(leader edge, isoval) -> set of edges on that isovalue visited from that leader
+  std::map<std::pair<int, double>, std::vector<int>> visitedEdges;
+  //a used edges map where the key is 
+  //(edge index, isoval) -> whether or not that edge has been visited by that isovalue
+  std::map<std::pair<int, double>, int> usedEdges;
+  double bary;
+  EdgeData<int> leaders(mesh, 0);
+
+  //this approach will have some repitions since isolines take on 
+  //different values depending on the edges they're on 
+  //but if the isoline hits the same edges it shouldn't matter in the long run
+  for (double isoVal : uniqueIsoVals){
+    std::cout << "unique isoval = " << isoVal << std::endl;
+    for (Halfedge he : mesh.halfedges()){
+      if (halfedgeContainsLevelSet(stripeValues[he.corner()], stripeValues[he.next().corner()], bary, isoVal) && 
+        usedEdges.find(std::make_pair(he.edge().getIndex(), isoVal)) == usedEdges.end()){//this edge has not been visited for isoVal
+        std::cout << "leader for isovalue " << isoVal << " is edge " << he.edge().getIndex() << std::endl;
+        leaders[he.edge()] = 1;
+        usedEdges[std::make_pair(he.edge().getIndex(), isoVal)] = 1;
+        visitedEdges[std::make_pair(he.edge().getIndex(), isoVal)] = std::vector<int>{static_cast<int>(he.edge().getIndex())};
+
+        //walk along this isovalue starting from the leader
+        Halfedge startHe = he;
+        Halfedge currHe = startHe;
+        while(true){
+          Halfedge jk = currHe.next();
+          Halfedge ki = currHe.next().next();
+          if (halfedgeContainsLevelSet(stripeValues[jk.corner()], stripeValues[jk.next().corner()], bary, isoVal) && 
+          usedEdges.find(std::make_pair(jk.edge().getIndex(), isoVal)) == usedEdges.end()){//this edge has not been visited for this isoval
+            
+            usedEdges[std::make_pair(jk.edge().getIndex(), isoVal)] = 1;
+            visitedEdges[std::make_pair(he.edge().getIndex(), isoVal)].push_back(jk.edge().getIndex());
+            currHe = jk;
+          }
+
+          else if (halfedgeContainsLevelSet(stripeValues[ki.corner()], stripeValues[ki.next().corner()], bary, isoVal) && 
+          usedEdges.find(std::make_pair(ki.edge().getIndex(), isoVal)) == usedEdges.end()){//this edge has not been visited for this isoval
+            
+            usedEdges[std::make_pair(ki.edge().getIndex(), isoVal)] = 1;
+            visitedEdges[std::make_pair(he.edge().getIndex(), isoVal)].push_back(ki.edge().getIndex());
+            currHe = ki;
+          }
+
+          else{//isoline ends
+            std::cout << "iso line is ending! " << std::endl;
+            break;
+          }
+
+          if (currHe == startHe){//made a closed loop
+            std::cout << "isoline made a closed! " << std::endl;
+            break;
+          }
+
+          //otherwise keep walking
+          currHe = currHe.twin();
+
+        }
+      }
+    }
+  }
+
+  std::cout << "size of visited edges = " << visitedEdges.size() << std::endl;
+
+  for (auto entry : visitedEdges){
+    std::cout << "for pair " << entry.first.first << ", " << entry.first.second << std::endl;
+    for (int i = 0; i < entry.second.size(); i++){
+      std::cout << "edge it hits = " << entry.second[i] << std::endl;
+    }
+    std::cout << "-----------------------------" << std::endl;
+  }
+
+  psMesh.addEdgeScalarQuantity("edge leaders", leaders);
+
+  
+
+  return result;
+}
+
 //extract isolines when multiple isolines may pass through a face (using face-based matching)
 std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLines(EmbeddedGeometryInterface& geometry,
                                                       const CornerData<double>& stripeValues,
@@ -409,7 +516,6 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
 
   std::vector<PolyLinePoint> isoline_points;
 
-  FaceData<std::vector<double>> faceIsoValues = getFaceIsoValues(geometry, stripeValues, stripesIndices, period);
   HalfedgeData<std::vector<double>> halfedgeIsoValues = getHalfEdgeIsoValues(geometry, stripeValues, stripesIndices, period);
 
   //first generate all the points
@@ -428,6 +534,8 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
         PolyLinePoint currPoint;
         currPoint.position = pos;
         currPoint.f = h.face();
+        currPoint.e = h.edge();
+        currPoint.he = h;
         currPoint.isoval = heSet[i];
 
         isoline_points.push_back(currPoint);
@@ -449,7 +557,6 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
 
     //search for the point p1 should connect to
     for (int j = 0; j < isoline_points.size(); j++){
-
       PolyLinePoint p2 = isoline_points[j];
       if (p1.f == p2.f && std::abs(p1.isoval - p2.isoval) < pert && i != j){
         std::array<int, 2> edge = {i, j};
@@ -459,6 +566,442 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
   }
 
   return std::tie(points, edges);
+}
+
+// lists all the k's \in \mathbb{Z} such that val1 < 2 k \pi < val2 or val2 < 2 k \pi < val1
+std::vector<double> crossingsModuloPeriod(double val1, double val2, double period) {
+  std::vector<double> barys;
+  if (val1 == val2) return barys;
+
+  int maxCrossings = std::ceil(std::abs(val1 - val2) / (period));
+
+  if (val1 < val2) {
+    for (int i = 0; i < maxCrossings; ++i) {
+      int k = std::ceil(val1 / (period)) + i;
+      double isoval = 2 * PI * k;
+
+      if (isoval < val2) {
+        barys.push_back((isoval - val2) / (val1 - val2));
+      }
+    }
+  } else {
+    for (int i = maxCrossings - 1; i >= 0; --i) {
+      int k = std::ceil(val2 / (period)) + i;
+      double isoval = 2 * PI * k;
+
+      if (isoval < val1) {
+        barys.push_back((isoval - val2) / (val1 - val2));
+      }
+    }
+  }
+
+  return barys;
+}
+
+// Matches crossings based on a strategy proposed in "Navigating intrinsic triangulations" [Sharp et al. 2019].
+// See https://github.com/nmwsharp/geometry-central/pull/89#issuecomment-936150222 for more details
+std::vector<std::array<int, 2>> matchCrossings(const std::vector<std::vector<int>>& crossings) {
+  assert(crossings.size() == 3);
+
+  int idxIJ = 2;
+  if (crossings[0].size() >= crossings[1].size() && crossings[0].size() >= crossings[2].size()) {
+    idxIJ = 0;
+  } else if (crossings[1].size() >= crossings[2].size() && crossings[1].size() >= crossings[0].size()) {
+    idxIJ = 1;
+  }
+  int idxJK = (idxIJ + 1) % 3;
+  int idxKI = (idxIJ + 2) % 3;
+
+  const std::vector<int>& IJ = crossings[idxIJ];
+  const std::vector<int>& JK = crossings[idxJK];
+  const std::vector<int>& KI = crossings[idxKI];
+
+  int nIJ = IJ.size();
+  int nJK = JK.size();
+  int nKI = KI.size();
+
+  assert(nIJ >= nJK && nIJ >= nKI);
+  assert(nIJ <= nJK + nKI);
+  assert((nIJ + nJK + nKI) % 2 == 0);
+
+  std::vector<std::array<int, 2>> matchings;
+  if (nIJ == nJK + nKI) { // Case 1: all edges intersecting ijk cross a common edge ij
+    // match IJ with IK
+    for (int m = 0; m < nKI; ++m) {
+      matchings.push_back({IJ[m], KI[nKI - m - 1]});
+    }
+    // match IJ with KJ
+    for (int m = 0; m < nJK; ++m) {
+      matchings.push_back({IJ[nKI + m], JK[nJK - m - 1]});
+    }
+  } else { // Case 2: there is no common edge
+    int nRemainingCrossings = (nIJ + nJK + nKI) / 2;
+    int m = 0;
+    while (nRemainingCrossings > nJK) {
+      matchings.push_back({IJ[m], KI[nKI - m - 1]});
+      ++m;
+      nRemainingCrossings -= 1;
+    }
+
+    int l = 0;
+    while (nRemainingCrossings > nKI - m) {
+      matchings.push_back({IJ[nIJ - 1 - l], JK[l]});
+      nRemainingCrossings -= 1;
+      ++l;
+    }
+
+    int p = 0;
+    while (nRemainingCrossings > 0) {
+      matchings.push_back({JK[nJK - 1 - p], KI[p]});
+      ++p;
+      nRemainingCrossings -= 1;
+    }
+  }
+
+  return matchings;
+}
+
+
+//utility functions to find level sets of stripes
+bool existsInVertexList(std::vector<Vector3>& vertices, Vector3& newVertex){
+
+  for (Vector3 v : vertices){
+    if (norm(v - newVertex) < 1e-8)
+      return true;
+  }
+  return false;
+
+}
+bool existsInVertexList(std::vector<PolyLinePoint>& vertices, PolyLinePoint& p){
+
+  for (PolyLinePoint v : vertices){
+    if (norm(v.position - p.position) < 1e-8)
+      return true;
+  }
+  return false;
+
+}
+
+int find(std::vector<Vector3>& vertices, Vector3& newVertex){
+
+  for (int i = 0; i < vertices.size(); i++){
+    if (norm(vertices[i] - newVertex) < 1e-8){
+      return i;
+    }
+  }
+
+  return -1;
+
+}
+
+int find(std::vector<PolyLinePoint>& vertices, PolyLinePoint& p){
+
+  for (int i = 0; i < vertices.size(); i++){
+    if (norm(vertices[i].position - p.position) < 1e-8){
+      return i;
+    }
+  }
+
+  return -1;
+
+}
+
+
+std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> removeCurveNetworkDuplicatedVertices(VertexPositionGeometry& globalGeometry, 
+                                                                        std::vector<Vector3>& vertices, std::vector<std::array<int, 2>>& edges){
+
+                                                                                  
+  // SurfaceMesh& globalMesh = globalGeometry.mesh;
+  // // Map to store unique vertices and their indices
+  // std::unordered_map<Vector3, size_t> uniqueVertices;
+  // std::vector<size_t> vertexMapping(vertices.size(), -1);
+  // std::vector<Vector3> newVertices;
+  // double eps = 1e-8;
+
+  // // Identify unique vertices and build the mapping
+  // for (size_t i = 0; i < vertices.size(); ++i) {
+  //   Vector3 pos = vertices[i];
+  //   if (uniqueVertices.find(pos) == uniqueVertices.end()) {
+  //       // New unique vertex
+  //       uniqueVertices[pos] = newVertices.size();
+  //       vertexMapping[i] = newVertices.size();
+  //       newVertices.push_back(pos);
+  //     } else {
+  //       // Duplicate vertex, map to the unique one
+  //       vertexMapping[i] = uniqueVertices[pos];
+  //     }
+  // }
+
+  SurfaceMesh& globalMesh = globalGeometry.mesh;
+  std::vector<Vector3> uniqueVertices;
+  std::vector<size_t> vertexMapping(vertices.size(), -1);
+  std::vector<Vector3> newVertices;
+  double eps = 1e-8;
+
+  // Identify unique vertices and build the mapping
+  for (size_t i = 0; i < vertices.size(); ++i) {
+    Vector3 pos = vertices[i];
+    if (!existsInVertexList(uniqueVertices, pos)){
+      //New unique vertex
+      uniqueVertices.push_back(pos);
+      vertexMapping[i] = newVertices.size();
+      newVertices.push_back(pos);
+    } 
+    else {
+      // Duplicate vertex, map to the unique one
+      //vertexMapping[i] = uniqueVertices[pos];
+      vertexMapping[i] = find(uniqueVertices, pos);
+    }
+  }
+
+    // Create new edges with updated vertex indices
+    std::vector<std::array<int, 2>> newEdges;
+    for (auto e : edges) {
+        int v1 = vertexMapping[e[0]];
+        int v2 = vertexMapping[e[1]];
+
+        // Avoid duplicate edges
+        if (v1 != v2) {
+            if (v1 > v2) std::swap(v1, v2); // Ensure consistent ordering
+            newEdges.emplace_back(std::array<int, 2>{v1, v2});
+        }
+    }
+
+    // Remove duplicate edges
+    std::sort(newEdges.begin(), newEdges.end());
+    newEdges.erase(std::unique(newEdges.begin(), newEdges.end()), newEdges.end());
+
+    return std::tie(newVertices, newEdges);
+
+}
+
+//find connected components of a curve network
+void findCurveNetworkConnectedComponents(VertexPositionGeometry& globalGeometry,
+                            std::vector<Vector3>& vertices, std::vector<std::array<int, 2>>& edges){
+  
+  SurfaceMesh& globalMesh = globalGeometry.mesh;
+
+  // Initialize disjoint set for vertices
+  DisjointSets vertexSets(vertices.size());
+
+  // Union-find: process each edge to connect the vertices
+  for (auto e : edges) {
+      auto v1 = e[0];
+      auto v2 = e[1];
+      vertexSets.merge(v1, v2);
+  }
+
+    // Map each set leader to its component
+    std::unordered_map<size_t, std::vector<size_t>> components;
+    for (size_t v = 0; v < vertices.size(); ++v) {
+        size_t leader = vertexSets.find(v);
+        components[leader].push_back(v);
+    }
+
+    // Print the connected components
+    size_t componentIndex = 0;
+    std::cout << "number of components = " << components.size() << std::endl;
+    // for (const auto& comp : components) {
+    //     std::cout << "Component " << componentIndex++ << ": ";
+    //     for (size_t v : comp.second) {
+    //         std::cout << v << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
+}
+
+std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> findStripeConnectedComponents(VertexPositionGeometry& globalGeometry, 
+                                  EdgeLengthGeometry& gluedGeometry, 
+                                  const CornerData<double>& stripeValues,
+                                  const FaceData<int>& stripesIndices, double period,
+                                  std::map<int, int>& edgeMap,
+                                  std::unordered_map<size_t, std::vector<PolyLinePoint>>& components){
+  
+  SurfaceMesh& globalMesh = globalGeometry.mesh; 
+  SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+  //clear out the map first 
+  components.clear();
+
+  globalGeometry.requireFaceIndices();
+  globalGeometry.requireVertexPositions();
+
+  //pertubation
+  double pert = 1e-8;
+
+  std::vector<PolyLinePoint> isoLinePoints;
+
+  HalfedgeData<std::vector<double>> halfedgeIsoValues = getHalfEdgeIsoValues(globalGeometry, stripeValues, stripesIndices, period);
+
+  //first generate all the points
+  for (Halfedge h : globalMesh.halfedges()){
+
+    if (h.face().isBoundaryLoop() || stripesIndices[h.face()] != 0) continue;//skip singular faces and boundary faces
+    std::vector<double> heSet = halfedgeIsoValues[h];
+
+    for (int i = 0; i < heSet.size(); i++){
+      double bary;
+      if (halfedgeContainsLevelSet(stripeValues[h.corner()], stripeValues[h.next().corner()], bary, heSet[i])){//this will always be true
+        //interpolating from tip to tail
+        Vector3 pos = (bary * globalGeometry.vertexPositions[h.tailVertex()] +
+                       (1 - bary) * globalGeometry.vertexPositions[h.tipVertex()]);
+        
+        PolyLinePoint currPoint;
+        currPoint.position = pos;
+        currPoint.f = h.face();
+        currPoint.e = h.edge();
+        currPoint.he = h;
+        currPoint.isoval = heSet[i];
+
+        isoLinePoints.push_back(currPoint);
+      }
+    }
+  }
+
+  std::vector<std::array<int, 2>> edges;
+  //now make the polyline 
+  for (int i = 0; i < isoLinePoints.size(); i++){
+    PolyLinePoint p1 = isoLinePoints[i];
+    //search for the point p1 should connect to
+    for (int j = 0; j < isoLinePoints.size(); j++){
+      PolyLinePoint p2 = isoLinePoints[j];
+      if (p1.f == p2.f && std::abs(p1.isoval - p2.isoval) < pert && i != j){
+        std::array<int, 2> edge = {i, j};
+        edges.push_back(edge);
+      }
+    }
+  }
+
+  //now remove all the duplicate points 
+  std::vector<PolyLinePoint> uniqueVertices;
+  std::vector<size_t> vertexMapping(isoLinePoints.size(), -1);
+  std::vector<PolyLinePoint> newVertices;
+  std::vector<Vector3> newVertexPositions;
+
+  // Identify unique vertices and build the mapping
+  for (size_t i = 0; i < isoLinePoints.size(); ++i) {
+    PolyLinePoint p = isoLinePoints[i];
+    if (!existsInVertexList(uniqueVertices, p)){
+      //New unique vertex
+      uniqueVertices.push_back(p);
+      vertexMapping[i] = newVertices.size();
+      newVertices.push_back(p);
+    } 
+    else {
+      vertexMapping[i] = find(uniqueVertices, p);
+    }
+  }
+
+  // Create new edges with updated vertex indices
+  std::vector<std::array<int, 2>> newEdges;
+  for (auto e : edges) {
+      int v1 = vertexMapping[e[0]];
+      int v2 = vertexMapping[e[1]];
+
+      // Avoid duplicate edges
+      if (v1 != v2) {
+          if (v1 > v2) std::swap(v1, v2); // Ensure consistent ordering
+          newEdges.emplace_back(std::array<int, 2>{v1, v2});
+      }
+  }
+
+  // Remove duplicate edges
+  std::sort(newEdges.begin(), newEdges.end());
+  newEdges.erase(std::unique(newEdges.begin(), newEdges.end()), newEdges.end());
+
+
+  //finally find the connected components
+  // Initialize disjoint set for vertices
+  DisjointSets vertexSets(newVertices.size());
+
+  // Union-find: process each edge to connect the vertices
+  for (auto e : newEdges) {
+    auto v1 = e[0];
+    auto v2 = e[1];
+    vertexSets.merge(v1, v2);
+  }
+  
+  // Map each set leader to its component
+  std::unordered_map<size_t, std::vector<size_t>> indexedComponents;
+
+  for (size_t v = 0; v < newVertices.size(); ++v) {
+    newVertexPositions.push_back(newVertices[v].position);
+    size_t leader = vertexSets.find(v);
+    indexedComponents[leader].push_back(v);
+  }
+
+  //reset the component index
+  size_t componentIndex = 0;
+  // std::cout << "number of components = " << indexedComponents.size() << std::endl;
+  for (const auto& comp : indexedComponents) {
+      //std::cout << "Component " << componentIndex++ << ": ";
+      componentIndex++;
+      for (size_t v : comp.second) {
+      //    std::cout << v << " ";
+          components[componentIndex].push_back(newVertices[v]);
+      }
+      //std::cout << std::endl;
+  }
+
+  return std::tie(newVertexPositions, newEdges);
+
+}
+
+//find a set of edge singularity pairs on the same isoline as the stripe patterns
+std::vector<std::pair<int, int>> findEdgeSingularityPairFromStripeIsoVals(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
+                                                            EdgeData<double>& edgeCurl, std::map<int, int>& edgeMap,
+                                                            std::unordered_map<size_t, std::vector<PolyLinePoint>>& components, int numPairs){
+  
+  //causing some malloc errors
+  //edge curl is in the global setting (maybe should do it in the glued setting)
+  //return top 3 pairs here?
+  SurfaceMesh& globalMesh = globalGeometry.mesh;
+  SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+  double eps = 1e-8;
+
+  //a map from edge curl to component id
+  std::vector<double> componentCurl(components.size());
+  std::map<int, size_t> edgeCurlToComponentId;
+
+  for (const auto &c : components){
+    std::vector<PolyLinePoint> vertices = c.second;
+    double curlSum = 0.0;
+    for (const auto &v : vertices){
+      curlSum += std::fabs(edgeCurl[v.e]);
+    }
+    double avgCurl = curlSum / vertices.size();
+    edgeCurlToComponentId[hashFloatQuantized(avgCurl)] = c.first;
+    componentCurl[c.first - 1] = avgCurl;
+    //componentCurl[c.first - 1] = curlSum;
+  }
+
+  std::sort(componentCurl.begin(), componentCurl.end(), std::greater<double>()); // Sort in descending order
+  componentCurl.resize(numPairs); // Keep only the top numPairs
+
+  std::vector<std::pair<int, int>> edgeSingularityPairs;
+  std::cout << "numPairs = " << numPairs << std::endl;
+  std::cout << "size of component curl = " << componentCurl.size() << std::endl;
+  std::cout << "number of components = " << components.size() << std::endl;
+  std::cout << "size of edge curl to component Id = " << edgeCurlToComponentId.size() << std::endl;
+
+  //now find the max and min curl edges on those components
+  for (const auto &c : componentCurl){
+    auto vertices = components[edgeCurlToComponentId[hashFloatQuantized(c)]];
+    double maxCurl = -DBL_MAX;
+    double minCurl = DBL_MAX;
+    int maxEdge, minEdge = -1;
+    for (const auto &v : vertices){
+      if (edgeCurl[v.e] > maxCurl){
+        maxCurl = edgeCurl[v.e];
+        maxEdge = v.e.getIndex();
+      }
+      if (edgeCurl[v.e] < minCurl){
+        minCurl = edgeCurl[v.e];
+        minEdge = v.e.getIndex();
+      }
+    }
+    edgeSingularityPairs.push_back(std::make_pair(maxEdge, minEdge));
+  }
+  return edgeSingularityPairs; 
 }
 
 //-------------------------re-impleminting Knoppel's stripes-----------------------//

@@ -35,23 +35,49 @@ HalfedgeData<double> constructGluedHalfedgeWeights(VertexPositionGeometry& globa
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    double penaltyFactor = 100.;//penalize anti aligned edges, ugh
     HalfedgeData<double> heWeights(gluedMesh, 0.);
     for (Face f : globalMesh.faces()){
 
         Halfedge hij = f.halfedge();
         double dotIJ = dot((globalGeometry.vertexPositions[hij.tipVertex()] - globalGeometry.vertexPositions[hij.tailVertex()]).normalize(), 
                             rotatedFaceGradients[f].normalize());
-        heWeights[gluedMesh.face(f.getIndex()).halfedge()] = std::fabs(dotIJ - maxDotProd);
+        //heWeights[hij] = std::fabs(dotIJ - maxDotProd);
+        heWeights[hij] = dotIJ < 0. ? penaltyFactor * (1 - dotIJ) / 2. : (1 - dotIJ) / 2;
+        //also set weights for boundary halfedges 
+        if (!hij.twin().isInterior()){
+            double dotIJTwin = dot((globalGeometry.vertexPositions[hij.tailVertex()] - globalGeometry.vertexPositions[hij.tipVertex()]).normalize(), 
+                            rotatedFaceGradients[f].normalize());
+            //heWeights[hij.twin()] = std::fabs(dotIJTwin - maxDotProd);
+            heWeights[hij.twin()] = dotIJTwin < 0. ? penaltyFactor * (1 - dotIJTwin)/2. : (1 - dotIJTwin)/2.;
+        }
 
         Halfedge hjk = hij.next();
         double dotJK = dot((globalGeometry.vertexPositions[hjk.tipVertex()] - globalGeometry.vertexPositions[hjk.tailVertex()]).normalize(), 
                             rotatedFaceGradients[f].normalize());
-        heWeights[gluedMesh.face(f.getIndex()).halfedge().next()] = std::fabs(dotJK - maxDotProd);
+        //heWeights[hjk] = std::fabs(dotJK - maxDotProd);
+        heWeights[hjk] = dotJK < 0. ? penaltyFactor * (1 - dotJK) / 2. : (1 - dotJK) / 2;
+        //also set weights for boundary halfedges 
+        if (!hjk.twin().isInterior()){
+            double dotJKTwin = dot((globalGeometry.vertexPositions[hjk.tailVertex()] - globalGeometry.vertexPositions[hjk.tipVertex()]).normalize(), 
+                            rotatedFaceGradients[f].normalize());
+            //heWeights[hjk.twin()] = std::fabs(dotJKTwin - maxDotProd);
+            heWeights[hjk.twin()] = dotJKTwin < 0. ? penaltyFactor * (1 - dotJKTwin) / 2. : (1 - dotJKTwin) / 2.;
+
+        }
 
         Halfedge hki = hjk.next();
         double dotKI = dot((globalGeometry.vertexPositions[hki.tipVertex()] - globalGeometry.vertexPositions[hki.tailVertex()]).normalize(), 
                             rotatedFaceGradients[f].normalize());
-        heWeights[gluedMesh.face(f.getIndex()).halfedge().next().next()] = std::fabs(dotKI - maxDotProd);
+        //heWeights[hki] = std::fabs(dotKI - maxDotProd);
+        heWeights[hki] = dotKI < 0. ? penaltyFactor * (1 - dotKI) / 2. : (1 - dotKI) / 2.;
+        //also set weights for boundary halfedges 
+        if (!hki.twin().isInterior()){
+            double dotKITwin = dot((globalGeometry.vertexPositions[hki.tailVertex()] - globalGeometry.vertexPositions[hki.tipVertex()]).normalize(), 
+                            rotatedFaceGradients[f].normalize());
+            //heWeights[hki.twin()] = std::fabs(dotKITwin - maxDotProd);
+            heWeights[hki.twin()] = dotKITwin < 0. ? penaltyFactor * (1 - dotKITwin) / 2. : (1 - dotKITwin) / 2.;
+        }
     }
 
     return heWeights;
@@ -143,7 +169,7 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
             }
             std::reverse(std::begin(path), std::end(path));
             for (Halfedge he : path){
-            toReturnGlued[he.edge().getIndex()] = he.orientation() ? 1.0 : -1.0;
+                toReturnGlued[he.edge().getIndex()] = he.orientation() ? 1.0 : -1.0;
             }
             for (Edge e : globalMesh.edges()){
                 toReturnGlobal[e.getIndex()] = toReturnGlued[gluedMesh.edge(edgeMap[e.getIndex()]).getIndex()];
