@@ -128,10 +128,10 @@ void showStripePatterns(){
   // globalPSMesh->addEdgeScalarQuantity("normalized time function gradient edge curl", edgeCurl);
 
   //generate the knit graph
-  KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
-                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-                      edgeMap);
-  graph.buildGraph();
+  // KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
+  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+  //                     edgeMap);
+  // graph.buildGraph();
 
 }
 

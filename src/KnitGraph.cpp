@@ -361,7 +361,9 @@ void KnitGraph::renderGraph(){
     for (int i = 0; i < vertexPositions.size(); i+=2){
         edges.push_back({i, i + 1});
     }
-    polyscope::registerCurveNetwork("Real knit graph vertices ", vertexPositions, edges);
+    auto graph = polyscope::registerCurveNetwork("Real knit graph vertices ", vertexPositions, edges);
+    graph -> setRadius(0.001);
+    graph -> setEnabled(false);
 }
 
 //perform epsilon merging to 
