@@ -76,6 +76,7 @@ void showStripePatterns(){
   //time function on the global mesh 
   VertexData<double> timeFunctionGlobal = convertGluedToGlobalVertexFunction(*globalGeometry, *gluedELG, timeFunctionGlued, vertexMap);
   globalPSMesh -> addVertexScalarQuantity("time function", timeFunctionGlobal);
+
   //gradient on the glued/global mesh
   //note that faces have a 1-to-1 mapping from global to glued setting
   FaceData<Vector3> timeFunctionGradientGlobal = computeTimeFunctionFaceGrad(*globalGeometry, timeFunctionGlobal);
@@ -128,10 +129,10 @@ void showStripePatterns(){
   // globalPSMesh->addEdgeScalarQuantity("normalized time function gradient edge curl", edgeCurl);
 
   //generate the knit graph
-  // KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
-  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-  //                     edgeMap);
-  // graph.buildGraph();
+  KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
+                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+                      edgeMap);
+  graph.buildGraph();
 
 }
 
@@ -209,6 +210,19 @@ int main(int argc, char **argv) {
   gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, vertexMap, edgeMap, gluedOneRingMap);
   //process boundary conditions in the glued mesh setting 
   globalBdyConditions = parseJson(*gluedELG, data, vertexMap, edgeMap);
+
+  //view the global boundary conditions
+  // VertexData<double> oneVertices(*globalMesh, 0);
+  // VertexData<double> zeroVertices(*globalMesh, 0);
+  // for (int v : globalBdyConditions.courseStartBoundaryVertices){
+  //   zeroVertices[v] = 1.0;
+  // }
+  // for (int v : globalBdyConditions.courseEndBoundaryVertices){
+  //   oneVertices[v] = 1.0;
+  // }
+  // globalPSMesh->addVertexScalarQuantity("ones", oneVertices);
+  // globalPSMesh->addVertexScalarQuantity("zeros", zeroVertices);
+
   //render the stitched vertices
   renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
   // Disable the ground plane

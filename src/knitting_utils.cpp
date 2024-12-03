@@ -2010,6 +2010,7 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
             }
         }
         currAvgDeviation = currDeviationSum / numEdges;
+        //currAvgDeviation = currDeviationSum;
         curlToIsoVal[currAvgDeviation] = curr;
         curr += stepSize;
     }
@@ -2021,10 +2022,10 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
         Eigen::MatrixXd iE;
         std::vector<int> f;
         std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, isoVal);
-        auto isoline = polyscope::registerCurveNetwork("isoline at " + std::to_string(isoVal), iV, iE);
-        std::cout << "average curl at isoval " << isoVal << " is " << entry.first << std::endl;
-        isoline->setEnabled(false);
-        isoline->setRadius(0.001);
+        // auto isoline = polyscope::registerCurveNetwork("isoline at " + std::to_string(isoVal), iV, iE);
+        // std::cout << "average curl at isoval " << isoVal << " is " << entry.first << std::endl;
+        // isoline->setEnabled(false);
+        // isoline->setRadius(0.001);
 
         std::vector<std::vector<int>> facesPerComponent = findConnectedComponents(gluedGeometry, f);
         if (facesPerComponent.size() == 1){//there's only one connected component in this isoline
@@ -2448,7 +2449,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //number of runs of the optimization
     int numRuns = 0;
     //max number of singularity pairs to check for insertion
-    int topPairs = 10;
+    int topPairs = 15;
     //threshold for alignment with the gradient 
     double threshold = 0.85;
     //gurobi model we will be solving 
@@ -2591,17 +2592,17 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         // singEdgePairs = findEdgeSingularityPairsUsingMaxCurls(globalGeometry, gluedGeometry, V, F, edgeCurl,
         //                 globalTimeFunction, hashedUsedIsoVals, topPairs);
 
+        
         //finding edge singularity pair using stripe isolines
         // singEdgePairs = findEdgeSingularityPairFromStripeIsoVals(globalGeometry, gluedGeometry, 
         //                                                         edgeCurl, edgeMap, components, topPairs);
         int numSkips = 0;
         int maxSkips = topPairs;
-        //std::cout << "size of components = " << components.size() << std::endl;
+        
         for (auto s : singEdgePairs){
             
             //if the return type is not a tuple
-            // std::pair<int, int> singEdgePair = s;
-            // std::cout << "pair = " << singEdgePair.first << " , " << singEdgePair.second << std::endl;
+            //std::pair<int, int> singEdgePair = s;
 
             //if the return type is a tuple 
             std::pair<int, int> singEdgePair = std::get<0>(s);
@@ -2656,7 +2657,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 continue;
             }
             else{
-                hashedUsedIsoVals[hashFloatQuantized(isoVal)] = 1;
+                //hashedUsedIsoVals[hashFloatQuantized(isoVal)] = 1;
                 numSingularities++;
                 //gotten to a valid pair of edge indices that improves the objective
                 //pair of singular edges

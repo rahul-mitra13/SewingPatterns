@@ -40,6 +40,8 @@ void KnitGraph::buildGraph(){
     //make the obj
     makeObj();
 
+    std::cout << "Completed building graph..." << std::endl;
+
 }
 
 void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
@@ -371,14 +373,14 @@ void KnitGraph::renderGraph(){
 void KnitGraph::epsilonMerging(){
 
     //epsilon ball around vertex we hope to merge
-    const double eps = 1e-5 * period;
+    const double eps = 1e-8;
     for (knitGraphVertex &v : vertices) {
         //skip singular edges in the intial merging
         //skip singular edges in the intial merging
-        // if (v.edge.has_value() && (std::fabs(courseSingularEdges[v.edge.value()]) > 0 || std::fabs(waleSingularEdges[v.edge.value()]) > 0)){ 
-        //     std::cout << "skipping singular edge " << v.edge.value() << std::endl;
-        //     continue;
-        // }
+        if (v.edge.has_value() && (std::fabs(courseSingularEdges[v.edge.value()]) > 0 || std::fabs(waleSingularEdges[v.edge.value()]) > 0)){ 
+            //std::cout << "skipping singular edge " << v.edge.value() << std::endl;
+            continue;
+        }
         // find clusters for all vertices that have not been handled
         if (!v.hasBeenHandled) {
             auto vCluster = findCluster(v, eps);
@@ -430,16 +432,16 @@ void KnitGraph::mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps)
         // find the row in/out and col in/outs
         for (auto &vi : vCluster){
             for (auto &vj : vertices){
-                if (norm(vi.position - vj.position) > eps && (vi.row_in == vj.id)){
+                if (norm(vi.position - vj.position) >= eps && (vi.row_in == vj.id)){
                     global_row_in = vj.id;
                 }
-                if (norm(vi.position - vj.position) > eps && (vi.row_out == vj.id)){
+                if (norm(vi.position - vj.position) >= eps && (vi.row_out == vj.id)){
                     global_row_out = vj.id;
                 }
-                if (norm(vi.position - vj.position) > eps && (vi.col_in[0] == vj.id)){
+                if (norm(vi.position - vj.position) >= eps && (vi.col_in[0] == vj.id)){
                     global_col_in = vj.id;
                 }
-                if (norm(vi.position - vj.position) > eps && (vi.col_out[0] == vj.id)){
+                if (norm(vi.position - vj.position) >= eps && (vi.col_out[0] == vj.id)){
                     global_col_out = vj.id;
                 }
             }
@@ -477,16 +479,16 @@ void KnitGraph::mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps)
 
         for (auto &vi : vCluster){
             for (auto &vj : vertices){
-                if (norm(vi.position - vj.position) > eps && (vi.row_in == vj.id)){
+                if (norm(vi.position - vj.position) >= eps && (vi.row_in == vj.id)){
                     global_row_in = vj.id;
                 }
-                if (norm(vi.position - vj.position) > eps && (vi.row_out == vj.id)){
+                if (norm(vi.position - vj.position) >= eps && (vi.row_out == vj.id)){
                     global_row_out = vj.id;
                 }
-                if (norm(vi.position - vj.position) > eps && (vi.col_in[0] == vj.id)){
+                if (norm(vi.position - vj.position) >= eps && (vi.col_in[0] == vj.id)){
                     global_col_in = vj.id;
                 }
-                if (norm(vi.position - vj.position) > eps && (vi.col_out[0] == vj.id)){
+                if (norm(vi.position - vj.position) >= eps && (vi.col_out[0] == vj.id)){
                     global_col_out = vj.id;
                 }
             }
