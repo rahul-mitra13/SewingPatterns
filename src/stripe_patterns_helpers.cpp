@@ -969,7 +969,7 @@ std::vector<std::pair<int, int>> findEdgeSingularityPairFromStripeIsoVals(Vertex
       curlSum += std::fabs(edgeCurl[v.e]);
     }
     double avgCurl = curlSum / vertices.size();
-    edgeCurlToComponentId[hashFloatQuantized(avgCurl)] = c.first;
+    edgeCurlToComponentId[hashFloatQuantized(curlSum)] = c.first;
     componentCurl[c.first - 1] = avgCurl;
     //componentCurl[c.first - 1] = curlSum;
   }
