@@ -78,6 +78,27 @@ void showStripePatterns(){
   VertexData<double> timeFunctionGlobal = convertGluedToGlobalVertexFunction(*globalGeometry, *gluedELG, timeFunctionGlued, vertexMap);
   globalPSMesh -> addVertexScalarQuantity("time function", timeFunctionGlobal);
 
+  // Compute course stripes using Knöppel's method
+  VertexData<Vector3> vertexVectorField = computeVertexValuedField(*globalGeometry, timeFunctionGlobal, 0.0);
+  VertexData<Vector2> lineField = vertexDirectionField(*globalGeometry, vertexVectorField);
+  VertexData<double> freq(globalGeometry->mesh, 1./(period));
+  CornerData<double> stripeValues(globalGeometry->mesh);
+  FaceData<int> stripeSingularities(globalGeometry->mesh);
+  FaceData<int> fieldSingularities(globalGeometry->mesh);
+  std::tie(stripeValues, stripeSingularities, fieldSingularities) = computeStripePattern(*globalGeometry, freq, lineField); // this is a GC call
+  // Do some visualization
+  globalPSMesh->addVertexVectorQuantity("vertexVectorField", vertexVectorField);
+  globalPSMesh->addFaceScalarQuantity("knoppel face singularities", stripeSingularities);
+  globalPSMesh->addFaceScalarQuantity("knoppel field singularities", fieldSingularities);
+  globalPSMesh->addCornerScalarQuantity("stripeValues", prepareCornerData(stripeValues));
+  std::vector<Vector3> knoppelPos; 
+  std::vector<std::array<size_t, 2>> knoppelEdges; 
+  std::tie(knoppelPos, knoppelEdges) = extractPolylinesFromStripePattern(*globalGeometry, stripeValues, stripeSingularities,
+                                          fieldSingularities, lineField, false);
+  auto knoppelStripes = polyscope::registerCurveNetwork("knoppel wale stripes stripes", knoppelPos, knoppelEdges);
+  knoppelStripes->setRadius(0.001);
+  knoppelStripes->setEnabled(false);
+
   //gradient on the glued/global mesh
   //note that faces have a 1-to-1 mapping from global to glued setting
   FaceData<Vector3> timeFunctionGradientGlobal = computeTimeFunctionFaceGrad(*globalGeometry, timeFunctionGlobal);
