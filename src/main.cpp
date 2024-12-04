@@ -78,6 +78,17 @@ void showStripePatterns(){
   VertexData<double> timeFunctionGlobal = convertGluedToGlobalVertexFunction(*globalGeometry, *gluedELG, timeFunctionGlued, vertexMap);
   globalPSMesh -> addVertexScalarQuantity("time function", timeFunctionGlobal);
 
+  // Compute a smooth 1-direction field
+  FaceData<Vector2> smoothDirectionField = computeSmoothestBoundaryAlignedFaceDirectionField(*globalGeometry, 1);
+  FaceData<Vector3> basisX(globalGeometry->mesh);
+  FaceData<Vector3> basisY(globalGeometry->mesh);
+  globalGeometry->requireFaceTangentBasis();
+  for (Face f : globalGeometry->mesh.faces()) {
+    basisX[f] = globalGeometry->faceTangentBasis[f][0];
+    basisY[f] = globalGeometry->faceTangentBasis[f][1];
+  }
+  globalPSMesh->addFaceTangentVectorQuantity("smooth direction field", smoothDirectionField, basisX, basisY);
+
   // Compute course stripes using Knöppel's method
   VertexData<Vector3> vertexVectorField = computeVertexValuedField(*globalGeometry, timeFunctionGlobal, 0.0);
   VertexData<Vector2> lineField = vertexDirectionField(*globalGeometry, vertexVectorField);
@@ -109,6 +120,7 @@ void showStripePatterns(){
   }
   globalPSMesh -> addFaceVectorQuantity("normalized time function gradient", timeFunctionGradientGlobalNormalized);
 
+  G = grad;
 
   // // Call Matteo's revealCurl
   // Model model;
@@ -121,7 +133,6 @@ void showStripePatterns(){
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
   EdgeData<double> courseSingularEdgesGlobal(globalGeometry -> mesh);
-  G = grad;
   FaceData<Vector3> courseOneFormGrad(globalGeometry -> mesh);
   std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
