@@ -3273,14 +3273,16 @@ VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, Edg
     globalGeometry.requireFaceAreas();
     for (Vertex vi : globalMesh.vertices()){
         double sum = 0.0;
+        double area = 0.0; // area of the 1-ring of faces
         for (Halfedge he : gluedOneRingMap[vi.getIndex()]){
             Halfedge hjk = he.next();
             if (!hjk.isInterior()) continue;
             Vector3 hjkVec = globalGeometry.vertexPositions[hjk.tipVertex()] - globalGeometry.vertexPositions[hjk.tailVertex()];
             //always normalize the field
             sum += dot(hjkVec, field[he.face()].normalize());
+            area += globalGeometry.faceArea(he.face());
         }
-        curl[vi] = sum;
+        curl[vi] = sum / area;
     }
 
     return curl;
@@ -3298,7 +3300,7 @@ EdgeData<double> computeVertexAveragedEdgeCurl(VertexPositionGeometry& globalGeo
         //if (e.isBoundary()) continue;//lens complex at boundary edges is just 0
         double c1 = vertexCurl[e.halfedge().tailVertex()];
         double c2 = vertexCurl[e.halfedge().tipVertex()];
-        edgeCurl[e] = (c1 + c2) /(2. * globalGeometry.edgeLengths[e]);
+        edgeCurl[e] = (c1 + c2) / 2;
     }
     return edgeCurl;
 
