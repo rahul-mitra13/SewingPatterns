@@ -1321,13 +1321,13 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     psMesh.addFaceScalarQuantity("knoppel face singularities", stripeSingularities);
     psMesh.addFaceScalarQuantity("knoppel field singularities", fieldSingularities);
     
-    std::vector<Vector3> knoppelPos; 
-    std::vector<std::array<size_t, 2>> knoppelEdges; 
-    std::tie(knoppelPos, knoppelEdges) = extractPolylinesFromStripePattern(globalGeometry, stripeValues, stripeSingularities,
-                                            fieldSingularities, lineField, false);
-    auto knoppelStripes = polyscope::registerCurveNetwork("knoppel wale stripes stripes", knoppelPos, knoppelEdges);
-    knoppelStripes -> setRadius(0.001);
-    knoppelStripes -> setEnabled(false);
+    // std::vector<Vector3> knoppelPos; 
+    // std::vector<std::array<size_t, 2>> knoppelEdges; 
+    // std::tie(knoppelPos, knoppelEdges) = extractPolylinesFromStripePattern(globalGeometry, stripeValues, stripeSingularities,
+    //                                         fieldSingularities, lineField, false);
+    // auto knoppelStripes = polyscope::registerCurveNetwork("knoppel wale stripes stripes", knoppelPos, knoppelEdges);
+    // knoppelStripes -> setRadius(0.001);
+    // knoppelStripes -> setEnabled(false);
 
     EdgeData<double> omegaWaleGlobal = computeMatchingOneForm(globalGeometry, 1, courseOneFormGrad, edgeMappingsPairs);
 
@@ -2544,7 +2544,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //number of runs of the optimization
     int numRuns = 0;
     //max number of singularity pairs to check for insertion
-    int topPairs = 15;
+    int topPairs = 5;
     //threshold for alignment with the gradient 
     double threshold = 0.85;
     //gurobi model we will be solving 
@@ -2659,6 +2659,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
     gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
+    courseOneFormGrad = gradSigmaTilde;
 
 
     //update the gradients for the next iteration of the model 
