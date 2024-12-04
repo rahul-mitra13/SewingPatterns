@@ -37,8 +37,9 @@ void KnitGraph::buildGraph(){
     //render the knit graph
     renderGraph();
 
+
     //make the obj
-    makeObj();
+    //makeObj();
 
     std::cout << "Completed building graph..." << std::endl;
 
@@ -48,7 +49,7 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
     
     double alphaI, alphaJ, alphaK, alpha_min, alpha_max, alpha_start, alpha_end, betaI, betaJ, betaK, beta_min, beta_max, beta_start, beta_end;
 
-    double eps = 1e-8 * period;//for error tolerance
+    double eps = 1e-8;//for error tolerance
 
     std::vector<knitGraphVertex> faceVertices;
 
@@ -81,10 +82,8 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
     c2 = betaK;
 
     //trace the middle of the stripes to avoid floating point error
-    
     alpha_start = (std::ceil((alpha_min - period/4.)/period) * period) + period/4.;
     alpha_end = (std::floor((alpha_max - period/4.)/period) * period) + period/4.;
-
     beta_start = (std::ceil((beta_min - period/4.)/period) * period) + period/4.;
     beta_end = (std::floor((beta_max - period/4.)/period) * period) + period/4.;
 
@@ -342,7 +341,6 @@ void KnitGraph::connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices){
 
 void KnitGraph::renderGraph(){
     
-    //gonna be a lot of repetition but it's okay I guess
     for (auto &v : realVertices){
         if (v.row_out != -1 && realVertices[v.row_out].row_in == v.id){
             vertexPositions.push_back(v.position);
@@ -363,9 +361,18 @@ void KnitGraph::renderGraph(){
     for (int i = 0; i < vertexPositions.size(); i+=2){
         edges.push_back({i, i + 1});
     }
-    auto graph = polyscope::registerCurveNetwork("Real knit graph vertices ", vertexPositions, edges);
+    auto graph = polyscope::registerCurveNetwork("knit graph ", vertexPositions, edges);
     graph -> setRadius(0.001);
     graph -> setEnabled(false);
+
+    std::vector<Vector3> preMergingVertices;
+    for (auto v : vertices){
+        if (v.isVirtual) continue;
+        preMergingVertices.push_back(v.position);
+    }
+
+    // auto preMergVerts = polyscope::registerPointCloud("real vertices", preMergingVertices);
+    // preMergVerts->setEnabled(false);
 }
 
 //perform epsilon merging to 
@@ -373,14 +380,14 @@ void KnitGraph::renderGraph(){
 void KnitGraph::epsilonMerging(){
 
     //epsilon ball around vertex we hope to merge
-    const double eps = 1e-8;
+    const double eps = 1e-9;
     for (knitGraphVertex &v : vertices) {
         //skip singular edges in the intial merging
         //skip singular edges in the intial merging
-        if (v.edge.has_value() && (std::fabs(courseSingularEdges[v.edge.value()]) > 0 || std::fabs(waleSingularEdges[v.edge.value()]) > 0)){ 
-            //std::cout << "skipping singular edge " << v.edge.value() << std::endl;
-            continue;
-        }
+        // if (v.edge.has_value() && (std::fabs(courseSingularEdges[v.edge.value()]) > 0 || std::fabs(waleSingularEdges[v.edge.value()]) > 0)){ 
+        //     //std::cout << "skipping singular edge " << v.edge.value() << std::endl;
+        //     continue;
+        // }
         // find clusters for all vertices that have not been handled
         if (!v.hasBeenHandled) {
             auto vCluster = findCluster(v, eps);
