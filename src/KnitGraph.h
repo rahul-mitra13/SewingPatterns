@@ -78,6 +78,10 @@ class KnitGraph{
 
         std::vector<knitGraphVertex> realVertices;
 
+        //vertex info map 
+        //vertex id to information
+        std::map<int, knitGraphVertex> vertexInfoMap;
+
 
 
         //vertex positions of this knit graph 
@@ -111,6 +115,9 @@ class KnitGraph{
 
             //update connections on the vertices of a smooth face 
             void connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices);
+
+            //merge all the virtual vertices first 
+            void mergeVirtual();
 
             //render the knit graph 
             void renderGraph();

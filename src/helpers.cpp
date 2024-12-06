@@ -476,19 +476,28 @@ std::unique_ptr<EdgeLengthGeometry> createGluedEdgeLengthGeometry(VertexPosition
         }
     }
 
-    //build a map from edges in the original mesh to edges in the glued mesh 
-    for (Halfedge he1 : mesh.halfedges()){
-        int v1 = vertexMap[he1.tailVertex().getIndex()];
-        int v2 = vertexMap[he1.tipVertex().getIndex()];
-        //find the corresponding edge in the glued mesh 
-        for (Halfedge he2 : gluedMesh->halfedges()){
-            if (he2.tailVertex().getIndex() == v1 && he2.tipVertex().getIndex() == v2){
-                edgeMap.insert({he1.edge().getIndex(), he2.edge().getIndex()});
-                edgeLengths[he2.edge()] = geometry.edgeLengths[he1.edge()];
-                break;
-            }
+    if (mesh.nConnectedComponents() == 1){//there is only one connected component so the edge map can be the identity
+        for (Edge e : mesh.edges()){
+            edgeMap.insert({e.getIndex(), e.getIndex()});
+            edgeLengths[e] = geometry.edgeLengths[e];
         }
     }
+    else{
+        //build a map from edges in the original mesh to edges in the glued mesh 
+        for (Halfedge he1 : mesh.halfedges()){
+            int v1 = vertexMap[he1.tailVertex().getIndex()];
+            int v2 = vertexMap[he1.tipVertex().getIndex()];
+            //find the corresponding edge in the glued mesh 
+            for (Halfedge he2 : gluedMesh->halfedges()){
+                if (he2.tailVertex().getIndex() == v1 && he2.tipVertex().getIndex() == v2){
+                    edgeMap.insert({he1.edge().getIndex(), he2.edge().getIndex()});
+                    edgeLengths[he2.edge()] = geometry.edgeLengths[he1.edge()];
+                    break;
+                }
+            }
+        } 
+    }
+    
     std::cout << "Number of faces in the original mesh " << mesh.nFaces() << std::endl;
     std::cout << "Number of faces in the glued mesh " << gluedMesh -> nFaces() << std::endl;
     std::cout << "Number of vertices in the original mesh " << mesh.nVertices() << std::endl;
@@ -506,10 +515,8 @@ std::unique_ptr<EdgeLengthGeometry> createGluedEdgeLengthGeometry(VertexPosition
     std::cout << "Is original mesh oriented " << mesh.isOriented() << std::endl;
     std::cout << "Is glued mesh oriented " << gluedMesh -> isOriented() << std::endl;
 
-    //EdgeLengthGeometry * ELG = new EdgeLengthGeometry(*gluedMesh, edgeLengths);
-    //return a smart pointer 
-    //std::unique_ptr<EdgeLengthGeometry> ELGSmart(ELG);
-    return std::unique_ptr<EdgeLengthGeometry>(new EdgeLengthGeometry(*gluedMesh, edgeLengths));
+    //return a pointer
+    return std::make_unique<EdgeLengthGeometry>(*gluedMesh, edgeLengths);
 }
 
 

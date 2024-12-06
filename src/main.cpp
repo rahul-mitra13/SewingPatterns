@@ -41,6 +41,10 @@ std::map<int, std::vector<Halfedge>> gluedOneRingMap;
 //EdgeLengthGeometry *gluedELG;
 std::unique_ptr<EdgeLengthGeometry> gluedELG;
 
+//pre-processed meshes and geometries
+std::unique_ptr<ManifoldSurfaceMesh> globalMeshPre;
+std::unique_ptr<VertexPositionGeometry> globalGeometryPre;
+
 std::unique_ptr<ManifoldSurfaceMesh> globalMesh;
 std::unique_ptr<VertexPositionGeometry> globalGeometry;
 polyscope::SurfaceMesh *globalPSMesh;
@@ -157,9 +161,12 @@ int main(int argc, char **argv) {
   std::ifstream jsonFile(argv[1]);
   nlohmann::json data = nlohmann::json::parse(jsonFile);
   //run sanity checks
-  std::tie(globalMesh, globalGeometry) = readManifoldSurfaceMesh(data["model_path"]);
-  //messes up edge indexing
-  //fixDelaunay(*globalMesh, *globalGeometry); // we make the mesh approximately Delaunay
+  std::tie(globalMeshPre, globalGeometryPre) = readManifoldSurfaceMesh(data["model_path"]);
+  //make the mesh Delaunay 
+  fixDelaunay(*globalMeshPre, *globalGeometryPre); // we make the mesh approximately Delaunay
+  std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometryPre);
+  globalMesh = std::make_unique<ManifoldSurfaceMesh>(F);
+  globalGeometry = std::make_unique<VertexPositionGeometry>(*globalMesh, V);
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometry);
   igl::grad(V,F,grad);
 
@@ -210,18 +217,6 @@ int main(int argc, char **argv) {
   gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, vertexMap, edgeMap, gluedOneRingMap);
   //process boundary conditions in the glued mesh setting 
   globalBdyConditions = parseJson(*gluedELG, data, vertexMap, edgeMap);
-
-  //view the global boundary conditions
-  // VertexData<double> oneVertices(*globalMesh, 0);
-  // VertexData<double> zeroVertices(*globalMesh, 0);
-  // for (int v : globalBdyConditions.courseStartBoundaryVertices){
-  //   zeroVertices[v] = 1.0;
-  // }
-  // for (int v : globalBdyConditions.courseEndBoundaryVertices){
-  //   oneVertices[v] = 1.0;
-  // }
-  // globalPSMesh->addVertexScalarQuantity("ones", oneVertices);
-  // globalPSMesh->addVertexScalarQuantity("zeros", zeroVertices);
 
   //render the stitched vertices
   renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
