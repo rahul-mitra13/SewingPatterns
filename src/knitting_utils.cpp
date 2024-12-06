@@ -2544,7 +2544,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //number of runs of the optimization
     int numRuns = 0;
     //max number of singularity pairs to check for insertion
-    int topPairs = 5;
+    int topPairs = 10;
     //threshold for alignment with the gradient 
     double threshold = 0.85;
     //gurobi model we will be solving 
@@ -2687,7 +2687,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     int numSingularities = 0;
     while(true){
         //finding edge singularity pairs by sampling time function isolines
-        //return type is a tuple
+        //return type is a a vector of tuples
         std::vector<std::tuple<std::pair<int, int>, double>> singEdgePairs = findEdgeSingularityPairsUsingTimeFunctionIsoVals(globalGeometry,  gluedGeometry, V, F, 
                                                                             edgeCurl, globalTimeFunction, stepSize, hashedUsedIsoVals, topPairs);
 
@@ -2697,6 +2697,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
         
         //finding edge singularity pair using stripe isolines
+        // doesn't return a tuple
         // singEdgePairs = findEdgeSingularityPairFromStripeIsoVals(globalGeometry, gluedGeometry, 
         //                                                         edgeCurl, edgeMap, components, topPairs);
         int numSkips = 0;
@@ -2760,26 +2761,24 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 continue;
             }
             else{
-                //hashedUsedIsoVals[hashFloatQuantized(isoVal)] = 1;
+                hashedUsedIsoVals[hashFloatQuantized(isoVal)] = 1;
                 numSingularities++;
                 //gotten to a valid pair of edge indices that improves the objective
                 //pair of singular edges
                 edgeIndices[edgeMap[singEdgePair.first]] = -1;
                 edgeIndices[edgeMap[singEdgePair.second]] = 1;
+                edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
+                edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
                 //don't retake edges from another path
                 updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, gluedHeWeights);
-                //keep track of isovals we've used so we don't reuse isovalues
-                hashedUsedIsoVals.insert({hashFloatQuantized(isoVal), 1});
                 psMesh.addEdgeScalarQuantity("path for " + std::to_string(numSingularities) + " singularity", globalPath);
                 edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
-                //model.setEdgePathConstraints(edgePathConstraints);
+                model.setEdgePathConstraints(edgePathConstraints);
                 model.setEdgeIndices(edgeIndices);
                 std::cout << "not breaking after " << std::to_string(numSingularities) << " singularity insertions " << std::endl;
                 std::cout << "newDistance = " << newDistance << std::endl;
                 std::cout << "oldDistance = " << oldDistance << std::endl;
                 oldDistance = newDistance;
-                edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
-                edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
                 courseOneFormGrad = gradSigmaTilde;
                 std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
                 std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
@@ -3018,6 +3017,16 @@ std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeome
     //require edge cotan weights
     gluedGeometry.requireEdgeCotanWeights();
 
+    // std::cout << "In virtual sigma function " << std::endl;
+    // std::cout << "size of edge indices = " << edgeIndices.size() << std::endl;
+    // int sum = 0.;
+    // for (int i = 0; i < edgeIndices.size(); i++){
+    //     if (edgeIndices[i] == 1) std::cout << "positive edge at index " << i << std::endl;
+    //     if (edgeIndices[i] == -1) std::cout << "negative edge at index " << i << std::endl;
+    //     sum += edgeIndices[i];
+    // }
+    // std::cout << "sum of edge indices = " << sum << std::endl;
+
     
     try {
         //reformulate the problem in terms of halfedges 
@@ -3032,8 +3041,7 @@ std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeome
         //set the timeout
         model.getEnv().set(GRB_DoubleParam_TimeLimit, 0.5);
         model.getEnv().set(GRB_IntParam_OutputFlag, 0);
-        //model.getEnv().set(GRB_IntParam_SolutionLimit, 2);
-
+        
         //sigma defined over halfedges
         std::vector<GRBVar> sigma;
         for (size_t i = 0; i < gluedMesh.nHalfedges(); i++){
@@ -3095,7 +3103,7 @@ std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeome
     } catch(...) {
         std::cout << "Exception during optimization" << std::endl;
     }
-
+    std::cout << "---------------------------------" << std::endl;
     return std::tie(gluedOneForm, objectiveVal);
     
 }
@@ -3229,6 +3237,7 @@ std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPosi
     } catch(...) {
         std::cout << "Exception during optimization" << std::endl;
     }
+
 
     return std::tie(gluedOneForm, objectiveVal);
 

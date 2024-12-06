@@ -29,10 +29,10 @@ void KnitGraph::buildGraph(){
     }
 
     //merge vertices together 
-    epsilonMerging();
+    //epsilonMerging();
 
     //reorder vertex indices
-    makeRealVertices();
+    //makeRealVertices();
     
     //render the knit graph
     renderGraph();
@@ -361,15 +361,29 @@ void KnitGraph::renderGraph(){
     for (int i = 0; i < vertexPositions.size(); i+=2){
         edges.push_back({i, i + 1});
     }
-    auto graph = polyscope::registerCurveNetwork("knit graph ", vertexPositions, edges);
-    graph -> setRadius(0.001);
-    graph -> setEnabled(false);
+    // auto graphReal = polyscope::registerCurveNetwork("knit graph ", vertexPositions, edges);
+    // graphReal -> setRadius(0.001);
+    // graphReal -> setEnabled(false);
 
-    std::vector<Vector3> preMergingVertices;
-    for (auto v : vertices){
-        if (v.isVirtual) continue;
-        preMergingVertices.push_back(v.position);
+    //visualize the knit graph vertices with the virtual connections
+    for (auto &v : vertices){
+        vertexPositions.push_back(v.position);
+        if (v.row_out != -1)
+            edges.push_back({v.id, v.row_out});
+        if (v.col_out[0] != -1)
+            edges.push_back({v.id, v.col_out[0]});
     }
+    auto graphVirtual = polyscope::registerCurveNetwork("knit graph with virtual connections", vertexPositions, edges);
+    graphVirtual -> setRadius(0.001);
+    graphVirtual -> setEnabled(false);
+
+    
+
+    // std::vector<Vector3> preMergingVertices;
+    // for (auto v : vertices){
+    //     if (v.isVirtual) continue;
+    //     preMergingVertices.push_back(v.position);
+    // }
 
     // auto preMergVerts = polyscope::registerPointCloud("real vertices", preMergingVertices);
     // preMergVerts->setEnabled(false);
