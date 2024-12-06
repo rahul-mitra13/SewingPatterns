@@ -101,7 +101,7 @@ void showStripePatterns(){
   globalPSMesh->addVertexVectorQuantity("vertexVectorField", vertexVectorField);
   globalPSMesh->addFaceScalarQuantity("knoppel face singularities", stripeSingularities);
   globalPSMesh->addFaceScalarQuantity("knoppel field singularities", fieldSingularities);
-  globalPSMesh->addCornerScalarQuantity("stripeValues", prepareCornerData(stripeValues));
+  globalPSMesh->addCornerScalarQuantity("knoppel stripe values", prepareCornerData(stripeValues));
   std::vector<Vector3> knoppelPos; 
   std::vector<std::array<size_t, 2>> knoppelEdges; 
   std::tie(knoppelPos, knoppelEdges) = extractPolylinesFromStripePattern(*globalGeometry, stripeValues, stripeSingularities,
