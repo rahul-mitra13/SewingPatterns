@@ -29,13 +29,13 @@ void KnitGraph::buildGraph(){
     }
 
     //merge vertices together 
-    epsilonMerging();
+    //epsilonMerging();
 
     //merge the virtual vertices 
-    //mergeVirtual();
+    mergeVirtual();
 
     //reorder vertex indices
-    makeRealVertices();
+    //makeRealVertices();
     
     //render the knit graph
     renderGraph();
@@ -306,13 +306,18 @@ void KnitGraph::connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices){
     std::set<int> uniqueAlphas;
     std::set<int> uniqueBetas;
 
-    for (knitGraphVertex v : faceVertices){
+    for (knitGraphVertex &v : faceVertices){
         if (!v.isBetaVirtual) uniqueAlphas.insert(hashFloatQuantized(v.alpha_tag));
         if (!v.isAlphaVirtual) uniqueBetas.insert(hashFloatQuantized(v.beta_tag));
     }
+    std::map<int, int> currAlphaRow;
+    std::map<int, int> currBetaCol;
+    knitGraphVertex* currVertex;
+    knitGraphVertex* nextVertex;
+    
     for (int currHashedAlphaVal : uniqueAlphas){
         //make an ordered map to store beta values for the current alpha value
-        std::map<int, int> currAlphaRow;
+        currAlphaRow.clear();
         for (knitGraphVertex v : faceVertices){
             if (hashFloatQuantized(v.alpha_tag) == currHashedAlphaVal){
                 //if a vertex has the same alpha_tag as the current alpha val, place them in currAlphaRow and order them according to their beta
@@ -321,18 +326,16 @@ void KnitGraph::connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices){
         }
         //set the course connections using the map (skip the last element)
         for (auto it = currAlphaRow.begin(); it != std::prev(currAlphaRow.end()); it++){
-            knitGraphVertex& currVertex = vertices[it->second];
-            knitGraphVertex& nextVertex = vertices[std::next(it)->second]; 
-
-            currVertex.row_out = nextVertex.id;
-            nextVertex.row_in = currVertex.id;
+            currVertex = &vertices[it->second];
+            nextVertex = &vertices[std::next(it)->second]; 
+            currVertex->row_out = nextVertex->id;
+            nextVertex->row_in = currVertex->id;
         }
     }
-
-
+    
     for (int currHashedBetaVal : uniqueBetas){
-        //make an ordered map to store alpha values for the current beta value
-        std::map<int, int> currBetaCol;
+        //make an ordered map to store the alpha tags for the current beta value
+        currBetaCol.clear();
         for (knitGraphVertex v : faceVertices){
             if (hashFloatQuantized(v.beta_tag) == currHashedBetaVal){
                 //if a vertex has the same beta_tag as the current beta val, place them in currBetaCol and order them according to their alpha
@@ -341,20 +344,32 @@ void KnitGraph::connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices){
         }
         //set the wale connections using the map
         for (auto it = currBetaCol.begin(); it != std::prev(currBetaCol.end()); it++){
-            knitGraphVertex& currVertex = vertices[it->second];
-            knitGraphVertex& nextVertex = vertices[std::next(it)->second];
+            currVertex = &vertices[it->second];
+            nextVertex = &vertices[std::next(it)->second];
 
-            currVertex.col_out[0] = nextVertex.id;
-            nextVertex.col_in[0] = currVertex.id;
+            currVertex->col_out[0] = nextVertex->id;
+            nextVertex->col_in[0] = currVertex->id;
         }
     }
 
 }
 
 void KnitGraph::mergeVirtual(){
+
+    for (knitGraphVertex &v : vertices){
+        if (!v.isVirtual) continue;
+        if (v.row_out == -1 && v.row_in == -1 && 
+            v.col_out[0] == -1 && v.col_in[0] == -1){
+                std::cout << "virtual vertex " << v.id << " has no connections " << std::endl; 
+                std::cout << "face = " << v.face << std::endl;
+            }
+
+    }
+
     double eps = 1e-8;
     int numCourseErrors = 0;
     int numWaleErrors = 0;
+    /**
     for (knitGraphVertex &v : vertices){
         int courseCtr = 0;
         int waleCtr = 0;
@@ -363,37 +378,30 @@ void KnitGraph::mergeVirtual(){
         || v.edge->isBoundary()))  continue;//skip singular and boundary edges for now
         for (knitGraphVertex &k : vertices){
             if (v.isAlphaVirtual){
-                // if (v.row_in == -1 && v.row_out == -1){
-                //     std::cout << "alpha virtual vertex " << v.id << " has no row in or out set " << std::endl;
-                //     std::cout << "row_in = " << v.row_in << std::endl;
-                //     std::cout << "row_out = " << v.row_out << std::endl;
-                //     std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
-                //     std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
-                // }
                 if (norm(v.position - k.position) < eps && k.isAlphaVirtual && v.id != k.id){
                     if (v.row_out == -1 && k.row_out != -1){
-                        std::cout << "v.row_out is unset but k.row_out is set " << std::endl;
+                        //std::cout << "v.row_out is unset but k.row_out is set " << std::endl;
                         vertices[v.row_in].row_out = k.row_out;
                         vertices[k.row_out].row_in = v.row_in;
                     }
                     else if (k.row_out == -1 && v.row_out != -1){
-                        std::cout << "k.row_out is unset but v.row_out is set " << std::endl;
+                        //std::cout << "k.row_out is unset but v.row_out is set " << std::endl;
                         vertices[k.row_in].row_out = v.row_out;
                         vertices[v.row_out].row_in = k.row_in;
                     }
                     else if (v.row_in == -1 && k.row_in != -1){
-                        std::cout << "v.row_in is unset but k.row_in is set " << std::endl;
+                        //std::cout << "v.row_in is unset but k.row_in is set " << std::endl;
                         vertices[v.row_out].row_in = k.row_in;
                         vertices[k.row_in].row_out = v.row_out;
                     }
                     else if (k.row_in == -1 && v.row_in != -1){
-                        std::cout << "k.row_in is unset but v.row_in is set " << std::endl;
+                        //std::cout << "k.row_in is unset but v.row_in is set " << std::endl;
                         vertices[k.row_out].row_in = v.row_in;
                         vertices[v.row_in].row_out = k.row_out;
                     }
                     else if (k.row_out == -1 && v.row_out == -1
                         && k.row_in == -1 && v.row_in == -1){
-                        std::cout << "Both row in/out unset in merge " << std::endl;
+                        //std::cout << "Both row in/out unset in merge " << std::endl;
                         numCourseErrors++;
                     }
                     courseCtr++;
@@ -402,28 +410,28 @@ void KnitGraph::mergeVirtual(){
             else if (v.isBetaVirtual){
                 if (norm(v.position - k.position) < eps && k.isBetaVirtual && v.id != k.id){
                     if (v.col_out[0] == -1 && k.col_out[0] != -1){
-                        std::cout << "v.col_out[0] is unset but k.col_out[0] is set " << std::endl;
+                        //std::cout << "v.col_out[0] is unset but k.col_out[0] is set " << std::endl;
                         vertices[v.col_in[0]].col_out[0] = k.col_out[0];
                         vertices[k.col_out[0]].col_in[0] = v.col_in[0];
                     }
                     else if (k.col_out[0] == -1 && v.col_out[0] != -1){
-                        std::cout << "k.col_out[0] is unset but v.col_out[0] is set " << std::endl;
+                        //std::cout << "k.col_out[0] is unset but v.col_out[0] is set " << std::endl;
                         vertices[k.col_in[0]].col_out[0] = v.col_out[0];
                         vertices[v.col_out[0]].col_in[0] = k.col_in[0];
                     }
                     else if (v.col_in[0] == -1 && k.col_in[0] != -1){
-                        std::cout << "v.col_in[0] is unset but k.col_in[0] is set " << std::endl;
+                        //std::cout << "v.col_in[0] is unset but k.col_in[0] is set " << std::endl;
                         vertices[k.col_in[0]].col_out[0] = v.col_out[0];
                         vertices[v.col_out[0]].col_in[0] = k.col_in[0];
                     }
                     else if (k.col_in[0] == -1 && v.col_in[0] != -1){
-                        std::cout << "k.col_in[0] is unset but v.col_in[0] is set " << std::endl;
+                        //std::cout << "k.col_in[0] is unset but v.col_in[0] is set " << std::endl;
                         vertices[v.col_in[0]].col_out[0] = k.col_out[0];
                         vertices[k.col_out[0]].col_in[0] = v.col_in[0];
                     }
                     else if (k.col_out[0] == -1 && v.col_out[0] == -1
                         && k.col_in[0] == -1 && v.col_in[0] == -1){
-                        std::cout << "Both row in/out unset in merge " << std::endl;
+                        //std::cout << "Both row in/out unset in merge " << std::endl;
                         numWaleErrors++;
                     }
                     waleCtr++;
@@ -441,55 +449,56 @@ void KnitGraph::mergeVirtual(){
     }
     std::cout << "number of course errors =  " << numCourseErrors << std::endl;
     std::cout << "number of wale errors = " << numWaleErrors << std::endl;
+    */
 }
 
 void KnitGraph::renderGraph(){
     
-    for (auto &v : realVertices){
-        if (v.row_out != -1 && realVertices[v.row_out].row_in == v.id){
-            vertexPositions.push_back(v.position);
-            vertexPositions.push_back(realVertices[v.row_out].position);
-        }
-        if (v.col_out[0] != -1 && realVertices[v.col_out[0]].col_in[0] == v.id){
-            vertexPositions.push_back(v.position);
-            vertexPositions.push_back(realVertices[v.col_out[0]].position);
-        }
+    // for (auto &v : realVertices){
+    //     if (v.row_out != -1 && realVertices[v.row_out].row_in == v.id){
+    //         vertexPositions.push_back(v.position);
+    //         vertexPositions.push_back(realVertices[v.row_out].position);
+    //     }
+    //     if (v.col_out[0] != -1 && realVertices[v.col_out[0]].col_in[0] == v.id){
+    //         vertexPositions.push_back(v.position);
+    //         vertexPositions.push_back(realVertices[v.col_out[0]].position);
+    //     }
 
-        if (v.col_out[1] != -1 && realVertices[v.col_out[1]].col_in[1] == v.id){
-            vertexPositions.push_back(v.position);
-            vertexPositions.push_back(realVertices[v.col_out[1]].position);
+    //     if (v.col_out[1] != -1 && realVertices[v.col_out[1]].col_in[1] == v.id){
+    //         vertexPositions.push_back(v.position);
+    //         vertexPositions.push_back(realVertices[v.col_out[1]].position);
 
-        }
-    }
+    //     }
+    // }
 
-    for (int i = 0; i < vertexPositions.size(); i+=2){
-        edges.push_back({i, i + 1});
-    }
-    auto graphReal = polyscope::registerCurveNetwork("knit graph ", vertexPositions, edges);
-    graphReal -> setRadius(0.001);
-    graphReal -> setEnabled(false);
+    // for (int i = 0; i < vertexPositions.size(); i+=2){
+    //     edges.push_back({i, i + 1});
+    // }
+    // auto graphReal = polyscope::registerCurveNetwork("knit graph ", vertexPositions, edges);
+    // graphReal -> setRadius(0.001);
+    // graphReal -> setEnabled(false);
 
     //visualize the knit graph vertices with the virtual connections
-    // for (auto &v : vertices){
-    //     vertexPositions.push_back(v.position);
-    //     if (v.row_out != -1)
-    //         edges.push_back({v.id, v.row_out});
-    //     if (v.col_out[0] != -1)
-    //         edges.push_back({v.id, v.col_out[0]});
-    // }
-    // auto graphVirtual = polyscope::registerCurveNetwork("knit graph with virtual connections", vertexPositions, edges);
-    // graphVirtual -> setRadius(0.001);
-    // graphVirtual -> setEnabled(false);
+    for (auto &v : vertices){
+        vertexPositions.push_back(v.position);
+        if (v.row_out != -1)
+            edges.push_back({v.id, v.row_out});
+        if (v.col_out[0] != -1)
+            edges.push_back({v.id, v.col_out[0]});
+    }
+    auto graphVirtual = polyscope::registerCurveNetwork("knit graph with virtual connections", vertexPositions, edges);
+    graphVirtual -> setRadius(0.001);
+    graphVirtual -> setEnabled(false);
 
     
-    // std::vector<Vector3> preMergingVertices;
-    // for (auto v : vertices){
-    //     if (v.isVirtual) continue;
-    //     preMergingVertices.push_back(v.position);
-    // }
+    std::vector<Vector3> virtualVertices;
+    for (auto v : vertices){
+        if (!v.isVirtual) continue;
+        virtualVertices.push_back(v.position);
+    }
 
-    // auto preMergVerts = polyscope::registerPointCloud("real vertices", preMergingVertices);
-    // preMergVerts->setEnabled(false);
+    auto virtualVerticesPC = polyscope::registerPointCloud("virtual vertices", virtualVertices);
+    virtualVerticesPC->setEnabled(false);
 }
 
 //perform epsilon merging to 
