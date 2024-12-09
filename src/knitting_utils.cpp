@@ -2781,6 +2781,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 oldDistance = newDistance;
                 courseOneFormGrad = gradSigmaTilde;
                 std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
+                psMesh.addCornerScalarQuantity("stripeValuesSigmaCourse after " + std::to_string(numRuns-1) + " runs", prepareCornerData(stripeValuesSigmaCourse));
                 std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
                                                 edgeMap, components);
                 //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
