@@ -29,7 +29,7 @@ void KnitGraph::buildGraph(){
     }
 
     //merge vertices together 
-    epsilonMerging();
+    //epsilonMerging();
 
     //edgeMerging();
 
@@ -86,7 +86,7 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
     b2 = betaJ - betaK;
     c2 = betaK;
 
-    //trace the middle of the stripes to avoid floating point error
+    //trace the middle of the stripes
     alpha_start = (std::ceil((alpha_min - period/4.)/period) * period) + period/4.;
     alpha_end = (std::floor((alpha_max - period/4.)/period) * period) + period/4.;
     beta_start = (std::ceil((beta_min - period/4.)/period) * period) + period/4.;
@@ -505,37 +505,27 @@ void KnitGraph::mergeVirtual(){
 void KnitGraph::renderGraph(){
     
     //visualize the knit graph vertices with the virtual connections
-    // for (auto &v : vertices){
-    //     if (v.isVirtual) continue;
-    //     if (vertices[v.row_out].isVirtual) continue;
-    //     if (vertices[v.col_out[0]].isVirtual) continue;
+    // for (auto &v : realVertices){
+    //     // if (v.isVirtual) continue;
+    //     // if (vertices[v.row_out].isVirtual) continue;
+    //     // if (vertices[v.col_out[0]].isVirtual) continue;
     //     vertexPositions.push_back(v.position);
     //     if (v.row_out != -1)
     //         edges.push_back({v.id, v.row_out});
     //     if (v.col_out[0] != -1)
     //         edges.push_back({v.id, v.col_out[0]});
     // }
-    // auto graphVirtual = polyscope::registerCurveNetwork("knit graph with virtual connections", vertexPositions, edges);
+    // auto graphVirtual = polyscope::registerCurveNetwork("knit graph with real connections", vertexPositions, edges);
     // graphVirtual -> setRadius(0.001);
     // graphVirtual -> setEnabled(false);
 
-    int i = 0;
-    //visualize the real knit graph 
-    for (auto &v : vertices){
-        if (v.isVirtual) continue;
-        std::cout << "id = " << v.id << std::endl;
-        std::cout << "node id = " << i++ << std::endl;
-        std::cout << "row in = " << v.row_in << std::endl;
-        std::cout << "row out = " << v.row_out << std::endl;
-        std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
-        std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
-        std::cout << "---------------------" << std::endl;
-        
-        if (v.row_out != -1 && !vertices[v.row_out].isVirtual){
+    //visualize the knit graph with virtual connections
+    for (auto &v : vertices){ 
+        if (v.row_out != -1 ){
             vertexPositions.push_back(v.position);
             vertexPositions.push_back(vertices[v.row_out].position);
         }
-        if (v.col_out[0] != -1 && !vertices[v.col_out[0]].isVirtual){
+        if (v.col_out[0] != -1){
             vertexPositions.push_back(v.position);
             vertexPositions.push_back(vertices[v.col_out[0]].position);
         }
@@ -545,7 +535,7 @@ void KnitGraph::renderGraph(){
         edges.push_back({i, i + 1});
     }
 
-    auto graph = polyscope::registerCurveNetwork("knit graph ", vertexPositions, edges);
+    auto graph = polyscope::registerCurveNetwork("knit graph with virtual connections", vertexPositions, edges);
     graph -> setRadius(0.001);
     graph -> setEnabled(false);
 
@@ -610,11 +600,20 @@ void KnitGraph::epsilonMerging(){
             auto vCluster = findCluster(v, eps);
             std::cout << "size of cluster = " << vCluster.size() << std::endl;
             if (vCluster.size() == 1) {
+                v.hasBeenHandled = true;
                 continue;
             }
             v.hasBeenHandled = true;
             mergeCluster(vCluster, eps);
         }
+    }
+
+    //remove any lingering connections from real vertices to virtual vertices 
+    for (knitGraphVertex &v : vertices){
+        if (vertices[v.row_out].isVirtual) v.row_out = -1;
+        if (vertices[v.row_in].isVirtual) v.row_in = -1;
+        if (vertices[v.col_in[0]].isVirtual) v.col_in[0] = -1;
+        if (vertices[v.col_out[0]].isVirtual) v.col_out[0] = -1;
     }
 }
 
@@ -675,11 +674,11 @@ void KnitGraph::mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps)
 
         //set all the vertices in this cluster to virtual 
         //except for the vertex we want to keep
-        for (auto &vi : vCluster){
-            if (vi.id != id_to_keep){
-                vi.isVirtual = true;
-            }
-        }
+        // for (auto &vi : vCluster){
+        //     if (vi.id != id_to_keep){
+        //         vi.isVirtual = true;
+        //     }
+        // }
 
         // auto &realVertex = vertices[id_to_keep];
 
@@ -749,14 +748,14 @@ void KnitGraph::mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps)
         }
 
         //unset the connections for the virtual vertices in the cluster
-        for (auto &vi : vCluster){
-            vi.row_in = -1;
-            vi.row_out = -1;
-            vi.col_in[0] = -1;
-            vi.col_in[1] = -1;
-            vi.col_out[0] =  -1;
-            vi.col_out[1] = -1;
-        }
+        // for (auto &vi : vCluster){
+        //     vi.row_in = -1;
+        //     vi.row_out = -1;
+        //     vi.col_in[0] = -1;
+        //     vi.col_in[1] = -1;
+        //     vi.col_out[0] =  -1;
+        //     vi.col_out[1] = -1;
+        // }
 
         std::cout << "global row in = " << global_row_in << std::endl;
         std::cout << "global row out = " << global_row_out << std::endl;
@@ -764,14 +763,13 @@ void KnitGraph::mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps)
         std::cout << "global col out = " << global_col_out << std::endl;
         std::cout << "----------------------------" << std::endl;
 
-        
+        //shouldn't really matter the order in which merging is happening
         if (global_row_in >= 0 && global_row_in < vertices.size()){
             if (global_row_out >= 0 && global_row_out < vertices.size()){//bounds checking
                 vertices[global_row_in].row_out = global_row_out;
                 vertices[global_row_out].row_in = global_row_in;
             }
         }
-
         if (global_col_in >= 0 && global_col_in < vertices.size()){
             if (global_col_out >= 0 && global_col_out < vertices.size()){//bounds checking
                 vertices[global_col_in].col_out[0] = global_col_out;
@@ -791,6 +789,19 @@ void KnitGraph::makeRealVertices(){
     int i = 0;
     for (knitGraphVertex& v: vertices){
         if (v.isVirtual) continue;//only handle real vertices
+        if (v.row_out != - 1 && vertices[v.row_out].isVirtual){
+            std::cout << "vertex " << v.id << " still has a row out to a virtual vertex " << std::endl;
+        }
+        if (v.row_out == -1){
+            std::cout << "vertex " << v.id << " has no row out set " << std::endl;
+            std::cout << "new id = " << i << std::endl;
+        }
+        // std::cout << "id = " << v.id << std::endl;
+        // std::cout << "row in = " << v.row_in << std::endl;
+        // std::cout << "row out = " << v.row_out << std::endl;
+        // std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
+        // std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
+        // std::cout << "---------------" << std::endl;
         //insert real vertices into the map
         mp.insert({v.id, i++});
     }
@@ -806,58 +817,67 @@ void KnitGraph::makeRealVertices(){
     //resize the real vertices
     realVertices.resize(mp.size());
 
+    std::cout << "size of real vertices = " << realVertices.size() << std::endl;
+
     //update the ids in the knit graph
     for (knitGraphVertex& v : vertices){
+
         if (v.isVirtual) continue;//only handle real vertices
-        auto it = mp.find(v.id);
-        id = it -> second;//new id
+
+        int id = mp[v.id];
 
         if (v.row_in == -1){//row_in is unset
             row_in = -1;
         }
         else{
-            it = mp.find(v.row_in);//find the row_in from the original graph
-            row_in = it -> second;
+            // it = mp.find(v.row_in);//find the row_in from the original graph
+            // row_in = it -> second;
+            row_in = mp[v.row_in];
         }
 
         if (v.row_out == -1){//row_out is unset
             row_out = -1;
         }
         else{
-            it = mp.find(v.row_out);//find the row out from the original graph
-            row_out = it -> second;
+            // it = mp.find(v.row_out);//find the row out from the original graph
+            // row_out = it -> second;
+            row_out = mp[v.row_out];
         }
 
         if (v.col_in[0] == -1){//col_in_1 is unset
             col_in_1 = -1;
         }
         else{
-            it = mp.find(v.col_in[0]);//find the col_in_1 from the orginal graph
-            col_in_1 = it -> second;
+            // it = mp.find(v.col_in[0]);//find the col_in_1 from the orginal graph
+            // col_in_1 = it -> second;
+            col_in_1 = mp[v.col_in[0]];
         }
 
         if (v.col_in[1] == -1){//col_in_2 is unset
             col_in_2 = -1;
         }
         else{
-            it = mp.find(v.col_in[1]);//find the col_in_1 from the orginal graph
-            col_in_2 = it -> second;
+            // it = mp.find(v.col_in[1]);//find the col_in_1 from the orginal graph
+            // col_in_2 = it -> second;
+            col_in_2 = mp[v.col_in[1]];
         }
 
         if (v.col_out[0] == -1){//col_out_1 is unset
             col_out_1 = -1;
         }
         else{
-            it = mp.find(v.col_out[0]);//find the col_out_1 from the orginal graph
-            col_out_1 = it -> second;
+            // it = mp.find(v.col_out[0]);//find the col_out_1 from the orginal graph
+            // col_out_1 = it -> second;
+            col_out_1 = mp[v.col_out[0]]; 
         }
 
         if (v.col_out[1] == -1){//col_out_2 is unset
             col_out_2 = -1;
         }
         else{
-            it = mp.find(v.col_out[1]);//find the col_out_1 from the orginal graph
-            col_out_2 = it -> second;
+            // it = mp.find(v.col_out[1]);//find the col_out_1 from the orginal graph
+            // col_out_2 = it -> second;
+            col_out_2 = mp[v.col_out[1]];
         }
 
         //update the info
