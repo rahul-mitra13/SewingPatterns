@@ -99,14 +99,14 @@ void showStripePatterns(){
   std::tie(stripeValues, stripeSingularities, fieldSingularities) = computeStripePattern(*globalGeometry, freq, lineField); // this is a GC call
   // Do some visualization
   globalPSMesh->addVertexVectorQuantity("vertexVectorField", vertexVectorField);
-  globalPSMesh->addFaceScalarQuantity("knoppel face singularities", stripeSingularities);
-  globalPSMesh->addFaceScalarQuantity("knoppel field singularities", fieldSingularities);
-  globalPSMesh->addCornerScalarQuantity("knoppel stripe values", prepareCornerData(stripeValues));
+  globalPSMesh->addFaceScalarQuantity("knoppel course face singularities", stripeSingularities);
+  globalPSMesh->addFaceScalarQuantity("knoppel course field singularities", fieldSingularities);
+  globalPSMesh->addCornerScalarQuantity("knoppel course stripe values", prepareCornerData(stripeValues));
   std::vector<Vector3> knoppelPos; 
   std::vector<std::array<size_t, 2>> knoppelEdges; 
   std::tie(knoppelPos, knoppelEdges) = extractPolylinesFromStripePattern(*globalGeometry, stripeValues, stripeSingularities,
                                           fieldSingularities, lineField, false);
-  auto knoppelStripes = polyscope::registerCurveNetwork("knoppel wale stripes stripes", knoppelPos, knoppelEdges);
+  auto knoppelStripes = polyscope::registerCurveNetwork("knoppel course stripes", knoppelPos, knoppelEdges);
   knoppelStripes->setRadius(0.001);
   knoppelStripes->setEnabled(false);
 
