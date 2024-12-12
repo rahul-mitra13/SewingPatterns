@@ -438,11 +438,11 @@ std::unique_ptr<EdgeLengthGeometry> createGluedEdgeLengthGeometry(VertexPosition
     }
     ManifoldSurfaceMesh * gluedMesh = new ManifoldSurfaceMesh(polygons);
 
-    //create a map (vertex in original mesh -> outgoing halfedges in the glued mesh)
+    //create a map (vertex in original mesh -> outgoing global halfedges in glued context)
     for (Vertex v : mesh.vertices())
         gluedOneRingMap[v.getIndex()] = {};
-    for (Halfedge he : gluedMesh->halfedges())
-        for (int iv : gluedMeshToOriginal[he.tailVertex().getIndex()])
+    for (Halfedge he : mesh.halfedges())
+        for (int iv : gluedMeshToOriginal[vertexMap[he.tailVertex().getIndex()]])
             gluedOneRingMap[iv].push_back(he);
 
     // Setup a map for glued mesh: (v1, v2) -> he
