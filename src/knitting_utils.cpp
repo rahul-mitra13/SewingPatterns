@@ -367,7 +367,6 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
         std::complex<double> complexDirectionField(r * std::complex<double>(cos(2.0 * a), sin(2.0 * a)));
         directionField[v] = Vector2::fromComplex(complexDirectionField);
         directionField[v] = unit(directionField[v]);
-
         //directionField[v] = rotate90 ? directionField[v].rotate90() : directionField[v];
     }
 
@@ -2732,13 +2731,16 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             Model testModel = model; 
             std::vector<std::pair<std::vector<double>, double>> testEdgePathConstraints = edgePathConstraints;
             std::vector<int> testEdgeIndices = edgeIndices;
+            //try a new pair of singularities
             testEdgeIndices[edgeMap[singEdgePair.first]] = -1;
             testEdgeIndices[edgeMap[singEdgePair.second]] = 1;
             std::tie(globalPath, gluedPath) = constructEdgePath(globalGeometry, gluedGeometry, globalMesh.edge(singEdgePair.first), globalMesh.edge(singEdgePair.second),
                                         vertexMap, edgeMap, globalTimeFunctionGradientsNormalized, gluedHeWeights);
             testEdgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
-            testModel.setEdgePathConstraints(edgePathConstraints);
+            testModel.setEdgePathConstraints(testEdgePathConstraints);
             testModel.setEdgeIndices(testEdgeIndices);
+
+            
             
             //solve the model with singularities
             std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, testModel, vertexMap, G, psMesh);
@@ -3017,6 +3019,9 @@ std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeome
     gluedGeometry.requireEdgeLengths();
     //require edge cotan weights
     gluedGeometry.requireEdgeCotanWeights();
+    //require the corner angles 
+    gluedGeometry.requireCornerAngles();
+
 
     // std::cout << "In virtual sigma function " << std::endl;
     // std::cout << "size of edge indices = " << edgeIndices.size() << std::endl;
@@ -3033,6 +3038,8 @@ std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeome
         //reformulate the problem in terms of halfedges 
         // Create an environment
         GRBEnv env = GRBEnv(true);
+        //don't log output to console 
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.set("LogFile", "1-form computation.log");
         env.start();
 
@@ -3040,8 +3047,7 @@ std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeome
         GRBModel model = GRBModel(env);
 
         //set the timeout
-        model.getEnv().set(GRB_DoubleParam_TimeLimit, 0.5);
-        model.getEnv().set(GRB_IntParam_OutputFlag, 0);
+        model.getEnv().set(GRB_DoubleParam_TimeLimit, 1.0);
         
         //sigma defined over halfedges
         std::vector<GRBVar> sigma;
@@ -3080,8 +3086,6 @@ std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeome
             }
         }
 
-    
-
         //set up the objective term
         GRBQuadExpr obj = 0;        
     
@@ -3090,6 +3094,17 @@ std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeome
             obj += gluedGeometry.edgeCotanWeights[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
         }
 
+        // for (Edge e : gluedMesh.edges()){
+        //     double weight = 0.;
+        //     for (Face f: e.adjacentFaces()){
+        //         for (Corner c: f.adjacentCorners()){
+        //             weight += atan(gluedGeometry.cornerAngles[c] / 2.) / gluedGeometry.edgeLengths[e];
+        //         }
+        //     }
+        //     
+        //     obj += weight * sigma[e.halfedge().getIndex()] * sigma[e.halfedge().twin().getIndex()];
+        // }
+
         model.setObjective(obj, GRB_MINIMIZE);
         model.optimize(); 
         objectiveVal = model.get(GRB_DoubleAttr_ObjVal);
@@ -3097,6 +3112,8 @@ std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeome
         for (Halfedge he : gluedMesh.halfedges()){
             gluedOneForm[he] = sigma[he.getIndex()].get(GRB_DoubleAttr_X);
         }
+
+
     }
     catch(GRBException e) {
         std::cout << "Error code = " << e.getErrorCode() << std::endl;
@@ -3222,7 +3239,6 @@ std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPosi
         for (Halfedge he : gluedMesh.halfedges()){
             obj += gluedGeometry.edgeCotanWeights[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
         }
-
 
         model.setObjective(obj, GRB_MINIMIZE);
         model.optimize(); 

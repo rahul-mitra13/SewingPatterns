@@ -477,10 +477,8 @@ std::unique_ptr<EdgeLengthGeometry> createGluedEdgeLengthGeometry(VertexPosition
     std::cout << "Is original mesh oriented " << mesh.isOriented() << std::endl;
     std::cout << "Is glued mesh oriented " << gluedMesh -> isOriented() << std::endl;
 
-    //EdgeLengthGeometry * ELG = new EdgeLengthGeometry(*gluedMesh, edgeLengths);
-    //return a smart pointer 
-    //std::unique_ptr<EdgeLengthGeometry> ELGSmart(ELG);
-    return std::unique_ptr<EdgeLengthGeometry>(new EdgeLengthGeometry(*gluedMesh, edgeLengths));
+    //return a pointer
+    return std::make_unique<EdgeLengthGeometry>(*gluedMesh, edgeLengths);
 }
 
 
