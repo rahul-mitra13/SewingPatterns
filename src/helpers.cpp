@@ -401,103 +401,65 @@ std::vector<double> createEdgeWeightsFromVertexList(VertexPositionGeometry& geom
 std::unique_ptr<EdgeLengthGeometry> createGluedEdgeLengthGeometry(VertexPositionGeometry& geometry, std::vector<std::pair<int, int>>& vertexMappingsPairs, std::map<int,int>& vertexMap, 
                                     std::map<int, int>& edgeMap, std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
     SurfaceMesh& mesh = geometry.mesh;
-    //find original index to glued mesh index for vertices
+
+    // vertexMap will map: original mesh -> glued mesh.
+    // Store another map from glued mesh index to original mesh indices
+    // (it's the inverse of vertexMap)
+    std::map<int, std::vector<int>> gluedMeshToOriginal;
+
+    // Setup vertexMap and its inverse gluedMeshVertexIndexToOriginalMeshIndex
+    UF uf(mesh.nVertices()); // union find
+    for (auto [v1,v2] : vertexMappingsPairs)
+        uf.merge(v1, v2); 
+    
+    // Map each root to a new vertex in the glued mesh
     int numUniqueVertices = 0;
-    //store another map from glued mesh index to original mesh index 
-    std::map<int, int> gluedMeshVertexIndexToOriginalMeshIndex;
-
-    for (Vertex v : mesh.vertices()){
-        size_t iV = v.getIndex();
-        //iterate over the mappings 
-        for (auto p : vertexMappingsPairs){
-            if (p.first == iV || p.second == iV){
-                if (vertexMap.find(p.first) == vertexMap.end()
-                && vertexMap.find(p.second) == vertexMap.end()){
-                    vertexMap.insert({p.first, numUniqueVertices});
-                    vertexMap.insert({p.second, numUniqueVertices});
-                    //put in the other other map 
-                    gluedMeshVertexIndexToOriginalMeshIndex.insert({numUniqueVertices, p.first});
-                    numUniqueVertices++;
-                }
-                if (vertexMap.find(p.first) != vertexMap.end()&&
-                    vertexMap.find(p.second) == vertexMap.end()){
-                    vertexMap.insert({p.second, vertexMap.at(p.first)});
-                }
-                if (vertexMap.find(p.second) != vertexMap.end() &&
-                    vertexMap.find(p.first) == vertexMap.end()){
-                    vertexMap.insert({p.first, vertexMap.at(p.second)});
-                }
-            }
-        }
-        if (vertexMap.find(iV) == vertexMap.end()){
-            vertexMap.insert({iV, numUniqueVertices});
-            //put it in the other map 
-            gluedMeshVertexIndexToOriginalMeshIndex.insert({numUniqueVertices, iV});
-
+    for (size_t i = 0; i < mesh.nVertices(); i++) {
+        int root = uf.find(i);
+        if (vertexMap.count(root) == 0) { // this set has not been mapped yet
+            vertexMap[root] = numUniqueVertices;
+            gluedMeshToOriginal[numUniqueVertices] = {root};
             numUniqueVertices++;
+        } else if (i != root) { // i has a glued counterpart, but is not the root
+            vertexMap[i] = vertexMap[root];
+            gluedMeshToOriginal[vertexMap[i]].push_back(i);
         }
     }
+    
+    // Copy triangulation with new vertex indices, and create the glued mesh
     std::vector<std::vector<size_t>> polygons;
     geometry.requireEdgeLengths();
     for (Face f : mesh.faces()){
         if (f.isBoundaryLoop()) continue;
         std::vector<size_t> currPolygon;
-        int i = vertexMap[f.halfedge().tailVertex().getIndex()];
-        int j = vertexMap[f.halfedge().next().tailVertex().getIndex()];
-        int k = vertexMap[f.halfedge().next().next().tailVertex().getIndex()];
-        currPolygon.push_back(i);
-        currPolygon.push_back(j);
-        currPolygon.push_back(k);
+        for (Vertex v : f.adjacentVertices())
+            currPolygon.push_back(vertexMap[v.getIndex()]);
         polygons.emplace_back(currPolygon);
     }
     ManifoldSurfaceMesh * gluedMesh = new ManifoldSurfaceMesh(polygons);
-    //set edge lengths in the glued mesh 
+
+    //create a map (vertex in original mesh -> outgoing halfedges in the glued mesh)
+    for (Vertex v : mesh.vertices())
+        gluedOneRingMap[v.getIndex()] = {};
+    for (Halfedge he : gluedMesh->halfedges())
+        for (int iv : gluedMeshToOriginal[he.tailVertex().getIndex()])
+            gluedOneRingMap[iv].push_back(he);
+
+    // Setup a map for glued mesh: (v1, v2) -> he
+    std::map<std::pair<int,int>, Halfedge> vertexpair2halfedge;
+    for (Halfedge he : gluedMesh->halfedges())
+        vertexpair2halfedge[{he.tailVertex().getIndex(), he.tipVertex().getIndex()}] = he;
+
+    //build a map from edges in the original mesh to edges in the glued mesh 
+    //also set edge lengths in the glued mesh 
     EdgeData<double> edgeLengths(*gluedMesh);
     geometry.requireEdgeLengths();
-    //create a map (vertex in original mesh -> outgoing halfedges in the glued mesh)
-    //don't need this really slow bit if you're carrying out the intergration in the glued mesh setting
-    for (Vertex v : mesh.vertices()){
-        gluedOneRingMap[v.getIndex()] = std::vector<Halfedge>{};
-        std::vector<Halfedge> halfedges;
-        std::vector<Halfedge> gluedMeshHalfedges;
-        Vertex gluedMeshVertex = gluedMesh->vertex(vertexMap[v.getIndex()]);
-        for (Halfedge he : gluedMeshVertex.outgoingHalfedges()){
-            gluedMeshHalfedges.push_back(he);
-        }
-        //find the corresponding halfedges in the original mesh
-        for (Halfedge he : mesh.halfedges()){
-            for (Halfedge heGlued : gluedMeshHalfedges){
-                if (vertexMap[he.tailVertex().getIndex()] == heGlued.tailVertex().getIndex() && vertexMap[he.tipVertex().getIndex()] == 
-                heGlued.tipVertex().getIndex()){
-                gluedOneRingMap[v.getIndex()].push_back(he);
-                break;
-                }
-            }
-        }
+    for (Halfedge he : mesh.halfedges()) {
+        Halfedge heGlued = vertexpair2halfedge[{vertexMap[he.tailVertex().getIndex()], vertexMap[he.tipVertex().getIndex()]}];
+        edgeMap[he.edge().getIndex()] = heGlued.edge().getIndex();
+        edgeLengths[heGlued.edge()] = geometry.edgeLengths[he.edge()];
     }
 
-    if (mesh.nConnectedComponents() == 1){//there is only one connected component so the edge map can be the identity
-        for (Edge e : mesh.edges()){
-            edgeMap.insert({e.getIndex(), e.getIndex()});
-            edgeLengths[e] = geometry.edgeLengths[e];
-        }
-    }
-    else{
-        //build a map from edges in the original mesh to edges in the glued mesh 
-        for (Halfedge he1 : mesh.halfedges()){
-            int v1 = vertexMap[he1.tailVertex().getIndex()];
-            int v2 = vertexMap[he1.tipVertex().getIndex()];
-            //find the corresponding edge in the glued mesh 
-            for (Halfedge he2 : gluedMesh->halfedges()){
-                if (he2.tailVertex().getIndex() == v1 && he2.tipVertex().getIndex() == v2){
-                    edgeMap.insert({he1.edge().getIndex(), he2.edge().getIndex()});
-                    edgeLengths[he2.edge()] = geometry.edgeLengths[he1.edge()];
-                    break;
-                }
-            }
-        } 
-    }
-    
     std::cout << "Number of faces in the original mesh " << mesh.nFaces() << std::endl;
     std::cout << "Number of faces in the glued mesh " << gluedMesh -> nFaces() << std::endl;
     std::cout << "Number of vertices in the original mesh " << mesh.nVertices() << std::endl;
