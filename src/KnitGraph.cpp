@@ -92,6 +92,11 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
     beta_start = (std::ceil((beta_min - period/4.)/period) * period) + period/4.;
     beta_end = (std::floor((beta_max - period/4.)/period) * period) + period/4.;
 
+    // alpha_start = (std::ceil((alpha_min - period/2.)/period) * period) + period/2.;
+    // alpha_end = (std::floor((alpha_max - period/2.)/period) * period) + period/2.;
+    // beta_start = (std::ceil((beta_min - period/2.)/period) * period) + period/2.;
+    // beta_end = (std::floor((beta_max - period/2.)/period) * period) + period/2.;
+
     Eigen::Matrix2f A, A_inv;
     Eigen::Vector2f x, b;
 
@@ -311,25 +316,45 @@ void KnitGraph::connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices){
     //b. Connecting real vertices to virtual vertices 
     //c. Connecting virtual vertices to virtual vertices
 
-    std::set<int> uniqueAlphas;
-    std::set<int> uniqueBetas;
-
-    for (knitGraphVertex &v : faceVertices){
-        if (!v.isBetaVirtual) uniqueAlphas.insert(hashFloatQuantized(v.alpha_tag));
-        if (!v.isAlphaVirtual) uniqueBetas.insert(hashFloatQuantized(v.beta_tag));
-    }
-    std::map<int, int> currAlphaRow;
-    std::map<int, int> currBetaCol;
+    std::vector<double> uniqueAlphas;
+    std::vector<double> uniqueBetas;
+    std::map<double, int> currAlphaRow;
+    std::map<double, int> currBetaCol;
     knitGraphVertex* currVertex;
     knitGraphVertex* nextVertex;
+    double eps = 1e-12;
+
+    for (knitGraphVertex &v : faceVertices){
+        if (!v.isBetaVirtual) {
+            bool isUnique = true;
+            for (double alpha : uniqueAlphas)
+                if (std::abs(alpha - v.alpha_tag) < eps) {
+                    isUnique = false;
+                    break;
+                }
+            if (isUnique)
+                uniqueAlphas.push_back(v.alpha_tag);
+        }
+
+        if (!v.isAlphaVirtual) {
+            bool isUnique = true;
+            for (double beta : uniqueBetas)
+                if (std::abs(beta - v.beta_tag) < eps) {
+                    isUnique = false;
+                    break;
+                }
+            if (isUnique)
+                uniqueBetas.push_back(v.beta_tag);
+        }
+    }
+   
     
-    for (int currHashedAlphaVal : uniqueAlphas){
+    for (double currAlphaVal : uniqueAlphas){
         currAlphaRow.clear();
         //make an ordered map to store beta values for the current alpha value
         for (knitGraphVertex &v : faceVertices){
-            if (hashFloatQuantized(v.alpha_tag) == currHashedAlphaVal){
-                //if a vertex has the same alpha_tag as the current alpha val, place them in currAlphaRow and order them according to their beta
-                currAlphaRow[hashFloatQuantized(v.beta_tag)] = v.id;
+            if (std::fabs(v.alpha_tag - currAlphaVal) < eps){
+                currAlphaRow[v.beta_tag] = v.id;
             }
         }
         //set the course connections using the map
@@ -370,13 +395,12 @@ void KnitGraph::connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices){
         }
     }
     
-    for (int currHashedBetaVal : uniqueBetas){
+    for (double currBetaVal : uniqueBetas){
         //make an ordered map to store the alpha tags for the current beta value
         currBetaCol.clear();
         for (knitGraphVertex &v : faceVertices){
-            if (hashFloatQuantized(v.beta_tag) == currHashedBetaVal){
-                //if a vertex has the same beta_tag as the current beta val, place them in currBetaCol and order them according to their alpha
-                currBetaCol[hashFloatQuantized(v.alpha_tag)] = v.id;
+            if (std::fabs(v.beta_tag - currBetaVal) < eps){
+                currBetaCol[v.alpha_tag] = v.id;
             }
         }
         //set the wale connections using the map
@@ -587,6 +611,17 @@ void KnitGraph::edgeMerging(){
 //merge connections across faces
 void KnitGraph::epsilonMerging(){
 
+    std::vector<Vector3> badVirtuals;
+    for (knitGraphVertex &v : vertices){
+        if (!v.isVirtual) continue;
+        if (v.row_in == -1 && v.row_out == -1 
+            && v.col_in[0] == -1 && v.col_out[0] == -1){
+                badVirtuals.push_back(v.position);
+        }
+    }
+    auto PC = polyscope::registerPointCloud("bad virtuals", badVirtuals);
+    //PC->setRadius(0.001);
+
     //epsilon ball around vertex we hope to merge
     const double eps = 1e-8;
     for (knitGraphVertex &v : vertices) {
@@ -602,6 +637,10 @@ void KnitGraph::epsilonMerging(){
             if (vCluster.size() == 1) {
                 v.hasBeenHandled = true;
                 continue;
+            }
+            if (vCluster.size() != 2){
+                std::cout << "size of cluster is not 2 " << std::endl;
+                exit(0);
             }
             v.hasBeenHandled = true;
             mergeCluster(vCluster, eps);
