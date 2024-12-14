@@ -38,7 +38,8 @@ HalfedgeData<double> constructGluedHalfedgeWeights(VertexPositionGeometry& globa
 //construct an edge path between two singular edges 
 //e1, e2 are in the global setting 
 std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Edge e1, Edge e2, 
-                                        std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, FaceData<Vector3>& globalFaceGradients, HalfedgeData<double>& gluedHeWeights);
+                                        std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, FaceData<Vector3>& globalFaceGradients, HalfedgeData<double>& gluedHeWeights,
+                                        HalfedgeData<double>& sigmaCourseGlued);
 
 
 //update glued halfedge weights 

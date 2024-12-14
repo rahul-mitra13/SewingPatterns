@@ -29,7 +29,7 @@ void KnitGraph::buildGraph(){
     }
 
     //merge vertices together 
-    //epsilonMerging();
+    epsilonMerging();
 
     //edgeMerging();
 
@@ -37,7 +37,7 @@ void KnitGraph::buildGraph(){
     //mergeVirtual();
 
     //reorder vertex indices
-    //makeRealVertices();
+    makeRealVertices();
     
     //render the knit graph
     renderGraph();
@@ -54,7 +54,7 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
 
     double alphaI, alphaJ, alphaK, alpha_min, alpha_max, alpha_start, alpha_end, betaI, betaJ, betaK, beta_min, beta_max, beta_start, beta_end;
 
-    double eps = 1e-15;//for error tolerance
+    double eps = 1e-12;//for error tolerance
 
     std::vector<knitGraphVertex> faceVertices;
 
@@ -92,10 +92,11 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
     beta_start = (std::ceil((beta_min - period/4.)/period) * period) + period/4.;
     beta_end = (std::floor((beta_max - period/4.)/period) * period) + period/4.;
 
-    // alpha_start = (std::ceil((alpha_min - period/2.)/period) * period) + period/2.;
-    // alpha_end = (std::floor((alpha_max - period/2.)/period) * period) + period/2.;
-    // beta_start = (std::ceil((beta_min - period/2.)/period) * period) + period/2.;
-    // beta_end = (std::floor((beta_max - period/2.)/period) * period) + period/2.;
+    // alpha_start = std::ceil(alpha_min/period) * period;
+    // alpha_end = std::floor(alpha_max/period) * period;
+    // beta_start = std::ceil(beta_min/period) * period;
+    // beta_end = std::floor(beta_max/period) * period;
+
 
     Eigen::Matrix2f A, A_inv;
     Eigen::Vector2f x, b;
@@ -103,8 +104,8 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
     //basically solving a 2 by 2 linear system over every face
     //create real vertices
    	//shift up by some small epsilon so that we don't break when Z_start = Z_end
-   	for (j = alpha_start; j < alpha_end + eps; j += period){//step alpha
-   	    for (k = beta_start; k < beta_end + eps; k += period){//step beta
+   	for (j = alpha_start - eps; j < alpha_end + eps; j += period){//step alpha
+   	    for (k = beta_start - eps; k < beta_end + eps; k += period){//step beta
    			//set up the linear system as Ax = b
    			//set RHS to constant
    			RHS_alpha = j - c1;
@@ -143,7 +144,7 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
 
     //interpolate the betas
     //shift up by some small epsilon so that we don't break when Z_start = Z_end
-   	for (j = alpha_start; j < alpha_end + eps; j += period){//fix alpha
+   	for (j = alpha_start - eps; j < alpha_end + eps; j += period){//fix alpha
         //ij edge
         bi = (j - alphaJ) / (alphaI - alphaJ);
         bj = 1.0 - bi;
@@ -225,7 +226,7 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
 
     //interpolate the alphas
     //shift up by some small epsilon so that we don't break when Z_start = Z_end
-   	for (k = beta_start; k < beta_end + eps; k += period){        
+   	for (k = beta_start - eps; k < beta_end + eps; k += period){        
         //ij edge
         bi = (k - betaJ) / (betaI - betaJ);
         bj = 1.0 - bi;
@@ -322,7 +323,7 @@ void KnitGraph::connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices){
     std::map<double, int> currBetaCol;
     knitGraphVertex* currVertex;
     knitGraphVertex* nextVertex;
-    double eps = 1e-12;
+    double eps = 1e-8;
 
     for (knitGraphVertex &v : faceVertices){
         if (!v.isBetaVirtual) {
@@ -361,37 +362,8 @@ void KnitGraph::connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices){
         for (auto it = currAlphaRow.begin(); it != std::prev(currAlphaRow.end()); it++){
             currVertex = &vertices[it->second];
             nextVertex = &vertices[std::next(it)->second]; 
-
             currVertex->row_out = nextVertex->id;
             nextVertex->row_in = currVertex->id;
-
-            //make a new vertices
-            knitGraphVertex v1, v2;
-            v1.id = currVertex->id;
-            v1.position = currVertex->position;
-            v1.face = currVertex->face;
-            if (currVertex->edge.has_value()){
-                v1.edge = currVertex->edge.value();
-            }
-            v1.isAlphaVirtual = currVertex->isAlphaVirtual;
-            v1.isBetaVirtual = currVertex->isBetaVirtual;
-            v1.isVirtual = currVertex->isVirtual;
-            v1.row_out = nextVertex->id;
-
-
-            v2.id = nextVertex->id;
-            v2.position = nextVertex->position;
-            v2.face = nextVertex->face;
-            if (nextVertex->edge.has_value()){
-                v2.edge = nextVertex->edge.value();
-            }
-            v2.isAlphaVirtual = nextVertex->isAlphaVirtual;
-            v2.isBetaVirtual = nextVertex->isBetaVirtual;
-            v2.isVirtual = nextVertex->isVirtual;
-            v2.row_in = currVertex->id;
-            vertexInfoMap[v1.id] = v1;
-            vertexInfoMap[v2.id] = v2;
-
         }
     }
     
@@ -407,37 +379,8 @@ void KnitGraph::connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices){
         for (auto it = currBetaCol.begin(); it != std::prev(currBetaCol.end()); it++){
             currVertex = &vertices[it->second];
             nextVertex = &vertices[std::next(it)->second];
-
             currVertex->col_out[0] = nextVertex->id;
             nextVertex->col_in[0] = currVertex->id;
-
-            //make a new vertices
-            knitGraphVertex v1, v2;
-            v1.id = currVertex->id;
-            v1.position = currVertex->position;
-            v1.face = currVertex->face;
-            if (currVertex->edge.has_value()){
-                v1.edge = currVertex->edge.value();
-            }
-            v1.isAlphaVirtual = currVertex->isAlphaVirtual;
-            v1.isBetaVirtual = currVertex->isBetaVirtual;
-            v1.isVirtual = currVertex->isVirtual;
-            v1.col_out[0] = nextVertex->id;
-
-
-            v2.id = nextVertex->id;
-            v2.position = nextVertex->position;
-            v2.face = nextVertex->face;
-            if (nextVertex->edge.has_value()){
-                v2.edge = nextVertex->edge.value();
-            }
-            v2.isAlphaVirtual = nextVertex->isAlphaVirtual;
-            v2.isBetaVirtual = nextVertex->isBetaVirtual;
-            v2.isVirtual = nextVertex->isVirtual;
-            v2.col_in[0] = currVertex->id;
-
-            vertexInfoMap[v1.id] = v1;
-            vertexInfoMap[v2.id] = v2;
         }
     }
 }
@@ -529,39 +472,39 @@ void KnitGraph::mergeVirtual(){
 void KnitGraph::renderGraph(){
     
     //visualize the knit graph vertices with the virtual connections
-    // for (auto &v : realVertices){
-    //     // if (v.isVirtual) continue;
-    //     // if (vertices[v.row_out].isVirtual) continue;
-    //     // if (vertices[v.col_out[0]].isVirtual) continue;
-    //     vertexPositions.push_back(v.position);
-    //     if (v.row_out != -1)
-    //         edges.push_back({v.id, v.row_out});
-    //     if (v.col_out[0] != -1)
-    //         edges.push_back({v.id, v.col_out[0]});
-    // }
-    // auto graphVirtual = polyscope::registerCurveNetwork("knit graph with real connections", vertexPositions, edges);
-    // graphVirtual -> setRadius(0.001);
-    // graphVirtual -> setEnabled(false);
+    for (auto &v : realVertices){
+        // if (v.isVirtual) continue;
+        // if (vertices[v.row_out].isVirtual) continue;
+        // if (vertices[v.col_out[0]].isVirtual) continue;
+        vertexPositions.push_back(v.position);
+        if (v.row_out != -1)
+            edges.push_back({v.id, v.row_out});
+        if (v.col_out[0] != -1)
+            edges.push_back({v.id, v.col_out[0]});
+    }
+    auto graphReal = polyscope::registerCurveNetwork("knit graph with real connections", vertexPositions, edges);
+    graphReal -> setRadius(0.001);
+    graphReal -> setEnabled(false);
 
     //visualize the knit graph with virtual connections
-    for (auto &v : vertices){ 
-        if (v.row_out != -1 ){
-            vertexPositions.push_back(v.position);
-            vertexPositions.push_back(vertices[v.row_out].position);
-        }
-        if (v.col_out[0] != -1){
-            vertexPositions.push_back(v.position);
-            vertexPositions.push_back(vertices[v.col_out[0]].position);
-        }
-    }
+    // for (auto &v : vertices){ 
+    //     if (v.row_out != -1 ){
+    //         vertexPositions.push_back(v.position);
+    //         vertexPositions.push_back(vertices[v.row_out].position);
+    //     }
+    //     if (v.col_out[0] != -1){
+    //         vertexPositions.push_back(v.position);
+    //         vertexPositions.push_back(vertices[v.col_out[0]].position);
+    //     }
+    // }
 
-    for (int i = 0; i < vertexPositions.size(); i+=2){
-        edges.push_back({i, i + 1});
-    }
+    // for (int i = 0; i < vertexPositions.size(); i+=2){
+    //     edges.push_back({i, i + 1});
+    // }
 
-    auto graph = polyscope::registerCurveNetwork("knit graph with virtual connections", vertexPositions, edges);
-    graph -> setRadius(0.001);
-    graph -> setEnabled(false);
+    // auto graph = polyscope::registerCurveNetwork("knit graph with virtual connections", vertexPositions, edges);
+    // graph -> setRadius(0.001);
+    // graph -> setEnabled(false);
 
     // std::vector<Vector3> virtualVertices;
     // for (auto v : vertices){
@@ -614,8 +557,8 @@ void KnitGraph::epsilonMerging(){
     std::vector<Vector3> badVirtuals;
     for (knitGraphVertex &v : vertices){
         if (!v.isVirtual) continue;
-        if (v.row_in == -1 && v.row_out == -1 
-            && v.col_in[0] == -1 && v.col_out[0] == -1){
+        if ((v.row_in == -1 && v.row_out == -1) 
+            && (v.col_in[0] == -1 && v.col_out[0] == -1)){
                 badVirtuals.push_back(v.position);
         }
     }
@@ -640,7 +583,7 @@ void KnitGraph::epsilonMerging(){
             }
             if (vCluster.size() != 2){
                 std::cout << "size of cluster is not 2 " << std::endl;
-                exit(0);
+                //mexit(0);
             }
             v.hasBeenHandled = true;
             mergeCluster(vCluster, eps);

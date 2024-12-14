@@ -2630,16 +2630,13 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             std::vector<std::pair<std::vector<double>, double>> testEdgePathConstraints = edgePathConstraints;
             std::vector<int> testEdgeIndices = edgeIndices;
             //try a new pair of singularities
-            testEdgeIndices[edgeMap[singEdgePair.first]] = -1;
-            testEdgeIndices[edgeMap[singEdgePair.second]] = 1;
+            testEdgeIndices[edgeMap[singEdgePair.first]] = -1;//positive edge (sign gets flipped)
+            testEdgeIndices[edgeMap[singEdgePair.second]] = 1;//negative edge (sign gets flipped)
             std::tie(globalPath, gluedPath) = constructEdgePath(globalGeometry, gluedGeometry, globalMesh.edge(singEdgePair.first), globalMesh.edge(singEdgePair.second),
-                                        vertexMap, edgeMap, globalTimeFunctionGradientsNormalized, gluedHeWeights);
+                                                                vertexMap, edgeMap, globalTimeFunctionGradientsNormalized, gluedHeWeights, gluedSigmaTilde);
             testEdgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
             testModel.setEdgePathConstraints(testEdgePathConstraints);
             testModel.setEdgeIndices(testEdgeIndices);
-
-            
-            
             //solve the model with singularities
             std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, testModel, vertexMap, G, psMesh);
             numRuns++;
@@ -2711,14 +2708,12 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         }
         //add the isovalue we've used to the map
         if (toBreak) break;//we are no longer improving the distance to unit norm
-
-    }
-
+    } 
     std::cout << "Number of singularities inserted = " << numSingularities << std::endl;
     return std::tie(stripeValuesSigmaCourse, edgeSingularities);
-    
-
 }
+
+
 
 std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
                                                         std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh){
@@ -2743,7 +2738,6 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
     //require edge cotan weights
     gluedGeometry.requireEdgeCotanWeights();
 
-    
     try {
         //reformulate the problem in terms of halfedges 
         // Create an environment
@@ -2794,12 +2788,33 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
         for (Halfedge he : gluedMesh.halfedges()){
             if (edgeIndices[he.edge().getIndex()] != 0){
                 model.addConstr(sigma[he.getIndex()] + sigma[he.twin().getIndex()] == edgeIndices[he.edge().getIndex()] * period);
+                // int globalCornerTail = he.face().halfedge().corner().getIndex();
+                // int globalCornerTip = he.face().halfedge().twin().corner().getIndex();
+                // Vector3 heVector = globalGeometry.vertexPositions[globalMesh.corner(globalCornerTail).halfedge().tipVertex()] - 
+                //                            globalGeometry.vertexPositions[globalMesh.corner(globalCornerTail).halfedge().tailVertex()];
+                // Vector3 heTwinVector = globalGeometry.vertexPositions[globalMesh.corner(globalCornerTip).halfedge().tipVertex()] - 
+                //                            globalGeometry.vertexPositions[globalMesh.corner(globalCornerTip).halfedge().tailVertex()];
+                //just test it in the global setting first
+                // Vector3 heVector = globalGeometry.vertexPositions[globalMesh.halfedge(he.getIndex()).tipVertex()] - 
+                //                             globalGeometry.vertexPositions[globalMesh.halfedge(he.getIndex()).tailVertex()];
+                // Vector3 heTwinVector = globalGeometry.vertexPositions[globalMesh.halfedge(he.getIndex()).tailVertex()] - 
+                //                             globalGeometry.vertexPositions[globalMesh.halfedge(he.getIndex()).tipVertex()];
+                // Vector3 gradientVector = Vector3{comparisonGrad[he.face().getIndex()][0], comparisonGrad[he.face().getIndex()][1], 
+                //                                 comparisonGrad[he.face().getIndex()][2]};
+                // if (dot(gradientVector, heVector) > dot(gradientVector, heTwinVector)){
+                //     model.addConstr(sigma[he.getIndex()] >= sigma[he.twin().getIndex()]); 
+                // }
+                // else{
+                //     model.addConstr(sigma[he.twin().getIndex()] >= sigma[he.getIndex()]);
+                // }
             }
             else{
                 model.addConstr(sigma[he.getIndex()] == -1.0 * sigma[he.twin().getIndex()]);
             }
         }
 
+
+        
         //constraint: add bdy-bdy path constraint 
         for (int i = 0; i < edgePathConstraints.size(); i++){
             std::vector<double> path = edgePathConstraints[i].first;
@@ -2886,7 +2901,6 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
     } catch(...) {
         std::cout << "Exception during optimization" << std::endl;
     }
-
     return std::tie(gluedOneForm, objectiveVal);
 }
 
