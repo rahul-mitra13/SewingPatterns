@@ -1967,7 +1967,8 @@ std::vector<std::pair<int, int>> findEdgeSingularityPairsUsingMaxCurls(VertexPos
 std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsingTimeFunctionIsoVals(VertexPositionGeometry& globalGeometry, 
                                                             EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, 
                                                             EdgeData<double>& curl, VertexData<double>& globalTimeFunction, 
-                                                            double stepSize, std::map<int, int>& hashedUsedIsoVals, int numSingularityPairs){
+                                                            double stepSize, std::map<int, int>& hashedUsedIsoVals, 
+                                                            FaceData<Vector3>& timeFunctionGrad, int numSingularityPairs){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
@@ -1985,6 +1986,7 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
     std::vector<std::tuple<std::pair<int, int>, double>> singEdgePairs;
     //should figure out some constant step size
     stepSize = 0.05;
+    double alignment = 0.9;
 
     while (curr < end){
 
@@ -1999,7 +2001,11 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
         int numEdges = 0;
         for (int i = 0; i < f.size(); i++){
             Face currFace = globalMesh.face(f[i]);
+            Vector3 grad = timeFunctionGrad[currFace];
             for (Edge e : currFace.adjacentEdges()){
+                Vector3 heVector = (globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()]).normalize();
+                Vector3 heTwinVector = (globalGeometry.vertexPositions[e.halfedge().tailVertex()] - globalGeometry.vertexPositions[e.halfedge().tipVertex()]).normalize();
+                if (dot(heVector, grad) < alignment && dot(heTwinVector, grad) < alignment) continue; //skip edges that are poorly aligned with the time function gradient
                 //check if current isoline crosses this edge
                 if ((curr > globalTimeFunction[e.halfedge().tailVertex()] && curr < globalTimeFunction[e.halfedge().tipVertex()])
                 || (curr > globalTimeFunction[e.halfedge().tipVertex()] && curr < globalTimeFunction[e.halfedge().tailVertex()])){
@@ -2034,10 +2040,14 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
             int maxEdge, minEdge;
             for (int i = 0; i < facesInComponent.size(); i++){
                 Face currFace = globalMesh.face(facesInComponent[i]);
+                Vector3 grad = timeFunctionGrad[currFace];
                 for (Edge e : currFace.adjacentEdges()){
-                    //check if current isoline crosses this edge
+                    Vector3 heVector = (globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()]).normalize();
+                    Vector3 heTwinVector = (globalGeometry.vertexPositions[e.halfedge().tailVertex()] - globalGeometry.vertexPositions[e.halfedge().tipVertex()]).normalize();
+                    if (dot(heVector, grad) < alignment && dot(heTwinVector, grad) < alignment) continue; //skip edges that are poorly aligned with the time function gradient
+                        //check if current isoline crosses this edge
                     if ((isoVal > globalTimeFunction[e.halfedge().tailVertex()] && isoVal < globalTimeFunction[e.halfedge().tipVertex()])
-                    || (isoVal > globalTimeFunction[e.halfedge().tipVertex()] && isoVal < globalTimeFunction[e.halfedge().tailVertex()])){
+                        || (isoVal > globalTimeFunction[e.halfedge().tipVertex()] && isoVal < globalTimeFunction[e.halfedge().tailVertex()])){
                         if (curl[e] > maxCurl){
                             maxCurl = curl[e];
                             maxEdge = e.getIndex();
@@ -2586,7 +2596,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //finding edge singularity pairs by sampling time function isolines
         //return type is a a vector of tuples
         std::vector<std::tuple<std::pair<int, int>, double>> singEdgePairs = findEdgeSingularityPairsUsingTimeFunctionIsoVals(globalGeometry,  gluedGeometry, V, F, 
-                                                                            edgeCurl, globalTimeFunction, stepSize, hashedUsedIsoVals, topPairs);
+                                                                            edgeCurl, globalTimeFunction, stepSize, hashedUsedIsoVals, globalTimeFunctionGradientsNormalized, 
+                                                                            topPairs);
 
         //finding edge singularity pairs by just looking for max curl edges
         // singEdgePairs = findEdgeSingularityPairsUsingMaxCurls(globalGeometry, gluedGeometry, V, F, edgeCurl,
