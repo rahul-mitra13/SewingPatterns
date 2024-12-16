@@ -410,11 +410,11 @@ std::unique_ptr<EdgeLengthGeometry> createGluedEdgeLengthGeometry(VertexPosition
     // Setup vertexMap and its inverse gluedMeshVertexIndexToOriginalMeshIndex
     UF uf(mesh.nVertices()); // union find
     for (auto [v1,v2] : vertexMappingsPairs)
-        uf.merge(v1, v2);
+        uf.merge(v1, v2); 
     
     // Map each root to a new vertex in the glued mesh
     int numUniqueVertices = 0;
-    for (int i = 0; i < mesh.nVertices(); i++) {
+    for (size_t i = 0; i < mesh.nVertices(); i++) {
         int root = uf.find(i);
         if (vertexMap.count(root) == 0) { // this set has not been mapped yet
             vertexMap[root] = numUniqueVertices;
@@ -438,11 +438,11 @@ std::unique_ptr<EdgeLengthGeometry> createGluedEdgeLengthGeometry(VertexPosition
     }
     ManifoldSurfaceMesh * gluedMesh = new ManifoldSurfaceMesh(polygons);
 
-    //create a map (vertex in original mesh -> outgoing halfedges in the glued mesh)
+    //create a map (vertex in original mesh -> outgoing global halfedges in glued context)
     for (Vertex v : mesh.vertices())
         gluedOneRingMap[v.getIndex()] = {};
-    for (Halfedge he : gluedMesh->halfedges())
-        for (int iv : gluedMeshToOriginal[he.tailVertex().getIndex()])
+    for (Halfedge he : mesh.halfedges())
+        for (int iv : gluedMeshToOriginal[vertexMap[he.tailVertex().getIndex()]])
             gluedOneRingMap[iv].push_back(he);
 
     // Setup a map for glued mesh: (v1, v2) -> he

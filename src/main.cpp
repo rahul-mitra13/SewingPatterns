@@ -167,7 +167,7 @@ void showStripePatterns(){
   waleStripes -> setEnabled(false);
 
 
-  //show vertex curl and edge curl of normalized time function gradient
+  // //show vertex curl and edge curl of normalized time function gradient
   // VertexData<double> vertexCurl = computeVertexCurl(*globalGeometry, *gluedELG, 
   //                                   timeFunctionGradientGlobalNormalized, gluedOneRingMap);
   // EdgeData<double> edgeCurl = computeVertexAveragedEdgeCurl(*globalGeometry, vertexCurl);
