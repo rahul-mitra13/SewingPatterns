@@ -2824,7 +2824,20 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         }
         //add the isovalue we've used to the map
         if (toBreak) break;//we are no longer improving the distance to unit norm
-    } 
+
+    }
+
+    // Plot stripe values with offset (to debug knit graph)
+    CornerData<double> stripeValuesWithOffset = stripeValuesSigmaCourse;
+    for (Corner co : gluedMesh.corners())
+        stripeValuesWithOffset[co] -= period/4;
+    std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesWithOffset, stripeIndicesSigmaCourse, period, edgeMap, components);
+    //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
+    courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes with offset", uniquePos, uniqueEdges);
+    courseStripes -> setRadius(0.001);
+    courseStripes -> setEnabled(false);
+
+
     std::cout << "Number of singularities inserted = " << numSingularities << std::endl;
     return std::tie(stripeValuesSigmaCourse, edgeSingularities);
 }

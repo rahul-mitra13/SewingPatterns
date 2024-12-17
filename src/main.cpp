@@ -166,6 +166,17 @@ void showStripePatterns(){
   waleStripes -> setRadius(0.001);
   waleStripes -> setEnabled(false);
 
+  globalPSMesh->addCornerScalarQuantity("wale stripe values", prepareCornerData(waleStripeValues));
+
+  // Plot wale stripe values with offset (to debug knit graph)
+  CornerData<double> waleStripeValuesWithOffset = waleStripeValues;
+  for (Corner co : gluedELG->mesh.corners())
+      waleStripeValuesWithOffset[co] -= period/4;
+  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValuesWithOffset, waleSingularFaces, period);
+  waleStripes = polyscope::registerCurveNetwork("wale stripes with offset", positionsWale, edgesWale);
+  waleStripes -> setRadius(0.001);
+  waleStripes -> setEnabled(false);
+
 
   // //show vertex curl and edge curl of normalized time function gradient
   // VertexData<double> vertexCurl = computeVertexCurl(*globalGeometry, *gluedELG, 
