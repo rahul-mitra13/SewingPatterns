@@ -66,6 +66,15 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
     Vertex vJ = f.halfedge().next().vertex();
     Vertex vK = f.halfedge().next().next().vertex();
 
+    Vector3 pI = globalGeometry->vertexPositions[vI];
+    Vector3 pJ = globalGeometry->vertexPositions[vJ];
+    Vector3 pK = globalGeometry->vertexPositions[vK];
+
+    Vector3 e1 = pJ - pI; // edge (i,j)
+    Vector3 e2 = pK - pI; // edge (i,k)
+    Vector3 n = cross(e1, e2) / 2; // triangle normal (weighted by its area)
+    double area = n.norm(); // triangle area
+
     //grab the alpha values
     alphaI = courseOneForm[f.halfedge().corner()];
     alphaJ = courseOneForm[f.halfedge().next().corner()];
@@ -75,6 +84,7 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
     a1 = alphaI - alphaK;
     b1 = alphaJ - alphaK;
     c1 = alphaK;
+    Vector3 gradAlpha = ((alphaJ - alphaI) * e2 - (alphaK - alphaI) * e1) / (2.0 * area);
 
     //grab the beta values
     betaI = waleOneForm[f.halfedge().corner()];
@@ -85,6 +95,7 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
     a2 = betaI - betaK;
     b2 = betaJ - betaK;
     c2 = betaK;
+    Vector3 gradBeta = ((betaJ - betaI) * e2 - (betaK - betaI) * e1) / (2.0 * area);
 
     //trace the middle of the stripes
     alpha_start = (std::ceil((alpha_min - period/4.)/period) * period) + period/4.;
@@ -132,10 +143,7 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
                 v.isBetaVirtual = false;
                 faceVertices.push_back(v);
                 //set the position from the bary coords
-                Vector3 i = globalGeometry->vertexPositions[f.halfedge().corner().vertex()];
-                Vector3 j = globalGeometry->vertexPositions[f.halfedge().next().corner().vertex()];
-                Vector3 k = globalGeometry->vertexPositions[f.halfedge().next().next().corner().vertex()];
-                v.position = v.baryCoords[0] * i + v.baryCoords[1] * j + v.baryCoords[2] * k;
+                v.position = v.baryCoords[0] * pI + v.baryCoords[1] * pJ + v.baryCoords[2] * pK;
                 vertices.push_back(v);
                 //vertexInfoMap[v.id] = v;
             }
@@ -163,10 +171,7 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
             v.isAlphaVirtual = true;
             faceVertices.push_back(v);
             //set the position from the bary coords
-            Vector3 i = globalGeometry->vertexPositions[f.halfedge().corner().vertex()];
-            Vector3 j = globalGeometry->vertexPositions[f.halfedge().next().corner().vertex()];
-            Vector3 k = globalGeometry->vertexPositions[f.halfedge().next().next().corner().vertex()];
-            v.position = v.baryCoords[0] * i + v.baryCoords[1] * j + v.baryCoords[2] * k;
+            v.position = v.baryCoords[0] * pI + v.baryCoords[1] * pJ + v.baryCoords[2] * pK;
             vertices.push_back(v);
             //vertexInfoMap[v.id] = v;
         }
@@ -189,10 +194,7 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
             v.isAlphaVirtual = true;
             faceVertices.push_back(v);
             //set the position from the bary coords
-            Vector3 i = globalGeometry->vertexPositions[f.halfedge().corner().vertex()];
-            Vector3 j = globalGeometry->vertexPositions[f.halfedge().next().corner().vertex()];
-            Vector3 k = globalGeometry->vertexPositions[f.halfedge().next().next().corner().vertex()];
-            v.position = v.baryCoords[0] * i + v.baryCoords[1] * j + v.baryCoords[2] * k;
+            v.position = v.baryCoords[0] * pI + v.baryCoords[1] * pJ + v.baryCoords[2] * pK;
             vertices.push_back(v);
             //vertexInfoMap[v.id] = v;
         }
@@ -215,10 +217,7 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
             v.isAlphaVirtual = true;
             faceVertices.push_back(v);
             //set the position from the bary coords
-            Vector3 i = globalGeometry->vertexPositions[f.halfedge().corner().vertex()];
-            Vector3 j = globalGeometry->vertexPositions[f.halfedge().next().corner().vertex()];
-            Vector3 k = globalGeometry->vertexPositions[f.halfedge().next().next().corner().vertex()];
-            v.position = v.baryCoords[0] * i + v.baryCoords[1] * j + v.baryCoords[2] * k;
+            v.position = v.baryCoords[0] * pI + v.baryCoords[1] * pJ + v.baryCoords[2] * pK;
             vertices.push_back(v);
             //vertexInfoMap[v.id] = v;
         }
@@ -245,10 +244,7 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
             v.isBetaVirtual = true;
             faceVertices.push_back(v);
             //set the position from the bary coords
-            Vector3 i = globalGeometry->vertexPositions[f.halfedge().corner().vertex()];
-            Vector3 j = globalGeometry->vertexPositions[f.halfedge().next().corner().vertex()];
-            Vector3 k = globalGeometry->vertexPositions[f.halfedge().next().next().corner().vertex()];
-            v.position = v.baryCoords[0] * i + v.baryCoords[1] * j + v.baryCoords[2] * k;
+            v.position = v.baryCoords[0] * pI + v.baryCoords[1] * pJ + v.baryCoords[2] * pK;
             vertices.push_back(v);
             //vertexInfoMap[v.id] = v;
         }
@@ -271,10 +267,7 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
             v.isBetaVirtual = true;
             faceVertices.push_back(v);
             //set the position from the bary coords
-            Vector3 i = globalGeometry->vertexPositions[f.halfedge().corner().vertex()];
-            Vector3 j = globalGeometry->vertexPositions[f.halfedge().next().corner().vertex()];
-            Vector3 k = globalGeometry->vertexPositions[f.halfedge().next().next().corner().vertex()];
-            v.position = v.baryCoords[0] * i + v.baryCoords[1] * j + v.baryCoords[2] * k;
+            v.position = v.baryCoords[0] * pI + v.baryCoords[1] * pJ + v.baryCoords[2] * pK;
             vertices.push_back(v);
             //vertexInfoMap[v.id] = v;
         }
@@ -297,12 +290,16 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
             v.isBetaVirtual = true;
             faceVertices.push_back(v);
             //set the position from the bary coords
-            Vector3 i = globalGeometry->vertexPositions[f.halfedge().corner().vertex()];
-            Vector3 j = globalGeometry->vertexPositions[f.halfedge().next().corner().vertex()];
-            Vector3 k = globalGeometry->vertexPositions[f.halfedge().next().next().corner().vertex()];
-            v.position = v.baryCoords[0] * i + v.baryCoords[1] * j + v.baryCoords[2] * k;
+            v.position = v.baryCoords[0] * pI + v.baryCoords[1] * pJ + v.baryCoords[2] * pK;
             vertices.push_back(v);
             //vertexInfoMap[v.id] = v;
+        }
+    }
+
+    if (dot(cross(gradAlpha, gradBeta), n) < 0) {
+        for (knitGraphVertex &v : faceVertices) {
+            v.alpha_tag = -v.alpha_tag;
+            v.beta_tag = -v.beta_tag;
         }
     }
 
@@ -325,7 +322,8 @@ void KnitGraph::connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices){
     knitGraphVertex* nextVertex;
     double eps = 1e-8;
 
-    for (knitGraphVertex &v : faceVertices){
+    // Collect unique alphas and betas
+    for (knitGraphVertex &v : faceVertices) {
         if (!v.isBetaVirtual) {
             bool isUnique = true;
             for (double alpha : uniqueAlphas)
@@ -471,7 +469,7 @@ void KnitGraph::mergeVirtual(){
 
 void KnitGraph::renderGraph(){
     
-    //visualize the knit graph vertices with the virtual connections
+    // visualize the knit graph vertices with the real connections
     for (auto &v : realVertices){
         // if (v.isVirtual) continue;
         // if (vertices[v.row_out].isVirtual) continue;
@@ -712,20 +710,17 @@ void KnitGraph::mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps)
         int global_col_in = -1;
         int global_col_out = -1;
 
-        for (auto &vi : vCluster){
-            for (auto &vj : vertices){
-                if (norm(vi.position - vj.position) > eps && (vi.row_in == vj.id)){
+        for (auto &vi : vCluster){ // for every vertex in the current cluster
+            // for every vertex outside of the current cluster
+            for (auto &vj : vertices) if (norm(vi.position - vj.position) > 2*eps) {
+                if (vi.row_in == vj.id)
                     global_row_in = vj.id;
-                }
-                if (norm(vi.position - vj.position) > eps && (vi.row_out == vj.id)){
+                if (vi.row_out == vj.id)
                     global_row_out = vj.id;
-                }
-                if (norm(vi.position - vj.position) > eps && (vi.col_in[0] == vj.id)){
+                if (vi.col_in[0] == vj.id)
                     global_col_in = vj.id;
-                }
-                if (norm(vi.position - vj.position) > eps && (vi.col_out[0] == vj.id)){
+                if (vi.col_out[0] == vj.id)
                     global_col_out = vj.id;
-                }
             }
         }
 
