@@ -25,6 +25,9 @@ class Model{
         //stores a pair of (edge indices, integral value of the path that those edge indices specify) 
         std::vector<std::pair<std::vector<double>, double>> edgePathConstraints;
 
+        //homology generator constraints 
+        std::vector<std::vector<double>> homologyGenerators;
+
         //smooth face indices 
         std::vector<int> smoothFaces;
 
@@ -110,6 +113,9 @@ class Model{
         //set face gradients using gc FaceData<Vector3>
         void setFaceGradients(FaceData<Vector3>& faceGradients);
 
+        //set homology generators
+        void setHomologyGenerators(std::vector<std::vector<double>>& homologyGenerators);
+
         //set edge mappings 
         void setEdgeMappingsPairs(std::vector<std::pair<int, int>>& edgeMappingsPairs);
 
@@ -160,6 +166,9 @@ class Model{
 
         //get wale path constraints
         std::vector<std::vector<double>> getWaleBdyPathConstraints();
+
+        //get homology generators 
+        std::vector<std::vector<double>> getHomologyGenerators();
 
         //clear the data in the class 
         void clear();

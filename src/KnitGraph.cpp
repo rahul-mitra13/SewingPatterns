@@ -42,6 +42,9 @@ void KnitGraph::buildGraph(){
     //render the knit graph
     renderGraph();
 
+    //sanity check the graph
+    sanityCheck();
+
 
     //make the obj
     //makeObj();
@@ -484,7 +487,7 @@ void KnitGraph::renderGraph(){
     }
     auto graphReal = polyscope::registerCurveNetwork("knit graph with real connections", vertexPositions, edges);
     graphReal -> setRadius(0.001);
-    graphReal -> setEnabled(false);
+    graphReal -> setEnabled(true);
 
     //visualize the knit graph with virtual connections
     // for (auto &v : vertices){ 
@@ -771,20 +774,6 @@ void KnitGraph::makeRealVertices(){
     int i = 0;
     for (knitGraphVertex& v: vertices){
         if (v.isVirtual) continue;//only handle real vertices
-        if (v.row_out != - 1 && vertices[v.row_out].isVirtual){
-            std::cout << "vertex " << v.id << " still has a row out to a virtual vertex " << std::endl;
-        }
-        if (v.row_out == -1){
-            std::cout << "vertex " << v.id << " has no row out set " << std::endl;
-            std::cout << "new id = " << i << std::endl;
-        }
-        // std::cout << "id = " << v.id << std::endl;
-        // std::cout << "row in = " << v.row_in << std::endl;
-        // std::cout << "row out = " << v.row_out << std::endl;
-        // std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
-        // std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
-        // std::cout << "---------------" << std::endl;
-        //insert real vertices into the map
         mp.insert({v.id, i++});
     }
 
@@ -931,3 +920,101 @@ knitGraphVertex& KnitGraph::get(int id){
    return vertices[id];
 
 }
+
+//sanity check the graph
+void KnitGraph::sanityCheck(){
+
+    double eps = 1e-8;
+
+    std::vector<Vector3> buggy_vertices;
+
+    //make sanity check similar to last project 
+    int num_errors = 0;
+    for (auto &v : realVertices){
+        if (v.row_in != -1 && realVertices[v.row_in].row_out != v.id){
+            buggy_vertices.push_back(v.position);
+            num_errors++;
+            std::cout << "Row mismatch at vertex " << v.id << std::endl;
+        }
+        if (v.row_out != -1 && realVertices[v.row_out].row_in != v.id){
+            buggy_vertices.push_back(v.position);
+            num_errors++;
+            std::cout << "Row mismatch at vertex " << v.id << std::endl;
+        }
+        if (v.col_in[0] != -1){
+            if (realVertices[v.col_in[0]].col_out[0] != v.id && realVertices[v.col_in[0]].col_out[1] != v.id){
+                buggy_vertices.push_back(v.position);
+                num_errors++;
+                std::cout << "Column 0 mismatch at vertex " << v.id << std::endl;
+            }
+        }
+        if (v.col_out[0] != -1){
+            if (realVertices[v.col_out[0]].col_in[0] != v.id && realVertices[v.col_out[0]].col_in[1] != v.id){
+                buggy_vertices.push_back(v.position);
+                num_errors++;
+                std::cout << "Column 0 mismatch at vertex " << v.id << std::endl;
+            }
+        }
+
+        if (v.col_in[1] != -1){
+            if (realVertices[v.col_in[1]].col_out[0] != v.id && realVertices[v.col_in[1]].col_out[1] != v.id){
+                buggy_vertices.push_back(v.position);
+                num_errors++;
+                std::cout << "Column 1 mismatch at vertex " << v.id << std::endl;
+            }
+        }
+        if (v.col_out[1] != -1){
+            if (realVertices[v.col_out[1]].col_in[0] != v.id && realVertices[v.col_out[1]].col_in[1] != v.id){
+                buggy_vertices.push_back(v.position);
+                num_errors++;
+                std::cout << "Column 0 mismatch at vertex " << v.id << std::endl;
+            }
+        }
+
+        if (!realVertices[v.col_in[0]].col_out[0] == v.id || realVertices[v.col_in[0]].col_out[1] == v.id){
+            buggy_vertices.push_back(v.position);
+            num_errors++;
+            std::cout << "Column mismatch at vertex (autoknit assertion) " << v.id << std::endl;
+        }
+    }
+
+    for (auto const &vi : realVertices){
+        for (auto &vj : realVertices){
+            if (norm(vi.position - vj.position) < eps && vi.id != vj.id){
+                std::cout << "2 real vertices are in the same place " << std::endl;
+            } 
+        }
+    }
+    if (num_errors == 0){
+        std::cout << "Sanity check passed " << std::endl << std::endl;
+    }
+    else{
+        std::cout << "Sanity check failed " << std::endl << std::endl;
+    }
+
+    polyscope::registerPointCloud("buggy vertices ", buggy_vertices);
+
+}
+
+
+
+//write knit graph to txt file 
+void KnitGraph::writeKnitGraphToTxtFile(const std::string& file_name){
+    
+    std::string obj_name = file_name.c_str();
+
+    //write knit graph to txt file 
+    std::ofstream file(obj_name.erase(obj_name.length() - 4) + "_knitgraph.txt");
+    
+
+    for (auto &v : realVertices){
+        if (v.isVirtual) continue;
+        file << v.id << " " << v.position[0] << " " << v.position[1] << " " << v.position[2] << " " << v.row_in << " " << v.row_out << 
+        " " << v.col_in[0] << " " << v.col_in[1] << " " << v.col_out[0] << " " << v.col_out[1] << "\n";
+    }
+
+    file.close();
+    std::cout << "wrote knit graph to txt file " << std::endl;
+}
+
+

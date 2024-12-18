@@ -110,7 +110,7 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
         
         if (gluedSigmaTilde[e1.halfedge()] < gluedSigmaTilde[e1.halfedge().twin()]){
             std::cout << "something went wrong " << std::endl;
-            exit(1);
+            //exit(1);
         }
         std::cout << "things are okay!! " << std::endl;
         startVert = gluedMesh.vertex(vertexMap[e1.halfedge().tipVertex().getIndex()]);
@@ -119,7 +119,7 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
     else{
         if (gluedSigmaTilde[e1.halfedge().twin()] < gluedSigmaTilde[e1.halfedge()]){
             std::cout << "something went wrong " << std::endl;
-            exit(1);
+            //exit(1);
         }
         std::cout << "things are okay!!" << std::endl;
         startVert = gluedMesh.vertex(vertexMap[e1.halfedge().twin().tipVertex().getIndex()]);
@@ -130,7 +130,7 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
             globalFaceGradients[e2.halfedge().twin().face()])){
         if (gluedSigmaTilde[e2.halfedge()] < gluedSigmaTilde[e2.halfedge().twin()]){
             std::cout << "something went wrong " << std::endl;
-            exit(1);
+            //exit(1);
         }
         std::cout << "things are okay!! " << std::endl;
         endVert = gluedMesh.vertex(vertexMap[e2.halfedge().tipVertex().getIndex()]);    
@@ -138,7 +138,7 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
     else{
         if (gluedSigmaTilde[e2.halfedge().twin()] < gluedSigmaTilde[e2.halfedge()]){
             std::cout << "something went wrong " << std::endl;
-            exit(1);
+            //makexit(1);
         }
         std::cout << "things are okay!! " << std::endl;
         endVert = gluedMesh.vertex(vertexMap[e2.halfedge().twin().tipVertex().getIndex()]);

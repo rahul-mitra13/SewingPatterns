@@ -103,10 +103,23 @@ class KnitGraph{
 
         public: 
 
+            //Default Constructor 
+            KnitGraph(){};
+
             //Constructor
             KnitGraph(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, double period, 
                       CornerData<double>& courseOneForm, EdgeData<double>& courseSingularEdges, CornerData<double>& waleOneForm, EdgeData<double>& waleSingularEdges,
                       std::map<int, int>& globalToGluedEdgeMap);
+
+            //get the vertices in this knit graph 
+            std::vector<knitGraphVertex>& getVertices(){
+                return this->vertices;
+            }
+
+            //get the real vertices in this knit graph 
+            std::vector<knitGraphVertex>& getRealVertices(){
+                return this->realVertices;
+            }
 
             //build the knit graph 
             void buildGraph();
@@ -141,5 +154,11 @@ class KnitGraph{
 
             //merge a cluster
             void mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps);
+
+            //sanity check the graph 
+            void sanityCheck();
+
+            //write knit graph to txt file
+            void writeKnitGraphToTxtFile(const std::string& file_name);
 };
 

@@ -27,6 +27,7 @@
 #include "stripe_patterns_helpers.h"
 #include "path_constraints.h"
 
+
 //includes to solve the optimization problem
 #include "gurobi_c++.h"
 #include "model.h"
@@ -242,7 +243,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                                                     std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
                                                                     globalBoundaryConditions& boundaryConditions, double period,
                                                                     Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G,
-                                                                    FaceData<Vector3>& courseOneFormGrad, std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
+                                                                    FaceData<Vector3>& courseOneFormGrad, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
+                                                                    std::vector<std::vector<double>> allSaddleLoops, std::vector<std::vector<double>> homologyGenerators);
 
 //@clean
 //compute course 1-form
@@ -277,3 +279,15 @@ std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeome
 //compute course 1-form
 std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
                                                         std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh);
+
+
+//given a time function over the mesh, extract the saddle vertices from it 
+//this function returns the vertex in the glued setting
+std::vector<Vertex> getSaddleVertices(IntrinsicGeometryInterface& geometry, VertexData<double>& timeFunction);
+
+//find all the saddle loops from the saddle vertex
+std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geometry, const std::vector<Vertex> &saddleVertices, const VertexData<double>& timeFunc);
+
+
+//repair a knit graph vertex that's missing a connection
+std::vector<int> repairKnitGraphVertex();

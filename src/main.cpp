@@ -24,6 +24,8 @@
 #include "experiments.h"
 #include "KnitGraph.h"
 
+#include "homology_generators.h"
+
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
@@ -72,6 +74,9 @@ Eigen::SparseMatrix<double> grad;
 //gradient operator in the row major format
 Eigen::SparseMatrix<double, Eigen::RowMajor> G;
 
+//the knit graph over the model 
+KnitGraph graph;
+
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
   
@@ -80,6 +85,17 @@ void showStripePatterns(){
   //time function on the global mesh 
   VertexData<double> timeFunctionGlobal = convertGluedToGlobalVertexFunction(*globalGeometry, *gluedELG, timeFunctionGlued, vertexMap);
   globalPSMesh -> addVertexScalarQuantity("time function", timeFunctionGlobal);
+
+  //loops from the saddle vertex for meshes with genus 
+  std::vector<std::vector<double>> allSaddleLoops;
+  //all the homology generators 
+  std::vector<std::vector<double>> homologyGenerators;
+  if (globalGeometry->mesh.nConnectedComponents() == 1){//do the homology generator stuff for just global 3D meshes for now 
+      std::vector<Vertex> saddleVertices = getSaddleVertices(*globalGeometry, timeFunctionGlobal);
+      allSaddleLoops = findAllSaddleLoops(*globalGeometry, saddleVertices, timeFunctionGlobal);
+      homologyGenerators = buildHomologyGeneratorsVector(*globalGeometry, *globalMesh);
+  }
+
 
   //gradient on the glued/global mesh
   //note that faces have a 1-to-1 mapping from global to glued setting
@@ -98,7 +114,8 @@ void showStripePatterns(){
   FaceData<Vector3> courseOneFormGrad(globalGeometry -> mesh);
   std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
-                                                                    globalBdyConditions, period, V, F, G, courseOneFormGrad, gluedOneRingMap);
+                                                                    globalBdyConditions, period, V, F, G, courseOneFormGrad, gluedOneRingMap, 
+                                                                    allSaddleLoops, homologyGenerators);
 
   std::tie(courseStripeValues, courseSingularEdgesGlobal);
 
@@ -125,18 +142,53 @@ void showStripePatterns(){
   waleStripes -> setEnabled(false);
 
 
-  // //show vertex curl and edge curl of normalized time function gradient
-  // VertexData<double> vertexCurl = computeVertexCurl(*globalGeometry, *gluedELG, 
-  //                                   timeFunctionGradientGlobalNormalized, gluedOneRingMap);
-  // EdgeData<double> edgeCurl = computeVertexAveragedEdgeCurl(*globalGeometry, vertexCurl);
-  // globalPSMesh->addVertexScalarQuantity("normalized time function gradient vertex curl", vertexCurl);
-  // globalPSMesh->addEdgeScalarQuantity("normalized time function gradient edge curl", edgeCurl);
+  // //generate the knit graph
+  // graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
+  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+  //                     edgeMap);
+  // graph.buildGraph();
 
-  //generate the knit graph
-  KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
-                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-                      edgeMap);
-  graph.buildGraph();
+}
+
+//repair a knit graph vertex that's missing connections
+//ugh 
+void manualKnitGraphRepair(){
+
+  std::vector<int> newInfo;
+  newInfo = repairKnitGraphVertex();
+
+  int id = newInfo[0];
+  int row_in = newInfo[1];
+  int row_out = newInfo[2];
+  int col_in_1 = newInfo[3];
+  int col_in_2 = newInfo[4];
+  int col_out_1 = newInfo[5];
+  int col_out_2 = newInfo[6];
+
+  //update the changes 
+  graph.getRealVertices()[id].row_in = row_in;
+  graph.getRealVertices()[row_in].row_out = id;
+
+  graph.getRealVertices()[id].row_out = row_out;
+  graph.getRealVertices()[row_out].row_in = id;
+
+  graph.getRealVertices()[id].col_in[0] = col_in_1;
+  graph.getRealVertices()[col_in_1].col_out[0] = id;
+
+  graph.getRealVertices()[id].col_in[1] = col_in_2;
+  graph.getRealVertices()[col_in_2].col_out[1] = id;
+
+  graph.getRealVertices()[id].col_out[0] = col_out_1;
+  graph.getRealVertices()[col_out_1].col_in[0] = id;
+
+  graph.getRealVertices()[id].col_out[1] = col_out_2;
+  graph.getRealVertices()[col_out_2].col_in[1] = id;
+
+  graph.renderGraph();
+  graph.sanityCheck();
+
+  //write the graph to a txt file 
+  graph.writeKnitGraphToTxtFile("half_torus_isotropic.obj");
 
 }
 
@@ -147,12 +199,16 @@ void callBacks() {
 
   ImGui::InputFloat("1-form period", &period);
   //there needs to be a better way to constrain wale edges
-  ImGui::InputFloat("Threshold", &threshold);
+  //ImGui::InputFloat("Threshold", &threshold);
   //frequency for knoppel stripes
   ImGui::InputFloat("Knoppel frequency", &knoppelFrequency);
 
   if (ImGui::Button("Show Stripe Patterns")){
     showStripePatterns();
+  }
+
+  if (ImGui::Button("Manaul Repair")){
+    manualKnitGraphRepair();
   }
 }
 
@@ -167,8 +223,16 @@ int main(int argc, char **argv) {
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometryPre);
   globalMesh = std::make_unique<ManifoldSurfaceMesh>(F);
   globalGeometry = std::make_unique<VertexPositionGeometry>(*globalMesh, V);
+  //find the gradient operator (want to do this just once)
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometry);
   igl::grad(V,F,grad);
+  //find the max edge length so that default period = 2 * max_e 
+  double maxLength = -DBL_MAX;
+  for (Edge e : globalMesh -> edges()){
+    double length = norm(globalGeometry->vertexPositions[e.halfedge().tipVertex()] - globalGeometry->vertexPositions[e.halfedge().tailVertex()]);
+    if (length > maxLength)
+      period = 2.0 * length;//set the default length to twice the period
+  }
 
   if (!(globalMesh -> isManifold())){
     std::cout << "Error: Mesh is not manifold" << std::endl;

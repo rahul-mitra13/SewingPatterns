@@ -87,6 +87,13 @@ void Model::setWaleBdyPathConstraints(std::vector<std::vector<double>>& waleBdyP
 
 }
 
+
+void Model::setHomologyGenerators(std::vector<std::vector<double>>& homologyGenerators){
+
+    this->homologyGenerators = homologyGenerators;
+
+}
+
 double Model::getPeriod(){
 
     return this->period;
@@ -166,6 +173,12 @@ std::vector<std::pair<int, int>> Model::getEdgeMappingsPairs(){
 std::vector<std::vector<double>> Model::getWaleBdyPathConstraints(){
 
     return this->waleBdyPathConstraints;
+
+}
+
+std::vector<std::vector<double>> Model::getHomologyGenerators(){
+
+    return this->homologyGenerators;
 
 }
 
