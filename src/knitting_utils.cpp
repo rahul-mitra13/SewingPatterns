@@ -2693,7 +2693,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 std::cout << "newDistance = " << newDistance << std::endl;
                 std::cout << "oldDistance = " << oldDistance << std::endl;
                 oldDistance = newDistance;
-                //courseOneFormGrad = gradSigmaTilde;
+                courseOneFormGrad = gradSigmaTilde;
                 std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
                 std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
                                                 edgeMap, components);
@@ -2727,7 +2727,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         if (toBreak) break;//we are no longer improving the distance to unit norm
     } 
     std::cout << "Number of singularities inserted = " << numSingularities << std::endl;
+
     return std::tie(stripeValuesSigmaCourse, edgeSingularities);
+
 }
 
 

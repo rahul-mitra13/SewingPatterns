@@ -43,7 +43,7 @@ void KnitGraph::buildGraph(){
     renderGraph();
 
     //sanity check the graph
-    sanityCheck();
+    //sanityCheck();
 
 
     //make the obj
@@ -88,6 +88,10 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
     b1 = alphaJ - alphaK;
     c1 = alphaK;
     Vector3 gradAlpha = ((alphaJ - alphaI) * e2 - (alphaK - alphaI) * e1) / (2.0 * area);
+
+    std::cout << "alphaI = " << alphaI << std::endl;
+    std::cout << "alphaJ = " << alphaJ << std::endl;
+    std::cout << "alphaK = " << alphaK << std::endl;
 
     //grab the beta values
     betaI = waleOneForm[f.halfedge().corner()];
@@ -472,7 +476,7 @@ void KnitGraph::mergeVirtual(){
 
 void KnitGraph::renderGraph(){
     
-    // visualize the knit graph vertices with the real connections
+    //visualize the knit graph vertices with the real connections
     for (auto &v : realVertices){
         // if (v.isVirtual) continue;
         // if (vertices[v.row_out].isVirtual) continue;
@@ -489,6 +493,7 @@ void KnitGraph::renderGraph(){
 
     //visualize the knit graph with virtual connections
     // for (auto &v : vertices){ 
+    //     if (v.isVirtual) continue;
     //     if (v.row_out != -1 ){
     //         vertexPositions.push_back(v.position);
     //         vertexPositions.push_back(vertices[v.row_out].position);
@@ -507,14 +512,6 @@ void KnitGraph::renderGraph(){
     // graph -> setRadius(0.001);
     // graph -> setEnabled(false);
 
-    // std::vector<Vector3> virtualVertices;
-    // for (auto v : vertices){
-    //     if (!v.isVirtual) continue;
-    //     virtualVertices.push_back(v.position);
-    // }
-
-    // auto virtualVerticesPC = polyscope::registerPointCloud("virtual vertices", virtualVertices);
-    // virtualVerticesPC->setEnabled(false);
 }
 
 //merge virtual vertices across an edge
@@ -577,16 +574,15 @@ void KnitGraph::epsilonMerging(){
         // find clusters for all vertices that have not been handled
         if (!v.hasBeenHandled) {
             auto vCluster = findCluster(v, eps);
-            std::cout << "size of cluster = " << vCluster.size() << std::endl;
             if (vCluster.size() == 1) {
                 v.hasBeenHandled = true;
                 continue;
             }
             if (vCluster.size() != 2){
                 std::cout << "size of cluster is not 2 " << std::endl;
-                //mexit(0);
+                //exit(1);
             }
-            v.hasBeenHandled = true;
+            //v.hasBeenHandled = true;
             mergeCluster(vCluster, eps);
         }
     }
@@ -618,7 +614,8 @@ std::vector<knitGraphVertex> KnitGraph::findCluster(const knitGraphVertex &v, do
 //merge a cluster
 void KnitGraph::mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps){
 
-    bool hasRealVertex = false;
+    std::cout << "size of cluster = " << vCluster.size() << std::endl;
+    bool hasRealVertex = false; 
     int id_to_keep = -1;
     //check if this cluster has a real vertex 
     //in that case we need to preserve the real vertex in this cluster.
@@ -716,14 +713,22 @@ void KnitGraph::mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps)
         for (auto &vi : vCluster){ // for every vertex in the current cluster
             // for every vertex outside of the current cluster
             for (auto &vj : vertices) if (norm(vi.position - vj.position) > 2*eps) {
-                if (vi.row_in == vj.id)
+                if (vi.row_in == vj.id){
+                    std::cout << "here for global row in!! " << std::endl;
                     global_row_in = vj.id;
-                if (vi.row_out == vj.id)
+                }
+                if (vi.row_out == vj.id){
+                    std::cout << "here for global row out!! " << std::endl;
                     global_row_out = vj.id;
-                if (vi.col_in[0] == vj.id)
+                }
+                if (vi.col_in[0] == vj.id){
+                    std::cout << "here for global col in!! " << std::endl;
                     global_col_in = vj.id;
-                if (vi.col_out[0] == vj.id)
+                }
+                if (vi.col_out[0] == vj.id){
+                    std::cout << "here for global col out!! " << std::endl;
                     global_col_out = vj.id;
+                }
             }
         }
 
@@ -858,14 +863,14 @@ void KnitGraph::makeRealVertices(){
         realVertices[v.id] = v;
     }
 
-    for (auto &v : realVertices){
-        std::cout << "id = " << v.id << std::endl;
-        std::cout << "row in = " << v.row_in << std::endl;
-        std::cout << "row out = " << v.row_out << std::endl;
-        std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
-        std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
-        std::cout << "---------------" << std::endl;
-    }
+    // for (auto &v : realVertices){
+    //     std::cout << "id = " << v.id << std::endl;
+    //     std::cout << "row in = " << v.row_in << std::endl;
+    //     std::cout << "row out = " << v.row_out << std::endl;
+    //     std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
+    //     std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
+    //     std::cout << "---------------" << std::endl;
+    // }
 }
 
 

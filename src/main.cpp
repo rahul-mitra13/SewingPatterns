@@ -121,6 +121,14 @@ void showStripePatterns(){
 
   globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
 
+  FaceData<int> stripeIndicesSigmaCourse(*globalMesh, 0);
+  std::vector<Vector3> positionsCourse;
+  std::vector<std::array<int, 2>> edgesCourse;
+  std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, courseStripeValues, stripeIndicesSigmaCourse, period);
+  auto courseStripes = polyscope::registerCurveNetwork("final course stripes ", positionsCourse, edgesCourse);
+  courseStripes -> setRadius(0.001);
+  courseStripes -> setEnabled(false);
+
 
   //WALE STRIPES
   //find Knöppel singularities in the WALE DIRECTION 
@@ -143,10 +151,10 @@ void showStripePatterns(){
 
 
   // //generate the knit graph
-  // graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
-  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-  //                     edgeMap);
-  // graph.buildGraph();
+  graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
+                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+                      edgeMap);
+  graph.buildGraph();
 
 }
 
