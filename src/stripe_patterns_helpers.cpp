@@ -201,7 +201,8 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
 
 //carry out the integration in the glued mesh setting
 //sigma is defined over the HALFEDGES of the glued mesh
-std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde, float period){
+std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+                                                                              HalfedgeData<double>& sigmaTilde, float period){
 
   SurfaceMesh& globalMesh = globalGeometry.mesh; 
   SurfaceMesh& gluedMesh = gluedGeometry.mesh;
@@ -222,7 +223,7 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
   std::queue<Vertex> Q;
   Q.push(startVertex);
   // Floating point thing for knit graph
-  sigma_mod[startVertex] = 0.0 + 1e-16;
+  sigma_mod[startVertex] = 0;
   visited[startVertex] = true;
   while(!Q.empty()){
     Vertex vi = Q.front(); Q.pop();

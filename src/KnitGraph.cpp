@@ -89,10 +89,6 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
     c1 = alphaK;
     Vector3 gradAlpha = ((alphaJ - alphaI) * e2 - (alphaK - alphaI) * e1) / (2.0 * area);
 
-    std::cout << "alphaI = " << alphaI << std::endl;
-    std::cout << "alphaJ = " << alphaJ << std::endl;
-    std::cout << "alphaK = " << alphaK << std::endl;
-
     //grab the beta values
     betaI = waleOneForm[f.halfedge().corner()];
     betaJ = waleOneForm[f.halfedge().next().corner()];
@@ -493,7 +489,7 @@ void KnitGraph::renderGraph(){
 
     //visualize the knit graph with virtual connections
     // for (auto &v : vertices){ 
-    //     if (v.isVirtual) continue;
+    //     //if (v.isVirtual) continue;
     //     if (v.row_out != -1 ){
     //         vertexPositions.push_back(v.position);
     //         vertexPositions.push_back(vertices[v.row_out].position);
@@ -571,6 +567,7 @@ void KnitGraph::epsilonMerging(){
         //     //std::cout << "skipping singular edge " << v.edge.value() << std::endl;
         //     continue;
         // }
+
         // find clusters for all vertices that have not been handled
         if (!v.hasBeenHandled) {
             auto vCluster = findCluster(v, eps);

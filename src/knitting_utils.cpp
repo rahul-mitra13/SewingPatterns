@@ -2774,6 +2774,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
         //model.getEnv().set(GRB_DoubleParam_TimeLimit, 30);
         //model.getEnv().set(GRB_IntParam_OutputFlag, 0);
         //model.getEnv().set(GRB_IntParam_SolutionLimit, 2);
+        model.getEnv().set(GRB_IntParam_NumericFocus, 3);
 
         //add integer variables for all the generators
         std::vector<GRBVar> generatorIntegers;
@@ -2844,27 +2845,26 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
             }
         }
 
-        //constraint: for the homology generators
-        for (int i = 0; i < homologyGenerators.size(); i++){
-            std::vector<double> path = homologyGenerators[i];
-            GRBLinExpr pathIntegral = 0;
-            std::vector<double> hePath(gluedMesh.nHalfedges(), 0.0);
-            for (int j = 0; j < gluedMesh.nEdges(); j++){
-                if (path[j] > 0){
-                    hePath[gluedMesh.edge(j).halfedge().getIndex()] = std::fabs(path[j]);
-                }
-                else if (path[j] < 0){
-                    hePath[gluedMesh.edge(j).halfedge().twin().getIndex()] = std::fabs(path[j]);
-                }
-            }
-            for (int k = 0; k < gluedMesh.nHalfedges(); k++){
-                pathIntegral += hePath[k] * sigma[k];
-            }
-            //add the constraints for the homology generators
-            //model.addConstr(pathIntegral == period * generatorIntegers[i]);
-            //model.addConstr(pathIntegral == period * 0.0);
-            
-        }
+        //constraint: add integer variables for homology generators
+        // for (int i = 0; i < homologyGenerators.size(); i++){
+        //     std::vector<double> path = homologyGenerators[i];
+        //     GRBLinExpr pathIntegral = 0;
+        //     std::vector<double> hePath(gluedMesh.nHalfedges(), 0.0);
+        //     for (int j = 0; j < gluedMesh.nEdges(); j++){
+        //         if (path[j] > 0){
+        //             hePath[gluedMesh.edge(j).halfedge().getIndex()] = std::fabs(path[j]);
+        //         }
+        //         else if (path[j] < 0){
+        //             hePath[gluedMesh.edge(j).halfedge().twin().getIndex()] = std::fabs(path[j]);
+        //         }
+        //     }
+        //     for (int k = 0; k < gluedMesh.nHalfedges(); k++){
+        //         pathIntegral += hePath[k] * sigma[k];
+        //     }
+        //     //add the constraints for the homology generators
+        //     //model.addConstr(pathIntegral == period * generatorIntegers[i]);
+        //     //model.addConstr(pathIntegral == period * 0.0);  
+        // }
         
         //constraint: add bdy-bdy path constraint 
         for (int i = 0; i < edgePathConstraints.size(); i++){
