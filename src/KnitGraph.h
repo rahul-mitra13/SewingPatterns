@@ -51,6 +51,12 @@ class KnitGraph{
         //period for sampling the knit graph 
         double period; 
 
+        //period for sampling the course stripes 
+        double coursePeriod; 
+
+        //period for sampling the wale stripes 
+        double walePeriod;
+
         //geometry on which this graph lives 
         VertexPositionGeometry *globalGeometry;
 
@@ -107,7 +113,7 @@ class KnitGraph{
             KnitGraph(){};
 
             //Constructor
-            KnitGraph(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, double period, 
+            KnitGraph(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, double coursePeriod, double walePeriod,
                       CornerData<double>& courseOneForm, EdgeData<double>& courseSingularEdges, CornerData<double>& waleOneForm, EdgeData<double>& waleSingularEdges,
                       std::map<int, int>& globalToGluedEdgeMap);
 

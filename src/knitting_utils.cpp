@@ -1384,7 +1384,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         }
     } 
     Model modelWale; 
-    modelWale.setPeriod(period);
+    modelWale.setPeriod((period));
     //modelWale.setMatchingTerms(modelMatchingTermsWale);
     modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
     modelWale.setFaceIndices(faceIndicesWaleModel);

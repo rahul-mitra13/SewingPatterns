@@ -1,13 +1,14 @@
 #include "KnitGraph.h"
 
-KnitGraph::KnitGraph(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, double period, 
+KnitGraph::KnitGraph(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, double coursePeriod, double walePeriod,
                       CornerData<double>& courseOneForm, EdgeData<double>& courseSingularEdges, CornerData<double>& waleOneForm, EdgeData<double>& waleSingularEdges,
                       std::map<int, int>& globalToGluedEdgeMap){
 
     this->globalGeometry = &globalGeometry; 
     this->gluedGeometry = &gluedGeometry;
     this->psMesh = &psMesh; 
-    this->period = period; 
+    this->coursePeriod = coursePeriod;
+    this->walePeriod = walePeriod;
     this->courseOneForm = courseOneForm;
     this->courseSingularEdges = courseSingularEdges;
     this->waleSingularEdges = waleSingularEdges;
@@ -43,13 +44,14 @@ void KnitGraph::buildGraph(){
     renderGraph();
 
     //sanity check the graph
-    //sanityCheck();
+    sanityCheck();
 
 
     //make the obj
     //makeObj();
 
     std::cout << "Completed building graph..." << std::endl;
+
 
 }
 
@@ -101,10 +103,10 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
     Vector3 gradBeta = ((betaJ - betaI) * e2 - (betaK - betaI) * e1) / (2.0 * area);
 
     //trace the middle of the stripes
-    alpha_start = (std::ceil((alpha_min - period/4.)/period) * period) + period/4.;
-    alpha_end = (std::floor((alpha_max - period/4.)/period) * period) + period/4.;
-    beta_start = (std::ceil((beta_min - period/4.)/period) * period) + period/4.;
-    beta_end = (std::floor((beta_max - period/4.)/period) * period) + period/4.;
+    alpha_start = (std::ceil((alpha_min - coursePeriod/4.)/coursePeriod) * coursePeriod) + coursePeriod/4.;
+    alpha_end = (std::floor((alpha_max - coursePeriod/4.)/coursePeriod) * coursePeriod) + coursePeriod/4.;
+    beta_start = (std::ceil((beta_min - walePeriod/4.)/walePeriod) * walePeriod) + walePeriod/4.;
+    beta_end = (std::floor((beta_max - walePeriod/4.)/walePeriod) * walePeriod) + walePeriod/4.;
 
     // alpha_start = std::ceil(alpha_min/period) * period;
     // alpha_end = std::floor(alpha_max/period) * period;
@@ -118,8 +120,8 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
     //basically solving a 2 by 2 linear system over every face
     //create real vertices
    	//shift up by some small epsilon so that we don't break when Z_start = Z_end
-   	for (j = alpha_start - eps; j < alpha_end + eps; j += period){//step alpha
-   	    for (k = beta_start - eps; k < beta_end + eps; k += period){//step beta
+   	for (j = alpha_start - eps; j < alpha_end + eps; j += coursePeriod){//step alpha
+   	    for (k = beta_start - eps; k < beta_end + eps; k += walePeriod){//step beta
    			//set up the linear system as Ax = b
    			//set RHS to constant
    			RHS_alpha = j - c1;
@@ -155,7 +157,7 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
 
     //interpolate the betas
     //shift up by some small epsilon so that we don't break when Z_start = Z_end
-   	for (j = alpha_start - eps; j < alpha_end + eps; j += period){//fix alpha
+   	for (j = alpha_start - eps; j < alpha_end + eps; j += coursePeriod){//fix alpha
         //ij edge
         bi = (j - alphaJ) / (alphaI - alphaJ);
         bj = 1.0 - bi;
@@ -228,7 +230,7 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
 
     //interpolate the alphas
     //shift up by some small epsilon so that we don't break when Z_start = Z_end
-   	for (k = beta_start - eps; k < beta_end + eps; k += period){        
+   	for (k = beta_start - eps; k < beta_end + eps; k += walePeriod){        
         //ij edge
         bi = (k - betaJ) / (betaI - betaJ);
         bj = 1.0 - bi;

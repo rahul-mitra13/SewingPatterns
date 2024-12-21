@@ -53,8 +53,9 @@ polyscope::SurfaceMesh *globalPSMesh;
 //global boundary conditions
 globalBoundaryConditions globalBdyConditions;
 
-//1-form optimization period
-float period = 1;
+//1-form optimization course Period
+float coursePeriod = 1;
+float walePeriod;//the ratio of width to height should be 1:1.6 (Kui)
 //threshold for constraining wale boundary edges 
 //I don't really like this and need to figure out a better way of doing this
 float threshold = 0.6;
@@ -80,6 +81,8 @@ KnitGraph graph;
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
   
+  //set the wale period 
+  walePeriod = ((0.5/1.6) * coursePeriod);
   //time function on the glued mesh 
   VertexData<double> timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
   //time function on the global mesh 
@@ -114,7 +117,7 @@ void showStripePatterns(){
   FaceData<Vector3> courseOneFormGrad(globalGeometry -> mesh);
   std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
-                                                                    globalBdyConditions, period, V, F, G, courseOneFormGrad, gluedOneRingMap, 
+                                                                    globalBdyConditions, coursePeriod, V, F, G, courseOneFormGrad, gluedOneRingMap, 
                                                                     allSaddleLoops, homologyGenerators);
 
   std::tie(courseStripeValues, courseSingularEdgesGlobal);
@@ -124,7 +127,7 @@ void showStripePatterns(){
   FaceData<int> stripeIndicesSigmaCourse(*globalMesh, 0);
   std::vector<Vector3> positionsCourse;
   std::vector<std::array<int, 2>> edgesCourse;
-  std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, courseStripeValues, stripeIndicesSigmaCourse, period);
+  std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, courseStripeValues, stripeIndicesSigmaCourse, coursePeriod);
   auto courseStripes = polyscope::registerCurveNetwork("final course stripes ", positionsCourse, edgesCourse);
   courseStripes -> setRadius(0.001);
   courseStripes -> setEnabled(false);
@@ -139,22 +142,24 @@ void showStripePatterns(){
   FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
   std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
                                                                     edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
-                                                                    courseOneFormGrad, G, period, knoppelFrequency, globalBdyConditions, 
+                                                                    courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
                                                                     courseSingularEdgesGlobal, *globalPSMesh);
   std::vector<Vector3> positionsWale;
   std::vector<std::array<int, 2>> edgesWale;
-  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, period);
+  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, walePeriod);
   auto waleStripes = polyscope::registerCurveNetwork("wale stripes", positionsWale, edgesWale);
   globalPSMesh -> addEdgeScalarQuantity("wale singularities", waleSingularEdgesGlobal);
   waleStripes -> setRadius(0.001);
   waleStripes -> setEnabled(false);
 
 
-  // //generate the knit graph
-  graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
+  //generate the knit graph
+  graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
                       courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
                       edgeMap);
   graph.buildGraph();
+
+  graph.writeKnitGraphToTxtFile("half_torus_isotropic_knitgraph_1_1.6.txt");
 
 }
 
@@ -205,7 +210,7 @@ void manualKnitGraphRepair(){
 // https://github.com/ocornut/imgui/blob/master/imgui.h
 void callBacks() {
 
-  ImGui::InputFloat("1-form period", &period);
+  ImGui::InputFloat("Course 1-form period", &coursePeriod);
   //there needs to be a better way to constrain wale edges
   //ImGui::InputFloat("Threshold", &threshold);
   //frequency for knoppel stripes
@@ -234,12 +239,12 @@ int main(int argc, char **argv) {
   //find the gradient operator (want to do this just once)
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometry);
   igl::grad(V,F,grad);
-  //find the max edge length so that default period = 2 * max_e 
+  //find the max edge length so that default coursePeriod = 2 * max_e 
   double maxLength = -DBL_MAX;
   for (Edge e : globalMesh -> edges()){
     double length = norm(globalGeometry->vertexPositions[e.halfedge().tipVertex()] - globalGeometry->vertexPositions[e.halfedge().tailVertex()]);
     if (length > maxLength)
-      period = 2.0 * length;//set the default length to twice the period
+      coursePeriod = 2.0 * length;//set the default length to twice the course period
   }
 
   if (!(globalMesh -> isManifold())){
