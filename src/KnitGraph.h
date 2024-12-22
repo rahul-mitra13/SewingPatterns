@@ -161,6 +161,9 @@ class KnitGraph{
             //merge a cluster
             void mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps);
 
+            //tag increases and decreases
+            void tagIncreasesDecreases();
+
             //sanity check the graph 
             void sanityCheck();
 

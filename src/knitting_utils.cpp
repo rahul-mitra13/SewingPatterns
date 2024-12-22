@@ -1986,7 +1986,8 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
     std::vector<std::tuple<std::pair<int, int>, double>> singEdgePairs;
     //should figure out some constant step size
     stepSize = 0.05;
-    double alignment = 0.9;
+    //changing the alignment strongly affects the helicing condition due to the path constraints
+    double alignment = 0.99;
 
     while (curr < end){
 

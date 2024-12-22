@@ -873,35 +873,72 @@ void KnitGraph::makeRealVertices(){
 }
 
 
-//make obj for yarn-level rendering
-void KnitGraph::makeObj(){
-
-    std::vector<Vector3> positions;
-    std::vector<std::vector<int>> faces;
-    std::vector<std::vector<int>> edges;
-    for (knitGraphVertex v : realVertices){
-        positions.push_back(v.position);
-        //skip short-rows for now
-        if (v.row_out == -1) continue;
-        //skip increas/decreases for now
-        if (v.col_out[0] == -1) continue;
-        //this is your standard quad face
-        std::vector<int> currFace = std::vector<int>{v.id + 1, v.row_in + 1, realVertices[v.row_in].col_out[0] + 1, v.col_out[0] + 1};
-        edges.push_back(std::vector<int>{0, 1, 2, 1});
-        faces.push_back(currFace);
+void KnitGraph::tagIncreasesDecreases(){
+               
+    //handle increases
+    for (auto &v : realVertices){
+        if (v.col_in[0] == -1  && v.col_in[1] == -1){
+            if ((realVertices[v.row_out].col_in[0]) != -1 && (realVertices[v.row_in].col_in[0]) != -1){//we're not at the bottom-most course row (assuming can't have short-rows on the bottom row)
+                std::cout << "In increase case for vertex " << v.id << std::endl;
+                auto &candidate1 = realVertices[realVertices[v.row_out].col_in[0]];
+                auto &candidate2 = realVertices[realVertices[v.row_in].col_in[0]];
+                if (norm(v.position - candidate1.position) < norm(v.position - candidate2.position)){
+                    candidate1.col_out[1] = v.id;
+                    v.col_in[0] = candidate1.id;
+                }
+                else{
+                    candidate2.col_out[1] = v.id;
+                    v.col_in[0] = candidate2.id;
+                }
+            }
+        }
     }
 
-    std::ofstream outfile("render.obj");
-    
-    for (auto p : positions){
-        outfile << "v " << p.x << " " << p.y << " " << p.z << std::endl;
+    //handle decrease
+    for (auto &v : realVertices){
+        if (v.col_out[0] == -1 && v.col_out[1] == -1){
+            if ((realVertices[v.row_out].col_out[0]) != -1 && (realVertices[v.row_in].col_out[0]) != -1){//we're not at the top-most course row (assuming can't have short-rows on the top row)
+            std::cout << "In decrease case for vertex " << v.id << std::endl;
+            auto &candidate1 = realVertices[realVertices[v.row_out].col_out[0]];
+            auto &candidate2 = realVertices[realVertices[v.row_in].col_out[0]];
+            if (norm(v.position - candidate1.position) < norm(v.position - candidate2.position)){
+                candidate1.col_in[1] = v.id;
+                v.col_out[0] = candidate1.id;
+            }
+            else{
+                candidate2.col_in[1] = v.id;
+                v.col_out[0] = candidate2.id;
+                }
+            }
+        }
     }
-    for (auto f : faces){
-        outfile << "f " << f[0] << " " << f[1] << " " << f[2] << " " << f[3] << std::endl;
+
+    //check if col_out[0] and col_out[1] need flipping for increases i.e., col_out[0] should always have a row_out that points to col_out[1]
+    for (auto &v : realVertices){
+        if (v.col_out[0] != -1 && v.col_out[1] != -1){//found a vertex with an increase
+            if (realVertices[v.col_out[1]].row_out == realVertices[v.col_out[0]].id){//col_out[1] has a row_out to col_out[0] - need to flip
+                std::cout << "flipping col outs for increase vertex " << v.id << std::endl;
+                int x = v.col_out[0];
+                int y = v.col_out[1];
+                v.col_out[0] = y;
+                v.col_out[1] = x;
+            }
+        }
     }
-    for (auto e : edges){
-        outfile << "e " << e[0] << " " << e[1] << " " << e[2] << " " << e[3] << std::endl;            
+
+    //check if col_in[0] and col_in[1] need flipping for decreases i.e., col_in[0] should always have a row_out that points to col_in[1]
+    for (auto &v : realVertices){
+        if (v.col_in[0] != -1 && v.col_in[1] != -1){//found a vertex with a decrease
+            if (realVertices[v.col_in[1]].row_out == realVertices[v.col_in[0]].id){//col_in[1] has a row_out to col_in[0] - need to flip
+                std::cout << "flipping col ins for decrease vertex " << v.id << std::endl;
+                int x = v.col_in[0];
+                int y = v.col_in[1];
+                v.col_in[0] = y;
+                v.col_in[1] = x;
+            }
+        }
     }
+
 }
 
 
