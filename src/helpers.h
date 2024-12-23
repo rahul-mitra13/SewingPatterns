@@ -33,7 +33,7 @@
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
-//boundary conditions on the glued mesh
+//boundary conditions on the GLUED MESH
 struct globalBoundaryConditions{
     std::vector<int> courseStartBoundaryVertices;//vertices where t = 0
     std::vector<int> courseEndBoundaryVertices;//vertices where t = 1

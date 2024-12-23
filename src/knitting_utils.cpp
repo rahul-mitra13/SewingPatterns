@@ -1310,7 +1310,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     VertexData<Vector3> vertexVectorField = computeVertexValuedField(globalGeometry, timeFunctionGlobal, PI/2.);
     VertexData<Vector2> lineField = vertexDirectionField(globalGeometry, vertexVectorField);
     EdgeData<double> waleSingularEdgesGlobal(globalGeometry.mesh, 0);
-    VertexData<double> freq(globalGeometry.mesh, 1./(period));
+    //doing (1/2.5*period) just to reduce the number of wale singularities
+    VertexData<double> freq(globalGeometry.mesh, 1./(2.5 * period));
     CornerData<double> stripeValues(globalGeometry.mesh);
     FaceData<int> stripeSingularities(globalGeometry.mesh);
     FaceData<int> fieldSingularities(globalGeometry.mesh);
@@ -1319,17 +1320,23 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     psMesh.addVertexVectorQuantity("vertexVectorField", vertexVectorField);
     psMesh.addFaceScalarQuantity("knoppel face singularities", stripeSingularities);
     psMesh.addFaceScalarQuantity("knoppel field singularities", fieldSingularities);
+
+    // std::vector<int> integers = computeIntegralValueAlongPaths(globalGeometry, gluedGeometry, 
+    //                                                             stripeValues, globalBdyConditions.waleBdyPathConstraints, 1./(2.5 * period));
+    // for (int i = 0; i < integers.size(); i++){
+    //     std::cout << "integer value for boundary " << i << " = " << integers[i] << std::endl;
+    // }
     
-    // std::vector<Vector3> knoppelPos; 
-    // std::vector<std::array<size_t, 2>> knoppelEdges; 
-    // std::tie(knoppelPos, knoppelEdges) = extractPolylinesFromStripePattern(globalGeometry, stripeValues, stripeSingularities,
-    //                                         fieldSingularities, lineField, false);
-    // auto knoppelStripes = polyscope::registerCurveNetwork("knoppel wale stripes stripes", knoppelPos, knoppelEdges);
-    // knoppelStripes -> setRadius(0.001);
-    // knoppelStripes -> setEnabled(false);
+    std::vector<Vector3> knoppelPos; 
+    std::vector<std::array<size_t, 2>> knoppelEdges; 
+    std::tie(knoppelPos, knoppelEdges) = extractPolylinesFromStripePattern(globalGeometry, stripeValues, stripeSingularities,
+                                            fieldSingularities, lineField, false);
+    auto knoppelStripes = polyscope::registerCurveNetwork("knoppel wale stripes stripes", knoppelPos, knoppelEdges);
+    knoppelStripes -> setRadius(0.001);
+    knoppelStripes -> setEnabled(false);
 
+    //average the final course 1-form gradient onto edges
     EdgeData<double> omegaWaleGlobal = computeMatchingOneForm(globalGeometry, 1, courseOneFormGrad, edgeMappingsPairs);
-
     // Fix the singularity indices
     for (Face f : globalGeometry.mesh.faces()) {
         if (stripeSingularities[f] != 0) {
@@ -1351,9 +1358,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         }
     }    
 
-    //EdgeData<double> omegaWaleGlued = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, omegaWaleGlobal, edgeMap);
-    //Eigen::Map<Eigen::VectorXd> omegaWaleGluedEig(omegaWaleGlued.raw().data(), (gluedGeometry.mesh).nEdges());
-    //std::vector<double> modelMatchingTermsWale(omegaWaleGluedEig.data(), omegaWaleGluedEig.data() + omegaWaleGluedEig.rows());
     Eigen::Map<Eigen::VectorXi> faceIndicesWaleEig(stripeSingularities.raw().data(), (gluedGeometry.mesh).nFaces());
     //place wale singularities at edges 
     std::vector<int> faceIndicesWaleModel(faceIndicesWaleEig.data(), faceIndicesWaleEig.data() + faceIndicesWaleEig.rows());
@@ -1384,8 +1388,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         }
     } 
     Model modelWale; 
-    modelWale.setPeriod((period));
-    //modelWale.setMatchingTerms(modelMatchingTermsWale);
+    modelWale.setPeriod(period);
     modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
     modelWale.setFaceIndices(faceIndicesWaleModel);
     modelWale.setFaceGradients(modelFaceGradients);

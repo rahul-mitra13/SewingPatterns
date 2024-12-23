@@ -32,13 +32,11 @@ void KnitGraph::buildGraph(){
     //merge vertices together 
     epsilonMerging();
 
-    //edgeMerging();
-
-    //merge the virtual vertices 
-    //mergeVirtual();
-
     //reorder vertex indices
     makeRealVertices();
+
+    //tag the increases and decreases 
+    tagIncreasesDecreases();
     
     //render the knit graph
     renderGraph();
@@ -484,6 +482,12 @@ void KnitGraph::renderGraph(){
             edges.push_back({v.id, v.row_out});
         if (v.col_out[0] != -1)
             edges.push_back({v.id, v.col_out[0]});
+        if (v.col_out[1] != -1)
+            edges.push_back({v.id, v.col_out[1]});
+        if (v.col_in[0] != -1)
+            edges.push_back({v.id, v.col_in[0]});
+        if (v.col_in[1] != -1)
+            edges.push_back({v.id, v.col_in[1]});
     }
     auto graphReal = polyscope::registerCurveNetwork("knit graph with real connections", vertexPositions, edges);
     graphReal -> setRadius(0.001);
@@ -981,6 +985,7 @@ void KnitGraph::sanityCheck(){
             if (realVertices[v.col_in[0]].col_out[0] != v.id && realVertices[v.col_in[0]].col_out[1] != v.id){
                 buggy_vertices.push_back(v.position);
                 num_errors++;
+                std::cout << "Here a " << std::endl;
                 std::cout << "Column 0 mismatch at vertex " << v.id << std::endl;
             }
         }
@@ -988,6 +993,7 @@ void KnitGraph::sanityCheck(){
             if (realVertices[v.col_out[0]].col_in[0] != v.id && realVertices[v.col_out[0]].col_in[1] != v.id){
                 buggy_vertices.push_back(v.position);
                 num_errors++;
+                std::cout << "Here b " << std::endl;
                 std::cout << "Column 0 mismatch at vertex " << v.id << std::endl;
             }
         }
@@ -1003,14 +1009,8 @@ void KnitGraph::sanityCheck(){
             if (realVertices[v.col_out[1]].col_in[0] != v.id && realVertices[v.col_out[1]].col_in[1] != v.id){
                 buggy_vertices.push_back(v.position);
                 num_errors++;
-                std::cout << "Column 0 mismatch at vertex " << v.id << std::endl;
+                std::cout << "Column 1 mismatch at vertex " << v.id << std::endl;
             }
-        }
-
-        if (!realVertices[v.col_in[0]].col_out[0] == v.id || realVertices[v.col_in[0]].col_out[1] == v.id){
-            buggy_vertices.push_back(v.position);
-            num_errors++;
-            std::cout << "Column mismatch at vertex (autoknit assertion) " << v.id << std::endl;
         }
     }
 

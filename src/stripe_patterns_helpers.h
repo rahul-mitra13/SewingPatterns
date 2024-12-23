@@ -52,6 +52,10 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
                                                                             std::vector<std::pair<int, int>>& vertexMappingsPairs, std::vector<std::pair<int, int>>& edgeMappingsPairs, 
                                                                             std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
 
+
+//given a stripe pattern as corner data, compute an integer value around a specified path
+std::vector<int> computeIntegralValueAlongPaths(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+                          CornerData<double>& stripeValues, std::vector<std::vector<double>>& paths, double period);
                                                           
 
 //returns a vector per face that stores all the isovalues (modulo period) passing through this face

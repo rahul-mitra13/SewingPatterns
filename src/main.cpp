@@ -82,7 +82,7 @@ KnitGraph graph;
 void showStripePatterns(){
   
   //set the wale period 
-  walePeriod = ((0.5/1.6) * coursePeriod);
+  walePeriod = ((1.0/1.6) * coursePeriod);
   //time function on the glued mesh 
   VertexData<double> timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
   //time function on the global mesh 
@@ -137,13 +137,13 @@ void showStripePatterns(){
   //find Knöppel singularities in the WALE DIRECTION 
   //just run Knoppel's algorithm on these models 
   //and then run our 1-form optimization with the singularities
-  // CornerData<double> waleStripeValues;
-  // EdgeData<double> waleSingularEdgesGlobal;
-  // FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
-  // std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
-  //                                                                   edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
-  //                                                                   courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
-  //                                                                   courseSingularEdgesGlobal, *globalPSMesh);
+  CornerData<double> waleStripeValues;
+  EdgeData<double> waleSingularEdgesGlobal;
+  FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
+  std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
+                                                                    edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
+                                                                    courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
+                                                                    courseSingularEdgesGlobal, *globalPSMesh);
   // std::vector<Vector3> positionsWale;
   // std::vector<std::array<int, 2>> edgesWale;
   // std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, walePeriod);
@@ -159,7 +159,7 @@ void showStripePatterns(){
   //                     edgeMap);
   // graph.buildGraph();
 
-  // graph.writeKnitGraphToTxtFile("half_torus_isotropic_knitgraph_1_1.6.txt");
+  // graph.writeKnitGraphToTxtFile("elbow");
 
 }
 
@@ -201,7 +201,7 @@ void manualKnitGraphRepair(){
   graph.sanityCheck();
 
   //write the graph to a txt file 
-  graph.writeKnitGraphToTxtFile("half_torus_isotropic.obj");
+  graph.writeKnitGraphToTxtFile("elbow");
 
 }
 
