@@ -617,7 +617,7 @@ std::vector<knitGraphVertex> KnitGraph::findCluster(const knitGraphVertex &v, do
 //merge a cluster
 void KnitGraph::mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps){
 
-    std::cout << "size of cluster = " << vCluster.size() << std::endl;
+    //std::cout << "size of cluster = " << vCluster.size() << std::endl;
     bool hasRealVertex = false; 
     int id_to_keep = -1;
     //check if this cluster has a real vertex 
@@ -717,19 +717,19 @@ void KnitGraph::mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps)
             // for every vertex outside of the current cluster
             for (auto &vj : vertices) if (norm(vi.position - vj.position) > 2*eps) {
                 if (vi.row_in == vj.id){
-                    std::cout << "here for global row in!! " << std::endl;
+                    //std::cout << "here for global row in!! " << std::endl;
                     global_row_in = vj.id;
                 }
                 if (vi.row_out == vj.id){
-                    std::cout << "here for global row out!! " << std::endl;
+                    //std::cout << "here for global row out!! " << std::endl;
                     global_row_out = vj.id;
                 }
                 if (vi.col_in[0] == vj.id){
-                    std::cout << "here for global col in!! " << std::endl;
+                    //std::cout << "here for global col in!! " << std::endl;
                     global_col_in = vj.id;
                 }
                 if (vi.col_out[0] == vj.id){
-                    std::cout << "here for global col out!! " << std::endl;
+                    //std::cout << "here for global col out!! " << std::endl;
                     global_col_out = vj.id;
                 }
             }
@@ -745,11 +745,11 @@ void KnitGraph::mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps)
         //     vi.col_out[1] = -1;
         // }
 
-        std::cout << "global row in = " << global_row_in << std::endl;
-        std::cout << "global row out = " << global_row_out << std::endl;
-        std::cout << "global col in = " << global_col_in << std::endl;
-        std::cout << "global col out = " << global_col_out << std::endl;
-        std::cout << "----------------------------" << std::endl;
+        // std::cout << "global row in = " << global_row_in << std::endl;
+        // std::cout << "global row out = " << global_row_out << std::endl;
+        // std::cout << "global col in = " << global_col_in << std::endl;
+        // std::cout << "global col out = " << global_col_out << std::endl;
+        // std::cout << "----------------------------" << std::endl;
 
         //shouldn't really matter the order in which merging is happening
         if (global_row_in >= 0 && global_row_in < vertices.size()){
