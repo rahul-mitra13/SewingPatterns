@@ -6,6 +6,7 @@
 #include "geometrycentral/surface/edge_length_geometry.h"
 #include "geometrycentral/surface/remeshing.h"
 #include "geometrycentral/surface/stripe_patterns.h"
+#include "geometrycentral/surface/rich_surface_mesh_data.h"
 
 //polyscope includes 
 #include "polyscope/polyscope.h"
@@ -83,6 +84,7 @@ void showStripePatterns(){
   
   //set the wale period 
   walePeriod = ((1.0/1.6) * coursePeriod);
+  walePeriod = coursePeriod;
   //time function on the glued mesh 
   VertexData<double> timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
   //time function on the global mesh 
@@ -123,6 +125,12 @@ void showStripePatterns(){
   std::tie(courseStripeValues, courseSingularEdgesGlobal);
 
   globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
+  // Store course singular edges for rendering later
+  RichSurfaceMeshData richData(globalGeometry->mesh);
+  richData.addMeshConnectivity();
+  richData.addGeometry(*globalGeometry);
+  richData.addEdgeProperty("courseSingularEdge", courseSingularEdgesGlobal);
+
 
   FaceData<int> stripeIndicesSigmaCourse(*globalMesh, 0);
   std::vector<Vector3> positionsCourse;
@@ -144,22 +152,27 @@ void showStripePatterns(){
                                                                     edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
                                                                     courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
                                                                     courseSingularEdgesGlobal, *globalPSMesh);
-  // std::vector<Vector3> positionsWale;
-  // std::vector<std::array<int, 2>> edgesWale;
-  // std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, walePeriod);
-  // auto waleStripes = polyscope::registerCurveNetwork("wale stripes", positionsWale, edgesWale);
-  // globalPSMesh -> addEdgeScalarQuantity("wale singularities", waleSingularEdgesGlobal);
-  // waleStripes -> setRadius(0.001);
-  // waleStripes -> setEnabled(false);
+  // Store wale singular edges for rendering later
+  richData.addEdgeProperty("waleSingularEdges", courseSingularEdgesGlobal);
+
+  richData.write("singularEdges.ply");
+
+  std::vector<Vector3> positionsWale;
+  std::vector<std::array<int, 2>> edgesWale;
+  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, walePeriod);
+  auto waleStripes = polyscope::registerCurveNetwork("wale stripes", positionsWale, edgesWale);
+  globalPSMesh -> addEdgeScalarQuantity("wale singularities", waleSingularEdgesGlobal);
+  waleStripes -> setRadius(0.001);
+  waleStripes -> setEnabled(false);
 
 
-  // //generate the knit graph
-  // graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
-  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-  //                     edgeMap);
-  // graph.buildGraph();
+  //generate the knit graph
+  graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
+                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+                      edgeMap);
+  graph.buildGraph();
 
-  // graph.writeKnitGraphToTxtFile("elbow");
+  graph.writeKnitGraphToTxtFile("bunny.obj");
 
 }
 
@@ -201,7 +214,7 @@ void manualKnitGraphRepair(){
   graph.sanityCheck();
 
   //write the graph to a txt file 
-  graph.writeKnitGraphToTxtFile("elbow");
+  graph.writeKnitGraphToTxtFile("misc-cactus.obj");
 
 }
 

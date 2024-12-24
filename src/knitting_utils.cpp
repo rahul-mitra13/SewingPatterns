@@ -1310,7 +1310,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     VertexData<Vector3> vertexVectorField = computeVertexValuedField(globalGeometry, timeFunctionGlobal, PI/2.);
     VertexData<Vector2> lineField = vertexDirectionField(globalGeometry, vertexVectorField);
     EdgeData<double> waleSingularEdgesGlobal(globalGeometry.mesh, 0);
-    //doing (1/2.5*period) just to reduce the number of wale singularities
+    //doing (1/2.5 * period) just to reduce the number of wale singularities
     VertexData<double> freq(globalGeometry.mesh, 1./(2.5 * period));
     CornerData<double> stripeValues(globalGeometry.mesh);
     FaceData<int> stripeSingularities(globalGeometry.mesh);
@@ -1990,7 +1990,7 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
     //should figure out some constant step size
     stepSize = 0.05;
     //changing the alignment strongly affects the helicing condition due to the path constraints
-    double alignment = 0.99;
+    double alignment = 0.90;
 
     while (curr < end){
 
@@ -2509,7 +2509,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     //find the step size to sample level sets at
     double avgSum = 0.;
-    double stepSize = 0.;
+    double stepSize = 0.01;
     for (int i = 0; i < boundaryConditions.bdyBdyPathConstraints.size(); i++){
         //visualizing bdy-bdy edge constraints
         EdgeData<double> bdyBdyPath(globalMesh);

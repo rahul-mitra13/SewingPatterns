@@ -1008,7 +1008,7 @@ std::vector<std::pair<int, int>> findEdgeSingularityPairFromStripeIsoVals(Vertex
 
 //given a stripe pattern as corner data, compute an integer value around a specified path
 std::vector<int> computeIntegralValueAlongPaths(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
-                          CornerData<double>& stripeValues, std::vector<std::vector<double>>& paths, double period){
+                                                CornerData<double>& stripeValues, std::vector<std::vector<double>>& paths, double period){
   
   SurfaceMesh& globalMesh = globalGeometry.mesh;
   SurfaceMesh& gluedMesh = gluedGeometry.mesh;
