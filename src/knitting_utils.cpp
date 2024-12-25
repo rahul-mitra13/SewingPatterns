@@ -1380,7 +1380,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             if (toSkip) continue;
             int edge = findSingularEdgeFromSingularFace(globalGeometry, f.getIndex(), courseOneFormGrad[f], 0., timeFunctionGlobal, 0.);
             if (edge == -1) continue;//couldn't find a very well-aligned edge
-            int index = stripeSingularities[f] > 0 ? 1 : -1;
+            //int index = stripeSingularities[f] > 0 ? 1 : -1;
+            int index = stripeSingularities[f];
             //reduce the singular index to +/- 1 (cause of Autoknit constraints)
             singularEdges.push_back(std::make_pair(edgeMap[edge], index));
             waleSingularEdgesGlobal[edge] = index;
