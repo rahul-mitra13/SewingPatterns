@@ -172,7 +172,7 @@ void showStripePatterns(){
                       edgeMap);
   graph.buildGraph();
 
-  graph.writeKnitGraphToTxtFile("bunny.obj");
+  graph.writeKnitGraphToTxtFile("half_torus.obj");
 
 }
 

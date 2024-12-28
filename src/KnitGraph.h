@@ -136,21 +136,15 @@ class KnitGraph{
             //update connections on the vertices of a smooth face 
             void connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices);
 
-            //merge all the virtual vertices first 
-            void mergeVirtual();
-
             //render the knit graph 
             void renderGraph();
 
-            //make obj out of knit graph 
-            void makeObj();
+            //handle the merge in the instrinsic setting 
+            void intrinsicMerge();
 
             //perform epsilon merging to 
             //merge connections across faces
             void epsilonMerging();
-
-            //merge virtual vertices across an edge
-            void edgeMerging();
 
             //reorder indices of knit graph
             void makeRealVertices();
