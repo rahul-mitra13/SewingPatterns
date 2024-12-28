@@ -172,7 +172,7 @@ void showStripePatterns(){
                       edgeMap);
   graph.buildGraph();
 
-  graph.writeKnitGraphToTxtFile("half_torus.obj");
+  graph.writeKnitGraphToTxtFile("model.obj");
 
 }
 
@@ -214,7 +214,7 @@ void manualKnitGraphRepair(){
   graph.sanityCheck();
 
   //write the graph to a txt file 
-  graph.writeKnitGraphToTxtFile("misc-cactus.obj");
+  graph.writeKnitGraphToTxtFile("model.obj");
 
 }
 
