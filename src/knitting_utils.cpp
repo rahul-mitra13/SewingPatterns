@@ -3851,17 +3851,19 @@ EdgeData<double> computeHeatDistanceWeights(EdgeLengthGeometry& gluedGeometry, E
 
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     EdgeData<double> result(gluedMesh);
+    std::vector<Vertex> sourceVerts;
 
     gluedGeometry.requireCotanLaplacian();
     gluedGeometry.requireVertexLumpedMassMatrix();
     Eigen::SparseMatrix<double> L = gluedGeometry.cotanLaplacian;
     Eigen::SparseMatrix<double> M = gluedGeometry.vertexLumpedMassMatrix;
-    double t = 1e-2;
+    double t = 1;
 
     Eigen::SparseMatrix<double> A = L - t*M;
     Eigen::VectorXd delta = Eigen::VectorXd::Zero(gluedMesh.nVertices(), 0);
     
     //force boundary conditions
+    //int ctr = 0;
     for (Edge e : gluedMesh.edges()){
         if (std::fabs(gluedSingularEdges[e]) > 1e-8){//singular edge
             delta(e.halfedge().tailVertex().getIndex()) = 1.0;
@@ -3870,8 +3872,11 @@ EdgeData<double> computeHeatDistanceWeights(EdgeLengthGeometry& gluedGeometry, E
             A.row(e.halfedge().tipVertex().getIndex()) *= 0.0;
             A.coeffRef(e.halfedge().tailVertex().getIndex(), e.halfedge().tailVertex().getIndex()) = 1.0;
             A.coeffRef(e.halfedge().tipVertex().getIndex(), e.halfedge().tipVertex().getIndex()) = 1.0;
-
+            sourceVerts.push_back(e.halfedge().tailVertex());
+            sourceVerts.push_back(e.halfedge().tipVertex());
+            //ctr++;
         }
+        //if (ctr == 1) break;
     }
 
 
@@ -3886,8 +3891,12 @@ EdgeData<double> computeHeatDistanceWeights(EdgeLengthGeometry& gluedGeometry, E
     }
 
     psMesh.addVertexScalarQuantity("heat flow", u);
-    
-    
+
+    // Create the Heat Method solver
+    HeatMethodDistanceSolver heatSolver(gluedGeometry);
+    VertexData<double> distToSource = heatSolver.computeDistance(sourceVerts);
+    psMesh.addVertexScalarQuantity("heat from gc solve", distToSource);
+
     return result;
 
 }

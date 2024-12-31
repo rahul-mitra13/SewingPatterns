@@ -7,6 +7,7 @@
 #include "geometrycentral/utilities/utilities.h"
 #include "geometrycentral/surface/stripe_patterns.h"
 #include "geometrycentral/surface/barycentric_vector.h"
+#include "geometrycentral/surface/heat_method_distance.h"
 
 //libigl includes
 //I guess we'll just put all the libigl includes here for now 
