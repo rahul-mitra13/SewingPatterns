@@ -291,3 +291,9 @@ std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geom
 
 //repair a knit graph vertex that's missing a connection
 std::vector<int> repairKnitGraphVertex();
+
+
+//compute multiplicative edge weights using the heat distance
+//this will all be done in the glued mesh setting
+EdgeData<double> computeHeatDistanceWeights(EdgeLengthGeometry& gluedGeometry, EdgeData<double>& gluedSingularEdges, polyscope::SurfaceMesh& psMesh);
+

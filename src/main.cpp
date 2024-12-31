@@ -174,6 +174,10 @@ void showStripePatterns(){
 
   // graph.writeKnitGraphToTxtFile("model.obj");
 
+
+  //testing heat method 
+  EdgeData<double> weights = computeHeatDistanceWeights(*gluedELG, courseSingularEdgesGlobal, *globalPSMesh);
+
 }
 
 //repair a knit graph vertex that's missing connections

@@ -1328,23 +1328,24 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     // }
 
     VertexData<int> bdyEdges(globalGeometry.mesh, 0);
-    HalfedgeData<double> formValues(globalGeometry.mesh, 0.0);
+    HalfedgeData<double> formValueHalfedges(globalGeometry.mesh, 0.0);
+    EdgeData<double> formValueEdges(globalGeometry.mesh, 0.0);
 
     for (Face f : globalGeometry.mesh.faces()){
         for (Halfedge he : f.adjacentHalfedges()){
-            formValues[he] = stripeValues[he.next().corner()] - stripeValues[he.corner()]; // stripe 1-form
+            formValueHalfedges[he] = stripeValues[he.next().corner()] - stripeValues[he.corner()]; // stripe 1-form
             if (he.next() == f.halfedge())
-                formValues[he] += 2 * stripeSingularities[f] * PI;
+                formValueHalfedges[he] += 2 * stripeSingularities[f] * PI;
         }
     }
 
     for (Edge e : globalGeometry.mesh.edges()){
-        // std::cout << "value at canonical halfedge = " << formValues[e.halfedge()] << std::endl;
-        // std::cout << "value at twin halfedge = " << formValues[e.halfedge().twin()] << std::endl << std::endl;
+        
+        formValueEdges[e] = formValueHalfedges[e.halfedge()];
 
-        if (std::fabs (formValues[e.halfedge()] + formValues[e.halfedge().twin()]) > 1e-6) {
-            std::cout << "val at halfedge " << formValues[e.halfedge()] << std::endl;
-            std::cout << "val at twin halfedge " << formValues[e.halfedge().twin()] << std::endl;
+        if (std::fabs (formValueHalfedges[e.halfedge()] + formValueHalfedges[e.halfedge().twin()]) > 1e-6) {
+            std::cout << "val at halfedge " << formValueHalfedges[e.halfedge()] << std::endl;
+            std::cout << "val at twin halfedge " << formValueHalfedges[e.halfedge().twin()] << std::endl;
             std::cout << "is the edge a boundary? " << e.isBoundary() << std::endl;
         }
     }
@@ -1357,13 +1358,17 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 Edge e = gluedGeometry.mesh.edge(j);
                 bdyEdges[e.halfedge().tailVertex()] = 1;
                 bdyEdges[e.halfedge().tipVertex()] = 1;
-                sum += formValues[e.halfedge()];
+                //sum += formValues[e.halfedge()];
+                sum += formValueEdges[globalGeometry.mesh.edge(j)];
+                std::cout << "adding term = " << formValueEdges[globalGeometry.mesh.edge(j)] << std::endl;
             }
             if (path[j] < 0){
                 Edge e = gluedGeometry.mesh.edge(j);
                 bdyEdges[e.halfedge().tailVertex()] = 1;
                 bdyEdges[e.halfedge().tipVertex()] = 1;
-                sum += formValues[e.halfedge().twin()];
+                //sum += formValues[e.halfedge().twin()];
+                sum += -1.0 * formValueEdges[globalGeometry.mesh.edge(j)];
+                std::cout << "adding term = " << -1.0 * formValueEdges[globalGeometry.mesh.edge(j)] << std::endl;
             }
         }
         std::cout << "sum = " << sum << std::endl;
@@ -3837,6 +3842,54 @@ std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geom
     }
 
     return allSaddleLoops;
+}
+
+
+//compute multiplicative edge weights using the heat distance method
+//this will all be done in the glued mesh setting
+EdgeData<double> computeHeatDistanceWeights(EdgeLengthGeometry& gluedGeometry, EdgeData<double>& gluedSingularEdges, polyscope::SurfaceMesh& psMesh){
+
+    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+    EdgeData<double> result(gluedMesh);
+
+    gluedGeometry.requireCotanLaplacian();
+    gluedGeometry.requireVertexLumpedMassMatrix();
+    Eigen::SparseMatrix<double> L = gluedGeometry.cotanLaplacian;
+    Eigen::SparseMatrix<double> M = gluedGeometry.vertexLumpedMassMatrix;
+    double t = 1e-2;
+
+    Eigen::SparseMatrix<double> A = L - t*M;
+    Eigen::VectorXd delta = Eigen::VectorXd::Zero(gluedMesh.nVertices(), 0);
+    
+
+    //force boundary conditions
+    for (Edge e : gluedMesh.edges()){
+        if (std::fabs(gluedSingularEdges[e]) > 1e-8){//singular edge
+            delta(e.halfedge().tailVertex().getIndex()) = 1.0;
+            delta(e.halfedge().tipVertex().getIndex()) = 1.0;
+            A.row(e.halfedge().tailVertex().getIndex()) *= 0.0;
+            A.row(e.halfedge().tipVertex().getIndex()) *= 0.0;
+            A.coeffRef(e.halfedge().tailVertex().getIndex(), e.halfedge().tailVertex().getIndex()) = 1.0;
+            A.coeffRef(e.halfedge().tipVertex().getIndex(), e.halfedge().tipVertex().getIndex()) = 1.0;
+        }
+    }
+
+
+    Eigen::SparseLU<SparseMatrix<double>> solver;
+    solver.compute(A);
+    if (solver.info() != Eigen::Success) {
+        std::cerr << "Decomposition failed" << std::endl;
+    }
+    Eigen::VectorXd u = solver.solve(delta);
+    if (solver.info() != Eigen::Success) {
+        std::cerr << "Solving failed" << std::endl;
+    }
+
+    psMesh.addVertexScalarQuantity("heat flow", u);
+    
+    
+    return result;
+
 }
 
 
