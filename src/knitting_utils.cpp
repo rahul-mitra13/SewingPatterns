@@ -3861,7 +3861,6 @@ EdgeData<double> computeHeatDistanceWeights(EdgeLengthGeometry& gluedGeometry, E
     Eigen::SparseMatrix<double> A = L - t*M;
     Eigen::VectorXd delta = Eigen::VectorXd::Zero(gluedMesh.nVertices(), 0);
     
-
     //force boundary conditions
     for (Edge e : gluedMesh.edges()){
         if (std::fabs(gluedSingularEdges[e]) > 1e-8){//singular edge
@@ -3871,6 +3870,7 @@ EdgeData<double> computeHeatDistanceWeights(EdgeLengthGeometry& gluedGeometry, E
             A.row(e.halfedge().tipVertex().getIndex()) *= 0.0;
             A.coeffRef(e.halfedge().tailVertex().getIndex(), e.halfedge().tailVertex().getIndex()) = 1.0;
             A.coeffRef(e.halfedge().tipVertex().getIndex(), e.halfedge().tipVertex().getIndex()) = 1.0;
+
         }
     }
 
