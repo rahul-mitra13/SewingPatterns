@@ -1328,6 +1328,27 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     // }
 
     VertexData<int> bdyEdges(globalGeometry.mesh, 0);
+    HalfedgeData<double> formValues(globalGeometry.mesh, 0.0);
+
+    for (Face f : globalGeometry.mesh.faces()){
+        for (Halfedge he : f.adjacentHalfedges()){
+            formValues[he] = stripeValues[he.next().corner()] - stripeValues[he.corner()]; // stripe 1-form
+            if (he.next() == f.halfedge())
+                formValues[he] += 2 * stripeSingularities[f] * PI;
+        }
+    }
+
+    for (Edge e : globalGeometry.mesh.edges()){
+        // std::cout << "value at canonical halfedge = " << formValues[e.halfedge()] << std::endl;
+        // std::cout << "value at twin halfedge = " << formValues[e.halfedge().twin()] << std::endl << std::endl;
+
+        if (std::fabs (formValues[e.halfedge()] + formValues[e.halfedge().twin()]) > 1e-6) {
+            std::cout << "val at halfedge " << formValues[e.halfedge()] << std::endl;
+            std::cout << "val at twin halfedge " << formValues[e.halfedge().twin()] << std::endl;
+            std::cout << "is the edge a boundary? " << e.isBoundary() << std::endl;
+        }
+    }
+
     for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
         std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
         double sum = 0;
@@ -1336,14 +1357,13 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 Edge e = gluedGeometry.mesh.edge(j);
                 bdyEdges[e.halfedge().tailVertex()] = 1;
                 bdyEdges[e.halfedge().tipVertex()] = 1;
-                sum += stripeValues[e.halfedge().next().corner()] - stripeValues[e.halfedge().corner()];
+                sum += formValues[e.halfedge()];
             }
             if (path[j] < 0){
                 Edge e = gluedGeometry.mesh.edge(j);
                 bdyEdges[e.halfedge().tailVertex()] = 1;
                 bdyEdges[e.halfedge().tipVertex()] = 1;
-                std::cout << "adding value = " << stripeValues[e.halfedge().corner()] - stripeValues[e.halfedge().next().corner()] << std::endl;
-                sum += stripeValues[e.halfedge().corner()] - stripeValues[e.halfedge().next().corner()];
+                sum += formValues[e.halfedge().twin()];
             }
         }
         std::cout << "sum = " << sum << std::endl;
@@ -1424,25 +1444,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     modelWale.setSingularEdges(singularEdges);
 
     HalfedgeData<double> sigmaWaleGlued = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
-
-    // for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
-        
-    //     std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
-    //     double pathIntegral = 0;
-    //     for (int j = 0; j < gluedGeometry.mesh.nEdges(); j++){
-    //         if (path[j] > 0){
-    //             pathIntegral += sigmaWaleGlued[gluedGeometry.mesh.edge(j).halfedge()];
-    //         }
-    //         else if (path[j] < 0){
-    //             pathIntegral += sigmaWaleGlued[gluedGeometry.mesh.edge(j).halfedge().twin()];
-    //         }
-    //     }
-    //     std::cout << "num stripes = " << std::round(pathIntegral / period) << std::endl;
-    // }
-
-    
-
-
     CornerData<double> stripeValuesOneFormGlued;
     FaceData<int> stripeIndicesOneFormGlued;
     std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
