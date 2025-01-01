@@ -118,7 +118,7 @@ add_executable(
 	      src/stripe_patterns_helpers.cpp
         src/iterative_assignment.cpp
         src/path_constraints.cpp
-        src/experiments.cpp
+        #src/experiments.cpp
         src/KnitGraph.cpp
 )
 
@@ -129,7 +129,7 @@ target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/de
 #add json
 target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/polyscope/deps/json/include/")
 #add python 
-target_include_directories(SewingPatterns PRIVATE ${PYTHON_LIBRARIES})
+#target_include_directories(SewingPatterns PRIVATE ${PYTHON_LIBRARIES})
 
 if(CXX)
   target_link_libraries(SewingPatterns optimized ${GUROBI_CXX_LIBRARY}
