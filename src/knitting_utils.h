@@ -216,7 +216,7 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
                                                             EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, 
                                                             EdgeData<double>& curl, VertexData<double>& globalTimeFunction, 
                                                             double stepSize, std::map<int, int>& hashedUsedIsoVals, 
-                                                            FaceData<Vector3>& timeFunctionGrad, int numSingularityPairs);
+                                                            FaceData<Vector3>& timeFunctionGrad, int numSingularityPairs, HeatMethodDistanceSolver &heatSolver);
 
 
 //@clean
@@ -261,7 +261,8 @@ void updateForbiddenFaces(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<dou
 //@debugging 
 //compute curl per vertex using the curl discretization from De Goes SIGGRAPH notes
 VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
-                                        FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
+                                    FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap, 
+                                    std::vector<int>& gluedEdgeSingularities, HeatMethodDistanceSolver& heatSolver, std::map<int, int>& vertexMap);
 
 //@debugging
 //average vertex curl onto edges
@@ -296,5 +297,5 @@ std::vector<int> repairKnitGraphVertex();
 
 //compute multiplicative edge weights using the heat distance
 //this will all be done in the glued mesh setting
-EdgeData<double> computeHeatDistanceWeights(EdgeLengthGeometry& gluedGeometry, EdgeData<double>& gluedSingularEdges, polyscope::SurfaceMesh& psMesh);
+EdgeData<double> computeHeatDistanceWeights(EdgeLengthGeometry& gluedGeometry, EdgeData<double>& gluedSingularEdges, polyscope::SurfaceMesh& psMesh, HeatMethodDistanceSolver& heatSolver);
 

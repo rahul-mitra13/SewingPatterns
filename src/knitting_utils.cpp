@@ -1327,56 +1327,54 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     //     std::cout << "integer value for boundary " << i << " = " << integers[i] << std::endl;
     // }
 
-    VertexData<int> bdyEdges(globalGeometry.mesh, 0);
-    HalfedgeData<double> formValueHalfedges(globalGeometry.mesh, 0.0);
-    EdgeData<double> formValueEdges(globalGeometry.mesh, 0.0);
+    // VertexData<int> bdyEdges(globalGeometry.mesh, 0);
+    // HalfedgeData<double> formValueHalfedges(globalGeometry.mesh, 0.0);
+    // EdgeData<double> formValueEdges(globalGeometry.mesh, 0.0);
 
-    for (Face f : globalGeometry.mesh.faces()){
-        for (Halfedge he : f.adjacentHalfedges()){
-            formValueHalfedges[he] = stripeValues[he.next().corner()] - stripeValues[he.corner()]; // stripe 1-form
-            if (he.next() == f.halfedge())
-                formValueHalfedges[he] += 2 * stripeSingularities[f] * PI;
-        }
-    }
+    // for (Face f : globalGeometry.mesh.faces()){
+    //     for (Halfedge he : f.adjacentHalfedges()){
+    //         formValueHalfedges[he] = stripeValues[he.next().corner()] - stripeValues[he.corner()]; // stripe 1-form
+    //         if (he.next() == f.halfedge())
+    //             formValueHalfedges[he] += 2 * stripeSingularities[f] * PI;
+    //     }
+    // }
 
-    for (Edge e : globalGeometry.mesh.edges()){
+    // for (Edge e : globalGeometry.mesh.edges()){
         
-        formValueEdges[e] = formValueHalfedges[e.halfedge()];
+    //     formValueEdges[e] = formValueHalfedges[e.halfedge()];
 
-        if (std::fabs (formValueHalfedges[e.halfedge()] + formValueHalfedges[e.halfedge().twin()]) > 1e-6) {
-            std::cout << "val at halfedge " << formValueHalfedges[e.halfedge()] << std::endl;
-            std::cout << "val at twin halfedge " << formValueHalfedges[e.halfedge().twin()] << std::endl;
-            std::cout << "is the edge a boundary? " << e.isBoundary() << std::endl;
-        }
-    }
+    //     if (std::fabs (formValueHalfedges[e.halfedge()] + formValueHalfedges[e.halfedge().twin()]) > 1e-6) {
+    //         std::cout << "val at halfedge " << formValueHalfedges[e.halfedge()] << std::endl;
+    //         std::cout << "val at twin halfedge " << formValueHalfedges[e.halfedge().twin()] << std::endl;
+    //         std::cout << "is the edge a boundary? " << e.isBoundary() << std::endl;
+    //     }
+    // }
 
-    for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
-        std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
-        double sum = 0;
-        for (int j = 0; j < path.size(); j++){
-            if (path[j] > 0){
-                Edge e = gluedGeometry.mesh.edge(j);
-                bdyEdges[e.halfedge().tailVertex()] = 1;
-                bdyEdges[e.halfedge().tipVertex()] = 1;
-                //sum += formValues[e.halfedge()];
-                sum += formValueEdges[globalGeometry.mesh.edge(j)];
-                std::cout << "adding term = " << formValueEdges[globalGeometry.mesh.edge(j)] << std::endl;
-            }
-            if (path[j] < 0){
-                Edge e = gluedGeometry.mesh.edge(j);
-                bdyEdges[e.halfedge().tailVertex()] = 1;
-                bdyEdges[e.halfedge().tipVertex()] = 1;
-                //sum += formValues[e.halfedge().twin()];
-                sum += -1.0 * formValueEdges[globalGeometry.mesh.edge(j)];
-                std::cout << "adding term = " << -1.0 * formValueEdges[globalGeometry.mesh.edge(j)] << std::endl;
-            }
-        }
-        std::cout << "sum = " << sum << std::endl;
-    }
+    // for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
+    //     std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
+    //     double sum = 0;
+    //     for (int j = 0; j < path.size(); j++){
+    //         if (path[j] > 0){
+    //             Edge e = gluedGeometry.mesh.edge(j);
+    //             bdyEdges[e.halfedge().tailVertex()] = 1;
+    //             bdyEdges[e.halfedge().tipVertex()] = 1;
+    //             //sum += formValues[e.halfedge()];
+    //             sum += formValueEdges[globalGeometry.mesh.edge(j)];
+    //             std::cout << "adding term = " << formValueEdges[globalGeometry.mesh.edge(j)] << std::endl;
+    //         }
+    //         if (path[j] < 0){
+    //             Edge e = gluedGeometry.mesh.edge(j);
+    //             bdyEdges[e.halfedge().tailVertex()] = 1;
+    //             bdyEdges[e.halfedge().tipVertex()] = 1;
+    //             //sum += formValues[e.halfedge().twin()];
+    //             sum += -1.0 * formValueEdges[globalGeometry.mesh.edge(j)];
+    //             std::cout << "adding term = " << -1.0 * formValueEdges[globalGeometry.mesh.edge(j)] << std::endl;
+    //         }
+    //     }
+    //     std::cout << "sum = " << sum << std::endl;
+    // }
 
-    psMesh.addVertexScalarQuantity("boundary edges", bdyEdges);
-
-
+    // psMesh.addVertexScalarQuantity("boundary edges", bdyEdges);
 
     
     std::vector<Vector3> knoppelPos; 
@@ -2025,7 +2023,7 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
                                                             EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, 
                                                             EdgeData<double>& curl, VertexData<double>& globalTimeFunction, 
                                                             double stepSize, std::map<int, int>& hashedUsedIsoVals, 
-                                                            FaceData<Vector3>& timeFunctionGrad, int numSingularityPairs){
+                                                            FaceData<Vector3>& timeFunctionGrad, int numSingularityPairs, HeatMethodDistanceSolver &heatSolver){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
@@ -2467,7 +2465,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
-    
+
+    // Create the Heat Method solver
+    HeatMethodDistanceSolver heatSolver(gluedGeometry);
     //curl per vertex 
     VertexData<double> vertexCurl(globalMesh, 0.0);
     //curl per edge
@@ -2485,14 +2485,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //edge singularities 
     EdgeData<double> edgeSingularities(globalMesh, 0.0);
     FaceData<double> faceSingularities(globalMesh, 0.0);
-    //forbidden faces - faces touched by some isoline can't be used again
-    //this is too restrictive
-    FaceData<int> forbiddenFaces(globalMesh, 0.0);
-    //set the boundary loops to 0 as well
-    for (BoundaryLoop b : globalMesh.boundaryLoops()){
-        Halfedge he = b.halfedge();
-        faceSingularities[he.face()] = 0.0;
-    }
+    
     //gradient of the one form used in each iterative optimization
     FaceData<Vector3> gradSigmaTilde(globalMesh, Vector3{0.0, 0.0, 0.0});
     //gradient of the one form after subtracting off the impluse function 
@@ -2642,7 +2635,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     //compute curl quantities without impulse function
     vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
-                                    gradSigmaTilde, gluedOneRingMap);
+                                    gradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
     edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
     psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (before subtracting)", edgeCurl);
     //compute virtual sigma
@@ -2652,7 +2645,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     adjustedGradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
     //compute curl quantities after impulse function
     vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
-                                    adjustedGradSigmaTilde, gluedOneRingMap);
+                                    gradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
     edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
     psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (after subtracting)", edgeCurl);
     int numSingularities = 0;
@@ -2661,7 +2654,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //return type is a a vector of tuples
         std::vector<std::tuple<std::pair<int, int>, double>> singEdgePairs = findEdgeSingularityPairsUsingTimeFunctionIsoVals(globalGeometry,  gluedGeometry, V, F, 
                                                                             edgeCurl, globalTimeFunction, stepSize, hashedUsedIsoVals, globalTimeFunctionGradientsNormalized, 
-                                                                            topPairs);
+                                                                            topPairs, heatSolver);
 
         //finding edge singularity pairs by just looking for max curl edges
         // singEdgePairs = findEdgeSingularityPairsUsingMaxCurls(globalGeometry, gluedGeometry, V, F, edgeCurl,
@@ -2764,7 +2757,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 //model.setFaceGradients(gradSigmaTilde);
                 //compute curl quantities without accounting for impulse function
                 vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
-                                    gradSigmaTilde, gluedOneRingMap);
+                                    gradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
                 edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
                 psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (before subtracting)", edgeCurl);
                 //compute virtual sigma
@@ -2774,7 +2767,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 adjustedGradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
                 //compute curl quantities after accounting for impulse function
                 vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
-                                    adjustedGradSigmaTilde, gluedOneRingMap);
+                                                gradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
                 edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
                 psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (after subtracting)", edgeCurl);
                 psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numSingularities) + " singularity insertion", edgeSingularities);
@@ -3307,14 +3300,30 @@ void updateForbiddenFaces(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<dou
     }
 }
 
-//@debugging
 //compute curl per vertex using the curl discretization from De Goes SIGGRAPH notes (in global setting)
 VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
-                                        FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
+                                    FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap, 
+                                    std::vector<int>& gluedEdgeSingularities, HeatMethodDistanceSolver& heatSolver, std::map<int, int>& vertexMap){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     VertexData<double> curl(globalMesh);
+    VertexData<double> distToSourceGlued(gluedMesh, 1.0);
+    VertexData<double> distToSourceGlobal(globalMesh, 1.0);
+
+    std::vector<Vertex> gluedSourceVerts;
+    for (Edge e : gluedMesh.edges()){
+        if (std::fabs(gluedEdgeSingularities[e.getIndex()]) == 1){
+            gluedSourceVerts.push_back(e.halfedge().tailVertex());
+            gluedSourceVerts.push_back(e.halfedge().tipVertex());
+        }
+    }
+
+    if (gluedSourceVerts.size() > 0){
+        //compute distance in the glued setting 
+        distToSourceGlued = heatSolver.computeDistance(gluedSourceVerts);
+        distToSourceGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, distToSourceGlued, vertexMap);
+    }
     globalGeometry.requireFaceAreas();
     for (Vertex vi : globalMesh.vertices()){
         double sum = 0.0;
@@ -3325,7 +3334,9 @@ VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, Edg
             //always normalize the field
             sum += dot(hjkVec, field[he.face()].normalize());
         }
-        curl[vi] = sum;
+        //multiply curl by distance as well
+        curl[vi] = distToSourceGlobal[vi] * sum;
+        //curl[vi] = sum;
     }
 
     return curl;
@@ -3847,55 +3858,21 @@ std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geom
 
 //compute multiplicative edge weights using the heat distance method
 //this will all be done in the glued mesh setting
-EdgeData<double> computeHeatDistanceWeights(EdgeLengthGeometry& gluedGeometry, EdgeData<double>& gluedSingularEdges, polyscope::SurfaceMesh& psMesh){
+EdgeData<double> computeHeatDistanceWeights(EdgeLengthGeometry& gluedGeometry, EdgeData<double>& gluedSingularEdges, polyscope::SurfaceMesh& psMesh, HeatMethodDistanceSolver& heatSolver){
 
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     EdgeData<double> result(gluedMesh);
     std::vector<Vertex> sourceVerts;
-
-    gluedGeometry.requireCotanLaplacian();
-    gluedGeometry.requireVertexLumpedMassMatrix();
-    Eigen::SparseMatrix<double> L = gluedGeometry.cotanLaplacian;
-    Eigen::SparseMatrix<double> M = gluedGeometry.vertexLumpedMassMatrix;
-    double t = 1;
-
-    Eigen::SparseMatrix<double> A = L - t*M;
-    Eigen::VectorXd delta = Eigen::VectorXd::Zero(gluedMesh.nVertices(), 0);
-    
-    //force boundary conditions
-    //int ctr = 0;
-    for (Edge e : gluedMesh.edges()){
-        if (std::fabs(gluedSingularEdges[e]) > 1e-8){//singular edge
-            delta(e.halfedge().tailVertex().getIndex()) = 1.0;
-            delta(e.halfedge().tipVertex().getIndex()) = 1.0;
-            A.row(e.halfedge().tailVertex().getIndex()) *= 0.0;
-            A.row(e.halfedge().tipVertex().getIndex()) *= 0.0;
-            A.coeffRef(e.halfedge().tailVertex().getIndex(), e.halfedge().tailVertex().getIndex()) = 1.0;
-            A.coeffRef(e.halfedge().tipVertex().getIndex(), e.halfedge().tipVertex().getIndex()) = 1.0;
-            sourceVerts.push_back(e.halfedge().tailVertex());
-            sourceVerts.push_back(e.halfedge().tipVertex());
-            //ctr++;
-        }
-        //if (ctr == 1) break;
-    }
-
-
-    Eigen::SparseLU<SparseMatrix<double>> solver;
-    solver.compute(A);
-    if (solver.info() != Eigen::Success) {
-        std::cerr << "Decomposition failed" << std::endl;
-    }
-    Eigen::VectorXd u = solver.solve(delta);
-    if (solver.info() != Eigen::Success) {
-        std::cerr << "Solving failed" << std::endl;
-    }
-
-    psMesh.addVertexScalarQuantity("heat flow", u);
-
+ 
     // Create the Heat Method solver
-    HeatMethodDistanceSolver heatSolver(gluedGeometry);
+    //HeatMethodDistanceSolver heatSolver(gluedGeometry);
     VertexData<double> distToSource = heatSolver.computeDistance(sourceVerts);
     psMesh.addVertexScalarQuantity("heat from gc solve", distToSource);
+
+    //create edge weights 
+    for (Edge e : gluedMesh.edges()){
+        result[e] = 0.5 * (distToSource[e.halfedge().tailVertex()] + distToSource[e.halfedge().tipVertex()]);
+    }
 
     return result;
 
