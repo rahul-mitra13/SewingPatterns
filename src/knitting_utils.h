@@ -216,7 +216,7 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
                                                             EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, 
                                                             EdgeData<double>& curl, VertexData<double>& globalTimeFunction, 
                                                             double stepSize, std::map<int, int>& hashedUsedIsoVals, 
-                                                            FaceData<Vector3>& timeFunctionGrad, int numSingularityPairs, HeatMethodDistanceSolver &heatSolver);
+                                                            FaceData<Vector3>& timeFunctionGrad, int numSingularityPairs);
 
 
 //@clean
@@ -295,7 +295,4 @@ std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geom
 std::vector<int> repairKnitGraphVertex();
 
 
-//compute multiplicative edge weights using the heat distance
-//this will all be done in the glued mesh setting
-EdgeData<double> computeHeatDistanceWeights(EdgeLengthGeometry& gluedGeometry, EdgeData<double>& gluedSingularEdges, polyscope::SurfaceMesh& psMesh, HeatMethodDistanceSolver& heatSolver);
 

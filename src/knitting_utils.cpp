@@ -2023,7 +2023,7 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
                                                             EdgeLengthGeometry& gluedGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, 
                                                             EdgeData<double>& curl, VertexData<double>& globalTimeFunction, 
                                                             double stepSize, std::map<int, int>& hashedUsedIsoVals, 
-                                                            FaceData<Vector3>& timeFunctionGrad, int numSingularityPairs, HeatMethodDistanceSolver &heatSolver){
+                                                            FaceData<Vector3>& timeFunctionGrad, int numSingularityPairs){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
@@ -2654,7 +2654,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //return type is a a vector of tuples
         std::vector<std::tuple<std::pair<int, int>, double>> singEdgePairs = findEdgeSingularityPairsUsingTimeFunctionIsoVals(globalGeometry,  gluedGeometry, V, F, 
                                                                             edgeCurl, globalTimeFunction, stepSize, hashedUsedIsoVals, globalTimeFunctionGradientsNormalized, 
-                                                                            topPairs, heatSolver);
+                                                                            topPairs);
 
         //finding edge singularity pairs by just looking for max curl edges
         // singEdgePairs = findEdgeSingularityPairsUsingMaxCurls(globalGeometry, gluedGeometry, V, F, edgeCurl,
@@ -3853,29 +3853,6 @@ std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geom
     }
 
     return allSaddleLoops;
-}
-
-
-//compute multiplicative edge weights using the heat distance method
-//this will all be done in the glued mesh setting
-EdgeData<double> computeHeatDistanceWeights(EdgeLengthGeometry& gluedGeometry, EdgeData<double>& gluedSingularEdges, polyscope::SurfaceMesh& psMesh, HeatMethodDistanceSolver& heatSolver){
-
-    SurfaceMesh& gluedMesh = gluedGeometry.mesh;
-    EdgeData<double> result(gluedMesh);
-    std::vector<Vertex> sourceVerts;
- 
-    // Create the Heat Method solver
-    //HeatMethodDistanceSolver heatSolver(gluedGeometry);
-    VertexData<double> distToSource = heatSolver.computeDistance(sourceVerts);
-    psMesh.addVertexScalarQuantity("heat from gc solve", distToSource);
-
-    //create edge weights 
-    for (Edge e : gluedMesh.edges()){
-        result[e] = 0.5 * (distToSource[e.halfedge().tailVertex()] + distToSource[e.halfedge().tipVertex()]);
-    }
-
-    return result;
-
 }
 
 
