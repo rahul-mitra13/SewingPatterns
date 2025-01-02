@@ -1316,21 +1316,19 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     FaceData<int> stripeSingularities(globalGeometry.mesh);
     FaceData<int> fieldSingularities(globalGeometry.mesh);
     std::tie(stripeValues, stripeSingularities, fieldSingularities) = computeStripePattern(globalGeometry, freq, lineField); // this is a GC call
+    
     // Do some visualization
     psMesh.addVertexVectorQuantity("vertexVectorField", vertexVectorField);
     psMesh.addFaceScalarQuantity("knoppel face singularities", stripeSingularities);
     psMesh.addFaceScalarQuantity("knoppel field singularities", fieldSingularities);
 
-    // std::vector<int> integers = computeIntegralValueAlongPaths(globalGeometry, gluedGeometry, 
-    //                                                             stripeValues, globalBdyConditions.waleBdyPathConstraints, 1./(2.5 * period));
-    // for (int i = 0; i < integers.size(); i++){
-    //     std::cout << "integer value for boundary " << i << " = " << integers[i] << std::endl;
-    // }
-
-    // VertexData<int> bdyEdges(globalGeometry.mesh, 0);
+    // Debugging stuff to compute values along integrals
+    // UGH so bad
     // HalfedgeData<double> formValueHalfedges(globalGeometry.mesh, 0.0);
     // EdgeData<double> formValueEdges(globalGeometry.mesh, 0.0);
-
+    // // for (Halfedge he : globalGeometry.mesh.halfedges()){
+    // //     std::cout << "value at base corner of halfedge between " << he.tailVertex() << " and " << he.tipVertex() << " is " << stripeValues[he.corner()] << std::endl;
+    // // }
     // for (Face f : globalGeometry.mesh.faces()){
     //     for (Halfedge he : f.adjacentHalfedges()){
     //         formValueHalfedges[he] = stripeValues[he.next().corner()] - stripeValues[he.corner()]; // stripe 1-form
@@ -1340,14 +1338,12 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     // }
 
     // for (Edge e : globalGeometry.mesh.edges()){
-        
     //     formValueEdges[e] = formValueHalfedges[e.halfedge()];
-
-    //     if (std::fabs (formValueHalfedges[e.halfedge()] + formValueHalfedges[e.halfedge().twin()]) > 1e-6) {
-    //         std::cout << "val at halfedge " << formValueHalfedges[e.halfedge()] << std::endl;
-    //         std::cout << "val at twin halfedge " << formValueHalfedges[e.halfedge().twin()] << std::endl;
-    //         std::cout << "is the edge a boundary? " << e.isBoundary() << std::endl;
-    //     }
+    //     // if (std::fabs (formValueHalfedges[e.halfedge()] + formValueHalfedges[e.halfedge().twin()]) > 1e-6) {
+    //     //     std::cout << "val at halfedge " << formValueHalfedges[e.halfedge()] << std::endl;
+    //     //     std::cout << "val at twin halfedge " << formValueHalfedges[e.halfedge().twin()] << std::endl;
+    //     //     std::cout << "is the edge a boundary? " << e.isBoundary() << std::endl;
+    //     // }
     // }
 
     // for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
@@ -1356,27 +1352,23 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     //     for (int j = 0; j < path.size(); j++){
     //         if (path[j] > 0){
     //             Edge e = gluedGeometry.mesh.edge(j);
-    //             bdyEdges[e.halfedge().tailVertex()] = 1;
-    //             bdyEdges[e.halfedge().tipVertex()] = 1;
-    //             //sum += formValues[e.halfedge()];
     //             sum += formValueEdges[globalGeometry.mesh.edge(j)];
-    //             std::cout << "adding term = " << formValueEdges[globalGeometry.mesh.edge(j)] << std::endl;
+    //             // std::cout << "adding halfedge term between " << e.halfedge().tailVertex() << " and " << e.halfedge().tipVertex() << std::endl;
+    //             // std::cout << "value at halfedge " << formValueEdges[globalGeometry.mesh.edge(j)] << std::endl;
+    //             // std::cout << "---------------------------" << std::endl;
+
     //         }
     //         if (path[j] < 0){
     //             Edge e = gluedGeometry.mesh.edge(j);
-    //             bdyEdges[e.halfedge().tailVertex()] = 1;
-    //             bdyEdges[e.halfedge().tipVertex()] = 1;
-    //             //sum += formValues[e.halfedge().twin()];
     //             sum += -1.0 * formValueEdges[globalGeometry.mesh.edge(j)];
-    //             std::cout << "adding term = " << -1.0 * formValueEdges[globalGeometry.mesh.edge(j)] << std::endl;
+    //             // std::cout << "adding halfedge term between " << e.halfedge().tipVertex() << " and " << e.halfedge().tailVertex() << std::endl;
+    //             // std::cout << "value at halfedge " << -1.0 * formValueEdges[globalGeometry.mesh.edge(j)] << std::endl;
+    //             // std::cout << "---------------------------" << std::endl;
     //         }
     //     }
-    //     std::cout << "sum = " << sum << std::endl;
+    //     //std::cout << "sum = " << sum << std::endl;
     // }
 
-    // psMesh.addVertexScalarQuantity("boundary edges", bdyEdges);
-
-    
     std::vector<Vector3> knoppelPos; 
     std::vector<std::array<size_t, 2>> knoppelEdges; 
     std::tie(knoppelPos, knoppelEdges) = extractPolylinesFromStripePattern(globalGeometry, stripeValues, stripeSingularities,

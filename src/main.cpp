@@ -167,12 +167,12 @@ void showStripePatterns(){
 
 
   //generate the knit graph
-  graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
-                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-                      edgeMap);
-  graph.buildGraph();
+  // graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
+  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+  //                     edgeMap);
+  // graph.buildGraph();
 
-  graph.writeKnitGraphToTxtFile("model.obj");
+  // graph.writeKnitGraphToTxtFile("model.obj");
 
 
 }
