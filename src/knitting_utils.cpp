@@ -273,7 +273,8 @@ VertexData<Vector3> computeVertexValuedField(VertexPositionGeometry& geometry, V
 }
 
 //get a line field per vertex from a vertex valued vector field in ambient space
-VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, VertexData<Vector3>& vertexValuedField){
+VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, VertexData<Vector3>& vertexValuedField, 
+                                         VertexData<Vector2>& usedRoot){
 
     SurfaceMesh& mesh = geometry.mesh;
     VertexData<Vector2> directionField(mesh);
@@ -363,6 +364,8 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
         Vector3 e = geometry.vertexPositions[v.halfedge().tipVertex()] - geometry.vertexPositions[v.halfedge().tailVertex()];
         Vector2 u = projectOntoPlane(vertex_valued_field.row(i).transpose(), {n.x, n.y, n.z}, {e.x, e.y, e.z});
         double a = std::atan2(u.y, u.x);
+        //storing which root we're using 
+        usedRoot[v] = unit(u);
         //for a 2-direction field
         std::complex<double> complexDirectionField(r * std::complex<double>(cos(2.0 * a), sin(2.0 * a)));
         directionField[v] = Vector2::fromComplex(complexDirectionField);
@@ -1305,10 +1308,12 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                                                                     std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, FaceData<Vector3>& courseOneFormGrad, 
                                                                     Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions,
                                                                     EdgeData<double>& courseSingularEdgesGlobal, polyscope::SurfaceMesh& psMesh){
-
+                                                
+    //which root we used in specifying the direction field
+    VertexData<Vector2> usedRoot(globalGeometry.mesh);
     //compute a line field in the tangent space of the vertex
     VertexData<Vector3> vertexVectorField = computeVertexValuedField(globalGeometry, timeFunctionGlobal, PI/2.);
-    VertexData<Vector2> lineField = vertexDirectionField(globalGeometry, vertexVectorField);
+    VertexData<Vector2> lineField = vertexDirectionField(globalGeometry, vertexVectorField, usedRoot);
     EdgeData<double> waleSingularEdgesGlobal(globalGeometry.mesh, 0);
     //doing (1/2.5 * period) just to reduce the number of wale singularities
     VertexData<double> freq(globalGeometry.mesh, 1./(2.5 * period));
@@ -1322,52 +1327,40 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     psMesh.addFaceScalarQuantity("knoppel face singularities", stripeSingularities);
     psMesh.addFaceScalarQuantity("knoppel field singularities", fieldSingularities);
 
-    // Debugging stuff to compute values along integrals
-    // UGH so bad
-    // HalfedgeData<double> formValueHalfedges(globalGeometry.mesh, 0.0);
-    // EdgeData<double> formValueEdges(globalGeometry.mesh, 0.0);
-    // // for (Halfedge he : globalGeometry.mesh.halfedges()){
-    // //     std::cout << "value at base corner of halfedge between " << he.tailVertex() << " and " << he.tipVertex() << " is " << stripeValues[he.corner()] << std::endl;
-    // // }
-    // for (Face f : globalGeometry.mesh.faces()){
-    //     for (Halfedge he : f.adjacentHalfedges()){
-    //         formValueHalfedges[he] = stripeValues[he.next().corner()] - stripeValues[he.corner()]; // stripe 1-form
-    //         if (he.next() == f.halfedge())
-    //             formValueHalfedges[he] += 2 * stripeSingularities[f] * PI;
-    //     }
-    // }
+    // compute stripe values along integrals
+    HalfedgeData<double> formValueHalfedges(globalGeometry.mesh, 0.0);
+    EdgeData<double> formValueEdges(globalGeometry.mesh, 0.0);
+    //adjust so that the signs make sense i.e., we consider values on the same sheet
+    for (Face f : globalGeometry.mesh.faces()){
+        for (Halfedge he : f.adjacentHalfedges()){
+            formValueHalfedges[he] = stripeValues[he.next().corner()] - stripeValues[he.corner()]; // stripe 1-form
+            Vector2 X = Vector2::fromAngle(lineField[he.tailVertex()].arg() / 2);
+            //if we're not on the same sheet
+            if (dot(usedRoot[f.halfedge().tailVertex()], X) < 0) formValueHalfedges[he] *= -1;
+            if (he.next() == f.halfedge())
+                formValueHalfedges[he] += 2 * stripeSingularities[f] * PI;
+        }
+    }
 
-    // for (Edge e : globalGeometry.mesh.edges()){
-    //     formValueEdges[e] = formValueHalfedges[e.halfedge()];
-    //     // if (std::fabs (formValueHalfedges[e.halfedge()] + formValueHalfedges[e.halfedge().twin()]) > 1e-6) {
-    //     //     std::cout << "val at halfedge " << formValueHalfedges[e.halfedge()] << std::endl;
-    //     //     std::cout << "val at twin halfedge " << formValueHalfedges[e.halfedge().twin()] << std::endl;
-    //     //     std::cout << "is the edge a boundary? " << e.isBoundary() << std::endl;
-    //     // }
-    // }
+    for (Edge e : globalGeometry.mesh.edges()){
+        formValueEdges[e] = formValueHalfedges[e.halfedge()];
+    }
 
-    // for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
-    //     std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
-    //     double sum = 0;
-    //     for (int j = 0; j < path.size(); j++){
-    //         if (path[j] > 0){
-    //             Edge e = gluedGeometry.mesh.edge(j);
-    //             sum += formValueEdges[globalGeometry.mesh.edge(j)];
-    //             // std::cout << "adding halfedge term between " << e.halfedge().tailVertex() << " and " << e.halfedge().tipVertex() << std::endl;
-    //             // std::cout << "value at halfedge " << formValueEdges[globalGeometry.mesh.edge(j)] << std::endl;
-    //             // std::cout << "---------------------------" << std::endl;
-
-    //         }
-    //         if (path[j] < 0){
-    //             Edge e = gluedGeometry.mesh.edge(j);
-    //             sum += -1.0 * formValueEdges[globalGeometry.mesh.edge(j)];
-    //             // std::cout << "adding halfedge term between " << e.halfedge().tipVertex() << " and " << e.halfedge().tailVertex() << std::endl;
-    //             // std::cout << "value at halfedge " << -1.0 * formValueEdges[globalGeometry.mesh.edge(j)] << std::endl;
-    //             // std::cout << "---------------------------" << std::endl;
-    //         }
-    //     }
-    //     //std::cout << "sum = " << sum << std::endl;
-    // }
+    for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
+        std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
+        double sum = 0;
+        for (int j = 0; j < path.size(); j++){
+            if (path[j] > 0){
+                Edge e = gluedGeometry.mesh.edge(j);
+                sum += formValueEdges[globalGeometry.mesh.edge(j)];
+            }
+            if (path[j] < 0){
+                Edge e = gluedGeometry.mesh.edge(j);
+                sum += -1.0 * formValueEdges[globalGeometry.mesh.edge(j)];
+            }
+        }
+        std::cout << "number of stripes on boundary " << i << " = " << std::round(sum/ (2. * PI)) << std::endl;
+    }
 
     std::vector<Vector3> knoppelPos; 
     std::vector<std::array<size_t, 2>> knoppelEdges; 
@@ -2770,6 +2763,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         if (toBreak) break;//we are no longer improving the distance to unit norm
     } 
     std::cout << "Number of singularities inserted = " << numSingularities << std::endl;
+
 
     return std::tie(stripeValuesSigmaCourse, edgeSingularities);
 
