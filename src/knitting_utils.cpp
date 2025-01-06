@@ -1316,7 +1316,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     VertexData<Vector2> lineField = vertexDirectionField(globalGeometry, vertexVectorField, usedRoot);
     EdgeData<double> waleSingularEdgesGlobal(globalGeometry.mesh, 0);
     //doing (1/2.5 * period) just to reduce the number of wale singularities
-    VertexData<double> freq(globalGeometry.mesh, 1./(2.5 * period));
+    VertexData<double> freq(globalGeometry.mesh, 1./(1.5 * period));
     CornerData<double> stripeValues(globalGeometry.mesh);
     FaceData<int> stripeSingularities(globalGeometry.mesh);
     FaceData<int> fieldSingularities(globalGeometry.mesh);

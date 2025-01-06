@@ -167,12 +167,12 @@ void showStripePatterns(){
 
 
   //generate the knit graph
-  // graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
-  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-  //                     edgeMap);
-  // graph.buildGraph();
+  graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
+                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+                      edgeMap);
+  graph.buildGraph();
 
-  // graph.writeKnitGraphToTxtFile("model.obj");
+  graph.writeKnitGraphToTxtFile("model.obj");
 
 
 }
@@ -312,7 +312,7 @@ int main(int argc, char **argv) {
   //render the stitched vertices
   renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
   // Disable the ground plane
-  polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::None;
+  //polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::None;
   // Set the callback function
   polyscope::state::userCallback = callBacks;
   polyscope::show();
