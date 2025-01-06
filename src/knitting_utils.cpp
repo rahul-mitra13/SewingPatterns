@@ -1316,7 +1316,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     VertexData<Vector2> lineField = vertexDirectionField(globalGeometry, vertexVectorField, usedRoot);
     EdgeData<double> waleSingularEdgesGlobal(globalGeometry.mesh, 0);
     //doing (1/2.5 * period) just to reduce the number of wale singularities
-    VertexData<double> freq(globalGeometry.mesh, 1./(1.5 * period));
+    VertexData<double> freq(globalGeometry.mesh, 1./(period));
     CornerData<double> stripeValues(globalGeometry.mesh);
     FaceData<int> stripeSingularities(globalGeometry.mesh);
     FaceData<int> fieldSingularities(globalGeometry.mesh);
@@ -1330,13 +1330,15 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     // compute stripe values along integrals
     HalfedgeData<double> formValueHalfedges(globalGeometry.mesh, 0.0);
     EdgeData<double> formValueEdges(globalGeometry.mesh, 0.0);
+    std::vector<std::pair<std::vector<double>, double>> waleBdyEdgePathConstraints; 
+
     //adjust so that the signs make sense i.e., we consider values on the same sheet
     for (Face f : globalGeometry.mesh.faces()){
+        Vector2 X = Vector2::fromAngle(lineField[f.halfedge().tailVertex()].arg() / 2);
+        Vector2 root = usedRoot[f.halfedge().tailVertex()];
+        int sign = dot(X, root) < 0 ? -1 : 1;
         for (Halfedge he : f.adjacentHalfedges()){
-            formValueHalfedges[he] = stripeValues[he.next().corner()] - stripeValues[he.corner()]; // stripe 1-form
-            Vector2 X = Vector2::fromAngle(lineField[he.tailVertex()].arg() / 2);
-            //if we're not on the same sheet
-            if (dot(usedRoot[f.halfedge().tailVertex()], X) < 0) formValueHalfedges[he] *= -1;
+            formValueHalfedges[he] = sign * (stripeValues[he.next().corner()] - stripeValues[he.corner()]); // stripe 1-form
             if (he.next() == f.halfedge())
                 formValueHalfedges[he] += 2 * stripeSingularities[f] * PI;
         }
@@ -1346,9 +1348,11 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         formValueEdges[e] = formValueHalfedges[e.halfedge()];
     }
 
+    //for a model with n boundaries, we need (n - 1) bdy integral constraints
     for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
         std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
         double sum = 0;
+        int k = 0;
         for (int j = 0; j < path.size(); j++){
             if (path[j] > 0){
                 Edge e = gluedGeometry.mesh.edge(j);
@@ -1359,7 +1363,11 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 sum += -1.0 * formValueEdges[globalGeometry.mesh.edge(j)];
             }
         }
+        std::cout << "sum / (2 * PI) = " << sum / (2. * PI) << std::endl;
         std::cout << "number of stripes on boundary " << i << " = " << std::round(sum/ (2. * PI)) << std::endl;
+        k = std::round(sum / (2. * PI));
+        waleBdyEdgePathConstraints.push_back(std::make_pair(path, k));
+
     }
 
     std::vector<Vector3> knoppelPos; 
