@@ -10,6 +10,7 @@
 #include "geometrycentral/utilities/utilities.h"
 #include "geometrycentral/surface/stripe_patterns.h"
 #include "geometrycentral/surface/barycentric_vector.h"
+#include "geometrycentral/surface/heat_method_distance.h"
 
 //libigl includes
 //I guess we'll just put all the libigl includes here for now 
@@ -29,6 +30,7 @@
 #include "helpers.h"
 #include "stripe_patterns_helpers.h"
 #include "path_constraints.h"
+
 
 //includes to solve the optimization problem
 #include "gurobi_c++.h"
@@ -77,7 +79,8 @@ VertexData<Vector3> computeVertexValuedField(VertexPositionGeometry& geometry, V
 //@param[in]    vertexValuedField   VertexData<Vector3>                 #V by 3 vector per vertex
 //
 //@return       directionField      VertexData<Vector2>                 direction field at each vertex
-VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, VertexData<Vector3>& vertexValuedField);
+VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, VertexData<Vector3>& vertexValuedField, 
+                                         VertexData<Vector2>& usedRoot);
 
 //compute a 1-form that will be used to generate the stripes over the patches
 //
@@ -245,7 +248,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                                                     std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
                                                                     globalBoundaryConditions& boundaryConditions, double period,
                                                                     Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G,
-                                                                    FaceData<Vector3>& courseOneFormGrad, std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
+                                                                    FaceData<Vector3>& courseOneFormGrad, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
+                                                                    std::vector<std::vector<double>> allSaddleLoops, std::vector<std::vector<double>> homologyGenerators);
 
 //@clean
 //compute course 1-form
@@ -261,7 +265,8 @@ void updateForbiddenFaces(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<dou
 //@debugging 
 //compute curl per vertex using the curl discretization from De Goes SIGGRAPH notes
 VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
-                                        FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap);
+                                    FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap, 
+                                    std::vector<int>& gluedEdgeSingularities, HeatMethodDistanceSolver& heatSolver, std::map<int, int>& vertexMap);
 
 //@debugging
 //average vertex curl onto edges
@@ -281,4 +286,16 @@ std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeome
 std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
                                                         std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh);
 
+//given a time function over the mesh, extract the saddle vertices from it 
+//this function returns the vertex in the glued setting
+std::vector<Vertex> getSaddleVertices(IntrinsicGeometryInterface& geometry, VertexData<double>& timeFunction);
+
+//find all the saddle loops from the saddle vertex
+std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geometry, const std::vector<Vertex> &saddleVertices, const VertexData<double>& timeFunc);
+
+
+//repair a knit graph vertex that's missing a connection
+std::vector<int> repairKnitGraphVertex();
+
 #endif
+

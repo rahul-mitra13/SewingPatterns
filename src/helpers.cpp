@@ -595,7 +595,6 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
                 toReturn.waleBdyPathConstraints.push_back(weights);
             }
         }
-
         //knitting end conditions 
         for (int i = 0; i < endVertices.size(); i++){
             if (endVertices[i].size() == 1){//this is just a vertex on a boundary loop, do the same as above 
@@ -637,7 +636,6 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
             }
         }
     }
-
     //create boundary-boundary intergation paths 
     for (int i = 0; i < knittingStartVertices.size(); i++){
         for (int j = 0; j < knittingEndVertices.size(); j++){

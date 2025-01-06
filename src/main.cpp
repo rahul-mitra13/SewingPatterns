@@ -7,6 +7,7 @@
 #include "geometrycentral/surface/signpost_intrinsic_triangulation.h"
 #include "geometrycentral/surface/remeshing.h"
 #include "geometrycentral/surface/stripe_patterns.h"
+#include "geometrycentral/surface/rich_surface_mesh_data.h"
 
 //polyscope includes 
 #include "polyscope/polyscope.h"
@@ -22,8 +23,10 @@
 #include "knitting_utils.h"
 #include "stripe_patterns_helpers.h"
 #include "iterative_assignment.h"
-#include "experiments.h"
+//#include "experiments.h"
 #include "KnitGraph.h"
+
+#include "homology_generators.h"
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -52,8 +55,9 @@ polyscope::SurfaceMesh *globalPSMesh;
 //global boundary conditions
 globalBoundaryConditions globalBdyConditions;
 
-//1-form optimization period
-float period = 1;
+//1-form optimization course Period
+float coursePeriod = 1;
+float walePeriod;//the ratio of width to height should be 1:1.6 (Kui)
 //threshold for constraining wale boundary edges 
 //I don't really like this and need to figure out a better way of doing this
 float threshold = 0.6;
@@ -73,9 +77,15 @@ Eigen::SparseMatrix<double> grad;
 //gradient operator in the row major format
 Eigen::SparseMatrix<double, Eigen::RowMajor> G;
 
+//the knit graph over the model 
+KnitGraph graph;
+
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
   
+  //set the wale period 
+  walePeriod = ((1.0/1.6) * coursePeriod);
+  walePeriod = coursePeriod;
   //time function on the glued mesh 
   VertexData<double> timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
   //time function on the global mesh 
@@ -95,8 +105,9 @@ void showStripePatterns(){
 
   // Compute course stripes using Knöppel's method
   VertexData<Vector3> vertexVectorField = computeVertexValuedField(*globalGeometry, timeFunctionGlobal, 0.0);
-  VertexData<Vector2> lineField = vertexDirectionField(*globalGeometry, vertexVectorField);
-  VertexData<double> freq(globalGeometry->mesh, 1./(period));
+  VertexData<Vector2> usedRoot(globalGeometry->mesh);
+  VertexData<Vector2> lineField = vertexDirectionField(*globalGeometry, vertexVectorField, usedRoot);
+  VertexData<double> freq(globalGeometry->mesh, 1./(coursePeriod));
   CornerData<double> stripeValues(globalGeometry->mesh);
   FaceData<int> stripeSingularities(globalGeometry->mesh);
   FaceData<int> fieldSingularities(globalGeometry->mesh);
@@ -113,6 +124,17 @@ void showStripePatterns(){
   auto knoppelStripes = polyscope::registerCurveNetwork("knoppel course stripes", knoppelPos, knoppelEdges);
   knoppelStripes->setRadius(0.001);
   knoppelStripes->setEnabled(false);
+
+  //loops from the saddle vertex for meshes with genus 
+  std::vector<std::vector<double>> allSaddleLoops;
+  //all the homology generators 
+  std::vector<std::vector<double>> homologyGenerators;
+  if (globalGeometry->mesh.nConnectedComponents() == 1){//do the homology generator stuff for just global 3D meshes for now 
+      std::vector<Vertex> saddleVertices = getSaddleVertices(*globalGeometry, timeFunctionGlobal);
+      allSaddleLoops = findAllSaddleLoops(*globalGeometry, saddleVertices, timeFunctionGlobal);
+      homologyGenerators = buildHomologyGeneratorsVector(*globalGeometry, *globalMesh);
+  }
+
 
   //gradient on the glued/global mesh
   //note that faces have a 1-to-1 mapping from global to glued setting
@@ -140,11 +162,26 @@ void showStripePatterns(){
   FaceData<Vector3> courseOneFormGrad(globalGeometry -> mesh);
   std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
-                                                                    globalBdyConditions, period, V, F, G, courseOneFormGrad, gluedOneRingMap);
+                                                                    globalBdyConditions, coursePeriod, V, F, G, courseOneFormGrad, gluedOneRingMap, 
+                                                                    allSaddleLoops, homologyGenerators);
 
   std::tie(courseStripeValues, courseSingularEdgesGlobal);
 
   globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
+  // Store course singular edges for rendering later
+  RichSurfaceMeshData richData(globalGeometry->mesh);
+  richData.addMeshConnectivity();
+  richData.addGeometry(*globalGeometry);
+  richData.addEdgeProperty("courseSingularEdge", courseSingularEdgesGlobal);
+
+
+  FaceData<int> stripeIndicesSigmaCourse(*globalMesh, 0);
+  std::vector<Vector3> positionsCourse;
+  std::vector<std::array<int, 2>> edgesCourse;
+  std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, courseStripeValues, stripeIndicesSigmaCourse, coursePeriod);
+  auto courseStripes = polyscope::registerCurveNetwork("final course stripes ", positionsCourse, edgesCourse);
+  courseStripes -> setRadius(0.001);
+  courseStripes -> setEnabled(false);
 
 
   //WALE STRIPES
@@ -156,11 +193,16 @@ void showStripePatterns(){
   FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
   std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
                                                                     edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
-                                                                    courseOneFormGrad, G, period, knoppelFrequency, globalBdyConditions, 
+                                                                    courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
                                                                     courseSingularEdgesGlobal, *globalPSMesh);
+  // Store wale singular edges for rendering later
+  richData.addEdgeProperty("waleSingularEdges", courseSingularEdgesGlobal);
+
+  richData.write("singularEdges.ply");
+
   std::vector<Vector3> positionsWale;
   std::vector<std::array<int, 2>> edgesWale;
-  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, period);
+  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, walePeriod);
   auto waleStripes = polyscope::registerCurveNetwork("wale stripes", positionsWale, edgesWale);
   globalPSMesh -> addEdgeScalarQuantity("wale singularities", waleSingularEdgesGlobal);
   waleStripes -> setRadius(0.001);
@@ -171,25 +213,63 @@ void showStripePatterns(){
   // Plot wale stripe values with offset (to debug knit graph)
   CornerData<double> waleStripeValuesWithOffset = waleStripeValues;
   for (Corner co : gluedELG->mesh.corners())
-      waleStripeValuesWithOffset[co] -= period/4;
-  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValuesWithOffset, waleSingularFaces, period);
+      waleStripeValuesWithOffset[co] -= coursePeriod/4;
+  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValuesWithOffset, waleSingularFaces, coursePeriod);
   waleStripes = polyscope::registerCurveNetwork("wale stripes with offset", positionsWale, edgesWale);
   waleStripes -> setRadius(0.001);
   waleStripes -> setEnabled(false);
 
 
-  // //show vertex curl and edge curl of normalized time function gradient
-  // VertexData<double> vertexCurl = computeVertexCurl(*globalGeometry, *gluedELG, 
-  //                                   timeFunctionGradientGlobalNormalized, gluedOneRingMap);
-  // EdgeData<double> edgeCurl = computeVertexAveragedEdgeCurl(*globalGeometry, vertexCurl);
-  // globalPSMesh->addVertexScalarQuantity("normalized time function gradient vertex curl", vertexCurl);
-  // globalPSMesh->addEdgeScalarQuantity("normalized time function gradient edge curl", edgeCurl);
-
   //generate the knit graph
-  KnitGraph graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, period, 
+  graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
                       courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
                       edgeMap);
   graph.buildGraph();
+
+  graph.writeKnitGraphToTxtFile("model.obj");
+
+
+}
+
+//repair a knit graph vertex that's missing connections
+//ugh 
+void manualKnitGraphRepair(){
+
+  std::vector<int> newInfo;
+  newInfo = repairKnitGraphVertex();
+
+  int id = newInfo[0];
+  int row_in = newInfo[1];
+  int row_out = newInfo[2];
+  int col_in_1 = newInfo[3];
+  int col_in_2 = newInfo[4];
+  int col_out_1 = newInfo[5];
+  int col_out_2 = newInfo[6];
+
+  //update the changes 
+  graph.getRealVertices()[id].row_in = row_in;
+  graph.getRealVertices()[row_in].row_out = id;
+
+  graph.getRealVertices()[id].row_out = row_out;
+  graph.getRealVertices()[row_out].row_in = id;
+
+  graph.getRealVertices()[id].col_in[0] = col_in_1;
+  graph.getRealVertices()[col_in_1].col_out[0] = id;
+
+  graph.getRealVertices()[id].col_in[1] = col_in_2;
+  graph.getRealVertices()[col_in_2].col_out[1] = id;
+
+  graph.getRealVertices()[id].col_out[0] = col_out_1;
+  graph.getRealVertices()[col_out_1].col_in[0] = id;
+
+  graph.getRealVertices()[id].col_out[1] = col_out_2;
+  graph.getRealVertices()[col_out_2].col_in[1] = id;
+
+  graph.renderGraph();
+  graph.sanityCheck();
+
+  //write the graph to a txt file 
+  graph.writeKnitGraphToTxtFile("model.obj");
 
 }
 
@@ -198,14 +278,18 @@ void showStripePatterns(){
 // https://github.com/ocornut/imgui/blob/master/imgui.h
 void callBacks() {
 
-  ImGui::InputFloat("1-form period", &period);
+  ImGui::InputFloat("Course 1-form period", &coursePeriod);
   //there needs to be a better way to constrain wale edges
-  ImGui::InputFloat("Threshold", &threshold);
+  //ImGui::InputFloat("Threshold", &threshold);
   //frequency for knoppel stripes
   ImGui::InputFloat("Knoppel frequency", &knoppelFrequency);
 
   if (ImGui::Button("Show Stripe Patterns")){
     showStripePatterns();
+  }
+
+  if (ImGui::Button("Manaul Repair")){
+    manualKnitGraphRepair();
   }
 }
 
@@ -220,13 +304,21 @@ int main(int argc, char **argv) {
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometryPre);
   globalMesh = std::make_unique<ManifoldSurfaceMesh>(F);
   globalGeometry = std::make_unique<VertexPositionGeometry>(*globalMesh, V);
+  //find the gradient operator (want to do this just once)
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometry);
   igl::grad(V,F,grad);
+  //find the max edge length so that default coursePeriod = 2 * max_e 
+  double maxLength = -DBL_MAX;
+  for (Edge e : globalMesh -> edges()){
+    double length = norm(globalGeometry->vertexPositions[e.halfedge().tipVertex()] - globalGeometry->vertexPositions[e.halfedge().tailVertex()]);
+    if (length > maxLength)
+      coursePeriod = 2.0 * length;//set the default length to twice the course period
+  }
 
   // Parse stripe period, if available
   if (argc > 2) {
-    sscanf(argv[2], "%f", &period);
-    knoppelFrequency = 1.0 / period; // to match course and wale periods
+    sscanf(argv[2], "%f", &coursePeriod);
+    knoppelFrequency = 1.0 / coursePeriod; // to match course and wale periods
   }
 
   if (!(globalMesh -> isManifold())){
@@ -293,7 +385,7 @@ int main(int argc, char **argv) {
   //render the stitched vertices
   renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
   // Disable the ground plane
-  polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::None;
+  //polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::None;
   // Set the callback function
   polyscope::state::userCallback = callBacks;
 

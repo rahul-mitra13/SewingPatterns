@@ -273,7 +273,8 @@ VertexData<Vector3> computeVertexValuedField(VertexPositionGeometry& geometry, V
 }
 
 //get a line field per vertex from a vertex valued vector field in ambient space
-VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, VertexData<Vector3>& vertexValuedField){
+VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, VertexData<Vector3>& vertexValuedField, 
+                                         VertexData<Vector2>& usedRoot){
 
     SurfaceMesh& mesh = geometry.mesh;
     VertexData<Vector2> directionField(mesh);
@@ -363,6 +364,8 @@ VertexData<Vector2> vertexDirectionField(VertexPositionGeometry& geometry, Verte
         Vector3 e = geometry.vertexPositions[v.halfedge().tipVertex()] - geometry.vertexPositions[v.halfedge().tailVertex()];
         Vector2 u = projectOntoPlane(vertex_valued_field.row(i).transpose(), {n.x, n.y, n.z}, {e.x, e.y, e.z});
         double a = std::atan2(u.y, u.x);
+        //storing which root we're using 
+        usedRoot[v] = unit(u);
         //for a 2-direction field
         std::complex<double> complexDirectionField(r * std::complex<double>(cos(2.0 * a), sin(2.0 * a)));
         directionField[v] = Vector2::fromComplex(complexDirectionField);
@@ -1305,31 +1308,70 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                                                                     std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, FaceData<Vector3>& courseOneFormGrad, 
                                                                     Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions,
                                                                     EdgeData<double>& courseSingularEdgesGlobal, polyscope::SurfaceMesh& psMesh){
-
+                                                
+    //which root we used in specifying the direction field
+    VertexData<Vector2> usedRoot(globalGeometry.mesh);
     //compute a line field in the tangent space of the vertex
     VertexData<Vector3> vertexVectorField = computeVertexValuedField(globalGeometry, timeFunctionGlobal, PI/2.);
-    VertexData<Vector2> lineField = vertexDirectionField(globalGeometry, vertexVectorField);
+    VertexData<Vector2> lineField = vertexDirectionField(globalGeometry, vertexVectorField, usedRoot);
     EdgeData<double> waleSingularEdgesGlobal(globalGeometry.mesh, 0);
-    VertexData<double> freq(globalGeometry.mesh, 1./(period));
+    //doing (1/2.5 * period) just to reduce the number of wale singularities
+    VertexData<double> freq(globalGeometry.mesh, 1./(1.5 * period));
     CornerData<double> stripeValues(globalGeometry.mesh);
     FaceData<int> stripeSingularities(globalGeometry.mesh);
     FaceData<int> fieldSingularities(globalGeometry.mesh);
     std::tie(stripeValues, stripeSingularities, fieldSingularities) = computeStripePattern(globalGeometry, freq, lineField); // this is a GC call
+    
     // Do some visualization
     psMesh.addVertexVectorQuantity("vertexVectorField", vertexVectorField);
     psMesh.addFaceScalarQuantity("knoppel face singularities", stripeSingularities);
     psMesh.addFaceScalarQuantity("knoppel field singularities", fieldSingularities);
-    
-    // std::vector<Vector3> knoppelPos; 
-    // std::vector<std::array<size_t, 2>> knoppelEdges; 
-    // std::tie(knoppelPos, knoppelEdges) = extractPolylinesFromStripePattern(globalGeometry, stripeValues, stripeSingularities,
-    //                                         fieldSingularities, lineField, false);
-    // auto knoppelStripes = polyscope::registerCurveNetwork("knoppel wale stripes stripes", knoppelPos, knoppelEdges);
-    // knoppelStripes -> setRadius(0.001);
-    // knoppelStripes -> setEnabled(false);
 
+    // compute stripe values along integrals
+    HalfedgeData<double> formValueHalfedges(globalGeometry.mesh, 0.0);
+    EdgeData<double> formValueEdges(globalGeometry.mesh, 0.0);
+    //adjust so that the signs make sense i.e., we consider values on the same sheet
+    for (Face f : globalGeometry.mesh.faces()){
+        for (Halfedge he : f.adjacentHalfedges()){
+            formValueHalfedges[he] = stripeValues[he.next().corner()] - stripeValues[he.corner()]; // stripe 1-form
+            Vector2 X = Vector2::fromAngle(lineField[he.tailVertex()].arg() / 2);
+            //if we're not on the same sheet
+            if (dot(usedRoot[f.halfedge().tailVertex()], X) < 0) formValueHalfedges[he] *= -1;
+            if (he.next() == f.halfedge())
+                formValueHalfedges[he] += 2 * stripeSingularities[f] * PI;
+        }
+    }
+
+    for (Edge e : globalGeometry.mesh.edges()){
+        formValueEdges[e] = formValueHalfedges[e.halfedge()];
+    }
+
+    for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
+        std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
+        double sum = 0;
+        for (int j = 0; j < path.size(); j++){
+            if (path[j] > 0){
+                Edge e = gluedGeometry.mesh.edge(j);
+                sum += formValueEdges[globalGeometry.mesh.edge(j)];
+            }
+            if (path[j] < 0){
+                Edge e = gluedGeometry.mesh.edge(j);
+                sum += -1.0 * formValueEdges[globalGeometry.mesh.edge(j)];
+            }
+        }
+        std::cout << "number of stripes on boundary " << i << " = " << std::round(sum/ (2. * PI)) << std::endl;
+    }
+
+    std::vector<Vector3> knoppelPos; 
+    std::vector<std::array<size_t, 2>> knoppelEdges; 
+    std::tie(knoppelPos, knoppelEdges) = extractPolylinesFromStripePattern(globalGeometry, stripeValues, stripeSingularities,
+                                            fieldSingularities, lineField, false);
+    auto knoppelStripes = polyscope::registerCurveNetwork("knoppel wale stripes stripes", knoppelPos, knoppelEdges);
+    knoppelStripes -> setRadius(0.001);
+    knoppelStripes -> setEnabled(false);
+
+    //average the final course 1-form gradient onto edges
     EdgeData<double> omegaWaleGlobal = computeMatchingOneForm(globalGeometry, 1, courseOneFormGrad, edgeMappingsPairs);
-
     // Fix the singularity indices
     for (Face f : globalGeometry.mesh.faces()) {
         if (stripeSingularities[f] != 0) {
@@ -1351,9 +1393,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         }
     }    
 
-    //EdgeData<double> omegaWaleGlued = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, omegaWaleGlobal, edgeMap);
-    //Eigen::Map<Eigen::VectorXd> omegaWaleGluedEig(omegaWaleGlued.raw().data(), (gluedGeometry.mesh).nEdges());
-    //std::vector<double> modelMatchingTermsWale(omegaWaleGluedEig.data(), omegaWaleGluedEig.data() + omegaWaleGluedEig.rows());
     Eigen::Map<Eigen::VectorXi> faceIndicesWaleEig(stripeSingularities.raw().data(), (gluedGeometry.mesh).nFaces());
     //place wale singularities at edges 
     std::vector<int> faceIndicesWaleModel(faceIndicesWaleEig.data(), faceIndicesWaleEig.data() + faceIndicesWaleEig.rows());
@@ -1376,8 +1415,10 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             if (toSkip) continue;
             int edge = findSingularEdgeFromSingularFace(globalGeometry, f.getIndex(), courseOneFormGrad[f], 0., timeFunctionGlobal, 0.);
             if (edge == -1) continue;//couldn't find a very well-aligned edge
-            int index = stripeSingularities[f] > 0 ? 1 : -1;
             //reduce the singular index to +/- 1 (cause of Autoknit constraints)
+            //int index = stripeSingularities[f] > 0 ? 1 : -1;
+            //if we don't want to reduce the index constraints to +/-1 
+            int index = stripeSingularities[f];
             singularEdges.push_back(std::make_pair(edgeMap[edge], index));
             waleSingularEdgesGlobal[edge] = index;
             
@@ -1385,7 +1426,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     } 
     Model modelWale; 
     modelWale.setPeriod(period);
-    //modelWale.setMatchingTerms(modelMatchingTermsWale);
     modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
     modelWale.setFaceIndices(faceIndicesWaleModel);
     modelWale.setFaceGradients(modelFaceGradients);
@@ -1986,7 +2026,8 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
     std::vector<std::tuple<std::pair<int, int>, double>> singEdgePairs;
     //should figure out some constant step size
     stepSize = 0.05;
-    double alignment = 0.9;
+    //changing the alignment strongly affects the helicing condition due to the path constraints
+    double alignment = 0.99;
 
     while (curr < end){
 
@@ -2014,8 +2055,8 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
                 }
             }
         }
-        currAvgDeviation = currDeviationSum / numEdges;
-        //currAvgDeviation = currDeviationSum;
+        //currAvgDeviation = currDeviationSum / numEdges;
+        currAvgDeviation = currDeviationSum;
         curlToIsoVal[currAvgDeviation] = curr;
         curr += stepSize;
     }
@@ -2078,7 +2119,7 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
                         }
                     }
                 }
-                currAvg /= currComponent.size();
+                //currAvg /= currComponent.size();
                 if (currAvg > maxAvgCurl){
                     maxAvgCurl = currAvg;
                     componentWithMaxAvgCurl = currComponent;
@@ -2498,12 +2539,15 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                                                     std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
                                                                     globalBoundaryConditions& boundaryConditions, double period,
                                                                     Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G,
-                                                                    FaceData<Vector3>& courseOneFormGrad, std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
+                                                                    FaceData<Vector3>& courseOneFormGrad, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
+                                                                    std::vector<std::vector<double>> allSaddleLoops, std::vector<std::vector<double>> homologyGenerators){
     
     
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
-    
+
+    // Create the Heat Method solver
+    HeatMethodDistanceSolver heatSolver(gluedGeometry);
     //curl per vertex 
     VertexData<double> vertexCurl(globalMesh, 0.0);
     //curl per edge
@@ -2521,14 +2565,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //edge singularities 
     EdgeData<double> edgeSingularities(globalMesh, 0.0);
     FaceData<double> faceSingularities(globalMesh, 0.0);
-    //forbidden faces - faces touched by some isoline can't be used again
-    //this is too restrictive
-    FaceData<int> forbiddenFaces(globalMesh, 0.0);
-    //set the boundary loops to 0 as well
-    for (BoundaryLoop b : globalMesh.boundaryLoops()){
-        Halfedge he = b.halfedge();
-        faceSingularities[he.face()] = 0.0;
-    }
+    
     //gradient of the one form used in each iterative optimization
     FaceData<Vector3> gradSigmaTilde(globalMesh, Vector3{0.0, 0.0, 0.0});
     //gradient of the one form after subtracting off the impluse function 
@@ -2579,8 +2616,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<std::array<int, 2>> uniqueEdges;
     //conencted components identified by their component id 
     std::unordered_map<size_t, std::vector<PolyLinePoint>> components;
-
-
     //isoval we'll be tracing
     double isoVal;
     //break flag - to stop searching for singularities
@@ -2601,7 +2636,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     //find the step size to sample level sets at
     double avgSum = 0.;
-    double stepSize = 0.;
+    double stepSize = 0.01;
     for (int i = 0; i < boundaryConditions.bdyBdyPathConstraints.size(); i++){
         //visualizing bdy-bdy edge constraints
         EdgeData<double> bdyBdyPath(globalMesh);
@@ -2651,6 +2686,13 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     double maxDotProd = maximumDotProduct(globalGeometry, rotatedFaceGradients);
     HalfedgeData<double> gluedHeWeights = constructGluedHalfedgeWeights(globalGeometry, gluedGeometry, rotatedFaceGradients, maxDotProd);
 
+    //set the saddle loop constraints and homology constraints for the course direction
+    if (globalGeometry.mesh.nConnectedComponents() == 1){//only do this for global 3D meshes for now 
+        for(int i = 0; i < allSaddleLoops.size(); i++){
+            edgePathConstraints.push_back(std::make_pair(allSaddleLoops[i], 0.0));
+        }
+        model.setHomologyGenerators(homologyGenerators);
+    }
 
     //solve the model without any singularities 
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
@@ -2672,14 +2714,14 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
 
     //update the gradients for the next iteration of the model 
-    model.setFaceGradients(gradSigmaTilde);
+    //model.setFaceGradients(gradSigmaTilde);
     newDistance = computeDistanceFromUnitNorm(globalGeometry, gradSigmaTilde);
     std::cout << "distance from unit norm after " << std::to_string(numRuns - 1) << " singularity insertion " << newDistance << std::endl;
     oldDistance = newDistance;
 
     //compute curl quantities without impulse function
     vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
-                                    gradSigmaTilde, gluedOneRingMap);
+                                    gradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
     psMesh.addVertexScalarQuantity("vertex curl after " + std::to_string(numRuns - 1) + " singularity insertions (before subtracting)", vertexCurl);
     edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
     psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (before subtracting)", edgeCurl);
@@ -2690,7 +2732,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     adjustedGradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
     //compute curl quantities after impulse function
     vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
-                                    adjustedGradSigmaTilde, gluedOneRingMap);
+                                    gradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
     edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
     psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (after subtracting)", edgeCurl);
     int numSingularities = 0;
@@ -2800,10 +2842,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 courseStripes -> setRadius(0.001);
                 courseStripes -> setEnabled(false);
                 //update the gradients for the next round of the model 
-                model.setFaceGradients(gradSigmaTilde);
+                //model.setFaceGradients(gradSigmaTilde);
                 //compute curl quantities without accounting for impulse function
                 vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
-                                    gradSigmaTilde, gluedOneRingMap);
+                                    gradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
                 edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
                 psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (before subtracting)", edgeCurl);
                 //compute virtual sigma
@@ -2815,7 +2857,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 adjustedGradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
                 //compute curl quantities after accounting for impulse function
                 vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
-                                    adjustedGradSigmaTilde, gluedOneRingMap);
+                                                gradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
                 edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
                 psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (after subtracting)", edgeCurl);
                 psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numSingularities) + " singularity insertion", edgeSingularities);
@@ -2839,7 +2881,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
 
     std::cout << "Number of singularities inserted = " << numSingularities << std::endl;
+
+
     return std::tie(stripeValuesSigmaCourse, edgeSingularities);
+
 }
 
 
@@ -2860,6 +2905,9 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
     std::vector<std::pair<int, int>> singularEdges = gbModel.getSingularEdges();
     std::vector<int> edgeIndices = gbModel.getEdgeIndices();
     std::vector<std::array<double, 3>> comparisonGrad = gbModel.getFaceGradients();
+    std::vector<std::vector<double>> homologyGenerators = gbModel.getHomologyGenerators();
+
+    std::cout << "size of homology generators = " << homologyGenerators.size() << std::endl;
     //require the face areas
     gluedGeometry.requireFaceAreas();
     //require edge lengths 
@@ -2878,9 +2926,19 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
         GRBModel model = GRBModel(env);
 
         //set the timeout
-        //model.getEnv().set(GRB_DoubleParam_TimeLimit, 0.5);
-        model.getEnv().set(GRB_IntParam_OutputFlag, 0);
+        //model.getEnv().set(GRB_DoubleParam_TimeLimit, 30);
+        //model.getEnv().set(GRB_IntParam_OutputFlag, 0);
         //model.getEnv().set(GRB_IntParam_SolutionLimit, 2);
+        model.getEnv().set(GRB_IntParam_NumericFocus, 3);
+
+        //add integer variables for all the generators
+        std::vector<GRBVar> generatorIntegers;
+
+        //add integer variable for all the generators
+        for (size_t i = 0; i < homologyGenerators.size(); i++){
+            GRBVar gen_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_INTEGER);
+            generatorIntegers.push_back(gen_i);
+        }
 
         //sigma defined over halfedges
         std::vector<GRBVar> sigma;
@@ -2942,7 +3000,26 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
             }
         }
 
-
+        //constraint: add integer variables for homology generators
+        // for (int i = 0; i < homologyGenerators.size(); i++){
+        //     std::vector<double> path = homologyGenerators[i];
+        //     GRBLinExpr pathIntegral = 0;
+        //     std::vector<double> hePath(gluedMesh.nHalfedges(), 0.0);
+        //     for (int j = 0; j < gluedMesh.nEdges(); j++){
+        //         if (path[j] > 0){
+        //             hePath[gluedMesh.edge(j).halfedge().getIndex()] = std::fabs(path[j]);
+        //         }
+        //         else if (path[j] < 0){
+        //             hePath[gluedMesh.edge(j).halfedge().twin().getIndex()] = std::fabs(path[j]);
+        //         }
+        //     }
+        //     for (int k = 0; k < gluedMesh.nHalfedges(); k++){
+        //         pathIntegral += hePath[k] * sigma[k];
+        //     }
+        //     //add the constraints for the homology generators
+        //     //model.addConstr(pathIntegral == period * generatorIntegers[i]);
+        //     //model.addConstr(pathIntegral == period * 0.0);  
+        // }
         
         //constraint: add bdy-bdy path constraint 
         for (int i = 0; i < edgePathConstraints.size(); i++){
@@ -3327,14 +3404,30 @@ void updateForbiddenFaces(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<dou
     }
 }
 
-//@debugging
 //compute curl per vertex using the curl discretization from De Goes SIGGRAPH notes (in global setting)
 VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
-                                        FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap){
+                                    FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap, 
+                                    std::vector<int>& gluedEdgeSingularities, HeatMethodDistanceSolver& heatSolver, std::map<int, int>& vertexMap){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     VertexData<double> curl(globalMesh);
+    VertexData<double> distToSourceGlued(gluedMesh, 1.0);
+    VertexData<double> distToSourceGlobal(globalMesh, 1.0);
+
+    std::vector<Vertex> gluedSourceVerts;
+    for (Edge e : gluedMesh.edges()){
+        if (std::fabs(gluedEdgeSingularities[e.getIndex()]) == 1){
+            gluedSourceVerts.push_back(e.halfedge().tailVertex());
+            gluedSourceVerts.push_back(e.halfedge().tipVertex());
+        }
+    }
+
+    if (gluedSourceVerts.size() > 0){
+        //compute distance in the glued setting 
+        distToSourceGlued = heatSolver.computeDistance(gluedSourceVerts);
+        distToSourceGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, distToSourceGlued, vertexMap);
+    }
     globalGeometry.requireFaceAreas();
     for (Vertex vi : globalMesh.vertices()){
         double sum = 0.0;
@@ -3347,7 +3440,9 @@ VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, Edg
             sum += dot(hjkVec, field[he.face()].normalize());
             area += globalGeometry.faceArea(he.face());
         }
-        curl[vi] = sum / area;
+        //multiply curl by distance as well
+        curl[vi] = distToSourceGlobal[vi] * sum / area;
+        //curl[vi] = sum;
     }
 
     return curl;
@@ -3371,6 +3466,7 @@ EdgeData<double> computeVertexAveragedEdgeCurl(VertexPositionGeometry& globalGeo
 
 }
 
+
 //@debugging
 //compute distance from unit norm of a per-face vector field
 double computeDistanceFromUnitNorm(VertexPositionGeometry& globalGeometry, FaceData<Vector3>& gradients){
@@ -3384,3 +3480,485 @@ double computeDistanceFromUnitNorm(VertexPositionGeometry& globalGeometry, FaceD
 
     return sum;
 }
+
+//repair a knit graph vertex that's missing connections
+//write out GUI to repair a knitgraph vertex
+std::vector<int> repairKnitGraphVertex(){
+
+  int id = -1;
+  int row_in = -1;
+  int row_out = -1;
+  int col_in_1 = -1;
+  int col_in_2 = -1;
+  int col_out_1 = -1;
+  int col_out_2 = -1;
+  //int isVirtual = 0;
+
+  std::vector<int> result;
+
+  // Register the callback which creates the UI and does the hard work
+  auto focusedPopupUI = [&]() {
+      
+      static bool showWindow = true;
+      ImGui::SetNextWindowSize(ImVec2(400, 0), ImGuiCond_Once);
+      ImGui::Begin("Repair Knit Graph Vertex", &showWindow);
+
+      ImGui::PushItemWidth(100);
+      ImGui::InputInt("Id", &id); 
+      ImGui::InputInt("Row in", &row_in);
+      ImGui::InputInt("Row out", &row_out);
+      ImGui::InputInt("Column in 0", &col_in_1);
+      ImGui::InputInt("Column in 1", &col_in_2);
+      ImGui::InputInt("Column out 0", &col_out_1);
+      ImGui::InputInt("Column out 1", &col_out_2);
+      //ImGui::InputInt("isVirtual", &isVirtual);
+
+      ImGui::Separator();
+      if (ImGui::Button("Ok")) {
+        polyscope::popContext();
+      }
+
+      ImGui::End();
+  };
+  polyscope::pushContext(focusedPopupUI);
+
+  result.push_back(id);
+  result.push_back(row_in);
+  result.push_back(row_out);
+  result.push_back(col_in_1);
+  result.push_back(col_in_2);
+  result.push_back(col_out_1);
+  result.push_back(col_out_2);
+  //result.push_back(isVirtual);
+
+  return result;
+
+}
+
+
+//find the sign of a value
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+//given a time function over the mesh, extract the saddle vertices from it 
+//only works in the global setting for now 
+std::vector<Vertex> getSaddleVertices(IntrinsicGeometryInterface& geometry, VertexData<double>& timeFunction){
+    
+    SurfaceMesh& mesh = geometry.mesh;
+    std::vector<Vertex> saddleVertices;
+    geometry.requireDECOperators();
+    Eigen::SparseMatrix<double, Eigen::RowMajor> d_not;
+    d_not = geometry.d0;
+    Eigen::VectorXd f(mesh.nVertices());
+
+    //copy time function values into f
+    for (Vertex v : mesh.vertices()){
+        f(v.getIndex()) = timeFunction[v];
+    }
+
+    Eigen::VectorXd d0_f(mesh.nEdges());
+
+    d0_f = d_not * f;
+    HalfedgeData<double> oriented_d0_f(mesh);
+
+    for(Edge e : mesh.edges()){
+        oriented_d0_f[e.halfedge()] = d0_f(e.getIndex());
+        oriented_d0_f[e.halfedge().twin()] = -1.0 * d0_f(e.getIndex());
+    }
+
+    VertexData<double> saddleVerticesCopy(mesh);
+    
+    for (Vertex v : mesh.vertices()){
+        saddleVerticesCopy[v] = 0.0;
+        //number of sign changes around vertex v
+        int ctr = 0;
+        for (Halfedge he : v.outgoingHalfedges()){
+            assert(he.vertex() == v); // true
+            if (sgn(oriented_d0_f[he]) != sgn(oriented_d0_f[he.next().next().twin()])) ctr++;
+        }
+        if (ctr == 4) saddleVertices.push_back(v);
+        
+    }
+
+    return saddleVertices;
+}
+
+/*
+ * Find all of the halfedges in the neighborhood of a a vertex that
+ * contain the isoline the harmonic time function of a saddle point.
+ */
+std::vector<Halfedge> findAllHalfedgesInSaddleLoop(const Vertex &v, const VertexData<double> &timeFunc) {
+    std::vector<Halfedge> saddleHalfedges;
+
+    for (const Halfedge &he : v.outgoingHalfedges()) {
+        const Halfedge nextHe = he.twin().next();
+        const Vertex v1 = he.tipVertex();
+        const Vertex v2 = nextHe.tipVertex();
+        const double saddleValue = timeFunc[v];
+        const double min = std::min(timeFunc[v1], timeFunc[v2]); 
+        const double max = std::max(timeFunc[v1], timeFunc[v2]); 
+        if (saddleValue > min && saddleValue < max) {
+           saddleHalfedges.push_back(nextHe.next());
+        }
+    }
+    return saddleHalfedges;
+}
+
+/*
+ * This will only ever find one particular halfedge in the saddle loop,
+ * I need to perhaps change this to return a list of such halfedges.
+ */
+Halfedge findFirstHalfedgeInSaddleLoop(const Vertex &v, const VertexData<double>& timeFunc) {
+    for (const Halfedge &he : v.outgoingHalfedges()) {
+        const Halfedge nextHe = he.twin().next();
+        const Vertex v1 = he.tipVertex();
+        const Vertex v2 = nextHe.tipVertex();
+        const double saddleValue = timeFunc[he.tailVertex()];
+        double min = std::min(timeFunc[v1], timeFunc[v2]); 
+        double max = std::max(timeFunc[v1], timeFunc[v2]); 
+        if (saddleValue > min && saddleValue < max) {
+            return nextHe.next();
+        }
+        continue;
+    }
+    std::cout << "did not find a first halfedge" << std::endl;
+    return v.halfedge(); // fail case
+}
+
+/*
+ * Returns the halfedge on the **adjacent triangle** from which the isoline.
+ * Need to know at least one of the halfedges that the isoline with value "v"
+ * goes through. 
+ *
+ * If this function returns the same halfedge, then there has been an error.
+ */
+Halfedge findNextHalfedgeInIsoline(double v, const Halfedge &he, const VertexData<double>& timeFunc) {
+    const auto heNext = he.next();
+    const auto hePrev = he.next().next();
+
+    const double nextMin = std::min(timeFunc[heNext.tailVertex()], 
+                                    timeFunc[heNext.tipVertex()]);
+    const double nextMax = std::max(timeFunc[heNext.tailVertex()], 
+                                    timeFunc[heNext.tipVertex()]);
+
+    const double prevMin = std::min(timeFunc[hePrev.tailVertex()],
+                                    timeFunc[hePrev.tipVertex()]);
+    const double prevMax = std::max(timeFunc[hePrev.tailVertex()], 
+                                    timeFunc[hePrev.tipVertex()]);
+
+    if (v > nextMin && v < nextMax) {
+        return heNext.twin();
+    }
+    else if (v > prevMin && v < prevMax) {
+        return hePrev.twin();
+    }
+    else{
+        // this is a fail case
+        return he;
+    }
+}
+
+std::vector<int> findSaddleLoop(IntrinsicGeometryInterface& geometry, const VertexData<double> &saddleVertices, const VertexData<double>& timeFunc) {
+
+    std::vector<int> edgeLoop(geometry.mesh.nEdges());
+    for (const Edge &edge : geometry.mesh.edges()) {
+        edgeLoop[edge.getIndex()] = 0;
+    }
+    // loop over all saddle vertices
+    for (const Vertex &v : geometry.mesh.vertices()) {
+        // skip all vertices that are not saddle points
+        if (saddleVertices[v] != 1.0) {continue;}
+        std::cout << "found the saddle vertex" << std::endl;
+        const double saddleValue = timeFunc[v];
+        std::cout << "saddle vertex has a harmonic value of: " << saddleValue << std::endl;
+        const auto allHalfedges = findAllHalfedgesInSaddleLoop(v, timeFunc); 
+        // this for loop will create duplicate edge loops
+        for (const Halfedge &rootHe : allHalfedges) {
+            // in order for the search to go correctly, the first halfedge 
+            // cannot be on the first face
+            Halfedge currHe = rootHe.twin();
+            edgeLoop[currHe.edge().getIndex()] = 1;
+            std::cout << "searching for next halfedge" << std::endl;
+            while (true) {
+                std::cout << "current halfedge: " << currHe << std::endl;
+                auto nextHe = findNextHalfedgeInIsoline(saddleValue, currHe, timeFunc);
+                std::cout << "next halfedge: " << nextHe << std::endl;
+                if (currHe == nextHe) { break;}
+                edgeLoop[currHe.edge().getIndex()] = 1;
+                currHe = nextHe;
+            }
+        }
+    }
+    return edgeLoop;
+}
+/*
+ * Finds the triangle strip that contains the isoline of the value 'saddleValue'
+ * that starts at 'rootHe'
+ */
+std::vector<Face> findTriangleStripSaddleLoop(IntrinsicGeometryInterface& geometry, const VertexData<double> &timeFunc, const Halfedge &rootHe, double saddleValue) {
+    // list of all faces in the triangle strip
+    std::vector<Face> triangleStrip;
+
+    // NOTE: I added this line to make sure the first and last triangles match up
+    triangleStrip.push_back(rootHe.face());
+    // this assume that the rootHe is a halfedge across from the saddle vertex
+    Halfedge currHe = rootHe.twin();
+    triangleStrip.push_back(currHe.face());
+    while(true) {
+        auto nextHe = findNextHalfedgeInIsoline(saddleValue, currHe, timeFunc);
+        if (currHe == nextHe) {
+            break;
+        }
+        triangleStrip.push_back(nextHe.face());
+        currHe = nextHe;
+    }
+    return triangleStrip;
+}
+
+
+/*
+ * Find the unique edges of a triangle strip.
+ *
+ */
+std::vector<Edge> findUniqueEdgesInTriangleStrip(const std::vector<Face> &triangleStrip) {
+    std::vector<Edge> allEdges;
+    std::vector<Edge> uniqueEdges;
+    // go through all of the triangles in the strip
+    for (const Face &f : triangleStrip) {
+        // go through all of the edges of the triangle
+        for (const Edge &e : f.adjacentEdges()) {
+            allEdges.push_back(e);
+        }
+    }
+    for (const Edge &e1 : allEdges) {
+        int uniqueCount = 0;
+        for (const Edge &e2 : allEdges) {
+            if (e1 == e2) {uniqueCount++;}
+        }
+        if (uniqueCount == 1) {
+            uniqueEdges.push_back(e1);
+        }
+    }
+    return uniqueEdges;
+}
+
+/*
+ * Given a list of edges that contains two loops, chooses one of the loops
+ * and disregards the edges in the other loop.
+ *
+ */
+std::vector<Edge> chooseEdgeLoop(const std::vector<Edge> &doubleLoop, 
+                                 const std::vector<Face> &triangleStrip) {
+
+    // construct the halfedges bounding the triangle strip
+    std::vector<Halfedge> doubleLoopHalfedges;
+    for (const Edge &e : doubleLoop) {
+       for (const Face &f : triangleStrip) {
+           if (e.halfedge().face() == f) {
+               doubleLoopHalfedges.push_back(e.halfedge());
+           }
+           else if (e.halfedge().twin().face() == f) {
+               doubleLoopHalfedges.push_back(e.halfedge().twin());
+           }
+       }
+    }
+
+    // visited map
+    std::unordered_map<Halfedge, bool> visited;
+    for (const Halfedge &he : doubleLoopHalfedges) {
+        visited[he] = false;
+    }
+    std::unordered_map<Vertex, bool> visitedVertex;
+    for (const Halfedge &he : doubleLoopHalfedges) {
+        visitedVertex[he.tipVertex()] = false;
+        visitedVertex[he.tailVertex()] = false;
+    }
+
+    // choose a particular halfedge to start searching for the root
+    std::vector<Halfedge> loopHalfedges;
+    const Halfedge rootHe = doubleLoopHalfedges[0];
+    Halfedge currHe = rootHe;
+    visitedVertex[rootHe.tailVertex()] = true;
+    loopHalfedges.push_back(currHe);
+
+
+    // find the loop
+    do {
+        for (const Halfedge &he : doubleLoopHalfedges) {
+            if (currHe.tipVertex() == he.tailVertex() && !visited[he]) {
+                loopHalfedges.push_back(he);
+                visited[he] = true;
+                currHe = he;
+                visitedVertex[currHe.tailVertex()] = true;
+                break;
+            }
+        }
+    } while (!visitedVertex[currHe.tipVertex()]);
+
+    std::vector<Edge> edgeLoop;
+    for (const Halfedge &he : loopHalfedges) {
+        edgeLoop.push_back(he.edge());
+    }
+
+    return edgeLoop;
+}
+
+std::vector<Halfedge> chooseHalfEdgeLoop(const std::vector<Edge> &doubleLoop, 
+                                 const std::vector<Face> &triangleStrip) {
+
+    // construct the halfedges bounding the triangle strip
+    std::vector<Halfedge> doubleLoopHalfedges;
+    for (const Edge &e : doubleLoop) {
+       for (const Face &f : triangleStrip) {
+           if (e.halfedge().face() == f) {
+               doubleLoopHalfedges.push_back(e.halfedge());
+           }
+           else if (e.halfedge().twin().face() == f) {
+               doubleLoopHalfedges.push_back(e.halfedge().twin());
+           }
+       }
+    }
+
+    // visited map
+    std::unordered_map<Halfedge, bool> visited;
+    for (const Halfedge &he : doubleLoopHalfedges) {
+        visited[he] = false;
+    }
+
+    // choose a particular halfedge to start searching for the root
+    std::vector<Halfedge> loopHalfedges;
+    const Halfedge rootHe = doubleLoopHalfedges[0];
+    Halfedge currHe = rootHe;
+    loopHalfedges.push_back(currHe);
+
+    // find the loop
+    do {
+        for (const Halfedge &he : doubleLoopHalfedges) {
+            if (currHe.tipVertex() == he.tailVertex() && !visited[he]) {
+                loopHalfedges.push_back(he);
+                visited[he] = true;
+                currHe = he;
+                break;
+            }
+        }
+    } while (currHe != rootHe);
+    return loopHalfedges;
+}
+
+void registerCurveNetworkFromEdges(VertexPositionGeometry& geometry, 
+        const std::vector<Edge> &edges, std::string &name) {
+    std::vector<Vector3> positions;
+    std::vector<std::array<size_t, 2>> edgeIndices;
+
+    size_t nodeCounter = 0;
+    for (const auto &e : edges) {
+        const auto p1 = geometry.vertexPositions[e.firstVertex()];
+        const auto p2 = geometry.vertexPositions[e.secondVertex()];
+        positions.push_back(p1);
+        positions.push_back(p2);
+        edgeIndices.push_back({nodeCounter, nodeCounter+1});
+        nodeCounter += 2;
+    }
+    polyscope::registerCurveNetwork(name, positions, edgeIndices);
+}
+
+void visualizeAllEdgeLoops(VertexPositionGeometry& geometry, std::vector<Vertex> &saddleVertices, const VertexData<double> &timeFunc) {
+    //const std::vector<Vertex> saddleVertices = extractSaddlePoints(geometry, saddleVerticesData);
+    std::cout << "extracted Saddle Points" << std::endl;
+    // for each saddle vertex, trace the time function isolines
+    int loopCounter = 0;
+    // iterate over the saddle points
+    for (const Vertex &v : saddleVertices) {
+        std::vector<std::vector<Face>> allTriangleStripsPerVertex;
+        const double saddleValue = timeFunc[v];
+        // find all of the halfedges that contain the isoline
+        std::vector<Halfedge> isolineHalfedges = findAllHalfedgesInSaddleLoop(v, timeFunc);
+        for (const Halfedge &rootHe : isolineHalfedges) {
+            const std::vector<Face> triangleStrip = findTriangleStripSaddleLoop(geometry, timeFunc, rootHe, saddleValue);
+           // make sure not adding duplicate paths
+            bool stripAlreadyExists = false;
+            for (const auto &strip : allTriangleStripsPerVertex) {
+                if (triangleStrip.front() == strip.back() || 
+                    triangleStrip.back() == strip.front()) {
+                    stripAlreadyExists = true;
+                    break;
+                }
+            }
+            if (!stripAlreadyExists) {
+                allTriangleStripsPerVertex.push_back(triangleStrip);
+            }
+        }
+        for (const auto &strip : allTriangleStripsPerVertex) {
+            auto uniqueEdges = findUniqueEdgesInTriangleStrip(strip);
+            auto edgeLoop = chooseEdgeLoop(uniqueEdges, strip);
+            std::string network = "edge loop" + std::to_string(loopCounter++);
+            registerCurveNetworkFromEdges(geometry, edgeLoop, network); 
+        }
+        
+    }
+}
+
+//the only function I ever need to care about
+std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geometry, const std::vector<Vertex> &saddleVertices, const VertexData<double>& timeFunc) {
+
+    std::vector<std::vector<double>>  allSaddleLoops;
+    
+    int loopCounter = 0;
+    // loop over all saddle vertices
+    for (const Vertex &v : saddleVertices) {
+        // skip all vertices that are not saddle points
+        //if (saddleVertices[v] != 1.0) {continue;}
+        // find the time function value at the saddle point
+        const double saddleValue = timeFunc[v];
+        // find all of the neighboring halfedge through which the isoline exits
+        const auto allNeighborHalfedges = findAllHalfedgesInSaddleLoop(v, timeFunc); 
+
+        // the set of all triangle strips per saddle vertex
+        std::vector<std::vector<Face>> allTriangleStripsPerVertex;
+        // iterate through all of the neighboring halfedges 
+        for (const Halfedge &rootHe : allNeighborHalfedges) {
+            const auto triangleStrip = findTriangleStripSaddleLoop(geometry, timeFunc, rootHe, saddleValue); 
+
+            // this code inserts a triangle strip if it is unique
+            bool stripAlreadyExists = false;
+            for (const auto &strip : allTriangleStripsPerVertex) {
+                if (triangleStrip.front() == strip.back() || 
+                        triangleStrip.back() == strip.front()) {
+                    stripAlreadyExists = true;
+                    break;
+                }
+            }
+            if (!stripAlreadyExists) {
+                allTriangleStripsPerVertex.push_back(triangleStrip);
+            }
+        }
+        int i = 0;
+        // by this point all of the unique triangle strips for this particular vertex will be added to the list  
+        for (const auto &strip : allTriangleStripsPerVertex) {
+            std::vector<double> saddleLoop(geometry.mesh.nEdges());
+            std::fill(saddleLoop.begin(), saddleLoop.end(), 0.0);
+            auto uniqueEdges = findUniqueEdgesInTriangleStrip(strip);
+            auto edgeLoop = chooseEdgeLoop(uniqueEdges, strip);
+            auto halfedgeLoop = chooseHalfEdgeLoop(uniqueEdges, strip);
+            // construct the output here
+            for (const Halfedge &he : halfedgeLoop) {
+                if (he.edge().halfedge() == he) {
+                    saddleLoop[he.edge().getIndex()] = 1.0;
+                }
+                else {
+                    saddleLoop[he.edge().getIndex()] = -1.0;
+                }
+            }
+            allSaddleLoops.push_back(saddleLoop);
+            // visualization (uncomment if you don't care)
+            std::string network = "edge loop" + std::to_string(loopCounter++);
+            registerCurveNetworkFromEdges(geometry, edgeLoop, network); 
+            //std::cout << "the size of loop " << i++ << "is: " << edgeLoop.size() << std::endl;
+            //std::cout << "the size of halfedge loop " << i++ << "is: " << halfedgeLoop.size() << std::endl;
+        }
+    }
+
+    return allSaddleLoops;
+}
+
+

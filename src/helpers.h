@@ -47,7 +47,7 @@ template<class T> std::ostream &operator<<(std::ostream &os, std::vector<T> v) {
 }
 
 
-//boundary conditions on the glued mesh
+//boundary conditions on the GLUED MESH
 struct globalBoundaryConditions{
     std::vector<int> courseStartBoundaryVertices;//vertices where t = 0
     std::vector<int> courseEndBoundaryVertices;//vertices where t = 1

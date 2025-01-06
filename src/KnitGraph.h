@@ -32,7 +32,7 @@ struct knitGraphVertex{
     double beta_tag = -1;
     Face face;//associated face of a vertex (on the underlying mesh)
     std::optional<Edge> edge;//associated edge of a vertex
-    std::optional<Halfedge> halfedge;//associated halfedg of a vertex
+    std::optional<Halfedge> halfedge;//associated halfedge of a vertex
     SurfacePoint surfacePoint;//used for intersections on singular faces
     bool isBaryCenter = false;//if this is a vertex at the barycenter
     bool hasBeenHandled = false;//if this vertex has been handled by a merge
@@ -40,6 +40,7 @@ struct knitGraphVertex{
     bool isAlphaVirtual = false;//is a virtual vertex in the course direction
     bool isBetaVirtual = false;//is a virtual vertex in the wale direction 
 };
+
 
 class KnitGraph{
 
@@ -50,6 +51,12 @@ class KnitGraph{
 
         //period for sampling the knit graph 
         double period; 
+
+        //period for sampling the course stripes 
+        double coursePeriod; 
+
+        //period for sampling the wale stripes 
+        double walePeriod;
 
         //geometry on which this graph lives 
         VertexPositionGeometry *globalGeometry;
@@ -103,10 +110,23 @@ class KnitGraph{
 
         public: 
 
+            //Default Constructor 
+            KnitGraph(){};
+
             //Constructor
-            KnitGraph(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, double period, 
+            KnitGraph(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, double coursePeriod, double walePeriod,
                       CornerData<double>& courseOneForm, EdgeData<double>& courseSingularEdges, CornerData<double>& waleOneForm, EdgeData<double>& waleSingularEdges,
                       std::map<int, int>& globalToGluedEdgeMap);
+
+            //get the vertices in this knit graph 
+            std::vector<knitGraphVertex>& getVertices(){
+                return this->vertices;
+            }
+
+            //get the real vertices in this knit graph 
+            std::vector<knitGraphVertex>& getRealVertices(){
+                return this->realVertices;
+            }
 
             //build the knit graph 
             void buildGraph();
@@ -117,21 +137,15 @@ class KnitGraph{
             //update connections on the vertices of a smooth face 
             void connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices);
 
-            //merge all the virtual vertices first 
-            void mergeVirtual();
-
             //render the knit graph 
             void renderGraph();
 
-            //make obj out of knit graph 
-            void makeObj();
+            //handle the merge in the instrinsic setting 
+            void intrinsicMerge();
 
             //perform epsilon merging to 
             //merge connections across faces
             void epsilonMerging();
-
-            //merge virtual vertices across an edge
-            void edgeMerging();
 
             //reorder indices of knit graph
             void makeRealVertices();
@@ -141,5 +155,14 @@ class KnitGraph{
 
             //merge a cluster
             void mergeCluster(std::vector<knitGraphVertex>& vCluster, double eps);
+
+            //tag increases and decreases
+            void tagIncreasesDecreases();
+
+            //sanity check the graph 
+            void sanityCheck();
+
+            //write knit graph to txt file
+            void writeKnitGraphToTxtFile(const std::string& file_name);
 };
 

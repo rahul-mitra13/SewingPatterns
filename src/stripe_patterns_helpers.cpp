@@ -201,7 +201,8 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
 
 //carry out the integration in the glued mesh setting
 //sigma is defined over the HALFEDGES of the glued mesh
-std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& globalGeometry, EdgeLengthGeometry& gluedGeometry, HalfedgeData<double>& sigmaTilde, float period){
+std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(IntrinsicGeometryInterface& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+                                                                              HalfedgeData<double>& sigmaTilde, float period){
 
   SurfaceMesh& globalMesh = globalGeometry.mesh; 
   SurfaceMesh& gluedMesh = gluedGeometry.mesh;
@@ -222,7 +223,7 @@ std::tuple<CornerData<double>, FaceData<int>> computeStripeValuesFromOneForm(Int
   std::queue<Vertex> Q;
   Q.push(startVertex);
   // Floating point thing for knit graph
-  sigma_mod[startVertex] = 0.0 + 1e-16;
+  sigma_mod[startVertex] = 0;
   visited[startVertex] = true;
   while(!Q.empty()){
     Vertex vi = Q.front(); Q.pop();
@@ -1004,7 +1005,40 @@ std::vector<std::pair<int, int>> findEdgeSingularityPairFromStripeIsoVals(Vertex
   return edgeSingularityPairs; 
 }
 
-//-------------------------re-impleminting Knoppel's stripes-----------------------//
+
+//given a stripe pattern as corner data, compute an integer value around a specified path
+std::vector<int> computeIntegralValueAlongPaths(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+                                                CornerData<double>& stripeValues, std::vector<std::vector<double>>& paths, double period){
+  
+  SurfaceMesh& globalMesh = globalGeometry.mesh;
+  SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+
+  std::vector<int> integerVariables(paths.size());
+  std::cout << "size of paths = " << paths.size() << std::endl;
+
+  for (int i = 0; i < paths.size(); i++){
+    std::vector<double> path = paths[i];
+    double sum = 0;
+    int integerVal = 0;
+    double pathIntegral = 0;
+  
+    for (int j = 0; j < gluedMesh.nEdges(); j++){
+      if (std::fabs(path[j]) > 1e-10){
+        sum += stripeValues[gluedMesh.edge(j).halfedge().corner()];
+      }
+    }
+    std::cout << "period = " << period << std::endl;
+    std::cout << "sum for boundary " << i << " = " << sum << std::endl;
+    integerVal = std::round(sum  / period);
+    std::cout << "integer val = " << integerVal << std::endl;
+    integerVariables[i] = integerVal;
+  }
+
+  return integerVariables;
+
+}
+
+//-------------------------re-implementing some of  Knoppel's stripes-----------------------//
 
 // Compute the 1-form \omega_{ij} such as defined in eq.7 of [Knoppel et al. 2015]
 //this returns omega per edge in the glued mesh setting 
