@@ -1149,22 +1149,23 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
     //print out the singular edges 
     std::vector<std::vector<double>> waleBdyPathConstraints = model.getWaleBdyPathConstraints();
     std::vector<std::array<double, 3>> gradients = model.getFaceGradients();
+    std::vector<std::pair<std::vector<double>, double>> edgePathConstraints = model.getEdgePathConstraints();
     //require the face areas
     gluedGeometry.requireFaceAreas();
     HalfedgeData<double> oneForm(gluedMesh);
-
-    std::cout << "Solving model for wale stripes..." << std::endl;
 
     try {
         //reformulate the problem in terms of halfedges 
         // Create an environment
         GRBEnv env = GRBEnv(true);
         //don't log output to console 
-        env.set(GRB_IntParam_OutputFlag, 0);
+        //env.set(GRB_IntParam_OutputFlag, 0);
         env.set("LogFile", "1-form computation.log");
         env.start();
         // Create an empty model
         GRBModel model = GRBModel(env);
+
+        //model.set(GRB_IntParam_Method, 2);
 
         //defined over halfedges
         std::vector<GRBVar> sigma;
@@ -1175,11 +1176,11 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
         }
 
         //add boundary integral value for wale direction stripes
-        std::vector<GRBVar> waleBdyIntegerConstraints;
-        for (size_t i = 0; i < waleBdyPathConstraints.size(); i++){
-            GRBVar k_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_INTEGER);
-            waleBdyIntegerConstraints.push_back(k_i);
-        }
+        // std::vector<GRBVar> waleBdyIntegerConstraints;
+        // for (size_t i = 0; i < waleBdyPathConstraints.size(); i++){
+        //     GRBVar k_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_INTEGER);
+        //     waleBdyIntegerConstraints.push_back(k_i);
+        // }
 
         //first constraint - (d1*sigma) == kP, P is period of optimization, k \in \mathbb{Z}
         //also compute nP 
@@ -1211,8 +1212,27 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
 
         //third constraint 
         //add constraints in the wale direction
-        for (int i = 0; i < waleBdyPathConstraints.size(); i++){
-            std::vector<double> path = waleBdyPathConstraints[i];
+        // for (int i = 0; i < waleBdyPathConstraints.size(); i++){
+        //     std::vector<double> path = waleBdyPathConstraints[i];
+        //     GRBLinExpr pathIntegral = 0;
+        //     std::vector<double> hePath(gluedMesh.nHalfedges(), 0.0);
+        //     for (int j = 0; j < gluedMesh.nEdges(); j++){
+        //         if (path[j] > 0){
+        //             hePath[gluedMesh.edge(j).halfedge().getIndex()] = path[j];
+        //         }
+        //         else if (path[j] < 0){
+        //             hePath[gluedMesh.edge(j).halfedge().twin().getIndex()] = path[j];
+        //         }
+        //     }
+        //     for (int k = 0; k < gluedMesh.nHalfedges(); k++){
+        //         pathIntegral += hePath[k] * sigma[k];
+        //     }
+        //     if (i == 0) model.addConstr(pathIntegral == period * (-22));
+        //     else model.addConstr(pathIntegral == period * (22));
+        // }
+
+        for (int i = 0; i < edgePathConstraints.size(); i++){
+            std::vector<double> path = edgePathConstraints[i].first;
             GRBLinExpr pathIntegral = 0;
             std::vector<double> hePath(gluedMesh.nHalfedges(), 0.0);
             for (int j = 0; j < gluedMesh.nEdges(); j++){
@@ -1226,7 +1246,7 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
             for (int k = 0; k < gluedMesh.nHalfedges(); k++){
                 pathIntegral += hePath[k] * sigma[k];
             }
-            model.addConstr(pathIntegral == period * waleBdyIntegerConstraints[i]);
+            model.addConstr(pathIntegral == period * edgePathConstraints[i].second);
         }
 
         //compute a piecewise linear function over the vertices of the mesh 
@@ -1284,7 +1304,7 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
 
         model.setObjective(obj, GRB_MINIMIZE);
         model.optimize(); 
-        
+
         //put the computed one-form into an halfedge vector
         for (Halfedge he : gluedMesh.halfedges()){
             oneForm[he] = sigma[he.getIndex()].get(GRB_DoubleAttr_X);
@@ -1307,8 +1327,10 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                                                                     std::vector<std::pair<int, int>>& edgeMappingsPairs, std::map<int, int>& edgeMap, 
                                                                     std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, FaceData<Vector3>& courseOneFormGrad, 
                                                                     Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions,
-                                                                    EdgeData<double>& courseSingularEdgesGlobal, polyscope::SurfaceMesh& psMesh){
-                                                
+                                                                    EdgeData<double>& courseSingularEdgesGlobal, std::map<int, std::vector<Halfedge>> gluedOneRingMap, polyscope::SurfaceMesh& psMesh){
+    
+    // Create the Heat Method solver
+    HeatMethodDistanceSolver heatSolver(gluedGeometry);            
     //which root we used in specifying the direction field
     VertexData<Vector2> usedRoot(globalGeometry.mesh);
     //compute a line field in the tangent space of the vertex
@@ -1363,8 +1385,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 sum += -1.0 * formValueEdges[globalGeometry.mesh.edge(j)];
             }
         }
-        std::cout << "sum / (2 * PI) = " << sum / (2. * PI) << std::endl;
-        std::cout << "number of stripes on boundary " << i << " = " << std::round(sum/ (2. * PI)) << std::endl;
+        // std::cout << "sum / (2 * PI) = " << sum / (2. * PI) << std::endl;
+        // std::cout << "number of stripes on boundary " << i << " = " << std::round(sum/ (2. * PI)) << std::endl;
         k = std::round(sum / (2. * PI));
         waleBdyEdgePathConstraints.push_back(std::make_pair(path, k));
 
@@ -1380,6 +1402,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     //average the final course 1-form gradient onto edges
     EdgeData<double> omegaWaleGlobal = computeMatchingOneForm(globalGeometry, 1, courseOneFormGrad, edgeMappingsPairs);
+    EdgeData<double> omegaWaleGlued = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, omegaWaleGlobal, edgeMap);
     // Fix the singularity indices
     for (Face f : globalGeometry.mesh.faces()) {
         if (stripeSingularities[f] != 0) {
@@ -1431,13 +1454,60 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             waleSingularEdgesGlobal[edge] = index;
             
         }
-    } 
+    }
+
+    std::vector<std::pair<std::vector<double>, double>> waleEdgePathConstraints;
+    
+    //for n boundaries, you need to enforce (n - 1) path constraints
+    for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size() - 1; i++){
+        std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
+        double integral = 0.;
+        double length = 0.;
+        double integerVal = 0;
+        for (int j = 0; j < gluedGeometry.mesh.nEdges(); j++){
+            integral += omegaWaleGlued[gluedGeometry.mesh.edge(j)] * path[j];
+            if (std::fabs(path[j]) > 0)
+                length += gluedGeometry.edgeLengths[gluedGeometry.mesh.edge(path[j])];
+        }
+        integerVal = (-1.0) * std::round(length/period);//not sure why I have to take the negation of this
+        waleEdgePathConstraints.push_back(std::make_pair(path, integerVal));
+    }
+
+    //convert the global singular edges to glued singular 
+    EdgeData<double> courseSingularEdgesGlued = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, courseSingularEdgesGlobal, edgeMap);
+    std::vector<int> gluedEdgeSingularities(gluedGeometry.mesh.nEdges(), 0);
+    for (Edge e : gluedGeometry.mesh.edges()){
+        if (std::fabs(courseSingularEdgesGlued[e]) > 0)
+            gluedEdgeSingularities[e.getIndex()] = 1;
+    }
+
+    //before computing curl, do Laplacian smoothing of courseOneFormGrad 
+    int num_iters = 1;
+    for (int i = 0; i < num_iters; i++){
+        for (Face f : gluedGeometry.mesh.faces()){
+            Vector3 sum;
+            for (Face n : f.adjacentFaces()){
+                sum += courseOneFormGrad[n.getIndex()];
+            }
+            courseOneFormGrad[f.getIndex()] = sum / 3.;
+            courseOneFormGrad[f.getIndex()] = courseOneFormGrad[f.getIndex()].normalize();
+        }
+    }
+
+    VertexData<double> waleVertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, courseOneFormGrad, gluedOneRingMap,
+                                                    gluedEdgeSingularities, heatSolver, vertexMap);
+    EdgeData<double> waleEdgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, waleVertexCurl);
+    
+    psMesh.addVertexScalarQuantity("wale vertex curl", waleVertexCurl);
+    psMesh.addEdgeScalarQuantity("wale edge curl", waleEdgeCurl);
+
     Model modelWale; 
     modelWale.setPeriod(period);
     modelWale.setWaleBdyPathConstraints(globalBdyConditions.waleBdyPathConstraints);
     modelWale.setFaceIndices(faceIndicesWaleModel);
     modelWale.setFaceGradients(modelFaceGradients);
     modelWale.setSingularEdges(singularEdges);
+    modelWale.setEdgePathConstraints(waleEdgePathConstraints);
 
     HalfedgeData<double> sigmaWaleGlued = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
     CornerData<double> stripeValuesOneFormGlued;
@@ -3317,6 +3387,7 @@ VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, Edg
     if (gluedSourceVerts.size() > 0){
         //compute distance in the glued setting 
         distToSourceGlued = heatSolver.computeDistance(gluedSourceVerts);
+        //convert distance to global setting
         distToSourceGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, distToSourceGlued, vertexMap);
     }
     globalGeometry.requireFaceAreas();
@@ -3332,10 +3403,11 @@ VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, Edg
 
         //if you want to do a visualization of curl correction with the Green's function
         //don't multiply by the heat distance as this messes up the curl!!
+        if (vi.isBoundary()) curl[vi] = 0.;
 
         //multiply curl by distance as well
-        curl[vi] = distToSourceGlobal[vi] * sum;
-        //curl[vi] = sum;
+        //curl[vi] = distToSourceGlobal[vi] * sum;
+        curl[vi] = sum;
     }
 
     return curl;
