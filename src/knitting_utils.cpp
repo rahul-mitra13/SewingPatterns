@@ -2871,7 +2871,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     // Plot stripe values with offset (to debug knit graph)
     CornerData<double> stripeValuesWithOffset = stripeValuesSigmaCourse;
-    for (Corner co : gluedMesh.corners())
+    for (Corner co : globalMesh.corners())
         stripeValuesWithOffset[co] -= period/4;
     std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesWithOffset, stripeIndicesSigmaCourse, period, edgeMap, components);
     //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;

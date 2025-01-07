@@ -212,9 +212,9 @@ void showStripePatterns(){
 
   // Plot wale stripe values with offset (to debug knit graph)
   CornerData<double> waleStripeValuesWithOffset = waleStripeValues;
-  for (Corner co : gluedELG->mesh.corners())
-      waleStripeValuesWithOffset[co] -= coursePeriod/4;
-  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValuesWithOffset, waleSingularFaces, coursePeriod);
+  for (Corner co : globalGeometry->mesh.corners())
+      waleStripeValuesWithOffset[co] -= walePeriod/4;
+  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValuesWithOffset, waleSingularFaces, walePeriod);
   waleStripes = polyscope::registerCurveNetwork("wale stripes with offset", positionsWale, edgesWale);
   waleStripes -> setRadius(0.001);
   waleStripes -> setEnabled(false);
