@@ -384,7 +384,7 @@ bool halfedgeContainsLevelSet(double val1, double val2, double& bary, double cur
   //pertubation
   double pert = 0.00001;
   
-  if (std::abs(val1 - val2) < pert) return false;
+  if (std::abs(val1 - val2) < pert) return false; // this eliminates halfedges that are exactly parallel to the isoline
   
   //just check if the isovalue lies in between the two values 
   if (currIsoVal > (std::min(val1, val2) - pert) && currIsoVal < (std::max(val1, val2) + pert)){
@@ -830,18 +830,23 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> findStripeConn
   double pert = 1e-8;
 
   std::vector<PolyLinePoint> isoLinePoints;
+  FaceData<std::vector<int>> isoLinePointsPerFace(globalMesh);
+  HalfedgeData<std::vector<int>> isoLinePointsPerHalfedge(globalMesh);
 
+  std::vector<Vector3> isoLinePointCoords;
+
+  // For each halfedge, find all isolines traversing it
   HalfedgeData<std::vector<double>> halfedgeIsoValues = getHalfEdgeIsoValues(globalGeometry, stripeValues, stripesIndices, period);
 
   //first generate all the points
   for (Halfedge h : globalMesh.halfedges()){
 
     if (h.face().isBoundaryLoop() || stripesIndices[h.face()] != 0) continue;//skip singular faces and boundary faces
-    std::vector<double> heSet = halfedgeIsoValues[h];
+    std::vector<double> heSet = halfedgeIsoValues[h]; // isolines traversing h
 
     for (int i = 0; i < heSet.size(); i++){
       double bary;
-      if (halfedgeContainsLevelSet(stripeValues[h.corner()], stripeValues[h.next().corner()], bary, heSet[i])){//this will always be true
+      if (halfedgeContainsLevelSet(stripeValues[h.corner()], stripeValues[h.next().corner()], bary, heSet[i])){//this will always be true, except if the halfedge is parallel to the level set
         //interpolating from tip to tail
         Vector3 pos = (bary * globalGeometry.vertexPositions[h.tailVertex()] +
                        (1 - bary) * globalGeometry.vertexPositions[h.tipVertex()]);
@@ -853,44 +858,69 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> findStripeConn
         currPoint.he = h;
         currPoint.isoval = heSet[i];
 
+        isoLinePointsPerFace[h.face()].push_back(isoLinePoints.size());
+        isoLinePointsPerHalfedge[h].push_back(isoLinePoints.size());
         isoLinePoints.push_back(currPoint);
+        isoLinePointCoords.push_back(pos);
+
       }
     }
   }
 
+  // polyscope::registerPointCloud("isoLinePoints", isoLinePointCoords);
+
   std::vector<std::array<int, 2>> edges;
   //now make the polyline 
-  for (int i = 0; i < isoLinePoints.size(); i++){
-    PolyLinePoint p1 = isoLinePoints[i];
-    //search for the point p1 should connect to
-    for (int j = 0; j < isoLinePoints.size(); j++){
-      PolyLinePoint p2 = isoLinePoints[j];
-      if (p1.f == p2.f && std::abs(p1.isoval - p2.isoval) < pert && i != j){
-        std::array<int, 2> edge = {i, j};
-        edges.push_back(edge);
+  for (Face f : globalMesh.faces()) {
+    std::vector<int> facePoints = isoLinePointsPerFace[f];
+    for (int i : facePoints) {
+      PolyLinePoint p1 = isoLinePoints[i];
+      //search for the point p1 should connect to
+      for (int j : facePoints) {
+        PolyLinePoint p2 = isoLinePoints[j];
+        if (p1.f == p2.f && std::abs(p1.isoval - p2.isoval) < pert && i != j){
+          std::array<int, 2> edge = {i, j};
+          edges.push_back(edge);
+        }
+      }
+    }
+  }
+
+  // Build mapping for vertices at same location, using a union find data structure
+  UF clusters(isoLinePoints.size());
+  for (Halfedge he : globalMesh.halfedges()) {
+    for (int i : isoLinePointsPerHalfedge[he]) { // for each point on halfedge
+      PolyLinePoint p = isoLinePoints[i];
+      for (int j : isoLinePointsPerHalfedge[he.twin()]) {
+        PolyLinePoint q = isoLinePoints[j];
+        if (norm(p.position - q.position) < 1e-8) // epsilon choice seems OK
+          clusters.merge(i, j);
+      }
+      // Also search on the face. This is useful when an isoline passes exactly through a mesh vertex
+      for (int j : isoLinePointsPerFace[he.face()]) {
+        PolyLinePoint q = isoLinePoints[j];
+        if (norm(p.position - q.position) < 1e-8) // epsilon choice seems OK
+          clusters.merge(i, j);
       }
     }
   }
 
   //now remove all the duplicate points 
   std::vector<PolyLinePoint> uniqueVertices;
-  std::vector<size_t> vertexMapping(isoLinePoints.size(), -1);
-  std::vector<PolyLinePoint> newVertices;
-  std::vector<Vector3> newVertexPositions;
-
-  // Identify unique vertices and build the mapping
-  for (size_t i = 0; i < isoLinePoints.size(); ++i) {
-    PolyLinePoint p = isoLinePoints[i];
-    if (!existsInVertexList(uniqueVertices, p)){
-      //New unique vertex
-      uniqueVertices.push_back(p);
-      vertexMapping[i] = newVertices.size();
-      newVertices.push_back(p);
-    } 
-    else {
-      vertexMapping[i] = find(uniqueVertices, p);
+  std::vector<int> vertexMapping(isoLinePoints.size(), -1);
+  std::vector<PolyLinePoint> newVertices; // what's the difference with uniqueVertices?
+  
+  // Find leaders
+  for (int i = 0; i < isoLinePoints.size(); i++) {
+    if (clusters.find(i) == i) { // if this is a leader
+      vertexMapping[i] = uniqueVertices.size();
+      uniqueVertices.push_back(isoLinePoints[i]);
+      newVertices.push_back(isoLinePoints[i]);
     }
   }
+  // Assign the remaining mappings
+  for (int i = 0; i < isoLinePoints.size(); i++)
+    vertexMapping[i] = vertexMapping[clusters.find(i)];
 
   // Create new edges with updated vertex indices
   std::vector<std::array<int, 2>> newEdges;
@@ -909,7 +939,6 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> findStripeConn
   std::sort(newEdges.begin(), newEdges.end());
   newEdges.erase(std::unique(newEdges.begin(), newEdges.end()), newEdges.end());
 
-
   //finally find the connected components
   // Initialize disjoint set for vertices
   DisjointSets vertexSets(newVertices.size());
@@ -920,10 +949,11 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> findStripeConn
     auto v2 = e[1];
     vertexSets.merge(v1, v2);
   }
-  
+
   // Map each set leader to its component
   std::unordered_map<size_t, std::vector<size_t>> indexedComponents;
 
+  std::vector<Vector3> newVertexPositions;
   for (size_t v = 0; v < newVertices.size(); ++v) {
     newVertexPositions.push_back(newVertices[v].position);
     size_t leader = vertexSets.find(v);
