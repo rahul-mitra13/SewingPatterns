@@ -2755,12 +2755,13 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (before subtracting)", edgeCurl);
                 //compute virtual sigma
                 std::tie(virtualSigmaTilde, virtualSigmaObj) = computeVirtualSigma(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
+                std::cout << "virtual sigma objective = " << virtualSigmaObj << std::endl;
                 //subtract off the impulse function
                 gluedSigmaTilde = gluedSigmaTilde - virtualSigmaTilde;
                 adjustedGradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
                 //compute curl quantities after accounting for impulse function
                 vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
-                                                gradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
+                                                adjustedGradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
                 edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
                 psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (after subtracting)", edgeCurl);
                 psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numSingularities) + " singularity insertion", edgeSingularities);
@@ -2822,13 +2823,13 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
         model.getEnv().set(GRB_IntParam_NumericFocus, 3);
 
         //add integer variables for all the generators
-        std::vector<GRBVar> generatorIntegers;
+        //std::vector<GRBVar> generatorIntegers;
 
         //add integer variable for all the generators
-        for (size_t i = 0; i < homologyGenerators.size(); i++){
-            GRBVar gen_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_INTEGER);
-            generatorIntegers.push_back(gen_i);
-        }
+        // for (size_t i = 0; i < homologyGenerators.size(); i++){
+        //     GRBVar gen_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_INTEGER);
+        //     generatorIntegers.push_back(gen_i);
+        // }
 
         //sigma defined over halfedges
         std::vector<GRBVar> sigma;
@@ -3328,6 +3329,10 @@ VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, Edg
             //always normalize the field
             sum += dot(hjkVec, field[he.face()].normalize());
         }
+
+        //if you want to do a visualization of curl correction with the Green's function
+        //don't multiply by the heat distance as this messes up the curl!!
+
         //multiply curl by distance as well
         curl[vi] = distToSourceGlobal[vi] * sum;
         //curl[vi] = sum;
