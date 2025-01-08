@@ -463,7 +463,11 @@ void KnitGraph::intrinsicMerge(){
     std::map<Halfedge, std::vector<knitGraphVertex>> halfedgeVertices;
     EdgeData<int> numVirtualVertices(gluedGeometry->mesh, 0);
     for (const knitGraphVertex& v : vertices) if (v.isVirtual) {
-        if (v.edge.has_value() && (std::fabs(courseSingularEdgesGlued[v.edge.value()]) > 0 || std::fabs(waleSingularEdgesGlued[v.edge.value()]) > 0)) continue;//don't merge across singular edges
+
+        // Prevent merging on singular edges
+        if (v.isAlphaVirtual && std::fabs(courseSingularEdgesGlued[v.edge.value()]) > 0) continue; // end of course stripe: skip
+        if (v.isBetaVirtual  && std::fabs(waleSingularEdgesGlued[v.edge.value()]) > 0)   continue; // end of wale stripe: skip
+
         numVirtualVertices[v.halfedge.value().edge()]++;
         halfedgeVertices[v.halfedge.value()].push_back(v);
     }
@@ -474,6 +478,7 @@ void KnitGraph::intrinsicMerge(){
         if (numVirtualVertices[e] % 2 != 0){
             std::cout << "something wrong on edge " << e << std::endl;
             std::cout << "non singular edge has an uneven number of virtual vertices " << std::endl;
+            polyscope::show();
             exit(1);    
         }
     }
@@ -591,15 +596,15 @@ void KnitGraph::intrinsicMerge(){
         if (vertices[v.col_out[0]].isVirtual) v.col_out[0] = -1;
     }
 
-    for (knitGraphVertex& v: vertices){
-        if (v.isVirtual) continue;//only handle real vertices
-        std::cout << "id = " << v.id << std::endl;
-        std::cout << "row in = " << v.row_in << std::endl;
-        std::cout << "row out = " << v.row_out << std::endl;
-        std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
-        std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
-        std::cout << "---------------" << std::endl;
-    }
+    // // Print out real vertices
+    // for (knitGraphVertex& v: vertices) if (!v.isVirtual) {
+    //     std::cout << "id = " << v.id << std::endl;
+    //     std::cout << "row in = " << v.row_in << std::endl;
+    //     std::cout << "row out = " << v.row_out << std::endl;
+    //     std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
+    //     std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
+    //     std::cout << "---------------" << std::endl;
+    // }
 }
 
 //perform epsilon merging to 
@@ -924,14 +929,14 @@ void KnitGraph::makeRealVertices(){
         realVertices[v.id] = v;
     }
 
-    // for (auto &v : realVertices){
-    //     std::cout << "id = " << v.id << std::endl;
-    //     std::cout << "row in = " << v.row_in << std::endl;
-    //     std::cout << "row out = " << v.row_out << std::endl;
-    //     std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
-    //     std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
-    //     std::cout << "---------------" << std::endl;
-    // }
+    for (auto &v : realVertices){
+        std::cout << "id = " << v.id << std::endl;
+        std::cout << "row in = " << v.row_in << std::endl;
+        std::cout << "row out = " << v.row_out << std::endl;
+        std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
+        std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
+        std::cout << "---------------" << std::endl;
+    }
 }
 
 
