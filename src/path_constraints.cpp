@@ -112,7 +112,6 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
             std::cout << "something went wrong " << std::endl;
             //exit(1);
         }
-        std::cout << "things are okay!! " << std::endl;
         startVert = gluedMesh.vertex(vertexMap[e1.halfedge().tipVertex().getIndex()]);
         
     }
@@ -121,7 +120,6 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
             std::cout << "something went wrong " << std::endl;
             //exit(1);
         }
-        std::cout << "things are okay!!" << std::endl;
         startVert = gluedMesh.vertex(vertexMap[e1.halfedge().twin().tipVertex().getIndex()]);
     }
 
