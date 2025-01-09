@@ -1133,10 +1133,10 @@ void KnitGraph::writeKnitGraphToTxtFile(const std::string& file_name){
     }
 
     // Write pairs of stitched vertices
-    for (const auto &[v1,v2] : stitchedVertices)
-        file << "s " << v1 << " " << v2 << "\n";
+    // for (const auto &[v1,v2] : stitchedVertices)
+    //     file << "s " << v1 << " " << v2 << "\n";
 
-    file.close();
+    // file.close();
     std::cout << "wrote knit graph to txt file " << std::endl;
 }
 

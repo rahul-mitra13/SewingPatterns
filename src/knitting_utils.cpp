@@ -1162,6 +1162,7 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
         env.start();
         // Create an empty model
         GRBModel model = GRBModel(env);
+        model.set(GRB_DoubleParam_TimeLimit, 1.0);
 
         //model.set(GRB_IntParam_Method, 2);
 
@@ -1388,10 +1389,10 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                                                                     std::vector<std::pair<int, int>>& edgeMappingsPairs, std::map<int, int>& edgeMap, 
                                                                     std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, FaceData<Vector3>& courseOneFormGrad, 
                                                                     Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions,
-                                                                    EdgeData<double>& courseSingularEdgesGlobal, std::map<int, std::vector<Halfedge>> gluedOneRingMap, polyscope::SurfaceMesh& psMesh){
+                                                                    EdgeData<double>& courseSingularEdgesGlobal, std::map<int, std::vector<Halfedge>> gluedOneRingMap, polyscope::SurfaceMesh& psMesh, std::vector<std::vector<double>>& allSaddleLoops){
     
     // Create the Heat Method solver
-    HeatMethodDistanceSolver heatSolver(gluedGeometry);
+    HeatMethodDistanceSolver heatSolver(gluedGeometry, 1.0);
     double oldDistance, newDistance;         
     //which root we used in specifying the direction field
     VertexData<Vector2> usedRoot(globalGeometry.mesh);
@@ -1492,7 +1493,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                                                                             G, vertexMap);
     VertexData<double> pseudoTimeFunctionGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, pseudoTimeFunctionGlued, vertexMap);
     psMesh.addVertexScalarQuantity("wale time function", pseudoTimeFunctionGlobal);
-    FaceData<Vector3> waleCurlFunctionGrad = computeTimeFunctionFaceGrad(globalGeometry, pseudoTimeFunctionGlobal);    
+    FaceData<Vector3> waleCurlFunctionGrad = computeTimeFunctionFaceGrad(globalGeometry, pseudoTimeFunctionGlobal);
+    psMesh.addFaceVectorQuantity("wale time function grad", waleCurlFunctionGrad);    
 
     Eigen::Map<Eigen::VectorXi> faceIndicesWaleEig(stripeSingularities.raw().data(), (gluedGeometry.mesh).nFaces());
     //place wale singularities at edges 
@@ -1533,6 +1535,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         // }
     }
 
+    psMesh.addFaceVectorQuantity("rotated wale time function grad", modelFaceGradients);
+
     std::vector<std::pair<std::vector<double>, double>> waleEdgePathConstraints;
     
     //for n boundaries, you need to enforce (n - 1) path constraints
@@ -1546,10 +1550,11 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             if (std::fabs(path[j]) > 0)
                 length += gluedGeometry.edgeLengths[gluedGeometry.mesh.edge(path[j])];
         }
-        integerVal = (-1.0) * std::round(length/period);//not sure why I have to take the negation of this
+        int sign = integral > 0 ? -1 : 1;
+        integerVal = (sign) * std::round(length/period);//not sure why I have to take the negation of this
         waleEdgePathConstraints.push_back(std::make_pair(path, integerVal));
     }
-
+    
     //convert the global singular edges to glued singular in the course direction 
     EdgeData<double> courseSingularEdgesGlued = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, courseSingularEdgesGlobal, edgeMap);
     std::vector<int> gluedEdgeSingularities(gluedGeometry.mesh.nEdges(), 0);
@@ -1568,7 +1573,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     Model modelWale; 
     modelWale.setPeriod(period);
     modelWale.setFaceGradients(modelFaceGradients);
-    modelWale.setEdgePathConstraints(waleEdgePathConstraints);
+    //modelWale.setEdgePathConstraints(waleEdgePathConstraints);
     modelWale.setEdgeIndices(edgeIndices);
 
     //solve the model with out any singularities
@@ -1583,9 +1588,25 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     FaceData<int> stripeIndicesOneFormGlued;
     //std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
 
+    //keep singularities away from saddle loops
+    for (int i = 0; i < allSaddleLoops.size(); i++){
+        auto path = allSaddleLoops[i];
+        for (int j = 0; j < path.size(); j++){
+            if (std::fabs(path[j]) > 0) gluedEdgeSingularities[edgeMap[j]] = 1;
+        }
+    }
+
+    //keep singularities away from saddle vertices 
+    std::vector<Vertex> saddleVertices = getSaddleVertices(globalGeometry, timeFunctionGlobal);
+    for (auto v : saddleVertices){
+        for (auto e : v.adjacentEdges()){
+            gluedEdgeSingularities[edgeMap[e.getIndex()]] = 1;
+        }
+    }
+
     int numWaleSingularities = 0;
     int maxWaleSingularities = 5;
-    int topPairs = 20;
+    int topPairs = 35;
 
     bool toBreak = false;
     while(true){
@@ -1646,7 +1667,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 waleVertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, adjustedGradSigmaWaleGlued, gluedOneRingMap,
                                                     gluedEdgeSingularities, heatSolver, vertexMap);
                 waleEdgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, waleVertexCurl);
-                psMesh.addFaceVectorQuantity("wale gradient after " + std::to_string(numWaleSingularities) + "wale singularities ", gradSigmaTilde);
+                psMesh.addFaceVectorQuantity("wale gradient after " + std::to_string(numWaleSingularities) + "wale singularities ", adjustedGradSigmaWaleGlued);
                 psMesh.addEdgeScalarQuantity("wale edge curl after " + std::to_string(numWaleSingularities) + " wale singularities", waleEdgeCurl);
                 break;
             }
@@ -1654,6 +1675,10 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         if (toBreak) break;//we are no longer improving the distance to unit norm 
     }
 
+    //solve the model with all the path constraints 
+    modelWale.setEdgePathConstraints(waleEdgePathConstraints);
+    sigmaWaleGlued = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
+    std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
     
     return std::tie(stripeValuesOneFormGlued, waleSingularEdgesGlobal);
 }
@@ -1772,24 +1797,25 @@ std::vector<std::pair<int, int>> findWaleSingularityEdges(VertexPositionGeometry
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     std::vector<std::pair<int, int>> singularEdges;
     
+    int numEdges = 0;
     //stores in descending order
     std::map<double, int, std::greater<double>> curlToEdgeIndex;
     for (Edge e : globalMesh.edges()){
         curlToEdgeIndex[std::fabs(edgeCurl[e])] = e.getIndex();
     }
 
-    int numEdges = 0;
+    
     for (auto &entry : curlToEdgeIndex){
         if (globalGeometry.mesh.edge(entry.second).isBoundary()) continue;//don't place singularities on boundary edges
         if (edgeCurl[entry.second] > 0) singularEdges.push_back(std::make_pair(entry.second, 1));
         else singularEdges.push_back(std::make_pair(entry.second, -1));
-        numEdges++; 
         if (numEdges == topPairs) break;
     }
 
-    for (auto &s : singularEdges){
-        std::cout << "singular edges = " << s.first << " " << s.second << std::endl;
-    }
+    // for (auto &s : singularEdges){
+    //     std::cout << "singular edges = " << s.first << " " << s.second << std::endl;
+    // }
+
     return singularEdges;
 
 }
@@ -3652,8 +3678,9 @@ VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, Edg
             Halfedge hjk = he.next();
             if (!hjk.isInterior()) continue;
             Vector3 hjkVec = globalGeometry.vertexPositions[hjk.tipVertex()] - globalGeometry.vertexPositions[hjk.tailVertex()];
+            field[he.face()] = field[he.face()].normalize();
             //always normalize the field
-            sum += dot(hjkVec, field[he.face()].normalize());
+            sum += dot(hjkVec, field[he.face()]);
         }
 
         //if you want to do a visualization of curl correction with the Green's function

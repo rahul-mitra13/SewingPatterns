@@ -83,7 +83,7 @@ KnitGraph graph;
 void showStripePatterns(){
   
   //set the wale period 
-  walePeriod = ((1.0/1.6) * coursePeriod);
+  //walePeriod = ((1.0/1.6) * coursePeriod);
   walePeriod = coursePeriod;
   //time function on the glued mesh 
   VertexData<double> timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
@@ -151,7 +151,7 @@ void showStripePatterns(){
   std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
                                                                     edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
                                                                     courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
-                                                                    courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh);
+                                                                    courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops);
   // Store wale singular edges for rendering later
   richData.addEdgeProperty("waleSingularEdges", courseSingularEdgesGlobal);
 
