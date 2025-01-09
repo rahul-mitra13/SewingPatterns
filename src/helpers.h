@@ -38,6 +38,12 @@ using namespace geometrycentral::surface;
 #define H(x) P(#x << ": " << (x))
 const bool debug = 1;
 
+// To print pairs easily
+template<class T1, class T2> std::ostream &operator<<(std::ostream &os, std::pair<T1, T2> v) {
+  os << "(" << v.first << ", " << v.second << ")";
+  return os;
+}
+
 // To print vectors easily
 template<class T> std::ostream &operator<<(std::ostream &os, std::vector<T> v) {
   os << "["; if (v.size() > 0) os << v[0];
