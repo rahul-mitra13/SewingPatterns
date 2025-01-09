@@ -55,6 +55,7 @@ class Model{
         //boundary loops such that the value of the integral along the boundary = kP (wale direction constraint) along the wale direction
         std::vector<std::vector<double>> waleBdyPathConstraints;
 
+
         //edge pairs where the value of sigma should agree 
         std::vector<std::pair<int, int>> edgeMappingsPairs;
 

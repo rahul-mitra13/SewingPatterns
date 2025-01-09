@@ -194,7 +194,7 @@ void showStripePatterns(){
   std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
                                                                     edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
                                                                     courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
-                                                                    courseSingularEdgesGlobal, *globalPSMesh);
+                                                                    courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh);
   // Store wale singular edges for rendering later
   richData.addEdgeProperty("waleSingularEdges", courseSingularEdgesGlobal);
 
