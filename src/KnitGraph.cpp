@@ -29,14 +29,26 @@ void KnitGraph::buildGraph(){
         handleCourseNonSingularFaceWaleNonSingularFace(f);
     }
 
-    //handle the merge in the intrinsic setting 
-    //intrinsicMerge();
+    // Plot vertices
+    std::vector<Vector3> vertexPositions;
+    for (knitGraphVertex &v : vertices)
+        vertexPositions.push_back(v.position);
+    polyscope::registerPointCloud("knit graph vertices before merge", vertexPositions)->setPointRadius(0.001);
 
-    //merge vertices together 
-    epsilonMerging();
+    //handle the merge in the intrinsic setting 
+    intrinsicMerge();
+
+    // //merge vertices together 
+    // epsilonMerging();
 
     //reorder vertex indices
     makeRealVertices();
+
+    std::vector<Vector3> realVertexPositions;
+    for (knitGraphVertex &v : realVertices)
+        realVertexPositions.push_back(v.position);
+    polyscope::registerPointCloud("real vertices", realVertexPositions)->setPointRadius(0.001);
+
 
     //tag the increases and decreases 
     tagIncreasesDecreases();
@@ -446,23 +458,27 @@ void KnitGraph::intrinsicMerge(){
     courseSingularEdgesGlued = convertGlobalToGluedEdgeFunction(*globalGeometry, *gluedGeometry, courseSingularEdges, *globalToGluedEdgeMap);
     waleSingularEdgesGlued = convertGlobalToGluedEdgeFunction(*globalGeometry, *gluedGeometry, waleSingularEdges, *globalToGluedEdgeMap);
 
-    //store these vertices in order of the "direction of the halfedge"
+
+    // Store these vertices in order of the "direction of the halfedge"
     std::map<Halfedge, std::vector<knitGraphVertex>> halfedgeVertices;
-
-
     EdgeData<int> numVirtualVertices(gluedGeometry->mesh, 0);
-    for (const auto& v : vertices){
-        if (!v.isVirtual) continue;
-        if (v.edge.has_value() && (std::fabs(courseSingularEdgesGlued[v.edge.value()]) > 0 || std::fabs(waleSingularEdgesGlued[v.edge.value()]) > 0)) continue;//don't merge across singular edges
+    for (const knitGraphVertex& v : vertices) if (v.isVirtual) {
+
+        // Prevent merging on singular edges
+        if (v.isAlphaVirtual && std::fabs(courseSingularEdgesGlued[v.edge.value()]) > 0) continue; // end of course stripe: skip
+        if (v.isBetaVirtual  && std::fabs(waleSingularEdgesGlued[v.edge.value()]) > 0)   continue; // end of wale stripe: skip
+
         numVirtualVertices[v.halfedge.value().edge()]++;
         halfedgeVertices[v.halfedge.value()].push_back(v);
     }
 
+    // Check that each edge has an even number of virtual vertices
     for (Edge e : (gluedGeometry->mesh).edges()){
         if (e.isBoundary()) continue;
         if (numVirtualVertices[e] % 2 != 0){
             std::cout << "something wrong on edge " << e << std::endl;
             std::cout << "non singular edge has an uneven number of virtual vertices " << std::endl;
+            polyscope::show();
             exit(1);    
         }
     }
@@ -470,19 +486,19 @@ void KnitGraph::intrinsicMerge(){
     // Custom comparator function
     auto compareByJK = [](const knitGraphVertex &a, const knitGraphVertex &b) -> bool {
         //sort in ascending order 
-        a.baryCoords[1] > b.baryCoords[1];
+        return a.baryCoords[1] > b.baryCoords[1];
     };
 
     // Custom comparator function
     auto compareByKI = [](const knitGraphVertex &a, const knitGraphVertex &b) -> bool {
         //sort in ascending order 
-        a.baryCoords[2] > b.baryCoords[2];
+        return a.baryCoords[2] > b.baryCoords[2];
     };
 
     // Custom comparator function
     auto compareByIJ = [](const knitGraphVertex &a, const knitGraphVertex &b) -> bool {
         //sort in ascending order 
-        a.baryCoords[0] > b.baryCoords[0];
+        return a.baryCoords[0] > b.baryCoords[0];
     };
 
     //now sort the halfedge vertices based on their barycoords
@@ -516,37 +532,60 @@ void KnitGraph::intrinsicMerge(){
         for (int i = 0; i < he1Vertices.size(); i++){
             knitGraphVertex v1 = he1Vertices[i];
             knitGraphVertex v2 = he2Vertices[(he1Vertices.size() - i) - 1];
-            
             if (v1.row_in == -1 && v2.row_in == -1 && v1.row_out == -1 && v2.row_out == -1){//this is a column merge
                 if (v1.col_in[0] == -1 && v2.col_in[0] != -1){
-                    std::cout << "v2.col_in[0] " << v2.col_in[0] << std::endl;
-                    std::cout << "v1.col_out[0] " << v1.col_out[0] << std::endl;
-                    vertices[v2.col_in[0]].col_out[0] = v1.col_out[0];
-                    vertices[v1.col_out[0]].col_in[0] = v2.col_in[0];
+                    vertices[v1.id].col_in[0]  = v2.id;
+                    vertices[v2.id].col_out[0] = v1.id;
                 }
                 if (v2.col_in[0] == -1 && v1.col_in[0] != -1){
-                    std::cout << "v1.col_in[0] " << v1.col_in[0] << std::endl;
-                    std::cout << "v2.col_out[0] " << v2.col_out[0] << std::endl;
-                    vertices[v1.col_in[0]].col_out[0] = v2.col_out[0];
-                    vertices[v2.col_out[0]].col_in[0] = v1.col_in[0];
+                    vertices[v1.id].col_out[0] = v2.id;
+                    vertices[v2.id].col_in[0]  = v1.id;
                 }
             }
 
             if (v1.col_in[0] == -1 && v2.col_in[0] == -1 && v1.col_out[0] == -1 && v2.col_out[0] == -1){//this is a row merge
                 if (v1.row_in == -1 && v2.row_in != -1){
-                    std::cout << "v2.row_in = " << v2.row_in << std::endl;
-                    std::cout << "v1.row_out = " << v1.row_out << std::endl;
-                    vertices[v2.row_in].row_out = v1.row_out;
-                    vertices[v1.row_out].row_in = v2.row_in;
+                    vertices[v2.id].row_out = v1.id;
+                    vertices[v1.id].row_in  = v2.id;
                 }
                 if (v2.row_in == -1 && v1.row_in != -1){
-                    std::cout << "v1.row_in = " << v1.row_in << std::endl;
-                    std::cout << "v2.row_out = " << v2.row_out << std::endl;
-                    vertices[v1.row_in].row_out = v2.row_out;
-                    vertices[v2.row_out].row_in = v1.row_in;
+                    vertices[v1.id].row_out = v2.id;
+                    vertices[v2.id].row_in  = v1.id;                    
                 }
             }
         }
+    }
+
+    // Now connect real vertices to one another
+    for (knitGraphVertex v0 : vertices) if (!v0.isVirtual) {
+        knitGraphVertex v, vprev;
+        
+        // Find row_in and row_out
+        v = v0;
+        do { 
+            if (v.row_out == -1) break; // sing or bdy edge
+            v = vertices[v.row_out]; 
+        } while(v.isVirtual);
+        if (v.isVirtual) // ended up on a sing or bdy edge
+            vertices[v0.id].row_out = -1;
+        else { // v is real
+            vertices[v0.id].row_out = v.id;
+            vertices[v.id].row_in = v0.id;
+        }
+
+        // Find col_in[0] and col_out[0]
+        v = vertices[v0.col_out[0]];
+        while (v.isVirtual) {
+            if (v.col_out[0] == -1) break;
+            vprev = v; // save previous
+            v = vertices[v.col_out[0]];
+        }
+        if (v.isVirtual)
+            vertices[v0.id].col_out[0] = -1;
+        else { // v is real
+            vertices[v0.id].col_out[0] = v.id;
+            vertices[v.id].col_in[0] = v0.id;
+        }        
     }
 
     //remove any lingering connections from real vertices to virtual vertices 
@@ -557,15 +596,15 @@ void KnitGraph::intrinsicMerge(){
         if (vertices[v.col_out[0]].isVirtual) v.col_out[0] = -1;
     }
 
-    for (knitGraphVertex& v: vertices){
-        if (v.isVirtual) continue;//only handle real vertices
-        std::cout << "id = " << v.id << std::endl;
-        std::cout << "row in = " << v.row_in << std::endl;
-        std::cout << "row out = " << v.row_out << std::endl;
-        std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
-        std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
-        std::cout << "---------------" << std::endl;
-    }
+    // // Print out real vertices
+    // for (knitGraphVertex& v: vertices) if (!v.isVirtual) {
+    //     std::cout << "id = " << v.id << std::endl;
+    //     std::cout << "row in = " << v.row_in << std::endl;
+    //     std::cout << "row out = " << v.row_out << std::endl;
+    //     std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
+    //     std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
+    //     std::cout << "---------------" << std::endl;
+    // }
 }
 
 //perform epsilon merging to 
@@ -890,14 +929,14 @@ void KnitGraph::makeRealVertices(){
         realVertices[v.id] = v;
     }
 
-    // for (auto &v : realVertices){
-    //     std::cout << "id = " << v.id << std::endl;
-    //     std::cout << "row in = " << v.row_in << std::endl;
-    //     std::cout << "row out = " << v.row_out << std::endl;
-    //     std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
-    //     std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
-    //     std::cout << "---------------" << std::endl;
-    // }
+    for (auto &v : realVertices){
+        std::cout << "id = " << v.id << std::endl;
+        std::cout << "row in = " << v.row_in << std::endl;
+        std::cout << "row out = " << v.row_out << std::endl;
+        std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
+        std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
+        std::cout << "---------------" << std::endl;
+    }
 }
 
 
