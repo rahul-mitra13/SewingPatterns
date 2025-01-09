@@ -70,6 +70,12 @@ class KnitGraph{
         //edge map from global mesh to glued mesh 
         std::map<int, int> *globalToGluedEdgeMap;
 
+        // Flag of edges that were glued together
+        EdgeData<bool> isGlued;
+
+        // Pairs of stitched (real) vertices
+        std::vector<std::pair<int, int>> stitchedVertices;
+
         //course stripe 1-form 
         CornerData<double> courseOneForm; 
         //wale stripe 1-form

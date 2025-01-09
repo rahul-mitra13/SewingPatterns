@@ -24,6 +24,15 @@ void KnitGraph::buildGraph(){
     EdgeData<double> courseSingularEdgesGlued = convertGlobalToGluedEdgeFunction(*globalGeometry, *gluedGeometry, courseSingularEdges, *globalToGluedEdgeMap);
     EdgeData<double> waleSingularEdgesGlued = convertGlobalToGluedEdgeFunction(*globalGeometry, *gluedGeometry, waleSingularEdges, *globalToGluedEdgeMap);
 
+    // Flag edges that were glued together
+    isGlued = EdgeData<bool>(gluedGeometry->mesh, false);
+    for (auto &[globalEdgeID, gluedEdgeID] : *globalToGluedEdgeMap) {
+        Edge globalEdge = globalGeometry->mesh.edge(globalEdgeID);
+        Edge gluedEdge = gluedGeometry->mesh.edge(gluedEdgeID);
+        if (globalEdge.isBoundary() && !gluedEdge.isBoundary())
+            isGlued[gluedEdge] = true;
+    }
+
     for (Face f : globalGeometry->mesh.faces()){
         //make the connections on a non-singular face in both directions
         handleCourseNonSingularFaceWaleNonSingularFace(f);
@@ -559,32 +568,39 @@ void KnitGraph::intrinsicMerge(){
     // Now connect real vertices to one another
     for (knitGraphVertex v0 : vertices) if (!v0.isVirtual) {
         knitGraphVertex v, vprev;
+        bool isGluedPath;
         
         // Find row_in and row_out
-        v = v0;
-        do { 
+        v = vertices[v0.row_out];
+        isGluedPath = false;
+        while(v.isVirtual) {
+            if (isGlued[v.edge.value()]) isGluedPath = true;
             if (v.row_out == -1) break; // sing or bdy edge
             v = vertices[v.row_out]; 
-        } while(v.isVirtual);
+        }
         if (v.isVirtual) // ended up on a sing or bdy edge
             vertices[v0.id].row_out = -1;
-        else { // v is real
+        else { // v is real: new connection
             vertices[v0.id].row_out = v.id;
             vertices[v.id].row_in = v0.id;
+            if (isGluedPath) stitchedVertices.push_back({v0.id, v.id});
         }
 
         // Find col_in[0] and col_out[0]
         v = vertices[v0.col_out[0]];
+        isGluedPath = false;
         while (v.isVirtual) {
-            if (v.col_out[0] == -1) break;
+            if (isGlued[v.edge.value()]) isGluedPath = true;
+            if (v.col_out[0] == -1) break; // sing or bdy edge
             vprev = v; // save previous
             v = vertices[v.col_out[0]];
         }
         if (v.isVirtual)
             vertices[v0.id].col_out[0] = -1;
-        else { // v is real
+        else { // v is real: new connection
             vertices[v0.id].col_out[0] = v.id;
             vertices[v.id].col_in[0] = v0.id;
+            if (isGluedPath) stitchedVertices.push_back({v0.id, v.id});
         }        
     }
 
@@ -929,6 +945,12 @@ void KnitGraph::makeRealVertices(){
         realVertices[v.id] = v;
     }
 
+    // Map ID's of stitched vertices pairs
+    for (std::pair<int,int> &p : stitchedVertices) {
+        p.first  = mp[p.first];
+        p.second = mp[p.second];
+    }
+
     for (auto &v : realVertices){
         std::cout << "id = " << v.id << std::endl;
         std::cout << "row in = " << v.row_in << std::endl;
@@ -1109,6 +1131,10 @@ void KnitGraph::writeKnitGraphToTxtFile(const std::string& file_name){
         file << v.id << " " << v.position[0] << " " << v.position[1] << " " << v.position[2] << " " << v.row_in << " " << v.row_out << 
         " " << v.col_in[0] << " " << v.col_in[1] << " " << v.col_out[0] << " " << v.col_out[1] << "\n";
     }
+
+    // Write pairs of stitched vertices
+    for (const auto &[v1,v2] : stitchedVertices)
+        file << "s " << v1 << " " << v2 << "\n";
 
     file.close();
     std::cout << "wrote knit graph to txt file " << std::endl;
