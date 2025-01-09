@@ -1596,7 +1596,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     int numWaleSingularities = 0;
     int maxWaleSingularities = 5;
-    int topPairs = 5;
+    int topPairs = 20;
 
     bool toBreak = false;
     while(true){
@@ -1645,13 +1645,13 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
                 //compute the impulse function 
                 HalfedgeData<double> waleVirtualSigma = computeWaleVirtualSigma(globalGeometry, gluedGeometry, modelWale);
-                std::cout << "here " << std::endl;
                 //subtracts off the impulse function
                 sigmaWaleGlued = sigmaWaleGlued - waleVirtualSigma;
                 FaceData<Vector3> adjustGradSigmaWaleGlued = computeOneFormFaceGrad(globalGeometry, gluedGeometry, sigmaWaleGlued);
                 waleVertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, adjustGradSigmaWaleGlued, gluedOneRingMap,
                                                     gluedEdgeSingularities, heatSolver, vertexMap);
                 waleEdgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, waleVertexCurl);
+                psMesh.addEdgeScalarQuantity("wale edge curl after " + std::to_string(numWaleSingularities) + " wale singularities", waleEdgeCurl);
                 break;
             }
         }
@@ -1672,6 +1672,8 @@ HalfedgeData<double> computeWaleVirtualSigma(VertexPositionGeometry& globalGeome
     std::vector<std::pair<std::vector<double>, double>> edgePathConstraints = model.getEdgePathConstraints();
     //require edge cotan weights
     gluedGeometry.requireEdgeCotanWeights();
+    //require edge lengths 
+    gluedGeometry.requireEdgeLengths();
     
     try {
         //reformulate the problem in terms of halfedges 
@@ -1696,9 +1698,9 @@ HalfedgeData<double> computeWaleVirtualSigma(VertexPositionGeometry& globalGeome
             sigma.push_back(sigma_i);//decision variables
         }
 
-        //add the second constraint while we're here
-        //constraint - (d1*sigma) == kP, P is period of optimization, k \in \mathbb{Z}
-        //here it will (d1 * sigma) == 0
+        // //add the second constraint while we're here
+        // //constraint - (d1*sigma) == kP, P is period of optimization, k \in \mathbb{Z}
+        // //here it will (d1 * sigma) == 0
         for (Face f : gluedMesh.faces()){
             GRBLinExpr lhs = 0.0;
             Halfedge hij = f.halfedge();
@@ -1708,19 +1710,19 @@ HalfedgeData<double> computeWaleVirtualSigma(VertexPositionGeometry& globalGeome
             model.addConstr(lhs == 0);
         }
 
-        //constraint: 
-        //specify singular halfedges and also specify that form values 
-        // for (Halfedge he : gluedMesh.halfedges()){
-        //     if (edgeIndices[he.edge().getIndex()] != 0){
-        //         model.addConstr(sigma[he.getIndex()] + sigma[he.twin().getIndex()] == edgeIndices[he.edge().getIndex()] * period);
-        //     }
-        //     else{
-        //         model.addConstr(sigma[he.getIndex()] == -1.0 * sigma[he.twin().getIndex()]);
-        //     }
-        // }
+        // //constraint: 
+        // //specify singular halfedges and also specify that form values 
+        for (Halfedge he : gluedMesh.halfedges()){
+            if (edgeIndices[he.edge().getIndex()] != 0){
+                model.addConstr(sigma[he.getIndex()] + sigma[he.twin().getIndex()] == edgeIndices[he.edge().getIndex()] * period);
+            }
+            else{
+                model.addConstr(sigma[he.getIndex()] == -1.0 * sigma[he.twin().getIndex()]);
+            }
+        }
 
-        //add constraint 
-        //add boundary constraints in the wale direction
+        // //add constraint 
+        // //add boundary constraints in the wale direction
         for (int i = 0; i < edgePathConstraints.size(); i++){
             std::vector<double> path = edgePathConstraints[i].first;
             GRBLinExpr pathIntegral = 0;
@@ -1744,7 +1746,8 @@ HalfedgeData<double> computeWaleVirtualSigma(VertexPositionGeometry& globalGeome
     
         //setting the objective to be min ||\sigma||^2
         for (Halfedge he : gluedMesh.halfedges()){
-            obj += gluedGeometry.edgeCotanWeights[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
+            //obj += gluedGeometry.edgeCotanWeights[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
+            obj += gluedGeometry.edgeLengths[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
         }
 
         model.setObjective(obj, GRB_MINIMIZE);
@@ -1773,8 +1776,8 @@ std::vector<std::pair<int, int>> findWaleSingularityEdges(VertexPositionGeometry
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     std::vector<std::pair<int, int>> singularEdges;
     
-    //stores in ascending order
-    std::map<double, int> curlToEdgeIndex;
+    //stores in descending order
+    std::map<double, int, std::greater<double>> curlToEdgeIndex;
     for (Edge e : globalMesh.edges()){
         curlToEdgeIndex[std::fabs(edgeCurl[e])] = e.getIndex();
     }
@@ -3638,6 +3641,7 @@ VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, Edg
     }
 
     if (gluedSourceVerts.size() > 0){
+        std::cout << "size of source verts = " << gluedSourceVerts.size() << std::endl;
         //compute distance in the glued setting 
         distToSourceGlued = heatSolver.computeDistance(gluedSourceVerts);
         //convert distance to global setting
