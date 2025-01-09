@@ -170,6 +170,9 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                                                                     Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions,
                                                                     EdgeData<double>& courseSingularEdgesGlobal, std::map<int, std::vector<Halfedge>> gluedOneRingMap, polyscope::SurfaceMesh& psMesh);
 
+//find singular edges in the wale direction in the global setting
+std::vector<std::pair<int, int>> findWaleSingularityEdges(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
+                                          EdgeData<double>& edgeCurl, int topPairs);
 
 //@clean 
 //compute the edge curl in the global setting
@@ -274,9 +277,12 @@ EdgeData<double> computeVertexAveragedEdgeCurl(VertexPositionGeometry& globalGeo
 double computeDistanceFromUnitNorm(VertexPositionGeometry& globalGeometry, FaceData<Vector3>& gradients);
 
 //@debugging
-std::tuple<HalfedgeData<double>, double> computeVirtualSigma(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
+//compute the Green's function in the course direction
+std::tuple<HalfedgeData<double>, double> computeCourseVirtualSigma(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
                                                         std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh);
 
+//compute the Green's function in the wale direction
+HalfedgeData<double> computeWaleVirtualSigma(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model &model);
 
 //@debugging 
 //compute course 1-form
