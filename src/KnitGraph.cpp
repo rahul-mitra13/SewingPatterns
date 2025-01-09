@@ -44,10 +44,10 @@ void KnitGraph::buildGraph(){
     //reorder vertex indices
     makeRealVertices();
 
-    std::vector<Vector3> realVertexPositions;
-    for (knitGraphVertex &v : realVertices)
-        realVertexPositions.push_back(v.position);
-    polyscope::registerPointCloud("real vertices", realVertexPositions)->setPointRadius(0.001);
+    // std::vector<Vector3> realVertexPositions;
+    // for (knitGraphVertex &v : realVertices)
+    //     realVertexPositions.push_back(v.position);
+    // polyscope::registerPointCloud("real vertices", realVertexPositions)->setPointRadius(0.001);
 
 
     //tag the increases and decreases 
@@ -929,14 +929,14 @@ void KnitGraph::makeRealVertices(){
         realVertices[v.id] = v;
     }
 
-    for (auto &v : realVertices){
-        std::cout << "id = " << v.id << std::endl;
-        std::cout << "row in = " << v.row_in << std::endl;
-        std::cout << "row out = " << v.row_out << std::endl;
-        std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
-        std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
-        std::cout << "---------------" << std::endl;
-    }
+    // for (auto &v : realVertices){
+    //     std::cout << "id = " << v.id << std::endl;
+    //     std::cout << "row in = " << v.row_in << std::endl;
+    //     std::cout << "row out = " << v.row_out << std::endl;
+    //     std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
+    //     std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
+    //     std::cout << "---------------" << std::endl;
+    // }
 }
 
 
