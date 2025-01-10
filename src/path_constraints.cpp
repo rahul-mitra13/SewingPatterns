@@ -43,7 +43,7 @@ HalfedgeData<double> constructGluedHalfedgeWeights(VertexPositionGeometry& globa
         double dotIJ = dot((globalGeometry.vertexPositions[hij.tipVertex()] - globalGeometry.vertexPositions[hij.tailVertex()]).normalize(), 
                             rotatedFaceGradients[f].normalize());
         //heWeights[hij] = std::fabs(dotIJ - maxDotProd);
-        heWeights[hij] = dotIJ < 0. ? penaltyFactor * (1 - dotIJ) / 2. : (1 - dotIJ) / 2;
+        heWeights[hij] = dotIJ < 0. ? penaltyFactor * ((1 - dotIJ) / 2.) : (1 - dotIJ) / 2;
         //also set weights for boundary halfedges 
         if (!hij.twin().isInterior()){
             double dotIJTwin = dot((globalGeometry.vertexPositions[hij.tailVertex()] - globalGeometry.vertexPositions[hij.tipVertex()]).normalize(), 

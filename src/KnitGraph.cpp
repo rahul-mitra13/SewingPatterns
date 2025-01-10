@@ -951,14 +951,14 @@ void KnitGraph::makeRealVertices(){
         p.second = mp[p.second];
     }
 
-    for (auto &v : realVertices){
-        std::cout << "id = " << v.id << std::endl;
-        std::cout << "row in = " << v.row_in << std::endl;
-        std::cout << "row out = " << v.row_out << std::endl;
-        std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
-        std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
-        std::cout << "---------------" << std::endl;
-    }
+    // for (auto &v : realVertices){
+    //     std::cout << "id = " << v.id << std::endl;
+    //     std::cout << "row in = " << v.row_in << std::endl;
+    //     std::cout << "row out = " << v.row_out << std::endl;
+    //     std::cout << "col_in[0] = " << v.col_in[0] << std::endl;
+    //     std::cout << "col_out[0] = " << v.col_out[0] << std::endl;
+    //     std::cout << "---------------" << std::endl;
+    // }
 }
 
 

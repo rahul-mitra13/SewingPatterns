@@ -1606,7 +1606,10 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     int numWaleSingularities = 0;
     int maxWaleSingularities = 5;
-    int topPairs = 35;
+    int topPairs = 50;
+
+    int numPos = 0;
+    int numNeg = 0;
 
     bool toBreak = false;
     while(true){
@@ -1617,6 +1620,12 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         int numSkips = 0;
         int maxSkips = topPairs;
         for (auto s : waleSingularityEdges){
+            if (s.second > 0){
+                    numPos++;
+                }
+                else{
+                    numNeg++;
+                }
             //test model 
             //to test a new pair of singularities
             Model testModel = modelWale; 
@@ -1648,9 +1657,11 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 std::cout << "oldDistance = " << oldDistance << std::endl;
                 oldDistance = newDistance;
                 if (s.second > 0){
+                    numPos++;
                     std::cout << "INDEX IS POSITIVE " << std::endl;
                 }
                 else{
+                    numNeg++;
                     std::cout << "INDEX IS NEGATIVE " << std::endl;
                 }
                 edgeIndices[edgeMap[s.first]] = -1 * s.second;
@@ -1680,6 +1691,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     sigmaWaleGlued = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
     std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
     
+    std::cout << "Number of positive edges sampled = " << numPos << std::endl;
+    std::cout << "Number of negative edges sampled = " << numNeg << std::endl;
     return std::tie(stripeValuesOneFormGlued, waleSingularEdgesGlobal);
 }
 
@@ -3659,7 +3672,7 @@ VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, Edg
 
     std::vector<Vertex> gluedSourceVerts;
     for (Edge e : gluedMesh.edges()){
-        if (std::fabs(gluedEdgeSingularities[e.getIndex()]) == 1 || e.isBoundary()){//don't place singularities near other singularities or near boundaries
+        if (std::fabs(gluedEdgeSingularities[e.getIndex()]) == 1 || e.isBoundary()){
             gluedSourceVerts.push_back(e.halfedge().tailVertex());
             gluedSourceVerts.push_back(e.halfedge().tipVertex());
         }
