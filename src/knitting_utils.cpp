@@ -1297,7 +1297,7 @@ HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, 
 //this will return the result in the glued setting 
 VertexData<double> computeWaleCurlFunction(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
                                                 FaceData<Vector3>& courseOneFormGrad, Eigen::SparseMatrix<double, Eigen::RowMajor>& G,
-                                                std::map<int, int>& vertexMap){
+                                                std::map<int, int>& vertexMap, globalBoundaryConditions& globalBdyConditions){
 
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     SurfaceMesh& globalMesh = globalGeometry.mesh;
@@ -1350,6 +1350,13 @@ VertexData<double> computeWaleCurlFunction(VertexPositionGeometry& globalGeometr
             }
             gradH[f.getIndex()][2] = currGradH;
 
+        }
+        
+        for (int v : globalBdyConditions.courseStartBoundaryVertices){
+            model.addConstr(h[v] == 0);
+        }
+        for (int v : globalBdyConditions.courseEndBoundaryVertices){
+            model.addConstr(h[v] == 1);
         }        
 
         //set up the objective term
@@ -1490,11 +1497,13 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     //before rotating the course face gradients compute the "psuedo time function" we'll use for curl in the wale direction 
     VertexData<double> pseudoTimeFunctionGlued = computeWaleCurlFunction(globalGeometry, gluedGeometry, courseOneFormGrad,
-                                                                            G, vertexMap);
+                                                                            G, vertexMap, globalBdyConditions);
     VertexData<double> pseudoTimeFunctionGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, pseudoTimeFunctionGlued, vertexMap);
     psMesh.addVertexScalarQuantity("wale time function", pseudoTimeFunctionGlobal);
     FaceData<Vector3> waleCurlFunctionGrad = computeTimeFunctionFaceGrad(globalGeometry, pseudoTimeFunctionGlobal);
     psMesh.addFaceVectorQuantity("wale time function grad", waleCurlFunctionGrad);    
+
+    std::cout << "Got here " << std::endl;
 
     Eigen::Map<Eigen::VectorXi> faceIndicesWaleEig(stripeSingularities.raw().data(), (gluedGeometry.mesh).nFaces());
     //place wale singularities at edges 
@@ -1563,7 +1572,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             gluedEdgeSingularities[e.getIndex()] = 1;
     }
 
-    VertexData<double> waleVertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, waleCurlFunctionGrad, gluedOneRingMap,
+    VertexData<double> waleVertexCurl = computeCourseVertexCurl(globalGeometry, gluedGeometry, waleCurlFunctionGrad, gluedOneRingMap,
                                                          gluedEdgeSingularities, heatSolver, vertexMap);
     EdgeData<double> waleEdgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, waleVertexCurl);
     
@@ -1614,6 +1623,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     bool toBreak = false;
     while(true){
 
+        break;
         std::vector<std::pair<int, int>> waleSingularityEdges = findWaleSingularityEdges(globalGeometry, gluedGeometry,
                                                                 waleEdgeCurl, topPairs);
 
@@ -1675,7 +1685,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 //subtracts off the impulse function
                 sigmaWaleGlued = sigmaWaleGlued - waleVirtualSigma;
                 FaceData<Vector3> adjustedGradSigmaWaleGlued = computeOneFormFaceGrad(globalGeometry, gluedGeometry, sigmaWaleGlued);
-                waleVertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, adjustedGradSigmaWaleGlued, gluedOneRingMap,
+                waleVertexCurl = computeCourseVertexCurl(globalGeometry, gluedGeometry, adjustedGradSigmaWaleGlued, gluedOneRingMap,
                                                     gluedEdgeSingularities, heatSolver, vertexMap);
                 waleEdgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, waleVertexCurl);
                 psMesh.addFaceVectorQuantity("wale gradient after " + std::to_string(numWaleSingularities) + "wale singularities ", adjustedGradSigmaWaleGlued);
@@ -3013,7 +3023,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     oldDistance = newDistance;
 
     //compute curl quantities without impulse function
-    vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
+    vertexCurl = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     gradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
     edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
     psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (before subtracting)", edgeCurl);
@@ -3023,7 +3033,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     gluedSigmaTilde = gluedSigmaTilde - virtualSigmaTilde;
     adjustedGradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
     //compute curl quantities after impulse function
-    vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
+    vertexCurl = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     gradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
     edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
     psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (after subtracting)", edgeCurl);
@@ -3135,7 +3145,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 //update the gradients for the next round of the model 
                 //model.setFaceGradients(gradSigmaTilde);
                 //compute curl quantities without accounting for impulse function
-                vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
+                vertexCurl = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     gradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
                 edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
                 psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (before subtracting)", edgeCurl);
@@ -3146,7 +3156,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 gluedSigmaTilde = gluedSigmaTilde - virtualSigmaTilde;
                 adjustedGradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
                 //compute curl quantities after accounting for impulse function
-                vertexCurl = computeVertexCurl(globalGeometry, gluedGeometry, 
+                vertexCurl = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                                 adjustedGradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
                 edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
                 psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (after subtracting)", edgeCurl);
@@ -3660,7 +3670,7 @@ void updateForbiddenFaces(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<dou
 }
 
 //compute curl per vertex using the curl discretization from De Goes SIGGRAPH notes (in global setting)
-VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+VertexData<double> computeCourseVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
                                     FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap, 
                                     std::vector<int>& gluedEdgeSingularities, HeatMethodDistanceSolver& heatSolver, std::map<int, int>& vertexMap){
 
