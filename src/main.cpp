@@ -145,17 +145,18 @@ void showStripePatterns(){
   //find Knöppel singularities in the WALE DIRECTION 
   //just run Knoppel's algorithm on these models 
   //and then run our 1-form optimization with the singularities
-  CornerData<double> waleStripeValues;
-  EdgeData<double> waleSingularEdgesGlobal;
-  FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
-  std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
-                                                                    edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
-                                                                    courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
-                                                                    courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops);
-  // // Store wale singular edges for rendering later
-  // richData.addEdgeProperty("waleSingularEdges", courseSingularEdgesGlobal);
+  // CornerData<double> waleStripeValues;
+  // EdgeData<double> waleSingularEdgesGlobal;
+  // FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
+  // std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
+  //                                                                   edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
+  //                                                                   courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
+  //                                                                   courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
+  //                                                                   homologyGenerators);
+  // // // Store wale singular edges for rendering later
+  // // richData.addEdgeProperty("waleSingularEdges", courseSingularEdgesGlobal);
 
-  // richData.write("singularEdges.ply");
+  // // richData.write("singularEdges.ply");
 
   // std::vector<Vector3> positionsWale;
   // std::vector<std::array<int, 2>> edgesWale;
