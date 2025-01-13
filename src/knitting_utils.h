@@ -147,7 +147,7 @@ std::vector<std::array<double, 3>> vectorOneFormFaceGrad(VertexPositionGeometry&
 //@param[in]    vertexMap           std::map<int, int>      a map from global vertex indices to glued vertex indices
 //
 //@return       sigma               HalfedgeData<double>    1-form value per halfedge representing the wale stripes
-HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, 
+std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, 
                                         Eigen::SparseMatrix<double, Eigen::RowMajor>& G, std::map<int, int>& vertexMap);
 
 //@clean 
