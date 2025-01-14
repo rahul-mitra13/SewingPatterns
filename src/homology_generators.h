@@ -217,7 +217,7 @@ void visualizeHomologyGenerators(const std::vector<std::vector<Halfedge>> &homol
             edgeIndices.push_back({nodeCounter, nodeCounter+1});
             nodeCounter += 2;
         }
-        polyscope::registerCurveNetwork(name, positions, edgeIndices);
+        polyscope::registerCurveNetwork(name, positions, edgeIndices)->setEnabled(false);
     }
 }
 

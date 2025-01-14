@@ -4,6 +4,7 @@
 #include "geometrycentral/surface/vertex_position_geometry.h"
 #include "geometrycentral/surface/direction_fields.h"
 #include "geometrycentral/surface/edge_length_geometry.h"
+#include "geometrycentral/surface/signpost_intrinsic_triangulation.h"
 #include "geometrycentral/surface/remeshing.h"
 #include "geometrycentral/surface/stripe_patterns.h"
 #include "geometrycentral/surface/rich_surface_mesh_data.h"
@@ -91,6 +92,39 @@ void showStripePatterns(){
   VertexData<double> timeFunctionGlobal = convertGluedToGlobalVertexFunction(*globalGeometry, *gluedELG, timeFunctionGlued, vertexMap);
   globalPSMesh -> addVertexScalarQuantity("time function", timeFunctionGlobal);
 
+  // Compute a smooth 1-direction field
+  FaceData<Vector2> smoothDirectionField = computeSmoothestBoundaryAlignedFaceDirectionField(*globalGeometry, 1);
+  FaceData<Vector3> basisX(globalGeometry->mesh);
+  FaceData<Vector3> basisY(globalGeometry->mesh);
+  globalGeometry->requireFaceTangentBasis();
+  for (Face f : globalGeometry->mesh.faces()) {
+    basisX[f] = globalGeometry->faceTangentBasis[f][0];
+    basisY[f] = globalGeometry->faceTangentBasis[f][1];
+  }
+  globalPSMesh->addFaceTangentVectorQuantity("smooth direction field", smoothDirectionField, basisX, basisY);
+
+  // Compute course stripes using Knöppel's method
+  VertexData<Vector3> vertexVectorField = computeVertexValuedField(*globalGeometry, timeFunctionGlobal, 0.0);
+  VertexData<Vector2> usedRoot(globalGeometry->mesh);
+  VertexData<Vector2> lineField = vertexDirectionField(*globalGeometry, vertexVectorField, usedRoot);
+  VertexData<double> freq(globalGeometry->mesh, 1./(coursePeriod));
+  CornerData<double> stripeValues(globalGeometry->mesh);
+  FaceData<int> stripeSingularities(globalGeometry->mesh);
+  FaceData<int> fieldSingularities(globalGeometry->mesh);
+  std::tie(stripeValues, stripeSingularities, fieldSingularities) = computeStripePattern(*globalGeometry, freq, lineField); // this is a GC call
+  // Do some visualization
+  globalPSMesh->addVertexVectorQuantity("vertexVectorField", vertexVectorField);
+  globalPSMesh->addFaceScalarQuantity("knoppel course face singularities", stripeSingularities);
+  globalPSMesh->addFaceScalarQuantity("knoppel course field singularities", fieldSingularities);
+  globalPSMesh->addCornerScalarQuantity("knoppel course stripe values", prepareCornerData(stripeValues));
+  std::vector<Vector3> knoppelPos; 
+  std::vector<std::array<size_t, 2>> knoppelEdges; 
+  std::tie(knoppelPos, knoppelEdges) = extractPolylinesFromStripePattern(*globalGeometry, stripeValues, stripeSingularities,
+                                          fieldSingularities, lineField, false);
+  auto knoppelStripes = polyscope::registerCurveNetwork("knoppel course stripes", knoppelPos, knoppelEdges);
+  knoppelStripes->setRadius(0.001);
+  knoppelStripes->setEnabled(false);
+
   //loops from the saddle vertex for meshes with genus 
   std::vector<std::vector<double>> allSaddleLoops;
   //all the homology generators 
@@ -111,11 +145,20 @@ void showStripePatterns(){
     timeFunctionGradientGlobalNormalized[f] = timeFunctionGradientGlobal[f].normalize();
   }
   globalPSMesh -> addFaceVectorQuantity("normalized time function gradient", timeFunctionGradientGlobalNormalized);
-  
+
+  G = grad;
+
+  // // Call Matteo's revealCurl
+  // Model model;
+  // model.setPeriod(period);
+  // model.setBdyEdges(globalBdyConditions.courseBdyEdges);
+  // revealCurl(*globalGeometry, *gluedELG, model, vertexMap, G);
+  // P("revealCurl done");
+  // polyscope::show();
+
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
   EdgeData<double> courseSingularEdgesGlobal(globalGeometry -> mesh);
-  G = grad;
   FaceData<Vector3> courseOneFormGrad(globalGeometry -> mesh);
   std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
@@ -162,6 +205,17 @@ void showStripePatterns(){
   std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, walePeriod);
   auto waleStripes = polyscope::registerCurveNetwork("wale stripes", positionsWale, edgesWale);
   globalPSMesh -> addEdgeScalarQuantity("wale singularities", waleSingularEdgesGlobal);
+  waleStripes -> setRadius(0.001);
+  waleStripes -> setEnabled(false);
+
+  globalPSMesh->addCornerScalarQuantity("wale stripe values", prepareCornerData(waleStripeValues));
+
+  // Plot wale stripe values with offset (to debug knit graph)
+  CornerData<double> waleStripeValuesWithOffset = waleStripeValues;
+  for (Corner co : globalGeometry->mesh.corners())
+      waleStripeValuesWithOffset[co] -= walePeriod/4;
+  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValuesWithOffset, waleSingularFaces, walePeriod);
+  waleStripes = polyscope::registerCurveNetwork("wale stripes with offset", positionsWale, edgesWale);
   waleStripes -> setRadius(0.001);
   waleStripes -> setEnabled(false);
 
@@ -245,8 +299,13 @@ int main(int argc, char **argv) {
   nlohmann::json data = nlohmann::json::parse(jsonFile);
   //run sanity checks
   std::tie(globalMeshPre, globalGeometryPre) = readManifoldSurfaceMesh(data["model_path"]);
+  
   //make the mesh Delaunay 
   fixDelaunay(*globalMeshPre, *globalGeometryPre); // we make the mesh approximately Delaunay
+
+  // // Remesh
+  // remesh(*globalMeshPre, *globalGeometryPre);
+
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometryPre);
   globalMesh = std::make_unique<ManifoldSurfaceMesh>(F);
   globalGeometry = std::make_unique<VertexPositionGeometry>(*globalMesh, V);
@@ -259,6 +318,12 @@ int main(int argc, char **argv) {
     double length = norm(globalGeometry->vertexPositions[e.halfedge().tipVertex()] - globalGeometry->vertexPositions[e.halfedge().tailVertex()]);
     if (length > maxLength)
       coursePeriod = 2.0 * length;//set the default length to twice the course period
+  }
+
+  // Parse stripe period, if available
+  if (argc > 2) {
+    sscanf(argv[2], "%f", &coursePeriod);
+    knoppelFrequency = 1.0 / coursePeriod; // to match course and wale periods
   }
 
   if (!(globalMesh -> isManifold())){
@@ -282,9 +347,10 @@ int main(int argc, char **argv) {
   std::set<Edge> visited;
   for (Face f : globalMesh->faces()) {
     for (Edge e : f.adjacentEdges()) {
-      if (visited.count(e) == 0)
+      if (visited.count(e) == 0) {
         perm.push_back(e.getIndex());
         visited.insert(e);
+      }
     }
   }
   vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(data["vertex_mappings"]);
@@ -298,6 +364,7 @@ int main(int argc, char **argv) {
       orientations.push_back(false);
     }
   }
+
   //now update the orientations to handle "stitched together edges" which actually represent a single edge 
   //just flip the orientations to make the viz sensible
   for (std::pair<int, int> pair : edgeMappingsPairs){
@@ -306,6 +373,17 @@ int main(int argc, char **argv) {
   globalPSMesh -> setEdgePermutation(perm);
   //create the glued edge length geometry
   gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, vertexMap, edgeMap, gluedOneRingMap);
+
+  // Halfedge permutation (global -> glued)
+  // Note: this works as long as the global and glued faces have the same order.
+  // If not, you should iterate over global mesh halfedges and find the corresponding half-edge in the glued mesh.
+  // I was just too lazy to implement that.
+  std::vector<size_t> halfedgePerm;
+  for (Face f : gluedELG->mesh.faces())
+    for (Halfedge he : f.adjacentHalfedges())
+      halfedgePerm.push_back(he.getIndex());  
+  globalPSMesh->setHalfedgePermutation(halfedgePerm);
+
   //process boundary conditions in the glued mesh setting 
   globalBdyConditions = parseJson(*gluedELG, data, vertexMap, edgeMap);
 
@@ -315,6 +393,10 @@ int main(int argc, char **argv) {
   //polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::None;
   // Set the callback function
   polyscope::state::userCallback = callBacks;
+
+  if (argc > 2) // period was provided
+    showStripePatterns();
+
   polyscope::show();
 
   return EXIT_SUCCESS; 
