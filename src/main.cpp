@@ -299,8 +299,13 @@ int main(int argc, char **argv) {
   nlohmann::json data = nlohmann::json::parse(jsonFile);
   //run sanity checks
   std::tie(globalMeshPre, globalGeometryPre) = readManifoldSurfaceMesh(data["model_path"]);
+  
   //make the mesh Delaunay 
   fixDelaunay(*globalMeshPre, *globalGeometryPre); // we make the mesh approximately Delaunay
+
+  // // Remesh
+  // remesh(*globalMeshPre, *globalGeometryPre);
+
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometryPre);
   globalMesh = std::make_unique<ManifoldSurfaceMesh>(F);
   globalGeometry = std::make_unique<VertexPositionGeometry>(*globalMesh, V);

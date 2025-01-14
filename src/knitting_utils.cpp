@@ -1806,11 +1806,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 //compute the impulse function 
                 HalfedgeData<double> waleVirtualSigma = computeWaleVirtualSigma(globalGeometry, gluedGeometry, modelWale);
                 //view the Green's function 
-                //FaceData<Vector3> impulseGrad = computeOneFormFaceGrad(globalGeometry, gluedGeometry, waleVirtualSigma);
-                // for (Face f : globalGeometry.mesh.faces()){
-                //     std::cout << "gradient at face " << f << impulseGrad[f] << std::endl;
-                // }
-                //psMesh.addFaceVectorQuantity("Green's function after " + std::to_string(numWaleSingularities), impulseGrad);
+                FaceData<Vector3> impulseGrad = computeOneFormFaceGrad(globalGeometry, gluedGeometry, waleVirtualSigma);
+                psMesh.addFaceVectorQuantity("Green's function after " + std::to_string(numWaleSingularities), impulseGrad);
                 //subtracts off the impulse function
                 sigmaWaleGlued = sigmaWaleGlued - waleVirtualSigma;
                 FaceData<Vector3> adjustedGradSigmaWaleGlued = computeOneFormFaceGrad(globalGeometry, gluedGeometry, sigmaWaleGlued);
@@ -1962,8 +1959,8 @@ HalfedgeData<double> computeWaleVirtualSigma(VertexPositionGeometry& globalGeome
     
         //setting the objective to be min ||\sigma||^2
         for (Halfedge he : gluedMesh.halfedges()){
-            //obj += gluedGeometry.edgeCotanWeights[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
-            obj += gluedGeometry.edgeLengths[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
+            obj += gluedGeometry.edgeCotanWeights[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
+            // obj += gluedGeometry.edgeLengths[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
         }
 
         model.setObjective(obj, GRB_MINIMIZE);
@@ -4113,7 +4110,7 @@ VertexData<double> computeCourseVertexCurl(VertexPositionGeometry& globalGeometr
         // else curl[vi] = sum;
         //else curl[vi] = distToSourceGlobal[vi] * sum;
         //else curl[vi] = exp(-pow(distToSourceGlobal[vi], 2)/ (2 * pow(0.107, 2))) * sum;
-        else curl[vi] = sum;
+        else curl[vi] = sum / area;
     }
 
     return curl;
