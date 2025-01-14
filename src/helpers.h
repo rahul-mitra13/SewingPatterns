@@ -33,6 +33,26 @@
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
+// Some useful macros :-)
+#define P(x) {if (debug) std::cout << x << std::endl;} 
+#define H(x) P(#x << ": " << (x))
+const bool debug = 1;
+
+// To print pairs easily
+template<class T1, class T2> std::ostream &operator<<(std::ostream &os, std::pair<T1, T2> v) {
+  os << "(" << v.first << ", " << v.second << ")";
+  return os;
+}
+
+// To print vectors easily
+template<class T> std::ostream &operator<<(std::ostream &os, std::vector<T> v) {
+  os << "["; if (v.size() > 0) os << v[0];
+  for(int i = 1; i < v.size(); i++) os << ", " << v[i];
+  os << "]";
+  return os;
+}
+
+
 //boundary conditions on the GLUED MESH
 struct globalBoundaryConditions{
     std::vector<int> courseStartBoundaryVertices;//vertices where t = 0
@@ -223,6 +243,13 @@ int hashFloatQuantized(double f);
 //find the number of connected components in a set of faces 
 //a single isoline of the time function passes through all these faces
 std::vector<std::vector<int>> findConnectedComponents(EdgeLengthGeometry& gluedGeometry, std::vector<int>& faces);
+
+// For some reason I cannot find the right permutation to make addCornerScalarQuantity work correctly.
+// I think there is something wrong with CornerData (e.g., note how cornerData.size() != mesh.nCorners()),
+// but I don't have the time to look into it.
+// In the meantime, here's a wrapper that correctly prepares corner data;
+// just call it and feed the output to addCornerScalarQuantity.
+std::vector<double> prepareCornerData(CornerData<double> cornerData);
 
 // A Union Find data structure
 // We use it for the vertex mappings in the glued mesh.

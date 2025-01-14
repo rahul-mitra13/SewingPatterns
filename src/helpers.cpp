@@ -498,6 +498,7 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
     if (courseUseBdyLoops){//just use the boundary loops of the glued mesh to specify the boundary conditions 
         std::vector<int> startVertices = data["boundaries"]["course"]["startVertices"];
         std::vector<int> endVertices = data["boundaries"]["course"]["endVertices"];
+                
         //knitting start conditions
         for (int i = 0; i < startVertices.size(); i++){
             knittingStartVertices.push_back(startVertices[i]);
@@ -506,9 +507,12 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
             for (Vertex v : bLoop.adjacentVertices()){
                 toReturn.courseStartBoundaryVertices.push_back(v.getIndex());
             }
+            double pathLength = 0;
             for (Edge e : bLoop.adjacentEdges()){
                 toReturn.courseBdyEdges.push_back(e.getIndex());
+                pathLength += gluedGeometry.edgeLengths[e];
             }
+            std::cout << "Knitting start boundary loop length: " << pathLength << std::endl;
             //build weights for wale boundary conditions 
             std::vector<double> weights(gluedMesh.nEdges(), 0.0);
             for (Halfedge he : bLoop.adjacentHalfedges()){
@@ -529,9 +533,12 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
             for (Vertex v : bLoop.adjacentVertices()){
                 toReturn.courseEndBoundaryVertices.push_back(v.getIndex());
             }
+            double pathLength = 0;
             for (Edge e : bLoop.adjacentEdges()){
                 toReturn.courseBdyEdges.push_back(e.getIndex());
+                pathLength += gluedGeometry.edgeLengths[e];
             }
+            std::cout << "Knitting end boundary loop length: " << pathLength << std::endl;
             //build weights for wale boundary conditions 
             std::vector<double> weights(gluedMesh.nEdges(), 0.0);
             for (Halfedge he : bLoop.adjacentHalfedges()){
@@ -874,3 +881,10 @@ std::vector<std::vector<int>> findConnectedComponents(EdgeLengthGeometry& gluedG
     return faceComponents;
 }
     
+std::vector<double> prepareCornerData(CornerData<double> cornerData) {
+  std::vector<double> preparedData;
+  for (Face f : cornerData.getMesh()->faces())
+    for (Corner co : f.adjacentCorners())
+      preparedData.push_back(cornerData[co]);
+  return preparedData;
+}
