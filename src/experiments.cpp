@@ -1322,7 +1322,7 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
     double objectiveVal;
     int numSingularFaces = 0;
 
-    //query information from the model
+    //query information from the model 
     std::vector<int> bdyEdges = gbModel.getBdyEdges();
     std::vector<std::pair<std::vector<double>, double>> edgePathConstraints = gbModel.getEdgePathConstraints();
     gluedGeometry.requireDECOperators();
@@ -1537,13 +1537,6 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
 
         //setting the objective to be min ||\nabla \sigma||^2
         //weighted by the face areas
-        // for (Face f : gluedMesh.faces()){
-        //     obj +=  (gradU[f.getIndex()][0] * gradU[f.getIndex()][0] + gradU[f.getIndex()][1] * gradU[f.getIndex()][1]
-        //             + gradU[f.getIndex()][2] * gradU[f.getIndex()][2]);
-        // }
-
-        // //setting the objective to be min ||\nabla \sigma||^2
-        // //weighted by the face areas
         // for (Face f : gluedMesh.faces()){
         //     obj +=  (gradU[f.getIndex()][0] * gradU[f.getIndex()][0] + gradU[f.getIndex()][1] * gradU[f.getIndex()][1]
         //             + gradU[f.getIndex()][2] * gradU[f.getIndex()][2]);

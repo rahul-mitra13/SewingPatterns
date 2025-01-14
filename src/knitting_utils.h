@@ -1,6 +1,3 @@
-#ifndef KNITTING_UTILS_H
-#define KNITTING_UTILS_H
-
 //eigen includes
 #include <Eigen/Dense>
 
@@ -38,6 +35,7 @@
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
+
 
 //compute time function using a vector of pairs of vertex mappings instead of the map because we miss stitches then 
 //
@@ -237,7 +235,6 @@ std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, std::vector<int>> getIsoLine(Eigen:
 double findIsoValWithMaxFaceCurl(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& globalTimeFunction, 
                                 FaceData<double>& curl, std::map<int, int>& hashedUsedIsoVals, FaceData<int>& forbiddenFaces, double stepSize);
 
-void revealCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, std::map<int, int>& vertexMap,  Eigen::SparseMatrix<double, Eigen::RowMajor>& G);
 
 //@debugging 
 //find isoval with maximum average edge curl 
@@ -293,6 +290,7 @@ HalfedgeData<double> computeWaleVirtualSigma(VertexPositionGeometry& globalGeome
 std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
                                                         std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh);
 
+
 //given a time function over the mesh, extract the saddle vertices from it 
 //this function returns the vertex in the glued setting
 std::vector<Vertex> getSaddleVertices(IntrinsicGeometryInterface& geometry, VertexData<double>& timeFunction);
@@ -304,5 +302,5 @@ std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geom
 //repair a knit graph vertex that's missing a connection
 std::vector<int> repairKnitGraphVertex();
 
-#endif
+
 
