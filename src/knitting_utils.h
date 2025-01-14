@@ -149,7 +149,7 @@ std::vector<std::array<double, 3>> vectorOneFormFaceGrad(VertexPositionGeometry&
 //@param[in]    vertexMap           std::map<int, int>      a map from global vertex indices to glued vertex indices
 //
 //@return       sigma               HalfedgeData<double>    1-form value per halfedge representing the wale stripes
-HalfedgeData<double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, 
+std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& model, 
                                         Eigen::SparseMatrix<double, Eigen::RowMajor>& G, std::map<int, int>& vertexMap);
 
 //@clean 
@@ -170,7 +170,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                                                                     std::vector<std::pair<int, int>>& edgeMappingsPairs, std::map<int, int>& edgeMap, 
                                                                     std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, FaceData<Vector3>& courseOneFormGrad, 
                                                                     Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions,
-                                                                    EdgeData<double>& courseSingularEdgesGlobal, std::map<int, std::vector<Halfedge>> gluedOneRingMap, polyscope::SurfaceMesh& psMesh);
+                                                                    EdgeData<double>& courseSingularEdgesGlobal, std::map<int, std::vector<Halfedge>> gluedOneRingMap, polyscope::SurfaceMesh& psMesh, 
+                                                                    std::vector<std::vector<double>>& allSaddleLoops, std::vector<std::vector<double>>& homologyGenerators);
 
 //find singular edges in the wale direction in the global setting
 std::vector<std::pair<int, int>> findWaleSingularityEdges(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
@@ -267,7 +268,7 @@ void updateForbiddenFaces(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<dou
 
 //@debugging 
 //compute curl per vertex using the curl discretization from De Goes SIGGRAPH notes
-VertexData<double> computeVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+VertexData<double> computeCourseVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
                                     FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap, 
                                     std::vector<int>& gluedEdgeSingularities, HeatMethodDistanceSolver& heatSolver, std::map<int, int>& vertexMap);
 
