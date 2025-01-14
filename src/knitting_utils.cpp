@@ -1407,6 +1407,19 @@ VertexData<double> computeWaleCurlFunction(VertexPositionGeometry& globalGeometr
     
 }
 
+//measure L1 distance between two vector fields 
+double L1Distance(VertexPositionGeometry& globalGeometry, FaceData<Vector3>& V1, FaceData<Vector3>& V2){
+
+    SurfaceMesh& mesh = globalGeometry.mesh;
+    double L1Distance = 0.;
+    for (Face f : mesh.faces()){
+        for (int j = 0; j < 3; j++)
+            L1Distance += std::fabs(V1[f][j] - V2[f][j]);
+    }
+
+    return L1Distance;
+}
+
 
 //@clean 
 std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
@@ -1646,22 +1659,26 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     psMesh.addVertexScalarQuantity("initial wale vertex curl", waleVertexCurl);
     psMesh.addEdgeScalarQuantity("wale edge curl without any wale singularities", waleEdgeCurl);
 
+    double oldL1Distance = 0.;
+    double newL1Distance = 0.;
     Model modelWale; 
     modelWale.setPeriod(period);
     modelWale.setFaceGradients(modelFaceGradients);
     //modelWale.setEdgePathConstraints(waleEdgePathConstraints);
     modelWale.setEdgeIndices(edgeIndices);
-
     HalfedgeData<double> sigmaWaleGlued(gluedGeometry.mesh);
     //solve the model with out any singularities
     std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
     FaceData<Vector3> gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, sigmaWaleGlued);
+    //newL1Distance = L1Distance(globalGeometry, gradSigmaTilde, waleCurlFunctionGrad);
     //newDistance = computeDistanceFromUnitNorm(globalGeometry, gradSigmaTilde);
     //std::cout << "distance from unit norm without any wale singularities = " << newDistance << std::endl;
+
     std::cout << "objective without any wale singularities = " << currObj << std::endl;
     psMesh.addFaceVectorQuantity("wale gradient after without any wale singularities", gradSigmaTilde);
     //oldDistance = newDistance;
     oldObj = currObj;
+    //oldL1Distance = newL1Distance;
 
     CornerData<double> stripeValuesOneFormGlued;
     FaceData<int> stripeIndicesOneFormGlued;
@@ -1723,7 +1740,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             testModel.setEdgeIndices(testEdgeIndices);
             std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, testModel, G, vertexMap);
             //gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, sigmaWaleGlued);
-            //newDistance = computeDistanceFromUnitNorm(globalGeometry, gradSigmaTilde);            
+            //newDistance = computeDistanceFromUnitNorm(globalGeometry, gradSigmaTilde);
+            //newL1Distance = L1Distance(globalGeometry, gradSigmaTilde, waleCurlFunctionGrad);            
             if (currObj >= oldObj){
                 std::cout << "new objective = " << currObj << std::endl;
                 std::cout << "old objective = " << oldObj << std::endl;
@@ -1739,6 +1757,21 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 }
                 continue;
             }
+            // if (newL1Distance >= oldL1Distance){
+            //     std::cout << "new L1 distance = " << newL1Distance << std::endl;
+            //     std::cout << "old L1 distance = " << oldL1Distance << std::endl;
+            //     std::cout << "norm is not improving trying next singular edge " << std::endl;
+            //     numSkips++;
+            //     std::cout << "numSkips = " << numSkips << std::endl;
+            //     if (numSkips >= maxSkips){
+            //         std::cout << "breaking after " << numWaleSingularities << " singularity insertions " << std::endl;
+            //         std::cout << "new objective = " << currObj << std::endl;
+            //         std::cout << "old objective = " << oldObj << std::endl;
+            //         toBreak = true;
+            //         break;
+            //     }
+            //     continue;
+            // }
             else{//we have a valid pair of singularities that improves the objective
                 numWaleSingularities++;
                 std::cout << "not breaking after " << std::to_string(numWaleSingularities) << " singularity insertions " << std::endl;
@@ -1746,6 +1779,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 std::cout << "old objective = " << oldObj << std::endl;
                 //oldDistance = newDistance;
                 oldObj = currObj;
+                //oldL1Distance = newL1Distance;
                 if (s.second > 0){
                     numPos++;
                     std::cout << "INDEX IS POSITIVE " << std::endl;
@@ -1830,9 +1864,11 @@ HalfedgeData<double> computeWaleVirtualSigma(VertexPositionGeometry& globalGeome
     HalfedgeData<double> gluedOneForm(gluedMesh);
     double period = model.getPeriod();
     std::vector<int> edgeIndices = model.getEdgeIndices();
-    std::vector<std::pair<std::vector<double>, double>> edgePathConstraints = model.getEdgePathConstraints();
+    //std::vector<std::pair<std::vector<double>, double>> edgePathConstraints = model.getEdgePathConstraints();
     //require edge cotan weights
     gluedGeometry.requireEdgeCotanWeights();
+    //require halfedge cotan weights 
+    gluedGeometry.requireHalfedgeCotanWeights();
     //require edge lengths 
     gluedGeometry.requireEdgeLengths();
     
@@ -1841,7 +1877,7 @@ HalfedgeData<double> computeWaleVirtualSigma(VertexPositionGeometry& globalGeome
         // Create an environment
         GRBEnv env = GRBEnv(true);
         //don't log output to console 
-        env.set(GRB_IntParam_OutputFlag, 0);
+        //env.set(GRB_IntParam_OutputFlag, 0);
         env.set("LogFile", "1-form computation.log");
         env.start();
 
@@ -1849,7 +1885,7 @@ HalfedgeData<double> computeWaleVirtualSigma(VertexPositionGeometry& globalGeome
         GRBModel model = GRBModel(env);
 
         //set the timeout
-        model.getEnv().set(GRB_DoubleParam_TimeLimit, 1.0);
+        //model.getEnv().set(GRB_DoubleParam_TimeLimit, 1.0);
         
         //sigma defined over halfedges
         std::vector<GRBVar> sigma;
@@ -1871,8 +1907,8 @@ HalfedgeData<double> computeWaleVirtualSigma(VertexPositionGeometry& globalGeome
             model.addConstr(lhs == 0);
         }
 
-        // //constraint: 
-        // //specify singular halfedges and also specify that form values 
+        // constraint: 
+        // specify singular halfedges and also specify that form values 
         for (Halfedge he : gluedMesh.halfedges()){
             if (edgeIndices[he.edge().getIndex()] != 0){
                 model.addConstr(sigma[he.getIndex()] + sigma[he.twin().getIndex()] == edgeIndices[he.edge().getIndex()] * period);
@@ -1884,31 +1920,31 @@ HalfedgeData<double> computeWaleVirtualSigma(VertexPositionGeometry& globalGeome
 
         // //add constraint 
         // //add boundary constraints in the wale direction
-        for (int i = 0; i < edgePathConstraints.size(); i++){
-            std::vector<double> path = edgePathConstraints[i].first;
-            GRBLinExpr pathIntegral = 0;
-            std::vector<double> hePath(gluedMesh.nHalfedges(), 0.0);
-            for (int j = 0; j < gluedMesh.nEdges(); j++){
-                if (path[j] > 0){
-                    hePath[gluedMesh.edge(j).halfedge().getIndex()] = path[j];
-                }
-                else if (path[j] < 0){
-                    hePath[gluedMesh.edge(j).halfedge().twin().getIndex()] = path[j];
-                }
-            }
-            for (int k = 0; k < gluedMesh.nHalfedges(); k++){
-                pathIntegral += hePath[k] * sigma[k];
-            }
-            model.addConstr(pathIntegral == period * edgePathConstraints[i].second);
-        }
+        // for (int i = 0; i < edgePathConstraints.size(); i++){
+        //     std::vector<double> path = edgePathConstraints[i].first;
+        //     GRBLinExpr pathIntegral = 0;
+        //     std::vector<double> hePath(gluedMesh.nHalfedges(), 0.0);
+        //     for (int j = 0; j < gluedMesh.nEdges(); j++){
+        //         if (path[j] > 0){
+        //             hePath[gluedMesh.edge(j).halfedge().getIndex()] = path[j];
+        //         }
+        //         else if (path[j] < 0){
+        //             hePath[gluedMesh.edge(j).halfedge().twin().getIndex()] = path[j];
+        //         }
+        //     }
+        //     for (int k = 0; k < gluedMesh.nHalfedges(); k++){
+        //         pathIntegral += hePath[k] * sigma[k];
+        //     }
+        //     model.addConstr(pathIntegral == period * edgePathConstraints[i].second);
+        // }
 
         //set up the objective term
         GRBQuadExpr obj = 0;        
     
         //setting the objective to be min ||\sigma||^2
         for (Halfedge he : gluedMesh.halfedges()){
-            //obj += gluedGeometry.edgeCotanWeights[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
-            obj += gluedGeometry.edgeLengths[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
+            obj += gluedGeometry.halfedgeCotanWeight(he) * sigma[he.getIndex()] * sigma[he.getIndex()];
+            //obj += gluedGeometry.edgeLengths[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
         }
 
         model.setObjective(obj, GRB_MINIMIZE);
