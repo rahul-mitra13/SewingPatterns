@@ -2641,7 +2641,7 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
     double currDeviationSum = 0.0;
     std::vector<std::tuple<std::pair<int, int>, double>> singEdgePairs;
     //should figure out some constant step size
-    stepSize = 0.04;
+    stepSize = 0.05;
     //changing the alignment strongly affects the helicing condition due to the path constraints
     double alignment = 0.99;
 
@@ -3313,7 +3313,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     if (globalGeometry.mesh.nConnectedComponents() == 1){//only do this for global 3D meshes for now 
         for(int i = 0; i < allSaddleLoops.size(); i++){
             edgePathConstraints.push_back(std::make_pair(allSaddleLoops[i], 0.0));
-            std::vector<double> path = allSaddleLoops[i];
         }
         //model.setHomologyGenerators(homologyGenerators);
 
