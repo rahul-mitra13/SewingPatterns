@@ -1585,10 +1585,12 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++) {
         std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
         EdgeData<double> pathGC(gluedGeometry.mesh);
+        EdgeData<double> pathGCGlobal(globalGeometry.mesh);
         int j = 0;
         for (Edge e : gluedGeometry.mesh.edges())
             pathGC[e] = path[j++];
-        psMesh.addEdgeScalarQuantity("waleBdyPathConstraints" + std::to_string(i), pathGC);
+        pathGCGlobal = convertGluedToGlobalEdgeFunction(globalGeometry, gluedGeometry, pathGC, edgeMap);
+        psMesh.addEdgeScalarQuantity("waleBdyPathConstraints" + std::to_string(i), pathGCGlobal);
     }
 
     std::vector<std::pair<std::vector<double>, double>> waleEdgePathConstraints;
@@ -1621,12 +1623,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     }
 
     std::vector<Vertex> heatSourceVerts;
-    //find all the saddle vertices 
-    //keep singularities away from saddle vertices
-    // std::vector<Vertex> saddleVerts = getSaddleVertices(globalGeometry, timeFunctionGlobal);
-    // for (Vertex v : saddleVerts){
-    //     heatSourceVerts.push_back(v);
-    // }
     //keep singualrities away from all saddle loops
     for (int i = 0; i < allSaddleLoops.size(); i++){
         std::vector<double> path = allSaddleLoops[i];
@@ -1751,11 +1747,11 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         int maxSkips = topPairs;
         for (auto s : waleSingularityEdges){
             if (s.second > 0){
-                    numPos++;
-                }
-                else{
-                    numNeg++;
-                }
+                numPos++;
+            }
+            else{
+                numNeg++;
+            }
             //test model 
             //to test a new pair of singularities
             Model testModel = modelWale; 
@@ -1765,9 +1761,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, testModel, G, vertexMap);
             gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, sigmaWaleGlued);
             checked[s.first] = 1.0;
-
-
-
             FaceData<Vector3> diffFromTarget(gluedGeometry.mesh);
             for (Face f : gluedGeometry.mesh.faces())
                 for (int i = 0; i < 3; i++)
@@ -1884,6 +1877,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 }
                 VertexData<double> allDistGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, allDist, vertexMap);
                 VertexData<double> gaussianMask(globalGeometry.mesh);
+                //use a hard mask in the wale direction
                 for (Vertex v : globalGeometry.mesh.vertices()) {
                     gaussianMask[v] = (allDistGlobal[v] > 2*period);
                     //gaussianMask[v] = 1 - exp(-pow(allDistGlobal[v], 2.) / (2 * pow(2*period, 2)));
@@ -3415,6 +3409,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         }
         allDistGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, allDist, vertexMap);
         //adjust with the Gaussian mask
+        //have a soft mask in the course direction
         for (Vertex v : globalMesh.vertices()){
             vertexCurl[v] = (1 - exp(-pow(allDistGlobal[v], 2.) / (2 * pow(period, 2)))) * vertexCurl[v];
         }
@@ -3481,7 +3476,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             //solve the model with singularities
             std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, testModel, vertexMap, G, psMesh);
             numRuns++;
-            gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
+            //gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
             //newDistance = computeDistanceFromUnitNorm(globalGeometry, gradSigmaTilde);
             if (currObj > oldObj){
                 std::cout << "currObj = " << currObj << std::endl;
@@ -3565,16 +3560,15 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 for (Vertex v : heatSourceVerts){
                     allDist[v] -= maxSourceVal;
                 }
-                //clip all values to 0 and normalize 
+                //clip all values to 0 
                 for (Vertex v : gluedMesh.vertices()){
                     allDist[v] = std::max(allDist[v], 0.0);
-                    //allDist[v] /= maxVal;
                 }
                 allDistGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, allDist, vertexMap);
+                //have a soft mask in the course direction
                 for (Vertex v : globalMesh.vertices()){
                     vertexCurl[v] = (1 - exp(-pow(allDistGlobal[v], 2.) / (2 * pow(period, 2)))) * vertexCurl[v];
                 }
-                //if (heatSourceVerts.size() > 2) toBreak = true;
                 psMesh.addVertexScalarQuantity("all distance", allDistGlobal);
                 edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
                 psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (after subtracting)", edgeCurl);
