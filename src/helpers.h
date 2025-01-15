@@ -30,6 +30,9 @@
 #include "polyscope/curve_network.h"
 #include "polyscope/point_cloud.h"
 
+// Include Gurobi
+#include "gurobi_c++.h"
+
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
@@ -282,3 +285,6 @@ class UF {
   // Return the number of disjoint sets.
   int count() { return cnt; }
 };
+
+// Given a set of continuous numbers, round them to the closest integers while maintaining a given sum
+std::vector<int> roundWithSum(std::vector<double> y, int sum);

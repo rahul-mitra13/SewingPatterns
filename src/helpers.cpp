@@ -516,10 +516,10 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
             //build weights for wale boundary conditions 
             std::vector<double> weights(gluedMesh.nEdges(), 0.0);
             for (Halfedge he : bLoop.adjacentHalfedges()){
-                if (he.orientation()){
+                if (he.orientation()){ // he and he.edge() point in the same direction
                     weights[he.edge().getIndex()] = 1.0;
                 }
-                else{
+                else{ // he and he.edge() point in opposite directions
                     weights[he.edge().getIndex()] = -1.0;
                 }
             }
@@ -887,4 +887,46 @@ std::vector<double> prepareCornerData(CornerData<double> cornerData) {
     for (Corner co : f.adjacentCorners())
       preparedData.push_back(cornerData[co]);
   return preparedData;
+}
+
+std::vector<int> roundWithSum(std::vector<double> y, int sum) {
+
+    std::vector<int> res(y.size());
+    
+    try {
+        GRBEnv env = GRBEnv(true);
+        env.start();
+        GRBModel model = GRBModel(env);
+
+        // Define integer variables
+        std::vector<GRBVar> x;
+        for (int i = 0; i < y.size(); i++)
+            x.push_back(model.addVar(-GRB_INFINITY, GRB_INFINITY, 0, GRB_INTEGER));
+        
+        // Define objective, ||x-y||^2
+        // Should we try sum of absolute values?
+        GRBQuadExpr obj = 0;
+        for (int i = 0; i < x.size(); i++)
+            obj += (x[i]-y[i]) * (x[i]-y[i]);
+        model.setObjective(obj, GRB_MINIMIZE);
+
+        // Define sum constraint
+        GRBLinExpr s;
+        for (int i = 0; i < x.size(); i++)
+            s += x[i];
+        model.addConstr(s == sum);
+
+        model.optimize();
+
+        for (int i = 0; i < x.size(); i++)
+            res[i] = std::round(x[i].get(GRB_DoubleAttr_X));
+    } catch(GRBException e) {
+        std::cout << "Error code = " << e.getErrorCode() << std::endl;
+        std::cout << e.getMessage() << std::endl;
+    } catch(...) {
+        std::cout << "Exception during optimization" << std::endl;
+    }
+
+
+    return res;
 }
