@@ -195,10 +195,10 @@ void showStripePatterns(){
                                                                     courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
                                                                     courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
                                                                     homologyGenerators);
-  // // // Store wale singular edges for rendering later
-  // // richData.addEdgeProperty("waleSingularEdges", courseSingularEdgesGlobal);
+  // // // // Store wale singular edges for rendering later
+  // // // richData.addEdgeProperty("waleSingularEdges", courseSingularEdgesGlobal);
 
-  // // richData.write("singularEdges.ply");
+  // // // richData.write("singularEdges.ply");
 
   std::vector<Vector3> positionsWale;
   std::vector<std::array<int, 2>> edgesWale;
@@ -208,7 +208,7 @@ void showStripePatterns(){
   waleStripes -> setRadius(0.001);
   waleStripes -> setEnabled(false);
 
-  globalPSMesh->addCornerScalarQuantity("wale stripe values", prepareCornerData(waleStripeValues));
+  // globalPSMesh->addCornerScalarQuantity("wale stripe values", prepareCornerData(waleStripeValues));
 
   // // Plot wale stripe values with offset (to debug knit graph)
   // CornerData<double> waleStripeValuesWithOffset = waleStripeValues;
@@ -221,12 +221,12 @@ void showStripePatterns(){
 
 
   // //generate the knit graph
-  // graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
-  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-  //                     edgeMap);
-  // graph.buildGraph();
+  graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
+                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+                      edgeMap);
+  graph.buildGraph();
 
-  // graph.writeKnitGraphToTxtFile("model.obj");
+  graph.writeKnitGraphToTxtFile("model.obj");
 
 
 }
@@ -301,7 +301,7 @@ int main(int argc, char **argv) {
   std::tie(globalMeshPre, globalGeometryPre) = readManifoldSurfaceMesh(data["model_path"]);
   
   //make the mesh Delaunay 
-  fixDelaunay(*globalMeshPre, *globalGeometryPre); // we make the mesh approximately Delaunay
+  //fixDelaunay(*globalMeshPre, *globalGeometryPre); // we make the mesh approximately Delaunay
 
   // // Remesh
   // remesh(*globalMeshPre, *globalGeometryPre);
@@ -309,6 +309,9 @@ int main(int argc, char **argv) {
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometryPre);
   globalMesh = std::make_unique<ManifoldSurfaceMesh>(F);
   globalGeometry = std::make_unique<VertexPositionGeometry>(*globalMesh, V);
+
+  EdgeData<double> negativeWeights(*globalMesh, 0.0);
+  
   //find the gradient operator (want to do this just once)
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometry);
   igl::grad(V,F,grad);
@@ -341,6 +344,7 @@ int main(int argc, char **argv) {
 
   globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(data["model_path"]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
 
+  
   // Internally, Polyscope numbers the edges by looping over faces.
   // Since our numbering is different than that after fixDelaunay, we need to specify the new numbering by providing a permutation.
   // Note that this is only useful for EdgeData visualization; apart from that everything works fine.
@@ -373,6 +377,13 @@ int main(int argc, char **argv) {
   globalPSMesh -> setEdgePermutation(perm);
   //create the glued edge length geometry
   gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, vertexMap, edgeMap, gluedOneRingMap);
+
+  //visualizing the cotan weights
+  globalGeometry->requireEdgeCotanWeights();
+  for (Edge e : globalMesh -> edges()){
+    if (globalGeometry->edgeCotanWeights[e] < 0) negativeWeights[e] = 1.0;
+  }
+  globalPSMesh->addEdgeScalarQuantity("negative cotan weights", negativeWeights);
 
   // Halfedge permutation (global -> glued)
   // Note: this works as long as the global and glued faces have the same order.

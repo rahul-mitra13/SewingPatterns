@@ -1199,24 +1199,24 @@ std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeomet
         }
 
         //constraint: add integer variables for homology generators
-        // for (int i = 0; i < homologyGenerators.size(); i++){
-        //     std::vector<double> path = homologyGenerators[i];
-        //     GRBLinExpr pathIntegral = 0;
-        //     std::vector<double> hePath(gluedMesh.nHalfedges(), 0.0);
-        //     for (int j = 0; j < gluedMesh.nEdges(); j++){
-        //         if (path[j] > 0){
-        //             hePath[gluedMesh.edge(j).halfedge().getIndex()] = std::fabs(path[j]);
-        //         }
-        //         else if (path[j] < 0){
-        //             hePath[gluedMesh.edge(j).halfedge().twin().getIndex()] = std::fabs(path[j]);
-        //         }
-        //     }
-        //     for (int k = 0; k < gluedMesh.nHalfedges(); k++){
-        //         pathIntegral += hePath[k] * sigma[k];
-        //     }
-        //     //add the constraints for the homology generators
-        //     model.addConstr(pathIntegral == period * generatorIntegers[i]);
-        // }
+        for (int i = 0; i < homologyGenerators.size(); i++){
+            std::vector<double> path = homologyGenerators[i];
+            GRBLinExpr pathIntegral = 0;
+            std::vector<double> hePath(gluedMesh.nHalfedges(), 0.0);
+            for (int j = 0; j < gluedMesh.nEdges(); j++){
+                if (path[j] > 0){
+                    hePath[gluedMesh.edge(j).halfedge().getIndex()] = std::fabs(path[j]);
+                }
+                else if (path[j] < 0){
+                    hePath[gluedMesh.edge(j).halfedge().twin().getIndex()] = std::fabs(path[j]);
+                }
+            }
+            for (int k = 0; k < gluedMesh.nHalfedges(); k++){
+                pathIntegral += hePath[k] * sigma[k];
+            }
+            //add the constraints for the homology generators
+            model.addConstr(pathIntegral == period * generatorIntegers[i]);
+        }
 
         // constraint: 
         // specify singular halfedges and also specify that form values 
@@ -1724,10 +1724,12 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     int numWaleSingularities = 0;
     // int maxWaleSingularities = 5;
-    int topPairs = 20;
+    int topPairs = 5;
 
     int numPos = 0;
     int numNeg = 0;
+
+    EdgeData<double> checked(globalGeometry.mesh, 0.0);
 
     bool toBreak = false;
     while(true){
@@ -1762,6 +1764,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             testModel.setEdgeIndices(testEdgeIndices);
             std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, testModel, G, vertexMap);
             gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, sigmaWaleGlued);
+            checked[s.first] = 1.0;
 
 
 
@@ -1883,10 +1886,13 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 VertexData<double> gaussianMask(globalGeometry.mesh);
                 for (Vertex v : globalGeometry.mesh.vertices()) {
                     gaussianMask[v] = (allDistGlobal[v] > 2*period);
-                    // gaussianMask[v] = 1 - exp(-pow(allDistGlobal[v], 2.) / (2 * pow(2*period, 2)));
+                    //gaussianMask[v] = 1 - exp(-pow(allDistGlobal[v], 2.) / (2 * pow(2*period, 2)));
                     waleVertexCurl[v] = gaussianMask[v] * waleVertexCurl[v];
                 }
                 waleEdgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, waleVertexCurl);
+                for (Edge e : globalGeometry.mesh.edges()){
+                    if (std::fabs(checked[e]) > 0) waleEdgeCurl[e] = 0.;
+                }
                 psMesh.addFaceVectorQuantity("wale gradient after " + std::to_string(numWaleSingularities) + "wale singularities ", adjustedGradSigmaWaleGlued);
                 psMesh.addVertexScalarQuantity("gaussian mask after " + std::to_string(numWaleSingularities) + " wale singularities", gaussianMask);
                 psMesh.addEdgeScalarQuantity("wale edge curl after " + std::to_string(numWaleSingularities) + " wale singularities", waleEdgeCurl);
@@ -1994,7 +2000,8 @@ HalfedgeData<double> computeWaleVirtualSigma(VertexPositionGeometry& globalGeome
     
         //setting the objective to be min ||\sigma||^2
         for (Halfedge he : gluedMesh.halfedges()){
-            obj += gluedGeometry.edgeCotanWeights[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
+            if (gluedGeometry.edgeCotanWeights[he.edge()] > 0)
+                obj += gluedGeometry.edgeCotanWeights[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
             // obj += gluedGeometry.edgeLengths[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
         }
 
@@ -2634,7 +2641,7 @@ std::vector<std::tuple<std::pair<int, int>, double>> findEdgeSingularityPairsUsi
     double currDeviationSum = 0.0;
     std::vector<std::tuple<std::pair<int, int>, double>> singEdgePairs;
     //should figure out some constant step size
-    stepSize = 0.05;
+    stepSize = 0.04;
     //changing the alignment strongly affects the helicing condition due to the path constraints
     double alignment = 0.99;
 
@@ -3206,7 +3213,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //number of runs of the optimization
     int numRuns = 0;
     //max number of singularity pairs to check for insertion
-    int topPairs = 3;
+    int topPairs = 10;
     //threshold for alignment with the gradient 
     double threshold = 0.85;
     //gurobi model we will be solving 
@@ -3910,7 +3917,8 @@ std::tuple<HalfedgeData<double>, double> computeCourseVirtualSigma(VertexPositio
     
         //setting the objective to be min ||\sigma||^2
         for (Halfedge he : gluedMesh.halfedges()){
-            obj += gluedGeometry.edgeCotanWeights[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
+            if (gluedGeometry.edgeCotanWeights[he.edge()] > 0)
+                obj += gluedGeometry.edgeCotanWeights[he.edge()] * sigma[he.getIndex()] * sigma[he.getIndex()];
         }
 
        
