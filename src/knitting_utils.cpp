@@ -1160,7 +1160,7 @@ std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeomet
         GRBEnv env = GRBEnv(true);
         env.set("LogFile", "1-form computation.log");
         //don't log output to console
-        env.set(GRB_IntParam_OutputFlag, 0);
+        //env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
         // Create an empty model
         GRBModel model = GRBModel(env);
@@ -3177,7 +3177,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //number of runs of the optimization
     int numRuns = 0;
     //max number of singularity pairs to check for insertion
-    int topPairs = 5;
+    int topPairs = 10;
     //threshold for alignment with the gradient 
     double threshold = 0.85;
     //gurobi model we will be solving 
@@ -4654,6 +4654,11 @@ std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geom
     }
 
     return allSaddleLoops;
+}
+
+//render the non-helicing path constraints
+void renderPathConstraint(VertexPositionGeometry& globalGeometry, std::vector<double>& edgePath){
+    std::cout << "blah" << std::endl;
 }
 
 
