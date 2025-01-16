@@ -168,7 +168,7 @@ std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeomet
 //@return       striping info       tuple<CornerData<double, EdgeData<double>>     striping info in the glued mesh setting 
 std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
                                                                     std::vector<std::pair<int, int>>& edgeMappingsPairs, std::map<int, int>& edgeMap, 
-                                                                    std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, FaceData<Vector3>& courseOneFormGrad, 
+                                                                    std::map<int, int>& vertexMap, VertexData<double>& timeFunctionGlobal, VertexData<double>& timeFunctionGlued, FaceData<Vector3>& courseOneFormGrad, 
                                                                     Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions,
                                                                     EdgeData<double>& courseSingularEdgesGlobal, std::map<int, std::vector<Halfedge>> gluedOneRingMap, polyscope::SurfaceMesh& psMesh, 
                                                                     std::vector<std::vector<double>>& allSaddleLoops, std::vector<std::vector<double>>& homologyGenerators);

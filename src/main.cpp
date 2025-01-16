@@ -85,7 +85,7 @@ void showStripePatterns(){
   
   //set the wale period 
   //walePeriod = ((1.0/1.6) * coursePeriod);
-  walePeriod = coursePeriod;
+  walePeriod = 1.6 * coursePeriod;
   //time function on the glued mesh 
   VertexData<double> timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
   //time function on the global mesh 
@@ -174,16 +174,16 @@ void showStripePatterns(){
   richData.addEdgeProperty("courseSingularEdge", courseSingularEdgesGlobal);
 
 
-  FaceData<int> stripeIndicesSigmaCourse(*globalMesh, 0);
-  std::vector<Vector3> positionsCourse;
-  std::vector<std::array<int, 2>> edgesCourse;
-  std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, courseStripeValues, stripeIndicesSigmaCourse, coursePeriod);
-  auto courseStripes = polyscope::registerCurveNetwork("final course stripes ", positionsCourse, edgesCourse);
-  courseStripes -> setRadius(0.001);
-  courseStripes -> setEnabled(false);
+  // // FaceData<int> stripeIndicesSigmaCourse(*globalMesh, 0);
+  // // std::vector<Vector3> positionsCourse;
+  // // std::vector<std::array<int, 2>> edgesCourse;
+  // // std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, courseStripeValues, stripeIndicesSigmaCourse, coursePeriod);
+  // // auto courseStripes = polyscope::registerCurveNetwork("final course stripes ", positionsCourse, edgesCourse);
+  // // courseStripes -> setRadius(0.001);
+  // // courseStripes -> setEnabled(false);
 
 
-  //WALE STRIPES
+  // // //WALE STRIPES
   //find Knöppel singularities in the WALE DIRECTION 
   //just run Knoppel's algorithm on these models 
   //and then run our 1-form optimization with the singularities
@@ -191,7 +191,7 @@ void showStripePatterns(){
   EdgeData<double> waleSingularEdgesGlobal;
   FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
   std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
-                                                                    edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, 
+                                                                    edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, timeFunctionGlued,
                                                                     courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
                                                                     courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
                                                                     homologyGenerators);
@@ -208,7 +208,7 @@ void showStripePatterns(){
   waleStripes -> setRadius(0.001);
   waleStripes -> setEnabled(false);
 
-  // globalPSMesh->addCornerScalarQuantity("wale stripe values", prepareCornerData(waleStripeValues));
+  //globalPSMesh->addCornerScalarQuantity("wale stripe values", prepareCornerData(waleStripeValues));
 
   // // Plot wale stripe values with offset (to debug knit graph)
   // CornerData<double> waleStripeValuesWithOffset = waleStripeValues;
@@ -220,7 +220,7 @@ void showStripePatterns(){
   // waleStripes -> setEnabled(false);
 
 
-  // //generate the knit graph
+  // generate the knit graph
   graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
                       courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
                       edgeMap);
@@ -310,7 +310,12 @@ int main(int argc, char **argv) {
   globalMesh = std::make_unique<ManifoldSurfaceMesh>(F);
   globalGeometry = std::make_unique<VertexPositionGeometry>(*globalMesh, V);
 
-  EdgeData<double> negativeWeights(*globalMesh, 0.0);
+  for (auto bl : globalMesh -> boundaryLoops()){
+    Face f = bl.asFace();
+    std::cout << "boundary vertex = " << f.halfedge().tailVertex() << std::endl;
+  }
+
+  //EdgeData<double> negativeWeights(*globalMesh, 0.0);
   
   //find the gradient operator (want to do this just once)
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometry);
@@ -379,11 +384,11 @@ int main(int argc, char **argv) {
   gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, vertexMap, edgeMap, gluedOneRingMap);
 
   //visualizing the cotan weights
-  globalGeometry->requireEdgeCotanWeights();
-  for (Edge e : globalMesh -> edges()){
-    if (globalGeometry->edgeCotanWeights[e] < 0) negativeWeights[e] = 1.0;
-  }
-  globalPSMesh->addEdgeScalarQuantity("negative cotan weights", negativeWeights);
+  // globalGeometry->requireEdgeCotanWeights();
+  // for (Edge e : globalMesh -> edges()){
+  //   if (globalGeometry->edgeCotanWeights[e] < 0) negativeWeights[e] = 1.0;
+  // }
+  // globalPSMesh->addEdgeScalarQuantity("negative cotan weights", negativeWeights);
 
   // Halfedge permutation (global -> glued)
   // Note: this works as long as the global and glued faces have the same order.
