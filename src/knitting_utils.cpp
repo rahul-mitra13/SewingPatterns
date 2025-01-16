@@ -1579,39 +1579,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     }
 
     psMesh.addFaceVectorQuantity("rotated wale time function grad", modelFaceGradients);
-
-    // For each boundary, find out its target number of wale stripes
-    for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++) {
-        std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
-        EdgeData<double> pathGC(gluedGeometry.mesh);
-        EdgeData<double> pathGCGlobal(globalGeometry.mesh);
-        int j = 0;
-        for (Edge e : gluedGeometry.mesh.edges())
-            pathGC[e] = path[j++];
-        pathGCGlobal = convertGluedToGlobalEdgeFunction(globalGeometry, gluedGeometry, pathGC, edgeMap);
-        psMesh.addEdgeScalarQuantity("waleBdyPathConstraints" + std::to_string(i), pathGCGlobal);
-    }
-
-    std::vector<std::pair<std::vector<double>, double>> waleEdgePathConstraints;
-    int bdySums = 0;
-    //for n boundaries, you need to enforce (n - 1) path constraints
-    for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
-        std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
-        double integral = 0.;
-        double length = 0.;
-        double integerVal = 0;
-        for (int j = 0; j < gluedGeometry.mesh.nEdges(); j++){
-            integral += omegaWaleGlued[gluedGeometry.mesh.edge(j)] * path[j];
-            if (std::fabs(path[j]) > 0)
-                length += gluedGeometry.edgeLengths[gluedGeometry.mesh.edge(path[j])];
-        }
-        int sign = integral > 0 ? -1 : 1;
-        integerVal = (sign) * std::round(length/period);//not sure why I have to take the negation of this
-        std::cout << "integer val = " << integerVal << std::endl;
-        bdySums += integerVal;
-        if (i != globalBdyConditions.waleBdyPathConstraints.size() - 1)
-            waleEdgePathConstraints.push_back(std::make_pair(path, integerVal));
-    }
     
     //convert the global singular edges to glued singular in the course direction 
     EdgeData<double> courseSingularEdgesGlued = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, courseSingularEdgesGlobal, edgeMap);
@@ -1869,14 +1836,43 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         if (toBreak) break;//we are no longer improving the distance to unit norm 
     }
 
+    // Compute the final non-integer 1-form
+    std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
+    std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
+
+    // Compute (integer) sum of indices
+    int sumIndices = 0;
+    for (int i = 0; i < gluedGeometry.mesh.nEdges(); i++)
+        sumIndices += edgeIndices[i]; // I think the sign convention in edgeIndices is wrong, which is why we have to put a negative here
+
+    // Compute (non-integer) number of stripes on boundaries
+    std::vector<double> boundaryStripes;
+    for (std::vector<double> path : globalBdyConditions.waleBdyPathConstraints) {
+        double integral = 0;
+        for (int i = 0; i < path.size(); i++) if (path[i] != 0) {
+            Edge e = gluedGeometry.mesh.edge(i);
+            integral += sigmaWaleGlued[e.halfedge()] * path[i];
+        }
+        boundaryStripes.push_back(integral / period);
+    }
+
+    // Round it up
+    std::vector<int> boundaryStripesInt = roundWithSum(boundaryStripes, sumIndices);
+
+    // Set up the edge path constraints 
+    std::vector<std::pair<std::vector<double>, double>> waleEdgePathConstraints;
+    for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
+        std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
+        waleEdgePathConstraints.push_back(std::make_pair(path, -boundaryStripesInt[i]));
+    }
+
     //solve the model with all the path constraints 
     modelWale.setEdgePathConstraints(waleEdgePathConstraints);
     modelWale.setHomologyGenerators(homologyGenerators);
     std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
     std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
     
-    std::cout << "boundary sum = " << bdySums << std::endl;
-    std::cout << "size of all saddle loops = " << allSaddleLoops.size() << std::endl;
+    std::cout << "boundary sum = " << sumIndices << std::endl;
     std::cout << "Number of positive edges sampled = " << numPos << std::endl;
     std::cout << "Number of negative edges sampled = " << numNeg << std::endl;
     return std::tie(stripeValuesOneFormGlued, waleSingularEdgesGlobal);
