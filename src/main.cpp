@@ -291,14 +291,16 @@ void callBacks() {
   if (ImGui::Button("Manaul Repair")){
     manualKnitGraphRepair();
   }
+
+  if (ImGui::Button("Save view as JSON string")){
+    std::cout << polyscope::view::getViewAsJson() << std::endl;
+  }
 }
 
 int main(int argc, char **argv) {
   polyscope::init();
   std::ifstream jsonFile(argv[1]);
   nlohmann::json data = nlohmann::json::parse(jsonFile);
-
-  std::cout << "Got here " << std::endl;
 
   //run sanity checks
   std::tie(globalMeshPre, globalGeometryPre) = readManifoldSurfaceMesh(data["model_path"]);
@@ -418,6 +420,7 @@ int main(int argc, char **argv) {
     showStripePatterns();
 
   polyscope::show();
+
 
   return EXIT_SUCCESS; 
 }

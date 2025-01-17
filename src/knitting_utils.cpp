@@ -1675,7 +1675,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     Model modelWale; 
     modelWale.setPeriod(period);
     modelWale.setFaceGradients(modelFaceGradients);
-    modelWale.setEdgePathConstraints(waleEdgePathConstraints);
     modelWale.setEdgeIndices(edgeIndices);
     HalfedgeData<double> sigmaWaleGlued(gluedGeometry.mesh);
     //solve the model with out any singularities
