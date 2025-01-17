@@ -1148,6 +1148,7 @@ std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeomet
     std::vector<std::array<double, 3>> gradients = model.getFaceGradients();
     std::vector<std::pair<std::vector<double>, double>> edgePathConstraints = model.getEdgePathConstraints();
     std::vector<int> edgeIndices = model.getEdgeIndices();
+    std::vector<int> bdyEdges = model.getBdyEdges();
     std::vector<std::vector<double>> homologyGenerators = model.getHomologyGenerators();
     //require the face areas
     gluedGeometry.requireFaceAreas();
@@ -1183,7 +1184,7 @@ std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeomet
             sigma.push_back(sigma_i);//decision variables
         }
 
-        //first constraint - (d1*sigma) == kP, P is period of optimization, k \in \mathbb{Z}
+        //constraint - (d1*sigma) == kP, P is period of optimization, k \in \mathbb{Z}
         //also compute nP 
         std::vector<GRBLinExpr> nP(gluedMesh.nFaces());
         for (Face f : gluedMesh.faces()){
@@ -1195,6 +1196,12 @@ std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeomet
             nP[f.getIndex()] = sigma[hij.getIndex()] + sigma[hjk.getIndex()] + sigma[hki.getIndex()];
             //model.addConstr(lhs == period * faceIndices[f.getIndex()]);
             model.addConstr(lhs == 0);
+        }
+
+        //constraint: alignment constraints in the wale direction
+        for (int e : bdyEdges){
+            model.addConstr(sigma[gluedMesh.edge(e).halfedge().getIndex()] == 0);
+            model.addConstr(sigma[gluedMesh.edge(e).halfedge().twin().getIndex()] == 0);
         }
 
         //constraint: add integer variables for homology generators
@@ -1608,6 +1615,22 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             heatSourceVerts.push_back(gluedGeometry.mesh.vertex(vertexMap[e.halfedge().tipVertex().getIndex()]));
         }
     }
+
+    //add wale alignment constraints 
+    // EdgeData<double> constrainedEdges(globalGeometry.mesh, 0.0);
+    // double alignment = 0.6;
+    // std::vector<int> waleBdyEdges;
+    // for (Edge e : globalGeometry.mesh.edges()){
+    //     if (!e.isBoundary()) continue;
+    //     Vector3 edgeVector = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
+    //     edgeVector = edgeVector.normalize();
+    //     if (std::fabs(dot(edgeVector, waleCurlFunctionGrad[e.halfedge().face()])) < alignment){
+    //         waleBdyEdges.push_back(edgeMap[e.getIndex()]);
+    //         constrainedEdges[e] = 1;
+    //     }
+    // }
+    // psMesh.addEdgeScalarQuantity("constrained edges", constrainedEdges);
+
     VertexData<double> waleVertexCurl = computeCourseVertexCurl(globalGeometry, gluedGeometry, waleCurlFunctionGrad, gluedOneRingMap,
                                                          gluedEdgeSingularities, heatSolver, vertexMap);
     VertexData<double> allDist(gluedGeometry.mesh, 1.0);
@@ -1652,7 +1675,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     Model modelWale; 
     modelWale.setPeriod(period);
     modelWale.setFaceGradients(modelFaceGradients);
-    //modelWale.setEdgePathConstraints(waleEdgePathConstraints);
+    modelWale.setEdgePathConstraints(waleEdgePathConstraints);
     modelWale.setEdgeIndices(edgeIndices);
     HalfedgeData<double> sigmaWaleGlued(gluedGeometry.mesh);
     //solve the model with out any singularities
@@ -1866,11 +1889,13 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         waleEdgePathConstraints.push_back(std::make_pair(path, -boundaryStripesInt[i]));
     }
 
-    //solve the model with all the path constraints 
+    // solve the model with all the path constraints and boundary constraints 
+    //modelWale.setBdyEdges(waleBdyEdges);
     modelWale.setEdgePathConstraints(waleEdgePathConstraints);
     modelWale.setHomologyGenerators(homologyGenerators);
     std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
     std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
+
     
     std::cout << "boundary sum = " << sumIndices << std::endl;
     std::cout << "Number of positive edges sampled = " << numPos << std::endl;
@@ -3297,6 +3322,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 }
             }
         }
+
 
     }
 

@@ -85,7 +85,7 @@ void showStripePatterns(){
   
   //set the wale period 
   //walePeriod = ((1.0/1.6) * coursePeriod);
-  walePeriod = 1.6 * coursePeriod;
+  walePeriod = coursePeriod;
   //time function on the glued mesh 
   VertexData<double> timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
   //time function on the global mesh 
@@ -297,9 +297,13 @@ int main(int argc, char **argv) {
   polyscope::init();
   std::ifstream jsonFile(argv[1]);
   nlohmann::json data = nlohmann::json::parse(jsonFile);
+
+  std::cout << "Got here " << std::endl;
+
   //run sanity checks
   std::tie(globalMeshPre, globalGeometryPre) = readManifoldSurfaceMesh(data["model_path"]);
-  
+
+
   //make the mesh Delaunay 
   //fixDelaunay(*globalMeshPre, *globalGeometryPre); // we make the mesh approximately Delaunay
 
@@ -310,10 +314,10 @@ int main(int argc, char **argv) {
   globalMesh = std::make_unique<ManifoldSurfaceMesh>(F);
   globalGeometry = std::make_unique<VertexPositionGeometry>(*globalMesh, V);
 
-  for (auto bl : globalMesh -> boundaryLoops()){
-    Face f = bl.asFace();
-    std::cout << "boundary vertex = " << f.halfedge().tailVertex() << std::endl;
-  }
+  // for (auto bl : globalMesh -> boundaryLoops()){
+  //   Face f = bl.asFace();
+  //   std::cout << "boundary vertex = " << f.halfedge().tailVertex() << std::endl;
+  // }
 
   //EdgeData<double> negativeWeights(*globalMesh, 0.0);
   

@@ -126,11 +126,11 @@ void KnitGraph::handleCourseNonSingularFaceWaleNonSingularFace(Face &f){
     beta_start = (std::ceil((beta_min - walePeriod/4.)/walePeriod) * walePeriod) + walePeriod/4.;
     beta_end = (std::floor((beta_max - walePeriod/4.)/walePeriod) * walePeriod) + walePeriod/4.;
 
-    // alpha_start = std::ceil(alpha_min/period) * period;
-    // alpha_end = std::floor(alpha_max/period) * period;
-    // beta_start = std::ceil(beta_min/period) * period;
-    // beta_end = std::floor(beta_max/period) * period;
-
+    //trace the stripes
+    // alpha_start = (std::ceil((alpha_min - coursePeriod/2.)/coursePeriod/2.) * coursePeriod) + coursePeriod/2.;
+    // alpha_end = (std::floor((alpha_max - coursePeriod/2.)/coursePeriod/2.) * coursePeriod) + coursePeriod/2.;
+    // beta_start = (std::ceil((beta_min - walePeriod/2.)/walePeriod/2.) * walePeriod) + walePeriod/2.;
+    // beta_end = (std::floor((beta_max - walePeriod/2.)/walePeriod/2.) * walePeriod) + walePeriod/2.;
 
     Eigen::Matrix2f A, A_inv;
     Eigen::Vector2f x, b;
