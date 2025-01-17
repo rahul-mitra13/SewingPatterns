@@ -136,7 +136,7 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
     else{
         if (gluedSigmaTilde[e2.halfedge().twin()] < gluedSigmaTilde[e2.halfedge()]){
             std::cout << "something went wrong " << std::endl;
-            //makexit(1);
+            //exit(1);
         }
         std::cout << "things are okay!! " << std::endl;
         endVert = gluedMesh.vertex(vertexMap[e2.halfedge().twin().tipVertex().getIndex()]);
