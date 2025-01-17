@@ -295,6 +295,7 @@ void callBacks() {
   if (ImGui::Button("Save view as JSON string")){
     std::cout << polyscope::view::getViewAsJson() << std::endl;
   }
+
 }
 
 int main(int argc, char **argv) {
@@ -419,8 +420,19 @@ int main(int argc, char **argv) {
   if (argc > 2) // period was provided
     showStripePatterns();
 
+  //for rendering figures
+  //has to go before the show() call
+  // std::string viewerString = R"({"farClipRatio":20.0,
+  //                   "fov":45.0,
+  //                   "nearClipRatio":0.005,
+  //                   "projectionMode":"Perspective",
+  //                   "viewMat":[0.999998569488525,2.40470399148762e-09,4.30503860116005e-07,
+  //                   0.00774363428354263,-1.26986364534787e-07,-0.207583829760551,
+  //                   0.978216588497162,-0.00685347197577357,4.26609688020108e-07,
+  //                   -0.978215873241425,-0.207583859562874,-0.382894456386566,0.0,0.0,0.0,1.0],
+  //                   "windowHeight":977,"windowWidth":1728})";
+  // polyscope::view::setViewFromJson(viewerString, false);
   polyscope::show();
-
 
   return EXIT_SUCCESS; 
 }
