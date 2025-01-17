@@ -42,7 +42,7 @@ void KnitGraph::buildGraph(){
     std::vector<Vector3> vertexPositions;
     for (knitGraphVertex &v : vertices)
         vertexPositions.push_back(v.position);
-    polyscope::registerPointCloud("knit graph vertices before merge", vertexPositions)->setPointRadius(0.001);
+    polyscope::registerPointCloud("knit graph vertices before merge", vertexPositions)->setPointRadius(0.001)->setEnabled(false);
 
     //handle the merge in the intrinsic setting 
     intrinsicMerge();

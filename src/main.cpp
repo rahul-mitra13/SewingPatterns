@@ -148,14 +148,6 @@ void showStripePatterns(){
 
   G = grad;
 
-  // // Call Matteo's revealCurl
-  // Model model;
-  // model.setPeriod(period);
-  // model.setBdyEdges(globalBdyConditions.courseBdyEdges);
-  // revealCurl(*globalGeometry, *gluedELG, model, vertexMap, G);
-  // P("revealCurl done");
-  // polyscope::show();
-
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
   EdgeData<double> courseSingularEdgesGlobal(globalGeometry -> mesh);
@@ -182,6 +174,7 @@ void showStripePatterns(){
   courseStripes -> setRadius(0.001);
   courseStripes -> setEnabled(false);
 
+  polyscope::show();
 
   //WALE STRIPES
   //find Knöppel singularities in the WALE DIRECTION 
@@ -219,6 +212,8 @@ void showStripePatterns(){
   // waleStripes -> setRadius(0.001);
   // waleStripes -> setEnabled(false);
 
+  std::cout << "Done with wale stripes" << std::endl;
+  polyscope::show();
 
   // //generate the knit graph
   graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
@@ -301,7 +296,7 @@ int main(int argc, char **argv) {
   std::tie(globalMeshPre, globalGeometryPre) = readManifoldSurfaceMesh(data["model_path"]);
   
   //make the mesh Delaunay 
-  //fixDelaunay(*globalMeshPre, *globalGeometryPre); // we make the mesh approximately Delaunay
+  fixDelaunay(*globalMeshPre, *globalGeometryPre); // we make the mesh approximately Delaunay
 
   // // Remesh
   // remesh(*globalMeshPre, *globalGeometryPre);
@@ -343,7 +338,6 @@ int main(int argc, char **argv) {
   }
 
   globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(data["model_path"]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
-
   
   // Internally, Polyscope numbers the edges by looping over faces.
   // Since our numbering is different than that after fixDelaunay, we need to specify the new numbering by providing a permutation.

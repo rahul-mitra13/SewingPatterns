@@ -269,7 +269,7 @@ void updateForbiddenFaces(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<dou
 //@debugging 
 //compute curl per vertex using the curl discretization from De Goes SIGGRAPH notes
 VertexData<double> computeCourseVertexCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
-                                    FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap, 
+                                    const FaceData<Vector3>& field, std::map<int, std::vector<Halfedge>>& gluedOneRingMap, 
                                     std::vector<int>& gluedEdgeSingularities, HeatMethodDistanceSolver& heatSolver, std::map<int, int>& vertexMap);
 
 //@debugging

@@ -895,6 +895,7 @@ std::vector<int> roundWithSum(std::vector<double> y, int sum) {
     
     try {
         GRBEnv env = GRBEnv(true);
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
         GRBModel model = GRBModel(env);
 
@@ -920,6 +921,9 @@ std::vector<int> roundWithSum(std::vector<double> y, int sum) {
 
         for (int i = 0; i < x.size(); i++)
             res[i] = std::round(x[i].get(GRB_DoubleAttr_X));
+
+        std::cout << "roundWithSum took " << model.get(GRB_DoubleAttr_Runtime) << " s" << std::endl;
+
     } catch(GRBException e) {
         std::cout << "Error code = " << e.getErrorCode() << std::endl;
         std::cout << e.getMessage() << std::endl;

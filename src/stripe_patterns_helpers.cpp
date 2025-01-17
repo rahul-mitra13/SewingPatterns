@@ -503,6 +503,8 @@ EdgeData<int> stripeIsoValEdges(EmbeddedGeometryInterface& geometry,
 }
 
 //extract isolines when multiple isolines may pass through a face (using face-based matching)
+// Contrary to findStripeConnectedComponents, we don't care about the actual sequence of edges in an isoline.
+// We just want to trace them on faces
 std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLines(EmbeddedGeometryInterface& geometry,
                                                       const CornerData<double>& stripeValues,
                                                       const FaceData<int>& stripesIndices, double period){
@@ -516,6 +518,7 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
   double pert = 0.000001;
 
   std::vector<PolyLinePoint> isoline_points;
+  FaceData<std::vector<int>> isolinePointsPerFace(mesh);
 
   HalfedgeData<std::vector<double>> halfedgeIsoValues = getHalfEdgeIsoValues(geometry, stripeValues, stripesIndices, period);
 
@@ -539,6 +542,7 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
         currPoint.he = h;
         currPoint.isoval = heSet[i];
 
+        isolinePointsPerFace[h.face()].push_back(isoline_points.size());
         isoline_points.push_back(currPoint);
       }
     }
@@ -551,20 +555,37 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> generateIsoLin
     points.push_back(isoline_points[i].position);
   }
 
-  //now make the polyline 
-  for (int i = 0; i < isoline_points.size(); i++){
-    
-    PolyLinePoint p1 = isoline_points[i];
-
-    //search for the point p1 should connect to
-    for (int j = 0; j < isoline_points.size(); j++){
-      PolyLinePoint p2 = isoline_points[j];
-      if (p1.f == p2.f && std::abs(p1.isoval - p2.isoval) < pert && i != j){
-        std::array<int, 2> edge = {i, j};
-        edges.push_back(edge);
+  // Now make the polylines
+  // Inside each face, brute-force all pairs of points to see if they should connect
+  for (Face f : mesh.faces()) {
+    std::vector<int> facePoints = isolinePointsPerFace[f];
+    for (int i : facePoints) {
+      PolyLinePoint p1 = isoline_points[i];
+      //search for the point p1 should connect to
+      for (int j : facePoints) {
+        PolyLinePoint p2 = isoline_points[j];
+        if (p1.f == p2.f && std::abs(p1.isoval - p2.isoval) < pert && i != j){
+          std::array<int, 2> edge = {i, j};
+          edges.push_back(edge);
+        }
       }
+
     }
   }
+
+  // for (int i = 0; i < isoline_points.size(); i++){
+    
+  //   PolyLinePoint p1 = isoline_points[i];
+
+  //   //search for the point p1 should connect to
+  //   for (int j = 0; j < isoline_points.size(); j++){
+  //     PolyLinePoint p2 = isoline_points[j];
+  //     if (p1.f == p2.f && std::abs(p1.isoval - p2.isoval) < pert && i != j){
+  //       std::array<int, 2> edge = {i, j};
+  //       edges.push_back(edge);
+  //     }
+  //   }
+  // }
 
   return std::tie(points, edges);
 }
