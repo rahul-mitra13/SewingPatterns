@@ -1659,7 +1659,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         allDistGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, allDist, vertexMap);
         for (Vertex v : globalGeometry.mesh.vertices()){
             waleWeighting[v] = (allDistGlobal[v] > 2*period);
-            // waleWeighting[v] = (1 - exp(-pow(allDistGlobal[v], 2.) / (2 * pow(2*period, 2))));
+            //waleWeighting[v] = (1 - exp(-pow(allDistGlobal[v], 2.) / (2 * pow(2*period, 2))));
             waleVertexCurl[v] = waleWeighting[v] * waleVertexCurl[v];
         }
     }
@@ -1696,7 +1696,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     int numWaleSingularities = 0;
     // int maxWaleSingularities = 5;
-    int topPairs = 8;
+    int topPairs = 10;
 
     int numPos = 0;
     int numNeg = 0;
@@ -3297,11 +3297,25 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     double maxDotProd = maximumDotProduct(globalGeometry, rotatedFaceGradients);
     HalfedgeData<double> gluedHeWeights = constructGluedHalfedgeWeights(globalGeometry, gluedGeometry, rotatedFaceGradients, maxDotProd);
 
+    //masked vertex for bent cylinder masking experiment/figure
+    // std::vector<int> maskedVerticesIds = {2624, 2620, 624, 2824, 2820, 2816, 2812, 528, 3016, 3012, 3008, 525,
+    //                               526, 527, 52, 620, 621, 622, 623, 64, 716, 717, 2643, 2639, 619, 2843, 2839, 2835, 
+    //                               2831, 523, 3035, 3031, 3027, 3026, 3030, 3034, 522, 2830, 2834, 2838, 2842, 618, 2638, 2642, 
+    //                               2641, 2637, 617, 2841, 2837, 2833, 2820, 521, 3033, 3029, 3024, 3028, 3032, 520, 2828, 2832, 2836, 2840, 616,
+    //                               2636, 2640, 2829, 3025};
+    // VertexData<double> maskedVertices(globalMesh, 0.0);
+    // for (int v : maskedVerticesIds){
+    //     maskedVertices[v] = 1.0;
+    //     //add the masked vertices to the heat sources
+    //     heatSourceVerts.push_back(gluedMesh.vertex(vertexMap[v]));
+    // }
+    // psMesh.addVertexScalarQuantity("masked vertices", maskedVertices);
+
+
     //handle saddle loops in the intrinsic setting
     for(int i = 0; i < allSaddleLoops.size(); i++){
         edgePathConstraints.push_back(std::make_pair(allSaddleLoops[i], 0.0));
     }
-
     for (int i = 0; i < allSaddleLoops.size(); i++){
         std::vector<double> path = allSaddleLoops[i];
         for (int j = 0; j < path.size(); j++){
@@ -3421,6 +3435,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (after subtracting)", edgeCurl);
     int numSingularities = 0;
     while(true){
+
         //finding edge singularity pairs by sampling time function isolines
         //return type is a a vector of tuples
         std::vector<std::tuple<std::pair<int, int>, double>> singEdgePairs = findEdgeSingularityPairsUsingTimeFunctionIsoVals(globalGeometry,  gluedGeometry, V, F, 
@@ -3744,8 +3759,8 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                 pathIntegral += hePath[k] * sigma[k];
             }
             //add the constraints for the homology generators
-            model.addConstr(pathIntegral == period * generatorIntegers[i]);
-            //model.addConstr(pathIntegral == period * 0.0);  
+            //model.addConstr(pathIntegral == period * generatorIntegers[i]);
+            model.addConstr(pathIntegral == period * 0.0);  
         }
         
         //constraint: add bdy-bdy path constraint 

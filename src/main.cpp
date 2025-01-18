@@ -323,10 +323,10 @@ int main(int argc, char **argv) {
   globalMesh = std::make_unique<ManifoldSurfaceMesh>(F);
   globalGeometry = std::make_unique<VertexPositionGeometry>(*globalMesh, V);
 
-  // for (auto bl : globalMesh -> boundaryLoops()){
-  //   Face f = bl.asFace();
-  //   std::cout << "boundary vertex = " << f.halfedge().tailVertex() << std::endl;
-  // }
+  for (auto bl : globalMesh -> boundaryLoops()){
+    Face f = bl.asFace();
+    std::cout << "boundary vertex = " << f.halfedge().tailVertex() << std::endl;
+  }
 
   //EdgeData<double> negativeWeights(*globalMesh, 0.0);
   
@@ -375,6 +375,7 @@ int main(int argc, char **argv) {
       }
     }
   }
+
   vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(data["vertex_mappings"]);
   edgeMappingsPairs = buildPairOfStitchedEdges(*globalGeometry, vertexMappingsPairs);
   //set up the orientations for the 1-form viz while we're here
@@ -429,15 +430,17 @@ int main(int argc, char **argv) {
   //for rendering figures
   //has to go before the show() call
   // std::string viewerString = R"({"farClipRatio":20.0,
-  //                   "fov":45.0,
-  //                   "nearClipRatio":0.005,
-  //                   "projectionMode":"Perspective",
-  //                   "viewMat":[0.999998569488525,2.40470399148762e-09,4.30503860116005e-07,
-  //                   0.00774363428354263,-1.26986364534787e-07,-0.207583829760551,
-  //                   0.978216588497162,-0.00685347197577357,4.26609688020108e-07,
-  //                   -0.978215873241425,-0.207583859562874,-0.382894456386566,0.0,0.0,0.0,1.0],
-  //                   "windowHeight":977,"windowWidth":1728})";
+  //                               "fov":45.0,
+  //                               "nearClipRatio":0.005,
+  //                               "projectionMode":
+  //                               "Perspective",
+  //                               "viewMat":[0.0205091927200556,-1.87355908565223e-10,-0.999801218509674,
+  //                               -0.399929404258728,-0.0461873635649681,0.998910784721375,
+  //                               -0.000946979271247983,-0.528441607952118,0.99871826171875,
+  //                               0.0461944416165352,0.0204852763563395,-3.25812482833862,0.0,0.0,0.0,1.0],
+  //                               "windowHeight":1440,"windowWidth":2560})";
   // polyscope::view::setViewFromJson(viewerString, false);
+  
   polyscope::show();
 
   return EXIT_SUCCESS; 
