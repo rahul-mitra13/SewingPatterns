@@ -129,11 +129,17 @@ void showStripePatterns(){
   std::vector<std::vector<double>> allSaddleLoops;
   //all the homology generators 
   std::vector<std::vector<double>> homologyGenerators;
-  if (globalGeometry->mesh.nConnectedComponents() == 1){//do the homology generator stuff for just global 3D meshes for now 
-      std::vector<Vertex> saddleVertices = getSaddleVertices(*globalGeometry, timeFunctionGlobal);
-      allSaddleLoops = findAllSaddleLoops(*globalGeometry, saddleVertices, timeFunctionGlobal);
+
+  //if doing the homology generators on the 3D models
+  if (globalGeometry->mesh.nConnectedComponents() == 1){
+      // std::vector<Vertex> saddleVertices = getSaddleVertices(*globalGeometry, timeFunctionGlobal);
+      // allSaddleLoops = findAllSaddleLoops(*globalGeometry, saddleVertices, timeFunctionGlobal);
       homologyGenerators = buildHomologyGeneratorsVector(*globalGeometry, *globalMesh);
   }
+
+  //get the saddle loops on general patch models
+  std::vector<Vertex> saddleVertices = getSaddleVertices(*gluedELG, timeFunctionGlued);
+  allSaddleLoops = findAllSaddleLoops(*gluedELG, saddleVertices, timeFunctionGlued);
 
 
   //gradient on the glued/global mesh

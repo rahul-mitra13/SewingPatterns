@@ -1696,7 +1696,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     int numWaleSingularities = 0;
     // int maxWaleSingularities = 5;
-    int topPairs = 10;
+    int topPairs = 8;
 
     int numPos = 0;
     int numNeg = 0;
@@ -3297,33 +3297,22 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     double maxDotProd = maximumDotProduct(globalGeometry, rotatedFaceGradients);
     HalfedgeData<double> gluedHeWeights = constructGluedHalfedgeWeights(globalGeometry, gluedGeometry, rotatedFaceGradients, maxDotProd);
 
-    //set the saddle loop constraints and homology constraints for the course direction
-    if (globalGeometry.mesh.nConnectedComponents() == 1){//only do this for global 3D meshes for now 
-        for(int i = 0; i < allSaddleLoops.size(); i++){
-            edgePathConstraints.push_back(std::make_pair(allSaddleLoops[i], 0.0));
-        }
-        //model.setHomologyGenerators(homologyGenerators);
+    //handle saddle loops in the intrinsic setting
+    for(int i = 0; i < allSaddleLoops.size(); i++){
+        edgePathConstraints.push_back(std::make_pair(allSaddleLoops[i], 0.0));
+    }
 
-        // //keep singularities away from saddle vertices 
-        // std::vector<Vertex> saddleVertices = getSaddleVertices(globalGeometry, globalTimeFunction);
-        // for (Vertex v : saddleVertices){
-        //     heatSourceVerts.push_back(gluedMesh.vertex(vertexMap[v.getIndex()]));
-        // }
-
-        //keep singualrities away from all saddle loops
-        for (int i = 0; i < allSaddleLoops.size(); i++){
-            std::vector<double> path = allSaddleLoops[i];
-            for (int j = 0; j < path.size(); j++){
-                if (std::fabs(path[j]) > 0){
-                    Edge e = gluedGeometry.mesh.edge(edgeMap[j]);
-                    heatSourceVerts.push_back(e.halfedge().tailVertex());
-                    heatSourceVerts.push_back(e.halfedge().tipVertex());
-                }
+    for (int i = 0; i < allSaddleLoops.size(); i++){
+        std::vector<double> path = allSaddleLoops[i];
+        for (int j = 0; j < path.size(); j++){
+            if (std::fabs(path[j]) > 0){
+                Edge e = gluedGeometry.mesh.edge(j);
+                heatSourceVerts.push_back(e.halfedge().tailVertex());
+                heatSourceVerts.push_back(e.halfedge().tipVertex());
             }
         }
-
-
     }
+    
 
     //solve the model without any singularities 
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
@@ -3819,6 +3808,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
         for (Face f : gluedMesh.faces()){
             //this is comparing to the non-normalized previous iterate 
             //how is it getting closer to unit norm?
+            double area = gluedGeometry.faceAreas[f];
             obj +=  ((gradU[f.getIndex()][0] - comparisonGrad[f.getIndex()][0]) * (gradU[f.getIndex()][0] - comparisonGrad[f.getIndex()][0])) 
                     + ((gradU[f.getIndex()][1] - comparisonGrad[f.getIndex()][1]) * (gradU[f.getIndex()][1] - comparisonGrad[f.getIndex()][1])) 
                     + ((gradU[f.getIndex()][2] - comparisonGrad[f.getIndex()][2]) * (gradU[f.getIndex()][2] - comparisonGrad[f.getIndex()][2]));  
@@ -4673,6 +4663,70 @@ std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geom
             // visualization (uncomment if you don't care)
             std::string network = "edge loop" + std::to_string(loopCounter++);
             registerCurveNetworkFromEdges(geometry, edgeLoop, network); 
+            //std::cout << "the size of loop " << i++ << "is: " << edgeLoop.size() << std::endl;
+            //std::cout << "the size of halfedge loop " << i++ << "is: " << halfedgeLoop.size() << std::endl;
+        }
+    }
+
+    return allSaddleLoops;
+}
+
+//the only function I ever need to care about
+//overloaded to handle intrinsic geometry
+std::vector<std::vector<double>> findAllSaddleLoops(IntrinsicGeometryInterface& geometry, const std::vector<Vertex> &saddleVertices, const VertexData<double>& timeFunc) {
+
+    std::vector<std::vector<double>>  allSaddleLoops;
+    
+    int loopCounter = 0;
+    // loop over all saddle vertices
+    for (const Vertex &v : saddleVertices) {
+        // skip all vertices that are not saddle points
+        //if (saddleVertices[v] != 1.0) {continue;}
+        // find the time function value at the saddle point
+        const double saddleValue = timeFunc[v];
+        // find all of the neighboring halfedge through which the isoline exits
+        const auto allNeighborHalfedges = findAllHalfedgesInSaddleLoop(v, timeFunc); 
+
+        // the set of all triangle strips per saddle vertex
+        std::vector<std::vector<Face>> allTriangleStripsPerVertex;
+        // iterate through all of the neighboring halfedges 
+        for (const Halfedge &rootHe : allNeighborHalfedges) {
+            const auto triangleStrip = findTriangleStripSaddleLoop(geometry, timeFunc, rootHe, saddleValue); 
+
+            // this code inserts a triangle strip if it is unique
+            bool stripAlreadyExists = false;
+            for (const auto &strip : allTriangleStripsPerVertex) {
+                if (triangleStrip.front() == strip.back() || 
+                        triangleStrip.back() == strip.front()) {
+                    stripAlreadyExists = true;
+                    break;
+                }
+            }
+            if (!stripAlreadyExists) {
+                allTriangleStripsPerVertex.push_back(triangleStrip);
+            }
+        }
+        int i = 0;
+        // by this point all of the unique triangle strips for this particular vertex will be added to the list  
+        for (const auto &strip : allTriangleStripsPerVertex) {
+            std::vector<double> saddleLoop(geometry.mesh.nEdges());
+            std::fill(saddleLoop.begin(), saddleLoop.end(), 0.0);
+            auto uniqueEdges = findUniqueEdgesInTriangleStrip(strip);
+            auto edgeLoop = chooseEdgeLoop(uniqueEdges, strip);
+            auto halfedgeLoop = chooseHalfEdgeLoop(uniqueEdges, strip);
+            // construct the output here
+            for (const Halfedge &he : halfedgeLoop) {
+                if (he.edge().halfedge() == he) {
+                    saddleLoop[he.edge().getIndex()] = 1.0;
+                }
+                else {
+                    saddleLoop[he.edge().getIndex()] = -1.0;
+                }
+            }
+            allSaddleLoops.push_back(saddleLoop);
+            // visualization (uncomment if you don't care)
+            //std::string network = "edge loop" + std::to_string(loopCounter++);
+            //registerCurveNetworkFromEdges(geometry, edgeLoop, network); 
             //std::cout << "the size of loop " << i++ << "is: " << edgeLoop.size() << std::endl;
             //std::cout << "the size of halfedge loop " << i++ << "is: " << halfedgeLoop.size() << std::endl;
         }

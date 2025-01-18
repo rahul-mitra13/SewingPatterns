@@ -300,6 +300,10 @@ std::vector<Vertex> getSaddleVertices(IntrinsicGeometryInterface& geometry, Vert
 //find all the saddle loops from the saddle vertex
 std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geometry, const std::vector<Vertex> &saddleVertices, const VertexData<double>& timeFunc);
 
+//the only function I ever need to care about
+//overloaded to handle intrinsic geometry
+std::vector<std::vector<double>> findAllSaddleLoops(IntrinsicGeometryInterface& geometry, const std::vector<Vertex> &saddleVertices, const VertexData<double>& timeFunc);
+
 
 //repair a knit graph vertex that's missing a connection
 std::vector<int> repairKnitGraphVertex();
