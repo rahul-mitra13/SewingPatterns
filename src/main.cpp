@@ -214,19 +214,19 @@ void showStripePatterns(){
   waleStripes -> setRadius(0.001);
   waleStripes -> setEnabled(false);
 
-  //globalPSMesh->addCornerScalarQuantity("wale stripe values", prepareCornerData(waleStripeValues));
+  globalPSMesh->addCornerScalarQuantity("wale stripe values", prepareCornerData(waleStripeValues));
 
-  // // Plot wale stripe values with offset (to debug knit graph)
-  // CornerData<double> waleStripeValuesWithOffset = waleStripeValues;
-  // for (Corner co : globalGeometry->mesh.corners())
-  //     waleStripeValuesWithOffset[co] -= walePeriod/4;
-  // std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValuesWithOffset, waleSingularFaces, walePeriod);
-  // waleStripes = polyscope::registerCurveNetwork("wale stripes with offset", positionsWale, edgesWale);
-  // waleStripes -> setRadius(0.001);
-  // waleStripes -> setEnabled(false);
+  // Plot wale stripe values with offset (to debug knit graph)
+  CornerData<double> waleStripeValuesWithOffset = waleStripeValues;
+  for (Corner co : globalGeometry->mesh.corners())
+      waleStripeValuesWithOffset[co] -= walePeriod/4;
+  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValuesWithOffset, waleSingularFaces, walePeriod);
+  waleStripes = polyscope::registerCurveNetwork("wale stripes with offset", positionsWale, edgesWale);
+  waleStripes -> setRadius(0.001);
+  waleStripes -> setEnabled(false);
 
 
-  // generate the knit graph
+  //generate the knit graph
   graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
                       courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
                       edgeMap);
@@ -338,8 +338,9 @@ int main(int argc, char **argv) {
   for (Edge e : globalMesh -> edges()){
     double length = norm(globalGeometry->vertexPositions[e.halfedge().tipVertex()] - globalGeometry->vertexPositions[e.halfedge().tailVertex()]);
     if (length > maxLength)
-      coursePeriod = 2.0 * length;//set the default length to twice the course period
+      maxLength = length;
   }
+  coursePeriod = 2.0 * maxLength;//set the default length to twice the course period
 
   // Parse stripe period, if available
   if (argc > 2) {

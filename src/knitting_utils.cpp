@@ -1696,7 +1696,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     int numWaleSingularities = 0;
     // int maxWaleSingularities = 5;
-    int topPairs = 10;
+    int topPairs = 30;
 
     int numPos = 0;
     int numNeg = 0;
@@ -3435,7 +3435,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (after subtracting)", edgeCurl);
     int numSingularities = 0;
     while(true){
-
         //finding edge singularity pairs by sampling time function isolines
         //return type is a a vector of tuples
         std::vector<std::tuple<std::pair<int, int>, double>> singEdgePairs = findEdgeSingularityPairsUsingTimeFunctionIsoVals(globalGeometry,  gluedGeometry, V, F, 
@@ -3545,6 +3544,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                                     " singularity insertions", uniquePos, uniqueEdges);
                 courseStripes -> setRadius(0.001);
                 courseStripes -> setEnabled(false);
+                
                 //update the gradients for the next round of the model 
                 //model.setFaceGradients(gradSigmaTilde);
                 //compute curl quantities without accounting for impulse function
@@ -3824,9 +3824,9 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
             //this is comparing to the non-normalized previous iterate 
             //how is it getting closer to unit norm?
             double area = gluedGeometry.faceAreas[f];
-            obj +=  ((gradU[f.getIndex()][0] - comparisonGrad[f.getIndex()][0]) * (gradU[f.getIndex()][0] - comparisonGrad[f.getIndex()][0])) 
+            obj +=  area * (((gradU[f.getIndex()][0] - comparisonGrad[f.getIndex()][0]) * (gradU[f.getIndex()][0] - comparisonGrad[f.getIndex()][0])) 
                     + ((gradU[f.getIndex()][1] - comparisonGrad[f.getIndex()][1]) * (gradU[f.getIndex()][1] - comparisonGrad[f.getIndex()][1])) 
-                    + ((gradU[f.getIndex()][2] - comparisonGrad[f.getIndex()][2]) * (gradU[f.getIndex()][2] - comparisonGrad[f.getIndex()][2]));  
+                    + ((gradU[f.getIndex()][2] - comparisonGrad[f.getIndex()][2]) * (gradU[f.getIndex()][2] - comparisonGrad[f.getIndex()][2])));  
         }
 
         model.setObjective(obj, GRB_MINIMIZE);

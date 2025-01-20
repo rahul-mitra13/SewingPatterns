@@ -97,6 +97,7 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
 
     //startVert, endVert are in the glued mesh setting 
     Vertex startVert, endVert;
+    Halfedge additionalStartHe, additionalEndHe;
 
     //don't take paths through singular edges 
     // gluedHeWeights[e1.halfedge()] = DBL_MAX;
@@ -147,8 +148,19 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
         return std::tie(toReturnGlobal, toReturnGlued);
     }
 
+    if (e1.halfedge().tipVertex() == startVert){
+        additionalStartHe = e1.halfedge().next().twin();
+    }
+    else{
+        additionalStartHe = e1.halfedge().twin().next().twin();
+    }
 
-
+    if (e2.halfedge().tipVertex() == endVert){
+        additionalEndHe = e2.halfedge().twin().next().next().twin();
+    }
+    else{
+        additionalEndHe = e2.halfedge().next().next().twin();
+    }
 
     // Search state: incoming halfedges to each vertex, once discovered
     std::unordered_map<Vertex, Halfedge> incomingHalfedge;
@@ -197,6 +209,12 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
                 walkV = prevHe.vertex();
             }
             std::reverse(std::begin(path), std::end(path));
+
+            //insert the additional halfedge at the start of the vector 
+            path.insert(path.begin(), additionalStartHe);
+            //insert the additional halfedge at the end of the vector 
+            path.push_back(additionalEndHe);
+        
             for (Halfedge he : path){
                 toReturnGlued[he.edge().getIndex()] = he.orientation() ? 1.0 : -1.0;
             }
