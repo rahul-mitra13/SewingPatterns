@@ -1696,7 +1696,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     int numWaleSingularities = 0;
     // int maxWaleSingularities = 5;
-    int topPairs = 30;
+    int topPairs = 10;
 
     int numPos = 0;
     int numNeg = 0;
@@ -2027,13 +2027,38 @@ std::vector<std::pair<int, int>> findWaleSingularityEdges(VertexPositionGeometry
     }
 
     
+    // for (auto &entry : curlToEdgeIndex){
+    //     if (globalGeometry.mesh.edge(entry.second).isBoundary()) continue;//don't place singularities on boundary edges
+    //     if (edgeCurl[entry.second] > 0) singularEdges.push_back(std::make_pair(entry.second, 1));
+    //     else singularEdges.push_back(std::make_pair(entry.second, -1));
+    //     numEdges++;
+    //     if (numEdges == topPairs) break;
+    // }
+
+    // NEW: we force to have half positive, half negative candidate edges
+    int nPos = 0, nNeg = 0; // number of positive and negative edge candidates
     for (auto &entry : curlToEdgeIndex){
         if (globalGeometry.mesh.edge(entry.second).isBoundary()) continue;//don't place singularities on boundary edges
-        if (edgeCurl[entry.second] > 0) singularEdges.push_back(std::make_pair(entry.second, 1));
-        else singularEdges.push_back(std::make_pair(entry.second, -1));
-        numEdges++;
+        if (nPos < topPairs/2 && edgeCurl[entry.second] > 0) {
+            singularEdges.push_back(std::make_pair(entry.second, 1));
+            nPos++;
+            numEdges++;
+        } 
+        if (nNeg < topPairs/2 && edgeCurl[entry.second] < 0) {
+            singularEdges.push_back(std::make_pair(entry.second, -1));
+            nNeg++;
+            numEdges++;
+        }
         if (numEdges == topPairs) break;
     }
+
+    H(singularEdges.size());
+
+    // // for (auto &s : singularEdges){
+    // //     std::cout << "singular edges = " << s.first << " " << s.second << std::endl;
+    // // }
+
+    // return singularEdges;
 
     // for (auto &s : singularEdges){
     //     std::cout << "singular edges = " << s.first << " " << s.second << std::endl;

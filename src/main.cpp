@@ -217,13 +217,13 @@ void showStripePatterns(){
   globalPSMesh->addCornerScalarQuantity("wale stripe values", prepareCornerData(waleStripeValues));
 
   // Plot wale stripe values with offset (to debug knit graph)
-  CornerData<double> waleStripeValuesWithOffset = waleStripeValues;
-  for (Corner co : globalGeometry->mesh.corners())
-      waleStripeValuesWithOffset[co] -= walePeriod/4;
-  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValuesWithOffset, waleSingularFaces, walePeriod);
-  waleStripes = polyscope::registerCurveNetwork("wale stripes with offset", positionsWale, edgesWale);
-  waleStripes -> setRadius(0.001);
-  waleStripes -> setEnabled(false);
+  // CornerData<double> waleStripeValuesWithOffset = waleStripeValues;
+  // for (Corner co : globalGeometry->mesh.corners())
+  //     waleStripeValuesWithOffset[co] -= walePeriod/4;
+  // std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValuesWithOffset, waleSingularFaces, walePeriod);
+  // waleStripes = polyscope::registerCurveNetwork("wale stripes with offset", positionsWale, edgesWale);
+  // waleStripes -> setRadius(0.001);
+  // waleStripes -> setEnabled(false);
 
 
   //generate the knit graph
