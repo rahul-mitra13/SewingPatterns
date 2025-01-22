@@ -3447,12 +3447,15 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         for (Vertex v : gluedMesh.vertices()){
             allDist[v] = std::max(allDist[v], 0.0);
         }
+        edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
+        psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertion (after subtracting w/o mask)", edgeCurl);
         allDistGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, allDist, vertexMap);
         //adjust with the Gaussian mask
         //have a hard mask in the course direction
         for (Vertex v : globalMesh.vertices()){
             //vertexCurl[v] = (1 - exp(-pow(allDistGlobal[v], 2.) / (2 * pow(period, 2)))) * vertexCurl[v];
             courseWeighting[v] = (allDistGlobal[v] > 2*period);
+            //courseWeighting[v] = (allDistGlobal[v] > period);//reduce the radius of the Gaussian (for the figure)
             vertexCurl[v] = courseWeighting[v] * vertexCurl[v];
         }
     }
@@ -3548,6 +3551,12 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 heatSourceVerts.push_back(gluedMesh.edge(edgeMap[singEdgePair.second]).halfedge().tipVertex());
                 edgeSingularities[globalMesh.edge(singEdgePair.first)] = 1.0;
                 edgeSingularities[globalMesh.edge(singEdgePair.second)] = -1.0;
+                //make a curve network to viz singular edges
+                std::vector<Vector3> singPos; 
+                std::vector<std::array<int, 2>> edges;
+                singPos.push_back(globalGeometry.vertexPositions[globalMesh.edge(singEdgePair.first).halfedge().tailVertex()]);
+                singPos.push_back(globalGeometry.vertexPositions[globalMesh.edge(singEdgePair.first).halfedge().tipVertex()]);
+                edges.push_back(std::array<int, 2>{0, 1});
                 //don't retake edges from another path
                 updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, gluedHeWeights);
                 psMesh.addEdgeScalarQuantity("path for " + std::to_string(numSingularities) + " singularity", globalPath);
@@ -3607,17 +3616,21 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 for (Vertex v : gluedMesh.vertices()){
                     allDist[v] = std::max(allDist[v], 0.0);
                 }
+                edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
+                psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertion (after subtracting w/o mask)", edgeCurl);
                 allDistGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, allDist, vertexMap);
                 //have a hard mask in the course direction
                 for (Vertex v : globalMesh.vertices()){
                     //vertexCurl[v] = (1 - exp(-pow(allDistGlobal[v], 2.) / (2 * pow(period, 2)))) * vertexCurl[v];
                     courseWeighting[v] = (allDistGlobal[v] > 2*period);
+                    //courseWeighting[v] = (allDistGlobal[v] > period);//reduce the radius of the Gaussian (for fig.)
                     vertexCurl[v] = courseWeighting[v] * vertexCurl[v];
                 }
                 psMesh.addVertexScalarQuantity("all distance", allDistGlobal);
                 edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
                 psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (after subtracting)", edgeCurl);
                 psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numSingularities) + " singularity insertion", edgeSingularities);
+                polyscope::registerCurveNetwork("edge singularities network after " + std::to_string(numSingularities) + " singularitiy insertion", singPos, edges);
                 break;
             }
         }
