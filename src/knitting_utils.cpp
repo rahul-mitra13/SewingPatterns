@@ -4778,7 +4778,7 @@ std::vector<std::vector<double>> findAllSaddleLoops(IntrinsicGeometryInterface& 
             }
             allSaddleLoops.push_back(saddleLoop);
             // visualization (uncomment if you don't care)
-            std::string network = "edge loop" + std::to_string(loopCounter++);
+            //std::string network = "edge loop" + std::to_string(loopCounter++);
             //registerCurveNetworkFromEdges(geometry, edgeLoop, network); 
             //std::cout << "the size of loop " << i++ << "is: " << edgeLoop.size() << std::endl;
             //std::cout << "the size of halfedge loop " << i++ << "is: " << halfedgeLoop.size() << std::endl;
