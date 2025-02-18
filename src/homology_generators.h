@@ -1,6 +1,5 @@
 #include "geometrycentral/surface/vertex_position_geometry.h"
 #include <vector>
-
 /*
  * Determines whether or not a halfedge is in the primal spanning tree
  */
