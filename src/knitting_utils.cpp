@@ -3380,6 +3380,39 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //std::cout << "distance from unit norm after " << std::to_string(numRuns - 1) << " singularity insertion " << newDistance << std::endl;
     //oldDistance = newDistance;
 
+
+    //---------------------Testing-------------------------//
+    //Attempting to find the center of distributions using Vector Heat Method
+    VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
+                                    globalTimeFunctionGradientsNormalized, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
+    psMesh.addVertexScalarQuantity("initial curl measure ", curlMeasure);
+    //now divide the measure into positive and negative 
+    VertexData<double> posMeasure(globalMesh, 0.0);
+    VertexData<double> negMeasure(globalMesh, 0.0);
+    for (Vertex v : globalMesh.vertices()){
+        if (curlMeasure[v] > 0){
+            posMeasure[v] = curlMeasure[v];
+        }
+        else negMeasure[v] = std::fabs(curlMeasure[v]);
+    }
+    psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
+    psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
+    std::unique_ptr<ManifoldSurfaceMesh> manifoldGlobalMesh = globalMesh.toManifoldMesh();
+    std::cout << "finding positive center..." << std::endl;
+    SurfacePoint posCenter = findCenter(*manifoldGlobalMesh, globalGeometry, posMeasure, 2);
+    std::cout << "finished finding positive center " << std::endl;
+    SurfacePoint negCenter = findCenter(*manifoldGlobalMesh, globalGeometry, negMeasure, 2);
+    Vector3 posCenterPoint = posCenter.interpolate(globalGeometry.inputVertexPositions);
+    std::vector<Vector3> centerPosCloud{posCenterPoint};
+    auto posPoint = polyscope::registerPointCloud("positve center", centerPosCloud);
+    posPoint->setPointRadius(5.);
+    Vector3 negCenterPoint = negCenter.interpolate(globalGeometry.inputVertexPositions);
+    std::vector<Vector3> centerNegCloud{negCenterPoint};
+    auto negPoint = polyscope::registerPointCloud("negative center", centerNegCloud);
+    negPoint->setPointRadius(5.);
+    //-------------------End of testing-------------------//
+
+    /** 
     //compute curl quantities without impulse function
     vertexCurl = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     gradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
@@ -3663,6 +3696,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     courseStripes -> setEnabled(false);
 
     std::cout << "Number of singularities inserted = " << numSingularities << std::endl;
+    */
+
     return std::tie(stripeValuesSigmaCourse, edgeSingularities);
 
 }
