@@ -3410,6 +3410,40 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<Vector3> centerNegCloud{negCenterPoint};
     auto negPoint = polyscope::registerPointCloud("negative center", centerNegCloud);
     negPoint->setPointRadius(5.);
+    double curlSum = 0.;
+    int numSings = 0.;
+    for (Vertex v : globalMesh.vertices()){ 
+        curlSum += std::fabs(curlMeasure[v]);
+    }
+    numSings = std::round(curlSum / period);
+    std::cout << "num sings = " << numSings << std::endl;
+    std::cout << "curl over entire mesh = " << curlSum << std::endl;
+    VoronoiOptions options = defaultVoronoiOptions;
+    options.nSites = 3;
+    options.computeDistributions = true;
+    VertexData<double> absCurlMeasure(globalMesh, 0);
+    for (Vertex v : globalMesh.vertices()){
+        absCurlMeasure[v] = std::fabs(curlMeasure[v]);
+    }
+    //options.initialDistribution = absCurlMeasure;
+    //Does this method work for meshes with boundary??
+    VoronoiResult voronoiCenters = computeGeodesicCentroidalVoronoiTessellation(*manifoldGlobalMesh, globalGeometry, options);
+    std::cout << "size of site locations = " << voronoiCenters.siteLocations.size() << std::endl;
+    std::cout << "size of site distributions = " << voronoiCenters.siteDistributions.size() << std::endl;
+    std::cout << "has distributions? = " << voronoiCenters.hasDistributions << std::endl;
+    std::vector<Vector3> centers;
+    for (int i = 0; i < voronoiCenters.siteLocations.size(); i++){
+       centers.push_back(voronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+    }
+    polyscope::registerPointCloud("voronoi sites", centers);
+    //running into some bug when calling site distributions
+    // for (size_t i = 0; i < voronoiCenters.siteDistributions.size(); i++){
+    //     //VertexData<double> func(*manifoldGlobalMesh);
+    //     //func = voronoiCenters.siteDistributions[i];
+    //     //std::cout << "size of func = " << func.size() << std::endl;
+    //     psMesh.addVertexScalarQuantity("site " + std::to_string(i), voronoiCenters.siteDistributions[i]);
+    // }
+
     //-------------------End of testing-------------------//
 
     /** 
