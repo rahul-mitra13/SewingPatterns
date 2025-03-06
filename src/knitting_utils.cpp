@@ -3419,8 +3419,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::cout << "num sings = " << numSings << std::endl;
     std::cout << "curl over entire mesh = " << curlSum << std::endl;
     VoronoiOptions options = defaultVoronoiOptions;
-    options.nSites = 3;
+    options.nSites = 10;
+    options.useDelaunay = false;
     options.computeDistributions = true;
+    options.iterations = 100;
     VertexData<double> absCurlMeasure(globalMesh, 0);
     for (Vertex v : globalMesh.vertices()){
         absCurlMeasure[v] = std::fabs(curlMeasure[v]);
@@ -3436,12 +3438,13 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
        centers.push_back(voronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
     }
     polyscope::registerPointCloud("voronoi sites", centers);
-    //running into some bug when calling site distributions
-    // for (size_t i = 0; i < voronoiCenters.siteDistributions.size(); i++){
+    // std::vector<VertexData<double>> siteDistributions = voronoiCenters.siteDistributions;
+    // //running into some bug when calling site distributions
+    // for (size_t i = 0; i < siteDistributions.size(); i++){
     //     //VertexData<double> func(*manifoldGlobalMesh);
     //     //func = voronoiCenters.siteDistributions[i];
     //     //std::cout << "size of func = " << func.size() << std::endl;
-    //     psMesh.addVertexScalarQuantity("site " + std::to_string(i), voronoiCenters.siteDistributions[i]);
+    //     psMesh.addVertexScalarQuantity("site " + std::to_string(i), siteDistributions[i]);
     // }
 
     //-------------------End of testing-------------------//

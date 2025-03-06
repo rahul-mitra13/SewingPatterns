@@ -73,6 +73,7 @@ else()
   message( FATAL_ERROR "Unrecognized compiler [${CMAKE_CXX_COMPILER_ID}]" )
 endif()
 
+
 # Find Eigen
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
@@ -96,6 +97,15 @@ find_package(GUROBI REQUIRED)
 #find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 find_package(PythonInterp 3)
 find_package(PythonLibs 3)
+
+# Find SuiteSparse installed via Homebrew
+# Manually locate SuiteSparse (if find_package does not work)
+# set(SUITESPARSE_INCLUDE_DIRS "/opt/homebrew/include" "/usr/local/include")
+# set(SUITESPARSE_LIBRARIES
+#     "-L/opt/homebrew/lib -lumfpack -lcholmod -lccolamd -lcolamd -lamd -lcamd -lsuitesparseconfig"
+# )
+
+# include_directories(${SUITESPARSE_INCLUDE_DIRS})
 
 include_directories(${GUROBI_INCLUDE_DIRS})
 include_directories(${PYTHON_INCLUDE_DIRS})
@@ -136,6 +146,9 @@ if(CXX)
                         debug ${GUROBI_CXX_DEBUG_LIBRARY})
 endif()
 
+#target_link_libraries(SewingPatterns ${SUITESPARSE_LIBRARIES})
+
+
 
 
 # Link settings
@@ -144,6 +157,12 @@ target_link_libraries(SewingPatterns
 			Eigen3::Eigen
 			geometry-central
 			${GUROBI_LIBRARY})
+
+# target_link_libraries(SewingPatterns
+# 			polyscope
+# 			${SUITESPARSE_LIBRARIES}
+# 			geometry-central
+# 			${GUROBI_LIBRARY})
 
 if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
   include(FeatureSummary)
