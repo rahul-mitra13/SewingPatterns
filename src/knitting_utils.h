@@ -36,6 +36,9 @@
 #include "gurobi_c++.h"
 #include "model.h"
 
+//timing information 
+#include <chrono>
+
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
