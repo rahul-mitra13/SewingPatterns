@@ -3398,18 +3398,17 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     std::unique_ptr<ManifoldSurfaceMesh> manifoldGlobalMesh = globalMesh.toManifoldMesh();
-    std::cout << "finding positive center..." << std::endl;
-    SurfacePoint posCenter = findCenter(*manifoldGlobalMesh, globalGeometry, posMeasure, 2);
-    std::cout << "finished finding positive center " << std::endl;
-    SurfacePoint negCenter = findCenter(*manifoldGlobalMesh, globalGeometry, negMeasure, 2);
-    Vector3 posCenterPoint = posCenter.interpolate(globalGeometry.inputVertexPositions);
-    std::vector<Vector3> centerPosCloud{posCenterPoint};
-    auto posPoint = polyscope::registerPointCloud("positve center", centerPosCloud);
-    posPoint->setPointRadius(5.);
-    Vector3 negCenterPoint = negCenter.interpolate(globalGeometry.inputVertexPositions);
-    std::vector<Vector3> centerNegCloud{negCenterPoint};
-    auto negPoint = polyscope::registerPointCloud("negative center", centerNegCloud);
-    negPoint->setPointRadius(5.);
+    
+    // SurfacePoint posCenter = findCenter(*manifoldGlobalMesh, globalGeometry, posMeasure, 2);
+    // SurfacePoint negCenter = findCenter(*manifoldGlobalMesh, globalGeometry, negMeasure, 2);
+    // Vector3 posCenterPoint = posCenter.interpolate(globalGeometry.inputVertexPositions);
+    // std::vector<Vector3> centerPosCloud{posCenterPoint};
+    // auto posPoint = polyscope::registerPointCloud("positve center", centerPosCloud);
+    // posPoint->setPointRadius(5.);
+    // Vector3 negCenterPoint = negCenter.interpolate(globalGeometry.inputVertexPositions);
+    // std::vector<Vector3> centerNegCloud{negCenterPoint};
+    // auto negPoint = polyscope::registerPointCloud("negative center", centerNegCloud);
+    // negPoint->setPointRadius(5.);
     double curlSum = 0.;
     int numSings = 0.;
     for (Vertex v : globalMesh.vertices()){ 
@@ -3419,17 +3418,17 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::cout << "num sings = " << numSings << std::endl;
     std::cout << "curl over entire mesh = " << curlSum << std::endl;
     VoronoiOptions options = defaultVoronoiOptions;
-    options.nSites = 10;
+    options.nSites = 5;
     options.useDelaunay = false;
     options.computeDistributions = true;
-    options.iterations = 100;
+    options.iterations = 20;
     VertexData<double> absCurlMeasure(globalMesh, 0);
     for (Vertex v : globalMesh.vertices()){
         absCurlMeasure[v] = std::fabs(curlMeasure[v]);
     }
     //options.initialDistribution = absCurlMeasure;
     //Does this method work for meshes with boundary??
-    VoronoiResult voronoiCenters = computeGeodesicCentroidalVoronoiTessellation(*manifoldGlobalMesh, globalGeometry, options);
+    VoronoiResult voronoiCenters = computeGeodesicCentroidalVoronoiTessellation(*manifoldGlobalMesh, globalGeometry, options, posMeasure, negMeasure);
     std::cout << "size of site locations = " << voronoiCenters.siteLocations.size() << std::endl;
     std::cout << "size of site distributions = " << voronoiCenters.siteDistributions.size() << std::endl;
     std::cout << "has distributions? = " << voronoiCenters.hasDistributions << std::endl;
