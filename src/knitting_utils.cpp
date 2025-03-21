@@ -3217,6 +3217,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<Vertex> heatSourceVerts;
     //sing edge pairs (max/min curl edges)
     std::vector<std::pair<int, int>> singEdgePairs;
+    //accepted sing edge pairs 
+    std::vector<std::pair<int, int>> acceptedSingEdgePairs;
     //make a map of singular edges we've used so far 
     //so we don't re-use edges
     std::map<int, int> usedEdges;
@@ -3510,11 +3512,14 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             Model testModel = model; 
             std::vector<std::pair<std::vector<double>, double>> testEdgePathConstraints = edgePathConstraints;
             std::vector<int> testEdgeIndices = edgeIndices;
+            std::vector<std::pair<int, int>> testAcceptedSingEdgePairs = acceptedSingEdgePairs;
             //try a new pair of singularities
             testEdgeIndices[edgeMap[singEdgePair.first]] = -1;//positive edge (sign gets flipped)
             testEdgeIndices[edgeMap[singEdgePair.second]] = 1;//negative edge (sign gets flipped)
+            testAcceptedSingEdgePairs.push_back(singEdgePair);
             std::tie(globalPath, gluedPath) = constructEdgePath(globalGeometry, gluedGeometry, globalMesh.edge(singEdgePair.first), globalMesh.edge(singEdgePair.second),
                                                                 vertexMap, edgeMap, globalTimeFunctionGradientsNormalized, gluedHeWeights, gluedSigmaTilde);
+            testModel.setSingularEdges(testAcceptedSingEdgePairs);
             testEdgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
             testModel.setEdgePathConstraints(testEdgePathConstraints);
             testModel.setEdgeIndices(testEdgeIndices);
@@ -3542,6 +3547,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 hashedUsedIsoVals[hashFloatQuantized(isoVal)] = 1;
                 numSingularities++;
                 //gotten to a valid pair of edge indices that improves the objective
+                //append to accepted singEdgePairs
+                acceptedSingEdgePairs.push_back(singEdgePair);
                 //pair of singular edges
                 edgeIndices[edgeMap[singEdgePair.first]] = -1;
                 edgeIndices[edgeMap[singEdgePair.second]] = 1;
@@ -3630,7 +3637,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
                 psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (after subtracting)", edgeCurl);
                 psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numSingularities) + " singularity insertion", edgeSingularities);
-                polyscope::registerCurveNetwork("edge singularities network after " + std::to_string(numSingularities) + " singularitiy insertion", singPos, edges);
+                //polyscope::registerCurveNetwork("edge singularities network after " + std::to_string(numSingularities) + " singularitiy insertion", singPos, edges);
                 break;
             }
         }
@@ -3687,7 +3694,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
     std::vector<std::array<double, 3>> comparisonGrad = gbModel.getFaceGradients();
     std::vector<std::vector<double>> homologyGenerators = gbModel.getHomologyGenerators();
 
-    std::cout << "size of homology generators = " << homologyGenerators.size() << std::endl;
+    std::cout << "size of singular edges = " << singularEdges.size() << std::endl;
     //require the face areas
     gluedGeometry.requireFaceAreas();
     //require edge lengths 
@@ -3778,6 +3785,58 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
             else{
                 model.addConstr(sigma[he.getIndex()] == -1.0 * sigma[he.twin().getIndex()]);
             }
+        }
+
+        //constraint: 
+        //equality constraint across singular edges 
+        for (std::pair<int, int> s : singularEdges){
+            Halfedge he1 = gluedMesh.edge(s.first).halfedge();
+            Halfedge he1Twin = he1.twin();
+            Halfedge he2 = gluedMesh.edge(s.second).halfedge();
+            Halfedge he2Twin = he2.twin();
+
+            Vector3 he1Vector = globalGeometry.vertexPositions[he1.tipVertex()] - globalGeometry.vertexPositions[he1.tailVertex()];
+            he1Vector = he1Vector.normalize();
+            Vector3 he1TwinVector = globalGeometry.vertexPositions[he1Twin.tipVertex()] - globalGeometry.vertexPositions[he1Twin.tailVertex()];
+            he1TwinVector = he1TwinVector.normalize();
+            Vector3 he2Vector = globalGeometry.vertexPositions[he2.tipVertex()] - globalGeometry.vertexPositions[he2.tailVertex()];
+            he2Vector = he2Vector.normalize();
+            Vector3 he2TwinVector = globalGeometry.vertexPositions[he2Twin.tipVertex()] - globalGeometry.vertexPositions[he2Twin.tailVertex()];
+            he2TwinVector = he2TwinVector.normalize();
+
+            //compute the average gradient across faces
+            Vector3 gradientVector1 = 0.5 * (Vector3{comparisonGrad[he1.face().getIndex()][0], comparisonGrad[he1.face().getIndex()][1], 
+                                                 comparisonGrad[he1.face().getIndex()][2]} + Vector3{comparisonGrad[he1Twin.face().getIndex()][0], comparisonGrad[he1Twin.face().getIndex()][1], 
+                                                 comparisonGrad[he1Twin.face().getIndex()][2]});
+            gradientVector1 = gradientVector1.normalize();
+            Vector3 gradientVector2 = 0.5 * (Vector3{comparisonGrad[he2.face().getIndex()][0], comparisonGrad[he2.face().getIndex()][1], 
+                                                 comparisonGrad[he2.face().getIndex()][2]} + Vector3{comparisonGrad[he2Twin.face().getIndex()][0], comparisonGrad[he2Twin.face().getIndex()][1], 
+                                                 comparisonGrad[he2Twin.face().getIndex()][2]});
+            gradientVector2 = gradientVector2.normalize();
+
+            if ((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2Vector, gradientVector2) > dot(he2TwinVector, gradientVector2))){
+                model.addConstr(sigma[he1.getIndex()] == sigma[he2.getIndex()]);
+                //model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.twin().getIndex()]);
+            }
+            else if((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2TwinVector, gradientVector2) > dot(he2Vector, gradientVector2))){
+                model.addConstr(sigma[he1.getIndex()] == sigma[he2.twin().getIndex()]);
+                //model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.twin().twin().getIndex()]);
+
+            }
+            else if((dot(he1TwinVector, gradientVector1) > dot(he1Vector, gradientVector1)) && (dot(he2Vector, gradientVector2) > dot(he2TwinVector, gradientVector2))){
+                model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.getIndex()]);
+                //model.addConstr(sigma[he1.twin().twin().getIndex()] == sigma[he2.twin().getIndex()]);
+            }
+            else if((dot(he1TwinVector, gradientVector1) > dot(he1Vector, gradientVector1)) && (dot(he2TwinVector, gradientVector2) > dot(he2Vector, gradientVector2))){
+                model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.twin().getIndex()]);
+                //model.addConstr(sigma[he1.twin().twin().getIndex()] == sigma[he2.twin().twin().getIndex()]);
+            }
+            
+
+
+            
+            //model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.twin().getIndex()]);
+
         }
 
         //constraint: add integer variables for homology generators

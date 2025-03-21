@@ -195,26 +195,26 @@ void showStripePatterns(){
   //find Knöppel singularities in the WALE DIRECTION 
   //just run Knoppel's algorithm on these models 
   //and then run our 1-form optimization with the singularities
-  CornerData<double> waleStripeValues;
-  EdgeData<double> waleSingularEdgesGlobal;
-  FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
-  std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
-                                                                    edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, timeFunctionGlued,
-                                                                    courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
-                                                                    courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
-                                                                    homologyGenerators);
-  // Store wale singular edges for rendering later
-  richData.addEdgeProperty("waleSingularEdges", waleSingularEdgesGlobal);
+  // CornerData<double> waleStripeValues;
+  // EdgeData<double> waleSingularEdgesGlobal;
+  // FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
+  // std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
+  //                                                                   edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, timeFunctionGlued,
+  //                                                                   courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
+  //                                                                   courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
+  //                                                                   homologyGenerators);
+  // // Store wale singular edges for rendering later
+  // richData.addEdgeProperty("waleSingularEdges", waleSingularEdgesGlobal);
 
-  richData.write("singularEdges.ply");
+  // richData.write("singularEdges.ply");
 
-  std::vector<Vector3> positionsWale;
-  std::vector<std::array<int, 2>> edgesWale;
-  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, walePeriod);
-  auto waleStripes = polyscope::registerCurveNetwork("wale stripes", positionsWale, edgesWale);
-  globalPSMesh -> addEdgeScalarQuantity("wale singularities", waleSingularEdgesGlobal);
-  waleStripes -> setRadius(0.001);
-  waleStripes -> setEnabled(false);
+  // std::vector<Vector3> positionsWale;
+  // std::vector<std::array<int, 2>> edgesWale;
+  // std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, walePeriod);
+  // auto waleStripes = polyscope::registerCurveNetwork("wale stripes", positionsWale, edgesWale);
+  // globalPSMesh -> addEdgeScalarQuantity("wale singularities", waleSingularEdgesGlobal);
+  // waleStripes -> setRadius(0.001);
+  // waleStripes -> setEnabled(false);
 
   // globalPSMesh->addCornerScalarQuantity("wale stripe values", prepareCornerData(waleStripeValues));
 
@@ -229,12 +229,12 @@ void showStripePatterns(){
 
 
   // generate the knit graph
-  graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
-                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-                      edgeMap);
-  graph.buildGraph();
+  // graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
+  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+  //                     edgeMap);
+  // graph.buildGraph();
 
-  graph.writeKnitGraphToTxtFile("model.obj");
+  // graph.writeKnitGraphToTxtFile("model.obj");
 
 
 }
