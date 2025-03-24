@@ -3428,7 +3428,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
     //options.initialDistribution = absCurlMeasure;
     //Does this method work for meshes with boundary??
-    VoronoiResult voronoiCenters = computeGeodesicCentroidalVoronoiTessellation(*manifoldGlobalMesh, globalGeometry, options, posMeasure, negMeasure);
+    VoronoiResult voronoiCenters = computeGeodesicCentroidalVoronoiTessellation(*manifoldGlobalMesh, globalGeometry, options, posMeasure);
     std::cout << "size of site locations = " << voronoiCenters.siteLocations.size() << std::endl;
     std::cout << "size of site distributions = " << voronoiCenters.siteDistributions.size() << std::endl;
     std::cout << "has distributions? = " << voronoiCenters.hasDistributions << std::endl;
@@ -3436,15 +3436,35 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     for (int i = 0; i < voronoiCenters.siteLocations.size(); i++){
        centers.push_back(voronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
     }
-    polyscope::registerPointCloud("voronoi sites", centers);
-    // std::vector<VertexData<double>> siteDistributions = voronoiCenters.siteDistributions;
-    // //running into some bug when calling site distributions
-    // for (size_t i = 0; i < siteDistributions.size(); i++){
-    //     //VertexData<double> func(*manifoldGlobalMesh);
-    //     //func = voronoiCenters.siteDistributions[i];
-    //     //std::cout << "size of func = " << func.size() << std::endl;
-    //     psMesh.addVertexScalarQuantity("site " + std::to_string(i), siteDistributions[i]);
-    // }
+    polyscope::registerPointCloud("positive voronoi sites", centers);
+    std::vector<VertexData<double>> siteDistributions = voronoiCenters.siteDistributions;
+    //running into some bug when calling site distributions
+    for (size_t i = 0; i < siteDistributions.size(); i++){
+        //VertexData<double> func(*manifoldGlobalMesh);
+        //func = voronoiCenters.siteDistributions[i];
+        //std::cout << "size of func = " << func.size() << std::endl;
+        psMesh.addVertexScalarQuantity("site distribution " + std::to_string(i), siteDistributions[i]);
+    }
+
+    std::cout << "number of steps = " << voronoiCenters.steps[0].size() << std::endl;
+    for (size_t i = 0; i < siteDistributions.size(); i++){
+        std::vector<Vector3> stepsTaken;
+        std::vector<SurfacePoint> steps = voronoiCenters.steps[i];
+        for (size_t j = 0; j < steps.size(); j++){
+            stepsTaken.push_back(steps[j].interpolate(globalGeometry.vertexPositions));
+        }
+        for (size_t k = 0; k < stepsTaken.size(); k++){
+            polyscope::registerPointCloud("pos site: " + std::to_string(i) + ", step: " + std::to_string(k), std::vector<Vector3>{stepsTaken[k]});
+        }
+        //polyscope::registerPointCloud("steps taken", stepsTaken);
+    }
+
+    voronoiCenters = computeGeodesicCentroidalVoronoiTessellation(*manifoldGlobalMesh, globalGeometry, options, negMeasure);
+    centers.clear();
+    for (int i = 0; i < voronoiCenters.siteLocations.size(); i++){
+       centers.push_back(voronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+    }
+    polyscope::registerPointCloud("negative voronoi sites", centers);
 
     //-------------------End of testing-------------------//
 
