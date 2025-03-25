@@ -3398,9 +3398,11 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     //debugging on a simple square
     for (Vertex v : globalMesh.vertices()){
-        //if (globalGeometry.vertexPositions[v].z < 0 && globalGeometry.vertexPositions[v].x < 0) posMeasure[v] = 1.0;
-        //posMeasure[v] = std::fabs(globalGeometry.vertexPositions[v].x);
-        posMeasure[v] = globalTimeFunction[v];
+        if (globalGeometry.vertexPositions[v].z < 0 && globalGeometry.vertexPositions[v].x < 0) posMeasure[v] = 1.0;
+        // posMeasure[v] = std::fabs(globalGeometry.vertexPositions[v].x);
+        // posMeasure[v] = globalTimeFunction[v];
+        // posMeasure[v] = globalGeometry.vertexPositions[v].x * globalGeometry.vertexPositions[v].x;
+        // posMeasure[v] = std::exp(globalGeometry.vertexPositions[v].x);
     }
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
@@ -3425,7 +3427,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::cout << "num sings = " << numSings << std::endl;
     std::cout << "curl over entire mesh = " << curlSum << std::endl;
     VoronoiOptions options = defaultVoronoiOptions;
-    options.nSites = 20;
+    options.nSites = 2;
     options.useDelaunay = false;
     options.computeDistributions = true;
     options.iterations = 50;
@@ -3445,14 +3447,21 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
     polyscope::registerPointCloud("positive voronoi sites", centers);
     std::vector<VertexData<double>> siteDistributions = voronoiCenters.siteDistributions;
+    VertexData<double> masses(globalMesh, 0);
     //running into some bug when calling site distributions
     for (size_t i = 0; i < siteDistributions.size(); i++){
-        //VertexData<double> func(*manifoldGlobalMesh);
-        //func = voronoiCenters.siteDistributions[i];
-        //std::cout << "size of func = " << func.size() << std::endl;
+        double mass = 0;
+        for (Vertex v : globalMesh.vertices()){
+            if (std::fabs(siteDistributions[i][v]) > 1e-8){
+                mass += siteDistributions[i][v];
+            }
+        }
+        
+        std::cout << "mass at site " << i << " = " << mass << std::endl;
         psMesh.addVertexScalarQuantity("site distribution " + std::to_string(i), siteDistributions[i]);
     }
 
+    psMesh.addVertexScalarQuantity("masses", masses);
     std::cout << "number of steps = " << voronoiCenters.steps[0].size() << std::endl;
     // for (size_t i = 0; i < siteDistributions.size(); i++){
     //     std::vector<Vector3> stepsTaken;
