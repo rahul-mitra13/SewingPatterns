@@ -889,6 +889,17 @@ std::vector<double> prepareCornerData(CornerData<double> cornerData) {
   return preparedData;
 }
 
+std::vector<double> prepareHalfedgeData(HalfedgeData<double> halfedgeData) {
+  std::vector<double> preparedData;
+  for (Face f : halfedgeData.getMesh()->faces()){
+    if (f.isBoundaryLoop()) continue;
+    for (Halfedge he : f.adjacentHalfedges()){
+      preparedData.push_back(halfedgeData[he]);
+    }
+  }
+  return preparedData;
+}
+
 std::vector<int> roundWithSum(std::vector<double> y, int sum) {
 
     std::vector<int> res(y.size());

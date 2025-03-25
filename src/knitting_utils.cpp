@@ -3578,6 +3578,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 courseOneFormGrad = gradSigmaTilde;
                 std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
                 psMesh.addCornerScalarQuantity("stripeValuesSigmaCourse after " + std::to_string(numRuns-1) + " runs", prepareCornerData(stripeValuesSigmaCourse));
+                psMesh.addHalfedgeScalarQuantity("sigma values after " + std::to_string(numRuns-1) + " runs", gluedSigmaTilde);
                 std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
                                                 edgeMap, components);
                 //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
@@ -3814,28 +3815,19 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                                                  comparisonGrad[he2Twin.face().getIndex()][2]});
             gradientVector2 = gradientVector2.normalize();
 
+            //something going wrong in these constraints? 
             if ((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2Vector, gradientVector2) > dot(he2TwinVector, gradientVector2))){
-                model.addConstr(sigma[he1.getIndex()] == sigma[he2.getIndex()]);
-                //model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.twin().getIndex()]);
-            }
-            else if((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2TwinVector, gradientVector2) > dot(he2Vector, gradientVector2))){
                 model.addConstr(sigma[he1.getIndex()] == sigma[he2.twin().getIndex()]);
-                //model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.twin().twin().getIndex()]);
-
+            }
+            else if ((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2TwinVector, gradientVector2) > dot(he2Vector, gradientVector2))){
+                model.addConstr(sigma[he1.getIndex()] == sigma[he2.getIndex()]);
             }
             else if((dot(he1TwinVector, gradientVector1) > dot(he1Vector, gradientVector1)) && (dot(he2Vector, gradientVector2) > dot(he2TwinVector, gradientVector2))){
-                model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.getIndex()]);
-                //model.addConstr(sigma[he1.twin().twin().getIndex()] == sigma[he2.twin().getIndex()]);
+                model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.twin().getIndex()]);
             }
             else if((dot(he1TwinVector, gradientVector1) > dot(he1Vector, gradientVector1)) && (dot(he2TwinVector, gradientVector2) > dot(he2Vector, gradientVector2))){
-                model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.twin().getIndex()]);
-                //model.addConstr(sigma[he1.twin().twin().getIndex()] == sigma[he2.twin().twin().getIndex()]);
+                model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.getIndex()]);
             }
-            
-
-
-            
-            //model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.twin().getIndex()]);
 
         }
 

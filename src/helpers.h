@@ -254,6 +254,8 @@ std::vector<std::vector<int>> findConnectedComponents(EdgeLengthGeometry& gluedG
 // just call it and feed the output to addCornerScalarQuantity.
 std::vector<double> prepareCornerData(CornerData<double> cornerData);
 
+std::vector<double> prepareHalfedgeData(HalfedgeData<double> halfedgeData);
+
 // A Union Find data structure
 // We use it for the vertex mappings in the glued mesh.
 class UF {
