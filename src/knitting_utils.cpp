@@ -3389,11 +3389,18 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //now divide the measure into positive and negative 
     VertexData<double> posMeasure(globalMesh, 0.0);
     VertexData<double> negMeasure(globalMesh, 0.0);
+    // for (Vertex v : globalMesh.vertices()){
+    //     if (curlMeasure[v] > 0){
+    //         posMeasure[v] = curlMeasure[v];
+    //     }
+    //     else negMeasure[v] = std::fabs(curlMeasure[v]);
+    // }
+
+    //debugging on a simple square
     for (Vertex v : globalMesh.vertices()){
-        if (curlMeasure[v] > 0){
-            posMeasure[v] = curlMeasure[v];
-        }
-        else negMeasure[v] = std::fabs(curlMeasure[v]);
+        //if (globalGeometry.vertexPositions[v].z < 0 && globalGeometry.vertexPositions[v].x < 0) posMeasure[v] = 1.0;
+        //posMeasure[v] = std::fabs(globalGeometry.vertexPositions[v].x);
+        posMeasure[v] = globalTimeFunction[v];
     }
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
@@ -3447,24 +3454,24 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
 
     std::cout << "number of steps = " << voronoiCenters.steps[0].size() << std::endl;
-    for (size_t i = 0; i < siteDistributions.size(); i++){
-        std::vector<Vector3> stepsTaken;
-        std::vector<SurfacePoint> steps = voronoiCenters.steps[i];
-        for (size_t j = 0; j < steps.size(); j++){
-            stepsTaken.push_back(steps[j].interpolate(globalGeometry.vertexPositions));
-        }
-        for (size_t k = 0; k < stepsTaken.size(); k++){
-            polyscope::registerPointCloud("pos site: " + std::to_string(i) + ", step: " + std::to_string(k), std::vector<Vector3>{stepsTaken[k]});
-        }
-        //polyscope::registerPointCloud("steps taken", stepsTaken);
-    }
+    // for (size_t i = 0; i < siteDistributions.size(); i++){
+    //     std::vector<Vector3> stepsTaken;
+    //     std::vector<SurfacePoint> steps = voronoiCenters.steps[i];
+    //     for (size_t j = 0; j < steps.size(); j++){
+    //         stepsTaken.push_back(steps[j].interpolate(globalGeometry.vertexPositions));
+    //     }
+    //     for (size_t k = 0; k < stepsTaken.size(); k++){
+    //         polyscope::registerPointCloud("pos site: " + std::to_string(i) + ", step: " + std::to_string(k), std::vector<Vector3>{stepsTaken[k]});
+    //     }
+    //     //polyscope::registerPointCloud("steps taken", stepsTaken);
+    // }
 
-    voronoiCenters = computeGeodesicCentroidalVoronoiTessellation(*manifoldGlobalMesh, globalGeometry, options, negMeasure);
-    centers.clear();
-    for (int i = 0; i < voronoiCenters.siteLocations.size(); i++){
-       centers.push_back(voronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-    }
-    polyscope::registerPointCloud("negative voronoi sites", centers);
+    // voronoiCenters = computeGeodesicCentroidalVoronoiTessellation(*manifoldGlobalMesh, globalGeometry, options, negMeasure);
+    // centers.clear();
+    // for (int i = 0; i < voronoiCenters.siteLocations.size(); i++){
+    //    centers.push_back(voronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+    // }
+    // polyscope::registerPointCloud("negative voronoi sites", centers);
 
     //-------------------End of testing-------------------//
 
