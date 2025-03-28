@@ -3817,28 +3817,48 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
 
             //something going wrong in these constraints? 
             if ((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2Vector, gradientVector2) > dot(he2TwinVector, gradientVector2))){
+                //add constraints on singular edges 
                 model.addConstr(sigma[he1.getIndex()] == sigma[he2.twin().getIndex()]);
-                //add sign constaints 
-                // model.addConstr(sigma[he1.twin().getIndex()] >= 0);
-                // model.addConstr(sigma[he2.getIndex()] <= 0);
+                model.addConstr(sigma[he1.getIndex()] >= sigma[he1.twin().getIndex()]);
+                model.addConstr(sigma[he2.twin().getIndex()] <= sigma[he2.getIndex()]);
+                //add sign constraints for the rest of the halfedges on the face
+                model.addConstr(sigma[he1.next().getIndex()] >= 0.);
+                model.addConstr(sigma[he1.next().next().getIndex()] >= 0.);
+                model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
+                model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
             }
             else if ((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2TwinVector, gradientVector2) > dot(he2Vector, gradientVector2))){
+                //add constraints on singular edges
                 model.addConstr(sigma[he1.getIndex()] == sigma[he2.getIndex()]);
-                //add sign constraint 
-                // model.addConstr(sigma[he1.twin().getIndex()] >= 0);
-                // model.addConstr(sigma[he2.twin().getIndex()] <= 0);
+                model.addConstr(sigma[he1.getIndex()] >= sigma[he1.twin().getIndex()]);
+                model.addConstr(sigma[he2.getIndex()] <= sigma[he2.twin().getIndex()]);
+                //add sign constraints for the rest of the halfedges on the face 
+                model.addConstr(sigma[he1.next().getIndex()] >= 0.);
+                model.addConstr(sigma[he1.next().next().getIndex()] >= 0.);
+                model.addConstr(sigma[he2.next().getIndex()] <= 0.);
+                model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
             }
             else if((dot(he1TwinVector, gradientVector1) > dot(he1Vector, gradientVector1)) && (dot(he2Vector, gradientVector2) > dot(he2TwinVector, gradientVector2))){
+                //add constraints on singular edges
                 model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.twin().getIndex()]);
-                //add sign constraint 
-                // model.addConstr(sigma[he1.getIndex()] >= 0);
-                // model.addConstr(sigma[he2.getIndex()] <= 0);
+                model.addConstr(sigma[he1.twin().getIndex()] >= sigma[he1.getIndex()]);
+                model.addConstr(sigma[he2.twin().getIndex()] <= sigma[he2.getIndex()]);
+                //add sign constraints for the rest of the halfedges on the face
+                model.addConstr(sigma[he1.twin().next().getIndex()] >= 0.);
+                model.addConstr(sigma[he1.twin().next().next().getIndex()] >= 0.);
+                model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
+                model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
             }
             else if((dot(he1TwinVector, gradientVector1) > dot(he1Vector, gradientVector1)) && (dot(he2TwinVector, gradientVector2) > dot(he2Vector, gradientVector2))){
+                //add constraints on singular edges
                 model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.getIndex()]);
-                //add sign constraint 
-                // model.addConstr(sigma[he1.getIndex()] >= 0);
-                // model.addConstr(sigma[he2.twin().getIndex()] <= 0);
+                model.addConstr(sigma[he1.twin().getIndex()] >= sigma[he1.getIndex()]);
+                model.addConstr(sigma[he2.getIndex()] <= sigma[he2.twin().getIndex()]);
+                //add sign constraints for the rest of the halfedges on the face
+                model.addConstr(sigma[he1.twin().next().getIndex()] >= 0.);
+                model.addConstr(sigma[he1.twin().next().next().getIndex()] >= 0.);
+                model.addConstr(sigma[he2.next().getIndex()] <= 0.);
+                model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
             }
 
         }
