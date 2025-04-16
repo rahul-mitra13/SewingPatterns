@@ -83,37 +83,38 @@ HalfedgeData<double> constructGluedHalfedgeWeights(VertexPositionGeometry& globa
     return heWeights;
 }
 
-//construct an edge path between two vertices 
-//e1, e2 are in the global setting 
-std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Edge e1, Edge e2, 
+//construct an edge path between two vertices
+//e1, e2 are in the global setting
+std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Edge e1, Edge e2,
                                         std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, FaceData<Vector3>& globalFaceGradients, HalfedgeData<double>& gluedHeWeights,
                                         HalfedgeData<double>& gluedSigmaTilde){
-    
+
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
 
     std::vector<double> toReturnGlued(gluedMesh.nEdges(), 0.0);
     std::vector<double> toReturnGlobal(globalMesh.nEdges(), 0.0);
 
-    //startVert, endVert are in the glued mesh setting 
+    //startVert, endVert are in the glued mesh setting
     Vertex startVert, endVert;
+    Halfedge additionalStartHe, additionalEndHe;
 
-    //don't take paths through singular edges 
+    //don't take paths through singular edges
     // gluedHeWeights[e1.halfedge()] = DBL_MAX;
     // gluedHeWeights[e1.halfedge().twin()] = DBL_MAX;
     // gluedHeWeights[e2.halfedge()] = DBL_MAX;
     // gluedHeWeights[e2.halfedge().twin()] = DBL_MAX;
 
-    if (dot((globalGeometry.vertexPositions[e1.halfedge().tipVertex()] - globalGeometry.vertexPositions[e1.halfedge().tailVertex()]).normalize(), 
-            globalFaceGradients[e1.halfedge().face()]) > dot((globalGeometry.vertexPositions[e1.halfedge().twin().tipVertex()] - globalGeometry.vertexPositions[e1.halfedge().twin().tailVertex()]).normalize(), 
+    if (dot((globalGeometry.vertexPositions[e1.halfedge().tipVertex()] - globalGeometry.vertexPositions[e1.halfedge().tailVertex()]).normalize(),
+            globalFaceGradients[e1.halfedge().face()]) > dot((globalGeometry.vertexPositions[e1.halfedge().twin().tipVertex()] - globalGeometry.vertexPositions[e1.halfedge().twin().tailVertex()]).normalize(),
             globalFaceGradients[e1.halfedge().twin().face()])){
-        
+
         if (gluedSigmaTilde[e1.halfedge()] < gluedSigmaTilde[e1.halfedge().twin()]){
             std::cout << "something went wrong " << std::endl;
             //exit(1);
         }
         startVert = gluedMesh.vertex(vertexMap[e1.halfedge().tipVertex().getIndex()]);
-        
+
     }
     else{
         if (gluedSigmaTilde[e1.halfedge().twin()] < gluedSigmaTilde[e1.halfedge()]){
@@ -123,7 +124,7 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
         startVert = gluedMesh.vertex(vertexMap[e1.halfedge().twin().tipVertex().getIndex()]);
     }
 
-    if (dot((globalGeometry.vertexPositions[e2.halfedge().tipVertex()] - globalGeometry.vertexPositions[e2.halfedge().tailVertex()]).normalize(), 
+    if (dot((globalGeometry.vertexPositions[e2.halfedge().tipVertex()] - globalGeometry.vertexPositions[e2.halfedge().tailVertex()]).normalize(),
             globalFaceGradients[e2.halfedge().face()]) > dot((globalGeometry.vertexPositions[e2.halfedge().twin().tipVertex()] - globalGeometry.vertexPositions[e2.halfedge().twin().tailVertex()]).normalize(),
             globalFaceGradients[e2.halfedge().twin().face()])){
         if (gluedSigmaTilde[e2.halfedge()] < gluedSigmaTilde[e2.halfedge().twin()]){
@@ -131,12 +132,12 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
             //exit(1);
         }
         std::cout << "things are okay!! " << std::endl;
-        endVert = gluedMesh.vertex(vertexMap[e2.halfedge().tipVertex().getIndex()]);    
+        endVert = gluedMesh.vertex(vertexMap[e2.halfedge().tipVertex().getIndex()]);
     }
     else{
         if (gluedSigmaTilde[e2.halfedge().twin()] < gluedSigmaTilde[e2.halfedge()]){
             std::cout << "something went wrong " << std::endl;
-            //makexit(1);
+            //exit(1);
         }
         std::cout << "things are okay!! " << std::endl;
         endVert = gluedMesh.vertex(vertexMap[e2.halfedge().twin().tipVertex().getIndex()]);
@@ -147,8 +148,19 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
         return std::tie(toReturnGlobal, toReturnGlued);
     }
 
+    if (e1.halfedge().tipVertex() == startVert){
+        additionalStartHe = e1.halfedge().next().twin();
+    }
+    else{
+        additionalStartHe = e1.halfedge().twin().next().twin();
+    }
 
-
+    if (e2.halfedge().tipVertex() == endVert){
+        additionalEndHe = e2.halfedge().twin().next().next().twin();
+    }
+    else{
+        additionalEndHe = e2.halfedge().next().next().twin();
+    }
 
     // Search state: incoming halfedges to each vertex, once discovered
     std::unordered_map<Vertex, Halfedge> incomingHalfedge;
@@ -197,6 +209,12 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
                 walkV = prevHe.vertex();
             }
             std::reverse(std::begin(path), std::end(path));
+
+            //insert the additional halfedge at the start of the vector
+            path.insert(path.begin(), additionalStartHe);
+            //insert the additional halfedge at the end of the vector
+            path.push_back(additionalEndHe);
+
             for (Halfedge he : path){
                 toReturnGlued[he.edge().getIndex()] = he.orientation() ? 1.0 : -1.0;
             }

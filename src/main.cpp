@@ -82,10 +82,12 @@ KnitGraph graph;
 
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
+
+  H(coursePeriod);
   
   //set the wale period 
-  //walePeriod = ((1.0/1.6) * coursePeriod);
-  walePeriod = 1.6 * coursePeriod;
+  walePeriod = ((1.0/1.6) * coursePeriod); // rendering setting
+  // walePeriod = 1.0 * coursePeriod; // knitting setting
   //time function on the glued mesh 
   VertexData<double> timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
   //time function on the global mesh 
@@ -146,52 +148,123 @@ void showStripePatterns(){
   }
   globalPSMesh -> addFaceVectorQuantity("normalized time function gradient", timeFunctionGradientGlobalNormalized);
 
+  // Compute intrinsic time function gradient
+  gluedELG->requireEdgeLengths();
+  FaceData<Vector2> timeFunctionGradientIntrinsic = computeTimeFunctionFaceGradIntrinsic(*gluedELG, timeFunctionGlued);
+  for (Face f : gluedELG->mesh.faces()) timeFunctionGradientIntrinsic[f] = timeFunctionGradientIntrinsic[f].normalize();
+  VertexData<double> timeFunctionAligned = computeTimeFunctionAligned(*gluedELG, globalBdyConditions, timeFunctionGradientIntrinsic);
+  VertexData<double> timeFunctionAlignedGlobal = convertGluedToGlobalVertexFunction(*globalGeometry, *gluedELG, timeFunctionAligned, vertexMap);
+  globalPSMesh->addVertexScalarQuantity("time function aligned", timeFunctionAlignedGlobal)->setEnabled(false);
+
   G = grad;
 
-  //-------iteratively find course stripes and course singularities----------//
+  //-------iteratively find COURSE stripes and course singularities----------//
+
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
   EdgeData<double> courseSingularEdgesGlobal(globalGeometry -> mesh);
   FaceData<Vector3> courseOneFormGrad(globalGeometry -> mesh);
-  std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
-                                                                    timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
-                                                                    globalBdyConditions, coursePeriod, V, F, G, courseOneFormGrad, gluedOneRingMap, 
-                                                                    allSaddleLoops, homologyGenerators);
 
+  std::string courseDataFile;
+  courseDataFile = "../data/fertility/courseData.ply";
+
+  if (courseDataFile.size() > 0) { // if a file is specified, load it
+    RichSurfaceMeshData courseData(globalGeometry->mesh, courseDataFile);
+    courseStripeValues = courseData.getCornerProperty<double>("courseStripeValues");
+    courseSingularEdgesGlobal = courseData.getEdgeProperty<double>("courseSingularEdges");
+  } else {
+    std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionAlignedGlobal,
+                                                                      timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
+                                                                      globalBdyConditions, coursePeriod, V, F, G, courseOneFormGrad, gluedOneRingMap, 
+                                                                      allSaddleLoops, homologyGenerators);
+    RichSurfaceMeshData courseData(globalGeometry->mesh);
+    courseData.addCornerProperty("courseStripeValues", courseStripeValues);
+    courseData.addEdgeProperty("courseSingularEdges", courseSingularEdgesGlobal);
+    courseData.write("courseData.ply");
+  }
   
-  globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
-  // Store course singular edges for rendering later
+  // Store course singular edges for rendering later (Rahul's code)
   RichSurfaceMeshData richData(globalGeometry->mesh);
   richData.addMeshConnectivity();
   richData.addGeometry(*globalGeometry);
   richData.addEdgeProperty("courseSingularEdge", courseSingularEdgesGlobal);
 
+  globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
 
-  // // FaceData<int> stripeIndicesSigmaCourse(*globalMesh, 0);
-  // // std::vector<Vector3> positionsCourse;
-  // // std::vector<std::array<int, 2>> edgesCourse;
-  // // std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, courseStripeValues, stripeIndicesSigmaCourse, coursePeriod);
-  // // auto courseStripes = polyscope::registerCurveNetwork("final course stripes ", positionsCourse, edgesCourse);
-  // // courseStripes -> setRadius(0.001);
-  // // courseStripes -> setEnabled(false);
+  // Draw course singular edges
+  std::vector<Vector3> singularEdgePointsPos;
+  std::vector<Vector3> singularEdgePointsNeg;
+  std::vector<std::array<int,2>> singularEdgesPos;
+  std::vector<std::array<int,2>> singularEdgesNeg;
+  for (Edge e : globalMesh->edges()) if (courseSingularEdgesGlobal[e] != 0) {
+      if (courseSingularEdgesGlobal[e] > 0) {
+        singularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
+        singularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
+        singularEdgesPos.push_back({(int)singularEdgePointsPos.size()-2, (int)singularEdgePointsPos.size()-1});
+      } else {
+        singularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
+        singularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
+        singularEdgesNeg.push_back({(int)singularEdgePointsNeg.size()-2, (int)singularEdgePointsNeg.size()-1});
+      }
+  }
+  polyscope::registerCurveNetwork("course singular edges (+1)", singularEdgePointsPos, singularEdgesPos)->setRadius(0.003)->setColor({1,0,0})->setEnabled(false);
+  polyscope::registerCurveNetwork("course singular edges (-1)", singularEdgePointsNeg, singularEdgesNeg)->setRadius(0.003)->setColor({0,0,1})->setEnabled(false);
 
-  polyscope::show();
 
-  // // //WALE STRIPES
+  FaceData<int> stripeIndicesSigmaCourse(*globalMesh, 0);
+  std::vector<Vector3> positionsCourse;
+  std::vector<std::array<int, 2>> edgesCourse;
+  // std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, courseStripeValues, stripeIndicesSigmaCourse, coursePeriod);
+
+  std::unordered_map<size_t, std::vector<PolyLinePoint>> components; // don't really need this
+  std::tie(positionsCourse, edgesCourse) = findStripeConnectedComponents(*globalGeometry, *gluedELG, courseStripeValues, stripeIndicesSigmaCourse, coursePeriod, edgeMap, components);
+  auto courseStripes = polyscope::registerCurveNetwork("course stripes ", positionsCourse, edgesCourse)->setRadius(0.001)->setEnabled(false);
+  globalPSMesh->addCornerScalarQuantity("courseStripeValues", prepareCornerData(courseStripeValues));
+
+  // Plot stripe values with offset (to debug knit graph)
+  CornerData<double> courseStripeValuesWithOffset(courseStripeValues);
+  for (Corner co : globalMesh->corners())
+      courseStripeValuesWithOffset[co] -= coursePeriod/4;
+  std::tie(positionsCourse, edgesCourse) = findStripeConnectedComponents(*globalGeometry, *gluedELG, courseStripeValuesWithOffset, stripeIndicesSigmaCourse, coursePeriod, edgeMap, components);
+  //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
+  polyscope::registerCurveNetwork("course stripes with offset", positionsCourse, edgesCourse)->setRadius(0.002)->setColor({50.0/255, 205.0/255, 50.0/255})->setEnabled(false);
+
+  // polyscope::show();
+
+  //-------iteratively find WALE stripes and course singularities----------//
+
   //find Knöppel singularities in the WALE DIRECTION 
   //just run Knoppel's algorithm on these models 
   //and then run our 1-form optimization with the singularities
   CornerData<double> waleStripeValues;
   EdgeData<double> waleSingularEdgesGlobal;
   FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
-  std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
-                                                                    edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, timeFunctionGlued,
-                                                                    courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
-                                                                    courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
-                                                                    homologyGenerators);
-  // Store wale singular edges for rendering later
-  richData.addEdgeProperty("waleSingularEdges", waleSingularEdgesGlobal);
 
-  richData.write("singularEdges.ply");
+  std::string waleDataFile;
+  // waleDataFile = "bobWaleData10pairs.ply";
+  // waleDataFile = "bobPeriod2.0/waleData.ply";
+  waleDataFile = "../data/fertility/waleData.ply";
+
+  if (waleDataFile.size() > 0) { // if a file is specified, load it
+    RichSurfaceMeshData waleData(globalGeometry->mesh, waleDataFile);
+    waleStripeValues = waleData.getCornerProperty<double>("waleStripeValues");
+    waleSingularEdgesGlobal = waleData.getEdgeProperty<double>("waleSingularEdges");
+  } else {
+
+    std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
+                                                                      edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, timeFunctionGlued,
+                                                                      courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
+                                                                      courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
+                                                                      homologyGenerators);
+
+    RichSurfaceMeshData waleData(globalGeometry->mesh);
+    waleData.addEdgeProperty("waleSingularEdges", waleSingularEdgesGlobal);
+    waleData.addCornerProperty("waleStripeValues", waleStripeValues);
+    waleData.write("waleData.ply");
+  }
+
+  // Store wale singular edges for rendering later (Rahul's stuff)
+  richData.addEdgeProperty("waleSingularEdges", waleSingularEdgesGlobal);
+  // richData.write("singularEdges.ply");
 
   std::vector<Vector3> positionsWale;
   std::vector<std::array<int, 2>> edgesWale;
@@ -201,19 +274,37 @@ void showStripePatterns(){
   waleStripes -> setRadius(0.001);
   waleStripes -> setEnabled(false);
 
-  //globalPSMesh->addCornerScalarQuantity("wale stripe values", prepareCornerData(waleStripeValues));
+  // Draw wale singular edges as a curve network
+  std::vector<Vector3> waleSingularEdgePointsPos;
+  std::vector<Vector3> waleSingularEdgePointsNeg;
+  std::vector<std::array<int,2>> waleSingularEdgesPos;
+  std::vector<std::array<int,2>> waleSingularEdgesNeg;
+  for (Edge e : globalMesh->edges()) if (waleSingularEdgesGlobal[e] != 0) {
+      if (waleSingularEdgesGlobal[e] > 0) {
+        waleSingularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
+        waleSingularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
+        waleSingularEdgesPos.push_back({(int)waleSingularEdgePointsPos.size()-2, (int)waleSingularEdgePointsPos.size()-1});
+      } else {
+        waleSingularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
+        waleSingularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
+        waleSingularEdgesNeg.push_back({(int)waleSingularEdgePointsNeg.size()-2, (int)waleSingularEdgePointsNeg.size()-1});
+      }
+  }
+  polyscope::registerCurveNetwork("wale singular edges (+1)", waleSingularEdgePointsPos, waleSingularEdgesPos)->setRadius(0.003)->setColor({1,0,0})->setEnabled(false);
+  polyscope::registerCurveNetwork("wale singular edges (-1)", waleSingularEdgePointsNeg, waleSingularEdgesNeg)->setRadius(0.003)->setColor({0,0,1})->setEnabled(false);
 
-  // // Plot wale stripe values with offset (to debug knit graph)
-  // CornerData<double> waleStripeValuesWithOffset = waleStripeValues;
-  // for (Corner co : globalGeometry->mesh.corners())
-  //     waleStripeValuesWithOffset[co] -= walePeriod/4;
-  // std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValuesWithOffset, waleSingularFaces, walePeriod);
-  // waleStripes = polyscope::registerCurveNetwork("wale stripes with offset", positionsWale, edgesWale);
-  // waleStripes -> setRadius(0.001);
-  // waleStripes -> setEnabled(false);
 
+  globalPSMesh->addCornerScalarQuantity("wale stripe values", prepareCornerData(waleStripeValues));
+
+  // Plot wale stripe values with offset (to debug knit graph)
+  CornerData<double> waleStripeValuesWithOffset(waleStripeValues);
+  for (Corner co : globalGeometry->mesh.corners())
+      waleStripeValuesWithOffset[co] -= walePeriod/4;
+  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValuesWithOffset, waleSingularFaces, walePeriod);
+  polyscope::registerCurveNetwork("wale stripes with offset", positionsWale, edgesWale)->setRadius(0.002)->setColor({1,140./255,0})->setEnabled(false);
+  
   std::cout << "Done with wale stripes" << std::endl;
-  polyscope::show();
+  // polyscope::show();
 
   // generate the knit graph
   graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
@@ -286,6 +377,10 @@ void callBacks() {
   if (ImGui::Button("Manaul Repair")){
     manualKnitGraphRepair();
   }
+
+  if (ImGui::Button("Save view as JSON string")){
+    std::cout << polyscope::view::getViewAsJson() << std::endl;
+  }
 }
 
 int main(int argc, char **argv) {
@@ -320,8 +415,12 @@ int main(int argc, char **argv) {
   for (Edge e : globalMesh -> edges()){
     double length = norm(globalGeometry->vertexPositions[e.halfedge().tipVertex()] - globalGeometry->vertexPositions[e.halfedge().tailVertex()]);
     if (length > maxLength)
-      coursePeriod = 2.0 * length;//set the default length to twice the course period
+      maxLength = length;
   }
+  H(maxLength);
+  coursePeriod = 1.8 * maxLength; // let's push it :-)
+  // coursePeriod = 2.0 * maxLength; //set the default period to be twice the max edge length
+  // coursePeriod = 1.0 * maxLength; // skirt with seam
 
   // Parse stripe period, if available
   if (argc > 2) {
@@ -341,6 +440,8 @@ int main(int argc, char **argv) {
     std::cout << "Error: Mesh is not triangular" << std::endl;
     throw std::exception();
   }
+
+  H(coursePeriod);
 
   globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(data["model_path"]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
   
@@ -404,8 +505,17 @@ int main(int argc, char **argv) {
   // Set the callback function
   polyscope::state::userCallback = callBacks;
 
+  // for rendering figures
+  //   has to go before the show() call
+  polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::ShadowOnly;
+  // std::string viewerString = R"({"farClipRatio":20.0,"fov":45.0,"nearClipRatio":0.005,"projectionMode":"Perspective","viewMat":[0.888747692108154,3.49245965480804e-10,0.458396464586258,0.169118270277977,0.229787424206734,0.865281701087952,-0.445515632629395,0.0717917159199715,-0.396641701459885,0.501285016536713,0.769016802310944,-2.19324994087219,0.0,0.0,0.0,1.0],"windowHeight":916,"windowWidth":1512})"; // bob
+  // std::string viewerString = R"({"farClipRatio":20.0,"fov":45.0,"nearClipRatio":0.005,"projectionMode":"Perspective","viewMat":[0.939642131328583,8.14907252788544e-10,-0.342151880264282,1.5130295753479,-0.145037829875946,0.905707657337189,-0.398314714431763,34.9959487915039,0.309889197349548,0.423899203538895,0.851041853427887,-132.280212402344,0.0,0.0,0.0,1.0],"windowHeight":916,"windowWidth":1512})"; // skirt
+
+  // polyscope::view::setViewFromJson(viewerString, false);
+
   if (argc > 2) // period was provided
     showStripePatterns();
+
 
   polyscope::show();
 

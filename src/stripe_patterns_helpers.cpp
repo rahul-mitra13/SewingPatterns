@@ -1014,6 +1014,7 @@ std::vector<std::pair<int, int>> findEdgeSingularityPairFromStripeIsoVals(Vertex
   std::vector<double> componentCurl(components.size());
   std::map<int, size_t> edgeCurlToComponentId;
 
+
   for (const auto &c : components){
     std::vector<PolyLinePoint> vertices = c.second;
     double curlSum = 0.0;
@@ -1025,6 +1026,9 @@ std::vector<std::pair<int, int>> findEdgeSingularityPairFromStripeIsoVals(Vertex
     componentCurl[c.first - 1] = avgCurl;
     //componentCurl[c.first - 1] = curlSum;
   }
+
+  // H(componentCurl);
+  // polyscope::show();
 
   std::sort(componentCurl.begin(), componentCurl.end(), std::greater<double>()); // Sort in descending order
   componentCurl.resize(numPairs); // Keep only the top numPairs
@@ -1051,6 +1055,11 @@ std::vector<std::pair<int, int>> findEdgeSingularityPairFromStripeIsoVals(Vertex
         minEdge = v.e.getIndex();
       }
     }
+    H(vertices.size());
+    H(maxEdge);
+    H(minEdge);
+    H(maxCurl);
+    H(minCurl);
     edgeSingularityPairs.push_back(std::make_pair(maxEdge, minEdge));
   }
   return edgeSingularityPairs; 

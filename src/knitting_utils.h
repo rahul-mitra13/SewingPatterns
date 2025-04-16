@@ -18,9 +18,11 @@
 #include <igl/colon.h>
 #include <igl/setdiff.h>
 #include <igl/cotmatrix.h>
+#include <igl/cotmatrix_intrinsic.h>
 #include <igl/slice.h>
 #include <igl/slice_into.h>
 #include <igl/grad.h>
+#include <igl/grad_intrinsic.h>
 #include <igl/average_onto_vertices.h>
 #include <igl/hessian_energy.h>
 #include <igl/curved_hessian_energy.h>
@@ -50,6 +52,8 @@ VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::ve
 //compute time function directly in the glued mesh setting 
 VertexData<double> computeTimeFunction(EdgeLengthGeometry& gluedGeometry, globalBoundaryConditions& bdyConditions);
 
+VertexData<double> computeTimeFunctionAligned(EdgeLengthGeometry& geometry, globalBoundaryConditions& bdyConditions, FaceData<Vector2> guide);
+
 
 //compute the per face gradient of some function defined as a scalar over vertices
 //
@@ -62,6 +66,8 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, 
 //compute the gradient of the a function defined as a scalar over vertices in the glued mesh setting 
 //Don't think the formula I'm using in here is right
 FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, VertexData<double>& vertexScalarFunction);
+
+FaceData<Vector2> computeTimeFunctionFaceGradIntrinsic(const EdgeLengthGeometry& geometry, VertexData<double>& vertexScalarFunction);
 
 //compute a vector (in ambient space) per vertex that is aligned with the gradient of a scalar field
 //

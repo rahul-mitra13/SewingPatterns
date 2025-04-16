@@ -53,14 +53,22 @@ void KnitGraph::buildGraph(){
     //reorder vertex indices
     makeRealVertices();
 
-    // std::vector<Vector3> realVertexPositions;
-    // for (knitGraphVertex &v : realVertices)
-    //     realVertexPositions.push_back(v.position);
-    // polyscope::registerPointCloud("real vertices", realVertexPositions)->setPointRadius(0.001);
+    std::vector<Vector3> realVertexPositions;
+    for (knitGraphVertex &v : realVertices)
+        realVertexPositions.push_back(v.position);
+    polyscope::registerPointCloud("real vertices", realVertexPositions)->setPointRadius(0.001)->setEnabled(false);
 
 
     //tag the increases and decreases 
     tagIncreasesDecreases();
+
+    // invert graph
+    for (knitGraphVertex &v : realVertices) {
+        std::swap(v.col_in[0], v.col_out[0]);
+        std::swap(v.col_in[1], v.col_out[1]);
+        // if (v.col_in[1] != -1) std::swap(v.col_in[0], v.col_in[1]);
+        // if (v.col_out[1] != -1) std::swap(v.col_out[0], v.col_out[1]);
+    }
     
     //render the knit graph
     renderGraph();
@@ -431,9 +439,7 @@ void KnitGraph::renderGraph(){
         if (v.col_in[1] != -1)
             edges.push_back({v.id, v.col_in[1]});
     }
-    auto graphReal = polyscope::registerCurveNetwork("knit graph with real connections", vertexPositions, edges);
-    graphReal -> setRadius(0.001);
-    graphReal -> setEnabled(true);
+    polyscope::registerCurveNetwork("knit graph with real connections", vertexPositions, edges)->setRadius(0.002)->setColor({36./255, 55./255, 140./255})->setEnabled(false);
 
     //visualize the knit graph with virtual connections
     // for (auto &v : vertices){ 
@@ -604,13 +610,54 @@ void KnitGraph::intrinsicMerge(){
         }        
     }
 
+
+
+
     //remove any lingering connections from real vertices to virtual vertices 
     for (knitGraphVertex &v : vertices){
-        if (vertices[v.row_out].isVirtual) v.row_out = -1;
-        if (vertices[v.row_in].isVirtual) v.row_in = -1;
-        if (vertices[v.col_in[0]].isVirtual) v.col_in[0] = -1;
-        if (vertices[v.col_out[0]].isVirtual) v.col_out[0] = -1;
+        if (v.row_out != -1 && vertices[v.row_out].isVirtual) v.row_out = -1;
+        if (v.row_in  != -1 && vertices[v.row_in].isVirtual) v.row_in = -1;
+        if (v.col_in[0] != -1 && vertices[v.col_in[0]].isVirtual) v.col_in[0] = -1;
+        if (v.col_out[0] != -1 && vertices[v.col_out[0]].isVirtual) v.col_out[0] = -1;
     }
+
+    // Check for hooks
+    std::vector<Vector3> hooks;
+    for (knitGraphVertex &v : vertices) if (!v.isVirtual) {
+
+        // For interior hooks
+        if (v.col_in[0] == v.row_out && v.row_in == -1) {
+            hooks.push_back(v.position);
+            vertices[v.col_out[0]].col_in[0] = v.col_in[0];
+            vertices[v.col_in[0]].col_out[0] = v.col_out[0];
+            vertices[v.row_out].row_in = -1;
+            vertices[v.id].isVirtual = true;
+        }
+        if (v.col_in[0] == v.row_in && v.row_out == -1)
+            hooks.push_back(v.position);
+        if (v.col_out[0] == v.row_out && v.row_in == -1)
+            hooks.push_back(v.position);
+        if (v.col_out[0] == v.row_in && v.row_out == -1)
+            hooks.push_back(v.position);
+
+        // For boundary hooks
+        if (v.col_in[0] == -1 && v.col_out[0] == -1) { // remove this vertex
+            hooks.push_back(v.position);
+            vertices[v.row_in].row_out = v.row_out;
+            vertices[v.row_out].row_in = v.row_in;
+            vertices[v.id].isVirtual = true;
+        }
+        if (v.row_in == -1 && v.row_out == -1) { // remove this vertex
+            hooks.push_back(v.position);
+            vertices[v.col_in[0]].col_out[0] = v.col_out[0];
+            vertices[v.col_out[0]].col_in[0] = v.col_in[0];
+            vertices[v.id].isVirtual = true;
+        }
+    }
+
+
+    polyscope::registerPointCloud("hooks", hooks)->setPointRadius(0.001)->setEnabled(false);
+
 
     // // Print out real vertices
     // for (knitGraphVertex& v: vertices) if (!v.isVirtual) {
@@ -1111,7 +1158,24 @@ void KnitGraph::sanityCheck(){
         std::cout << "Sanity check failed " << std::endl << std::endl;
     }
 
-    polyscope::registerPointCloud("buggy vertices ", buggy_vertices);
+    polyscope::registerPointCloud("buggy vertices ", buggy_vertices)->setEnabled(false);
+
+
+    // CHECK HELICING
+    std::vector<Vector3> nodes;
+    std::vector<std::array<size_t,2>> edges;
+    for (auto &v0 : realVertices) {
+        if (v0.row_in == -1) {
+            knitGraphVertex v = v0;
+            while (v.row_out != -1) {
+                nodes.push_back(v.position);
+                edges.push_back({nodes.size()-1, nodes.size()});
+                v = realVertices[v.row_out];
+            }
+            nodes.push_back(v.position);
+        }
+    }
+    polyscope::registerCurveNetwork("short rows", nodes, edges)->setEnabled(false);
 
 }
 
