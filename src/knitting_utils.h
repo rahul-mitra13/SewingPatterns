@@ -253,7 +253,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                                                     globalBoundaryConditions& boundaryConditions, double period,
                                                                     Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G,
                                                                     FaceData<Vector3>& courseOneFormGrad, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
-                                                                    std::vector<std::vector<double>> allSaddleLoops, std::vector<std::vector<double>> homologyGenerators);
+                                                                    std::vector<std::vector<double>> allSaddleLoops, std::vector<std::vector<double>> homologyGenerators,
+                                                                    Options &opts);
 
 //@clean
 //compute course 1-form
