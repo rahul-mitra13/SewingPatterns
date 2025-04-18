@@ -382,7 +382,7 @@ HalfedgeData<std::vector<double>> getHalfEdgeIsoValues(IntrinsicGeometryInterfac
 bool halfedgeContainsLevelSet(double val1, double val2, double& bary, double currIsoVal){
   
   //pertubation
-  double pert = 1e-8;
+  double pert = 1e-9;
   
   if (std::abs(val1 - val2) < pert) return false; // this eliminates halfedges that are exactly parallel to the isoline
   
@@ -888,13 +888,13 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>, std::vector<St
       PolyLinePoint p = isoLinePoints[i];
       for (int j : isoLinePointsPerHalfedge[he.twin()]) {
         PolyLinePoint q = isoLinePoints[j];
-        if (norm(p.position - q.position) < 1e-8) // epsilon choice seems OK
+        if (norm(p.position - q.position) < pert) // epsilon choice seems OK
           clusters.merge(i, j);
       }
       // Also search on the face. This is useful when an isoline passes exactly through a mesh vertex
       for (int j : isoLinePointsPerFace[he.face()]) {
         PolyLinePoint q = isoLinePoints[j];
-        if (norm(p.position - q.position) < 1e-8) // epsilon choice seems OK
+        if (norm(p.position - q.position) < pert) // epsilon choice seems OK
           clusters.merge(i, j);
       }
     }
@@ -942,15 +942,25 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>, std::vector<St
     adj[e[1]].push_back(e[0]);
   }
 
+  std::vector<StripeConnectedComponent> components;
+
   // Sanity check: 1 ≤ deg(v) ≤ 2 
   // If these checks don't pass, it's almost certainly an epsilon issue. Good luck.
   for (int v = 0; v < uniqueVertices.size(); v++) {
+
+    if (adj[v].size() > 2) {
+      std::vector<Vector3> pointCloud {uniqueVertices[v].position};
+      for (int w : adj[v])
+        pointCloud.push_back(uniqueVertices[w].position);
+      polyscope::registerPointCloud("debug", pointCloud);
+      return std::tie(vertexPositions, newEdges, components);
+    }
+
     ensure (adj[v].size() > 0);
     ensure (adj[v].size() <= 2);
   }
 
   // Find connected components + cycles using BFS
-  std::vector<StripeConnectedComponent> components;
   std::vector<bool> visited(uniqueVertices.size(), false);
   
   // Start with open paths

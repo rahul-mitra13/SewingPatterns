@@ -3648,7 +3648,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     }
 
-
     //solve the final model with the singularities and homology generators 
     std::cout << "solving final course stripes...." << std::endl;
     model.setHomologyGenerators(homologyGenerators);
@@ -3665,9 +3664,20 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                                     " singularity insertions", uniquePos, uniqueEdges);
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
-    registerShortRows("short rows after " + std::to_string(numSingularities) + " singularity insertions", components);
-    polyscope::show();
-    
+    registerShortRows("short rows after " + std::to_string(numSingularities) + " singularity insertions", components);    
+
+    //visualize the saddle vertices
+    std::vector<Vector3> saddleVertexPositions;
+    for (Vertex v : globalMesh.vertices()){
+        int ctr = 0;
+        for (Halfedge he : v.outgoingHalfedges()){
+            if (sgn(gluedSigmaTilde[he]) != sgn(gluedSigmaTilde[he.next().next().twin()])) ctr++;
+        }
+        int index = (2 - ctr) / 2;
+        if (index == -1) saddleVertexPositions.push_back(globalGeometry.vertexPositions[v]);
+    }
+    polyscope::registerPointCloud("saddle vertices", saddleVertexPositions);
+
     // Plot stripe values with offset (to debug knit graph)
     CornerData<double> stripeValuesWithOffset = stripeValuesSigmaCourse;
     for (Corner co : globalMesh.corners())
@@ -3795,7 +3805,8 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                 model.addConstr(sigma[he.getIndex()] == -1.0 * sigma[he.twin().getIndex()]);
             }
         }
-
+        
+        /** 
         //constraint: 
         //equality constraint across singular edges 
         for (std::pair<int, int> s : singularEdges){
@@ -3826,50 +3837,95 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
             //something going wrong in these constraints? 
             if ((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2Vector, gradientVector2) > dot(he2TwinVector, gradientVector2))){
                 //add constraints on singular edges 
-                model.addConstr(sigma[he1.getIndex()] == sigma[he2.twin().getIndex()]);
-                model.addConstr(sigma[he1.getIndex()] >= sigma[he1.twin().getIndex()]);
-                model.addConstr(sigma[he2.twin().getIndex()] <= sigma[he2.getIndex()]);
-                //add sign constraints for the rest of the halfedges on the face
+                // model.addConstr(sigma[he1.getIndex()] == sigma[he2.twin().getIndex()]);
+                // model.addConstr(sigma[he1.getIndex()] >= sigma[he1.twin().getIndex()]);
+                // model.addConstr(sigma[he2.twin().getIndex()] <= sigma[he2.getIndex()]);
+                // //add sign constraints for the rest of the halfedges on the face
+                // model.addConstr(sigma[he1.next().getIndex()] >= 0.);
+                // model.addConstr(sigma[he1.next().next().getIndex()] >= 0.);
+                // model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
+                // model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
+                
+                //just place the constraints for the positive singularity face for now 
+                model.addConstr(sigma[he1.twin().getIndex()] <= 0.);
                 model.addConstr(sigma[he1.next().getIndex()] >= 0.);
                 model.addConstr(sigma[he1.next().next().getIndex()] >= 0.);
+
+                //add the constraints for the negative singularity face 
+                model.addConstr(sigma[he2.twin().getIndex()] >= 0.);
                 model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
                 model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
+
             }
             else if ((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2TwinVector, gradientVector2) > dot(he2Vector, gradientVector2))){
                 //add constraints on singular edges
-                model.addConstr(sigma[he1.getIndex()] == sigma[he2.getIndex()]);
-                model.addConstr(sigma[he1.getIndex()] >= sigma[he1.twin().getIndex()]);
-                model.addConstr(sigma[he2.getIndex()] <= sigma[he2.twin().getIndex()]);
-                //add sign constraints for the rest of the halfedges on the face 
+                // model.addConstr(sigma[he1.getIndex()] == sigma[he2.getIndex()]);
+                // model.addConstr(sigma[he1.getIndex()] >= sigma[he1.twin().getIndex()]);
+                // model.addConstr(sigma[he2.getIndex()] <= sigma[he2.twin().getIndex()]);
+                // //add sign constraints for the rest of the halfedges on the face 
+                // model.addConstr(sigma[he1.next().getIndex()] >= 0.);
+                // model.addConstr(sigma[he1.next().next().getIndex()] >= 0.);
+                // model.addConstr(sigma[he2.next().getIndex()] <= 0.);
+                // model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
+
+                //just place the constraints for the positive singularity face for now  
+                model.addConstr(sigma[he1.twin().getIndex()] <= 0.);
                 model.addConstr(sigma[he1.next().getIndex()] >= 0.);
                 model.addConstr(sigma[he1.next().next().getIndex()] >= 0.);
+
+                //add the constraints for the negative singularity face now 
+                model.addConstr(sigma[he2.getIndex()] >= 0.);
                 model.addConstr(sigma[he2.next().getIndex()] <= 0.);
                 model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
+
+
             }
             else if((dot(he1TwinVector, gradientVector1) > dot(he1Vector, gradientVector1)) && (dot(he2Vector, gradientVector2) > dot(he2TwinVector, gradientVector2))){
                 //add constraints on singular edges
-                model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.twin().getIndex()]);
-                model.addConstr(sigma[he1.twin().getIndex()] >= sigma[he1.getIndex()]);
-                model.addConstr(sigma[he2.twin().getIndex()] <= sigma[he2.getIndex()]);
-                //add sign constraints for the rest of the halfedges on the face
+                // model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.twin().getIndex()]);
+                // model.addConstr(sigma[he1.twin().getIndex()] >= sigma[he1.getIndex()]);
+                // model.addConstr(sigma[he2.twin().getIndex()] <= sigma[he2.getIndex()]);
+                // //add sign constraints for the rest of the halfedges on the face
+                // model.addConstr(sigma[he1.twin().next().getIndex()] >= 0.);
+                // model.addConstr(sigma[he1.twin().next().next().getIndex()] >= 0.);
+                // model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
+                // model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
+
+                //just place the constraints for the positive singularity face for now  
+                model.addConstr(sigma[he1.getIndex()] <= 0.);
                 model.addConstr(sigma[he1.twin().next().getIndex()] >= 0.);
                 model.addConstr(sigma[he1.twin().next().next().getIndex()] >= 0.);
+
+                //add the constraints for the negative singularity face 
+                model.addConstr(sigma[he2.twin().getIndex()] >= 0.);
                 model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
                 model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
+
             }
             else if((dot(he1TwinVector, gradientVector1) > dot(he1Vector, gradientVector1)) && (dot(he2TwinVector, gradientVector2) > dot(he2Vector, gradientVector2))){
                 //add constraints on singular edges
-                model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.getIndex()]);
-                model.addConstr(sigma[he1.twin().getIndex()] >= sigma[he1.getIndex()]);
-                model.addConstr(sigma[he2.getIndex()] <= sigma[he2.twin().getIndex()]);
-                //add sign constraints for the rest of the halfedges on the face
+                // model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.getIndex()]);
+                // model.addConstr(sigma[he1.twin().getIndex()] >= sigma[he1.getIndex()]);
+                // model.addConstr(sigma[he2.getIndex()] <= sigma[he2.twin().getIndex()]);
+                // //add sign constraints for the rest of the halfedges on the face
+                // model.addConstr(sigma[he1.twin().next().getIndex()] >= 0.);
+                // model.addConstr(sigma[he1.twin().next().next().getIndex()] >= 0.);
+                // model.addConstr(sigma[he2.next().getIndex()] <= 0.);
+                // model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
+
+                //just place the constraints for the positive singularity face for now  
+                model.addConstr(sigma[he1.getIndex()] <= 0.);
                 model.addConstr(sigma[he1.twin().next().getIndex()] >= 0.);
-                model.addConstr(sigma[he1.twin().next().next().getIndex()] >= 0.);
+                model.addConstr(sigma[he1.twin().next().next().getIndex()] >= 0);
+
+                //add the constraints for the negative singularity face now 
+                model.addConstr(sigma[he2.getIndex()] >= 0.);
                 model.addConstr(sigma[he2.next().getIndex()] <= 0.);
                 model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
             }
 
         }
+        */
 
         //constraint: add integer variables for homology generators
         for (int i = 0; i < homologyGenerators.size(); i++){
@@ -4390,10 +4446,6 @@ std::vector<int> repairKnitGraphVertex(){
 }
 
 
-//find the sign of a value
-template <typename T> int sgn(T val) {
-    return (T(0) < val) - (val < T(0));
-}
 //given a time function over the mesh, extract the saddle vertices from it 
 //only works in the global setting for now 
 std::vector<Vertex> getSaddleVertices(IntrinsicGeometryInterface& geometry, VertexData<double>& timeFunction){
