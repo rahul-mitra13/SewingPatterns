@@ -55,6 +55,14 @@ template<class T> std::ostream &operator<<(std::ostream &os, std::vector<T> v) {
   return os;
 }
 
+// Our own assert() equivalent
+#undef ensure
+#define ensure(x)                                         \
+  if (!(x)) {                                             \
+    std::cout << "Assertion failed: " << #x << std::endl; \
+    exit(1);                                               \
+  }
+
 // Global configuration options
 struct Options {
 

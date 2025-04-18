@@ -34,7 +34,13 @@ struct PolyLinePoint{
   Face f;//the face this point belongs to
   Edge e;//the edge this point belongs to
   Halfedge he;//the halfedge this point belongs to
-  double isoval;//the isoval (modulo P of this point)
+  double isoval;//the isoval of this point on face f (multiple of P)
+};
+
+struct StripeConnectedComponent {
+  std::vector<PolyLinePoint> points; // sequence of points
+  double isoval; // the corresponding value of the levelset mod P
+  bool isClosed; // true if it's a closed curve, otherwise it starts and ends at a singularity or boundary
 };
 
 //do the integration in the glued mesh setting itself
@@ -81,13 +87,11 @@ EdgeData<int> stripeIsoValEdges(EmbeddedGeometryInterface& geometry,
 
 
 //find the connected components in a stripe pattern
-std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> findStripeConnectedComponents(VertexPositionGeometry& globalGeometry, 
+std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>, std::vector<StripeConnectedComponent>> findStripeConnectedComponents(VertexPositionGeometry& globalGeometry, 
                                   EdgeLengthGeometry& gluedGeometry, 
                                   const CornerData<double>& stripeValues,
                                   const FaceData<int>& stripesIndices, double period,
-                                  std::map<int, int>& edgeMap,
-                                  std::unordered_map<size_t, std::vector<PolyLinePoint>>& 
-                                  components);
+                                  const std::map<int, int>& edgeMap);
 
 //find a set of edge singularity pairs on the same isoline as the stripe patterns
 std::vector<std::pair<int, int>> findEdgeSingularityPairFromStripeIsoVals(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
@@ -135,3 +139,4 @@ computeStripePattern(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry&
                         polyscope::SurfaceMesh& psMesh, std::vector<bool>& orientations);
 
 
+polyscope::CurveNetwork* registerShortRows(std::string name, std::vector<StripeConnectedComponent> &components);
