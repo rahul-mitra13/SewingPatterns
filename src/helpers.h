@@ -55,6 +55,13 @@ template<class T> std::ostream &operator<<(std::ostream &os, std::vector<T> v) {
   return os;
 }
 
+// Global configuration options
+struct Options {
+
+  // Add Polyscope quantities for every iteration of the algorithm
+  bool showAllIterations = true;
+
+};
 
 //boundary conditions on the GLUED MESH
 struct globalBoundaryConditions{

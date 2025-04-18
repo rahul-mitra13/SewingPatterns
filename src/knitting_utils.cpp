@@ -3169,7 +3169,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                                                     globalBoundaryConditions& boundaryConditions, double period,
                                                                     Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G,
                                                                     FaceData<Vector3>& courseOneFormGrad, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
-                                                                    std::vector<std::vector<double>> allSaddleLoops, std::vector<std::vector<double>> homologyGenerators){
+                                                                    std::vector<std::vector<double>> allSaddleLoops, std::vector<std::vector<double>> homologyGenerators,
+                                                                    Options &opts){
     
     
     SurfaceMesh& globalMesh = globalGeometry.mesh;
@@ -3367,7 +3368,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
                                                                     edgeMap, components);
-    auto courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes " + std::to_string(numRuns - 1) + 
+    auto courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numRuns - 1) + 
                                                     " singularity insertions", uniquePos, uniqueEdges);
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
@@ -3566,7 +3567,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 edges.push_back(std::array<int, 2>{0, 1});
                 //don't retake edges from another path
                 updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, gluedHeWeights);
-                psMesh.addEdgeScalarQuantity("path for " + std::to_string(numSingularities) + " singularity", globalPath);
+                if (opts.showAllIterations) psMesh.addEdgeScalarQuantity("path for " + std::to_string(numSingularities) + " singularity", globalPath);
                 edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
                 model.setEdgePathConstraints(edgePathConstraints);
                 model.setEdgeIndices(edgeIndices);
@@ -3577,15 +3578,17 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 oldObj = currObj;
                 courseOneFormGrad = gradSigmaTilde;
                 std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
-                psMesh.addCornerScalarQuantity("stripeValuesSigmaCourse after " + std::to_string(numRuns-1) + " runs", prepareCornerData(stripeValuesSigmaCourse));
-                psMesh.addHalfedgeScalarQuantity("sigma values after " + std::to_string(numRuns-1) + " runs", gluedSigmaTilde);
                 std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
                                                 edgeMap, components);
                 //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
-                courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numSingularities) + 
+                if (opts.showAllIterations) {
+                    psMesh.addCornerScalarQuantity("stripeValuesSigmaCourse after " + std::to_string(numRuns-1) + " runs", prepareCornerData(stripeValuesSigmaCourse));
+                    psMesh.addHalfedgeScalarQuantity("sigma values after " + std::to_string(numRuns-1) + " runs", gluedSigmaTilde);
+                    courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numSingularities) + 
                                                     " singularity insertions", uniquePos, uniqueEdges);
-                courseStripes -> setRadius(0.001);
-                courseStripes -> setEnabled(false);
+                    courseStripes -> setRadius(0.001);
+                    courseStripes -> setEnabled(false);
+                }
                 
                 //update the gradients for the next round of the model 
                 //model.setFaceGradients(gradSigmaTilde);
@@ -3593,7 +3596,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 vertexCurl = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     gradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
                 edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
-                psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (before subtracting)", edgeCurl);
+                if (opts.showAllIterations) psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (before subtracting)", edgeCurl);
                 //compute virtual sigma
                 std::tie(virtualSigmaTilde, virtualSigmaObj) = computeCourseVirtualSigma(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
                 //psMesh.addHalfedgeScalarQuantity("virtualSigmaTilde after " + std::to_string(numRuns-1) + " runs", virtualSigmaTilde);
@@ -3625,7 +3628,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                     allDist[v] = std::max(allDist[v], 0.0);
                 }
                 edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
-                psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertion (after subtracting w/o mask)", edgeCurl);
+                if (opts.showAllIterations) psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertion (after subtracting w/o mask)", edgeCurl);
                 allDistGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, allDist, vertexMap);
                 //have a hard mask in the course direction
                 for (Vertex v : globalMesh.vertices()){
@@ -3636,8 +3639,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 }
                 psMesh.addVertexScalarQuantity("all distance", allDistGlobal);
                 edgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, vertexCurl);
-                psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (after subtracting)", edgeCurl);
-                psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numSingularities) + " singularity insertion", edgeSingularities);
+                if (opts.showAllIterations) psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (after subtracting)", edgeCurl);
+                if (opts.showAllIterations) psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numSingularities) + " singularity insertion", edgeSingularities);
                 //polyscope::registerCurveNetwork("edge singularities network after " + std::to_string(numSingularities) + " singularitiy insertion", singPos, edges);
                 break;
             }
@@ -3655,6 +3658,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
                                                 edgeMap, components);
     //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
+    psMesh.addCornerScalarQuantity("stripeValuesSigmaCourse after " + std::to_string(numRuns-1) + " runs", prepareCornerData(stripeValuesSigmaCourse));
     courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numSingularities) + 
                                                     " singularity insertions", uniquePos, uniqueEdges);
     courseStripes -> setRadius(0.001);

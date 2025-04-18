@@ -56,13 +56,13 @@ polyscope::SurfaceMesh *globalPSMesh;
 globalBoundaryConditions globalBdyConditions;
 
 //1-form optimization course Period
-float coursePeriod = 1;
-float walePeriod;//the ratio of width to height should be 1:1.6 (Kui)
+double coursePeriod = 1;
+double walePeriod;//the ratio of width to height should be 1:1.6 (Kui)
 //threshold for constraining wale boundary edges 
 //I don't really like this and need to figure out a better way of doing this
-float threshold = 0.6;
+double threshold = 0.6;
 //knoppel frequency in the stripe patterns
-float knoppelFrequency = 0.0;
+double knoppelFrequency = 0.0;
 
 //set the permutation of edges and orientations for 1-form viz
 std::vector<size_t> perm;
@@ -79,6 +79,11 @@ Eigen::SparseMatrix<double, Eigen::RowMajor> G;
 
 //the knit graph over the model 
 KnitGraph graph;
+
+// Global configuration options
+// TODO: setup command line interface with CLI11
+Options opts; 
+
 
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
@@ -171,7 +176,7 @@ void showStripePatterns(){
   std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
                                                                     globalBdyConditions, coursePeriod, V, F, G, courseOneFormGrad, gluedOneRingMap, 
-                                                                    allSaddleLoops, homologyGenerators);
+                                                                    allSaddleLoops, homologyGenerators, opts);
 
   
   globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
@@ -286,11 +291,11 @@ void manualKnitGraphRepair(){
 // https://github.com/ocornut/imgui/blob/master/imgui.h
 void callBacks() {
 
-  ImGui::InputFloat("Course 1-form period", &coursePeriod);
+  ImGui::InputDouble("Course 1-form period", &coursePeriod);
   //there needs to be a better way to constrain wale edges
   //ImGui::InputFloat("Threshold", &threshold);
   //frequency for knoppel stripes
-  ImGui::InputFloat("Knoppel frequency", &knoppelFrequency);
+  ImGui::InputDouble("Knoppel frequency", &knoppelFrequency);
 
   if (ImGui::Button("Show Stripe Patterns")){
     showStripePatterns();
@@ -346,7 +351,7 @@ int main(int argc, char **argv) {
 
   // Parse stripe period, if available
   if (argc > 2) {
-    sscanf(argv[2], "%f", &coursePeriod);
+    sscanf(argv[2], "%lf", &coursePeriod);
     knoppelFrequency = 1.0 / coursePeriod; // to match course and wale periods
   }
 
