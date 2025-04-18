@@ -3649,7 +3649,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     }
 
-
     //solve the final model with the singularities and homology generators 
     std::cout << "solving final course stripes...." << std::endl;
     model.setHomologyGenerators(homologyGenerators);
@@ -3663,6 +3662,18 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                                     " singularity insertions", uniquePos, uniqueEdges);
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
+
+    //visualize the saddle vertices
+    std::vector<Vector3> saddleVertexPositions;
+    for (Vertex v : globalMesh.vertices()){
+        int ctr = 0;
+        for (Halfedge he : v.outgoingHalfedges()){
+            if (sgn(gluedSigmaTilde[he]) != sgn(gluedSigmaTilde[he.next().next().twin()])) ctr++;
+        }
+        int index = (2 - ctr) / 2;
+        if (index == -1) saddleVertexPositions.push_back(globalGeometry.vertexPositions[v]);
+    }
+    polyscope::registerPointCloud("saddle vertices", saddleVertexPositions);
 
     // Plot stripe values with offset (to debug knit graph)
     CornerData<double> stripeValuesWithOffset = stripeValuesSigmaCourse;
@@ -3791,7 +3802,8 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                 model.addConstr(sigma[he.getIndex()] == -1.0 * sigma[he.twin().getIndex()]);
             }
         }
-
+        
+        /** 
         //constraint: 
         //equality constraint across singular edges 
         for (std::pair<int, int> s : singularEdges){
@@ -3910,6 +3922,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
             }
 
         }
+        */
 
         //constraint: add integer variables for homology generators
         for (int i = 0; i < homologyGenerators.size(); i++){
@@ -4430,10 +4443,6 @@ std::vector<int> repairKnitGraphVertex(){
 }
 
 
-//find the sign of a value
-template <typename T> int sgn(T val) {
-    return (T(0) < val) - (val < T(0));
-}
 //given a time function over the mesh, extract the saddle vertices from it 
 //only works in the global setting for now 
 std::vector<Vertex> getSaddleVertices(IntrinsicGeometryInterface& geometry, VertexData<double>& timeFunction){

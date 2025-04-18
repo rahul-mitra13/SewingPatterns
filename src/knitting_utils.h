@@ -39,6 +39,11 @@
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
+//find the sign of a value
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
 //compute time function using a vector of pairs of vertex mappings instead of the map because we miss stitches then 
 //
 //@param[in]    geometry        VertexPositionGeometry                  input geometry
