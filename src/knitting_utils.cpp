@@ -3420,17 +3420,11 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     // negPoint->setPointRadius(5.);
     double curlSum = 0.;
     int numSings = 0.;
-    for (Vertex v : globalMesh.vertices()){ 
-        curlSum += std::fabs(curlMeasure[v]);
-    }
-    numSings = std::round(curlSum / period);
-    std::cout << "num sings = " << numSings << std::endl;
-    std::cout << "curl over entire mesh = " << curlSum << std::endl;
     VoronoiOptions options = defaultVoronoiOptions;
     options.nSites = 5;
     options.useDelaunay = false;
     options.computeDistributions = true;
-    options.iterations = 10;
+    options.iterations = 50;
     VertexData<double> absCurlMeasure(globalMesh, 0);
     for (Vertex v : globalMesh.vertices()){
         absCurlMeasure[v] = std::fabs(curlMeasure[v]);
@@ -3445,8 +3439,12 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
        centers.push_back(voronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
     }
     polyscope::registerPointCloud("positive voronoi sites", centers);
-    std::vector<VertexData<double>> siteDistributions = voronoiCenters.siteDistributions;
-    VertexData<double> masses(globalMesh, 0);
+
+    // psMesh.addVertexScalarQuantity("normD at iteration 0 ", voronoiCenters.normD);
+    // psMesh.addVertexScalarQuantity("normRHS at iteration 0 ", voronoiCenters.normRHS);
+
+    // std::vector<VertexData<double>> siteDistributions = voronoiCenters.siteDistributions;
+    // VertexData<double> masses(globalMesh, 0);
     //running into some bug when calling site distributions
     // for (size_t i = 0; i < siteDistributions.size(); i++){
     //     double mass = 0;
@@ -3460,8 +3458,15 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //     psMesh.addVertexScalarQuantity("site distribution " + std::to_string(i), siteDistributions[i]);
     // }
 
-    psMesh.addVertexScalarQuantity("masses", masses);
-    std::cout << "number of steps = " << voronoiCenters.steps[0].size() << std::endl;
+    std::vector<std::vector<VertexData<double>>> cellEvolution = voronoiCenters.cellEvolution;
+    for (int i = 0; i < cellEvolution.size(); i++){
+        for (int j = 0; j < cellEvolution[i].size(); j++){
+            psMesh.addVertexScalarQuantity("site " + std::to_string(i) + " Lloyd iteration " + std::to_string(j), cellEvolution[i][j]);
+        }
+    }
+
+    // psMesh.addVertexScalarQuantity("masses", masses);
+    // std::cout << "number of steps = " << voronoiCenters.steps[0].size() << std::endl;
     // for (size_t i = 0; i < siteDistributions.size(); i++){
     //     std::vector<Vector3> stepsTaken;
     //     std::vector<SurfacePoint> steps = voronoiCenters.steps[i];
@@ -3471,7 +3476,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //     for (size_t k = 0; k < stepsTaken.size(); k++){
     //         polyscope::registerPointCloud("pos site: " + std::to_string(i) + ", step: " + std::to_string(k), std::vector<Vector3>{stepsTaken[k]});
     //     }
-    //     //polyscope::registerPointCloud("steps taken", stepsTaken);
     // }
 
     // voronoiCenters = computeGeodesicCentroidalVoronoiTessellation(*manifoldGlobalMesh, globalGeometry, options, negMeasure);
