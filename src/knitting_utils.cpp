@@ -3568,6 +3568,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, gluedHeWeights);
                 if (opts.showAllIterations) psMesh.addEdgeScalarQuantity("path for " + std::to_string(numSingularities) + " singularity", globalPath);
                 edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
+                model.setSingularEdges(acceptedSingEdgePairs);
                 model.setEdgePathConstraints(edgePathConstraints);
                 model.setEdgeIndices(edgeIndices);
                 std::cout << "not breaking after " << std::to_string(numSingularities) << " singularity insertions " << std::endl;
@@ -3806,7 +3807,6 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
             }
         }
         
-        /** 
         //constraint: 
         //equality constraint across singular edges 
         for (std::pair<int, int> s : singularEdges){
@@ -3824,7 +3824,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
             Vector3 he2TwinVector = globalGeometry.vertexPositions[he2Twin.tipVertex()] - globalGeometry.vertexPositions[he2Twin.tailVertex()];
             he2TwinVector = he2TwinVector.normalize();
 
-            //compute the average gradient across faces
+            //compute the average gradient across faces on both sides of the singular edges
             Vector3 gradientVector1 = 0.5 * (Vector3{comparisonGrad[he1.face().getIndex()][0], comparisonGrad[he1.face().getIndex()][1], 
                                                  comparisonGrad[he1.face().getIndex()][2]} + Vector3{comparisonGrad[he1Twin.face().getIndex()][0], comparisonGrad[he1Twin.face().getIndex()][1], 
                                                  comparisonGrad[he1Twin.face().getIndex()][2]});
@@ -3925,7 +3925,6 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
             }
 
         }
-        */
 
         //constraint: add integer variables for homology generators
         for (int i = 0; i < homologyGenerators.size(); i++){
