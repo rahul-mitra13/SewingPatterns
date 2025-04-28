@@ -3421,10 +3421,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     double curlSum = 0.;
     int numSings = 0.;
     VoronoiOptions options = defaultVoronoiOptions;
-    options.nSites = 5;
+    options.nSites = 2;
     options.useDelaunay = false;
     options.computeDistributions = true;
-    options.iterations = 60;
+    options.iterations = 30;
     VertexData<double> absCurlMeasure(globalMesh, 0);
     for (Vertex v : globalMesh.vertices()){
         absCurlMeasure[v] = std::fabs(curlMeasure[v]);
