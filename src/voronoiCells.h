@@ -29,7 +29,7 @@ struct VoronoiOptions {
 };
 extern const VoronoiOptions defaultVoronoiOptions;
 
-VoronoiResult computeGeodesicCentroidalVoronoiTessellation(ManifoldSurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
+VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
                                                            VoronoiOptions options, VertexData<double>& measure);
 
 } // namespace surface

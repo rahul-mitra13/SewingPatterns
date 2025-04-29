@@ -12,7 +12,7 @@ const bool VORONOI_PRINT = false;
 // The default trace options
 const VoronoiOptions defaultVoronoiOptions;
 
-VoronoiResult computeGeodesicCentroidalVoronoiTessellation(ManifoldSurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
+VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
                                                            VoronoiOptions options, VertexData<double>& measure) {
 
   if (options.useDelaunay) {
@@ -26,7 +26,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellation(ManifoldSurfaceMesh& 
 
     // Get solutions on intrinsic triangulation
     options.useDelaunay = false;
-    VoronoiResult result = computeGeodesicCentroidalVoronoiTessellation(*intTri->intrinsicMesh, *intTri, options, measure);
+    VoronoiResult result = computeGeodesicCentroidalVoronoiTessellationWithWeights(*intTri->intrinsicMesh, *intTri, options, measure);
 
     // Translate solutions back to original triangulation
     for (size_t iS = 0; iS < result.siteLocations.size(); iS++) {

@@ -3430,7 +3430,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         absCurlMeasure[v] = std::fabs(curlMeasure[v]);
     }
     //options.initialDistribution = absCurlMeasure;
-    VoronoiResult voronoiCenters = computeGeodesicCentroidalVoronoiTessellation(*manifoldGlobalMesh, globalGeometry, options, posMeasure);
+    VoronoiResult voronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, options, posMeasure);
     std::cout << "size of site locations = " << voronoiCenters.siteLocations.size() << std::endl;
     std::cout << "size of site distributions = " << voronoiCenters.siteDistributions.size() << std::endl;
     std::cout << "has distributions? = " << voronoiCenters.hasDistributions << std::endl;
@@ -3478,7 +3478,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         }
     }
 
-    // voronoiCenters = computeGeodesicCentroidalVoronoiTessellation(*manifoldGlobalMesh, globalGeometry, options, negMeasure);
+    // voronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, options, negMeasure);
     // centers.clear();
     // for (int i = 0; i < voronoiCenters.siteLocations.size(); i++){
     //    centers.push_back(voronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
