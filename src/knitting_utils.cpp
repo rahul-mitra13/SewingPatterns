@@ -3444,24 +3444,24 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     // psMesh.addVertexScalarQuantity("normRHS at iteration 0 ", voronoiCenters.normRHS);
 
     std::vector<VertexData<double>> siteDistributions = voronoiCenters.siteDistributions;
-    // VertexData<double> masses(globalMesh, 0);
+    VertexData<double> masses(globalMesh, 0);
     //running into some bug when calling site distributions
-    // for (size_t i = 0; i < siteDistributions.size(); i++){
-    //     double mass = 0;
-    //     for (Vertex v : globalMesh.vertices()){
-    //         if (std::fabs(siteDistributions[i][v]) > 1e-8){
-    //             mass += siteDistributions[i][v];
-    //         }
-    //     }
+    for (size_t i = 0; i < siteDistributions.size(); i++){
+        double mass = 0;
+        for (Vertex v : globalMesh.vertices()){
+            if (std::fabs(siteDistributions[i][v]) > 1e-8){
+                mass += siteDistributions[i][v];
+            }
+        }
         
-    //     std::cout << "mass at site " << i << " = " << mass << std::endl;
-    //     psMesh.addVertexScalarQuantity("site distribution " + std::to_string(i), siteDistributions[i]);
-    // }
+        std::cout << "mass at site " << i << " = " << mass << std::endl;
+        psMesh.addVertexScalarQuantity("site distribution " + std::to_string(i), siteDistributions[i]);
+    }
 
     std::vector<std::vector<VertexData<double>>> cellEvolution = voronoiCenters.cellEvolution;
     for (int i = 0; i < cellEvolution.size(); i++){
         for (int j = 0; j < cellEvolution[i].size(); j++){
-            psMesh.addVertexScalarQuantity("site " + std::to_string(i) + " Lloyd iteration " + std::to_string(j), cellEvolution[i][j]);
+            psMesh.addVertexScalarQuantity("thisFracD at site " + std::to_string(i) + " Lloyd iteration " + std::to_string(j), cellEvolution[i][j]);
         }
     }
 

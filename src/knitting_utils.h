@@ -12,7 +12,7 @@
 #include "geometrycentral/surface/barycentric_vector.h"
 #include "geometrycentral/surface/heat_method_distance.h"
 #include "geometrycentral/surface/surface_centers.h"
-#include "geometrycentral/surface/geodesic_centroidal_voronoi_tessellation.h"
+//#include "geometrycentral/surface/geodesic_centroidal_voronoi_tessellation.h"
 
 //libigl includes
 //I guess we'll just put all the libigl includes here for now 
@@ -32,6 +32,7 @@
 #include "helpers.h"
 #include "stripe_patterns_helpers.h"
 #include "path_constraints.h"
+#include "voronoiCells.h"
 
 
 //includes to solve the optimization problem

@@ -130,6 +130,7 @@ add_executable(
         src/path_constraints.cpp
         #src/experiments.cpp
         src/KnitGraph.cpp
+        src/voronoiCells.cpp
 )
 
 # Include settings
