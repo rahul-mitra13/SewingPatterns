@@ -238,6 +238,7 @@ void updateGluedHalfedgeWeights(VertexPositionGeometry& globalGeometry, EdgeLeng
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
 
+
     for (Edge e : gluedMesh.edges()){
         if (gluedPath[e.getIndex()] > 0){
             gluedHeWeights[e.halfedge().getIndex()] = DBL_MAX;
