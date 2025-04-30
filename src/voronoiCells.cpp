@@ -147,7 +147,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
         for (Vertex v : mesh.vertices()) {
           rho[v] += thisFracDWeights[v] / normD[v];
         }
-        
+
         double updateWSum = 0.0;
         //normalize and weigh the distibution by the curl measure 
         //also integrate lol
