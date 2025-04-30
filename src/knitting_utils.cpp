@@ -3398,7 +3398,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         else negMeasure[v] = std::fabs(curlMeasure[v]);
     }
 
-    // //debugging on a simple square
+    //debugging on a simple square
     // for (Vertex v : globalMesh.vertices()){
     //     //if (globalGeometry.vertexPositions[v].z < 0 && globalGeometry.vertexPositions[v].x < 0) posMeasure[v] = 1.0;
     //     // posMeasure[v] = std::fabs(globalGeometry.vertexPositions[v].x);
@@ -3425,9 +3425,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     int numSings = 0.;
     VoronoiOptions options = defaultVoronoiOptions;
     options.nSites = std::round(totalPosMeasure / period);
+    //options.nSites = 5;
     options.useDelaunay = false;
     options.computeDistributions = true;
-    options.iterations = 200;
+    options.iterations = 100;
     VertexData<double> absCurlMeasure(globalMesh, 0);
     for (Vertex v : globalMesh.vertices()){
         absCurlMeasure[v] = std::fabs(curlMeasure[v]);
@@ -3459,13 +3460,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         
         std::cout << "mass at site " << i << " = " << mass << std::endl;
         psMesh.addVertexScalarQuantity("site distribution " + std::to_string(i), siteDistributions[i]);
-    }
-
-    std::vector<std::vector<VertexData<double>>> cellEvolution = voronoiCenters.cellEvolution;
-    for (int i = 0; i < cellEvolution.size(); i++){
-        for (int j = 0; j < cellEvolution[i].size(); j++){
-            psMesh.addVertexScalarQuantity("thisFracD at site " + std::to_string(i) + " Lloyd iteration " + std::to_string(j), cellEvolution[i][j]);
-        }
     }
 
     // psMesh.addVertexScalarQuantity("masses", masses);

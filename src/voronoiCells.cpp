@@ -117,11 +117,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
   desiredMass /= nSites;
   std::cout << "desiredMass per cell = " << desiredMass << std::endl;
 
-  //for visualization of the sites
-  result.cellEvolution.resize(nSites);
-  for (int i = 0; i < nSites; i++){
-    result.cellEvolution[i].resize(options.iterations);
-  }
+  
 
   // == Iterations
   for (size_t iIter = 0; iIter < options.iterations; iIter++) {//Lloyd iterations
@@ -151,11 +147,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
         for (Vertex v : mesh.vertices()) {
           rho[v] += thisFracDWeights[v] / normD[v];
         }
-
-        //std::cout << "At site " << j << " weight: " << (phiWeights[j] / (4 * shortTime)) << std::endl;
-        //visualize thisFracDWeights 
-        result.cellEvolution[j][iIter] = thisFracDWeights;
-
+        
         double updateWSum = 0.0;
         //normalize and weigh the distibution by the curl measure 
         //also integrate lol

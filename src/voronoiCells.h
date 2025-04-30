@@ -14,9 +14,6 @@ struct VoronoiResult {
   std::vector<VertexData<double>> siteDistributions; // soft indicator functions for each Voronoi cell
   bool hasDistributions = false;                     // is siteDistributions populated?
   std::vector<std::vector<SurfacePoint>> steps;       // DEBUG: steps taken from each starting point
-
-  std::vector<std::vector<VertexData<double>>> cellEvolution;//visualize the evolution of the cells through the LLoyd iterations 
-
 };
 
 struct VoronoiOptions {
