@@ -1,6 +1,7 @@
 #include "voronoiCells.h"
 #include "math.h"
 #include "float.h"
+#include "helpers.h"
 
 namespace geometrycentral {
 namespace surface {
@@ -13,7 +14,7 @@ const bool VORONOI_PRINT = false;
 const VoronoiOptions defaultVoronoiOptions;
 
 VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
-                                                           VoronoiOptions options, VertexData<double>& measure) {
+                                                           VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh) {
 
   if (options.useDelaunay) {
     std::unique_ptr<SignpostIntrinsicTriangulation> intTri(new SignpostIntrinsicTriangulation(mesh, geom));
@@ -26,7 +27,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
 
     // Get solutions on intrinsic triangulation
     options.useDelaunay = false;
-    VoronoiResult result = computeGeodesicCentroidalVoronoiTessellationWithWeights(*intTri->intrinsicMesh, *intTri, options, measure);
+    VoronoiResult result = computeGeodesicCentroidalVoronoiTessellationWithWeights(*intTri->intrinsicMesh, *intTri, options, measure, psMesh);
 
     // Translate solutions back to original triangulation
     for (size_t iS = 0; iS < result.siteLocations.size(); iS++) {
@@ -52,6 +53,8 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
     return rhs;
   };
 
+
+  // This computes ∑_j e^(φ_j/4t)
   auto computeRHSWithWeights = [&](const std::vector<SurfacePoint>& points, std::vector<double>& weights, double shortTime) -> VertexData<double> {
     VertexData<double> rhs(mesh, 0);
 
@@ -64,6 +67,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
     // for (size_t i = 0; i < weights.size(); i++){
     //   weights[i] -= maxWeight;
     // }
+    maxWeight = 0; // cancel the effect, we do it outside now
 
     //divide by factor of (4 * shortTime)
     for (size_t i = 0; i < points.size(); i++){
@@ -131,10 +135,23 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
 
     std::cout << "Logging info..." << std::endl;
     std::cout << "LLoyd iteration number " << iIter << std::endl;
+
+    double maxWeight = *std::max_element(phiWeights.begin(), phiWeights.end());
+    H(maxWeight);
     
     // Compute the normalizer distribution
-    VertexData<double> normRHS = computeRHSWithWeights(siteLocations, phiWeights, shortTime);
-    VertexData<double> normD = vSolver.scalarDiffuse(normRHS);
+    VertexData<double> normD(mesh);
+    for (int i = 0; i < siteLocations.size(); i++) {
+      std::vector<double> weight {phiWeights[i]-maxWeight};
+      VertexData<double> normDi = vSolver.scalarDiffuse(computeRHSWithWeights({siteLocations[i]}, weight, shortTime));
+      for (Vertex v : mesh.vertices())
+        normD[v] += normDi[v];
+    }
+
+    // VertexData<double> normRHS = computeRHSWithWeights(siteLocations, phiWeights, shortTime);
+    // VertexData<double> normD = vSolver.scalarDiffuse(normRHS);
+
+    VertexData<double> rho(mesh, 0.0);
     
     //gradient descent to find the weights 
     for (size_t i = 0; i < descIter; i++){
@@ -144,8 +161,13 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
 
         double newWeight = 0.; 
         SurfacePoint site = siteLocations[j];
-        VertexData<double> unitRHSWeights = computeRHSWithWeights({site}, phiWeights, shortTime);
+        std::vector<double> weight {phiWeights[j]-maxWeight};
+        VertexData<double> unitRHSWeights = computeRHSWithWeights({site}, weight, shortTime);
         VertexData<double> thisFracDWeights = vSolver.scalarDiffuse(unitRHSWeights);//scalarDiffuse takes something that's a mass and returns a density
+
+        for (Vertex v : mesh.vertices()) {
+          rho[v] += thisFracDWeights[v] / normD[v];
+        }
 
         //std::cout << "At site " << j << " weight: " << (phiWeights[j] / (4 * shortTime)) << std::endl;
         //visualize thisFracDWeights 
@@ -167,6 +189,9 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
         //update the new phi weights
         newPhiWeights[j] = newWeight;
       }
+
+      psMesh.addVertexScalarQuantity("rho", rho);
+      
       //ensure that the average of all the weights is 0
       // mean /= nSites;
       // for (size_t k = 0; k < nSites; k++){
@@ -181,9 +206,18 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
       std::cout << "weight at site " << i << ": " << phiWeights[i] << std::endl;
     }
 
+    // Update maxWeight
+    maxWeight = *std::max_element(phiWeights.begin(), phiWeights.end());
 
-    normRHS = computeRHSWithWeights(siteLocations, phiWeights, shortTime);
-    normD = vSolver.scalarDiffuse(normRHS);
+    // Compute the normalizer distribution
+    for (Vertex v : mesh.vertices()) normD[v] = 0;
+    for (int i = 0; i < siteLocations.size(); i++) {
+      std::vector<double> weight {phiWeights[i]-maxWeight};
+      VertexData<double> normDi = vSolver.scalarDiffuse(computeRHSWithWeights({siteLocations[i]}, weight, shortTime));
+      for (Vertex v : mesh.vertices())
+        normD[v] += normDi[v];
+    }
+
 
     double energy = 0;
     std::vector<SurfacePoint> newSiteLocations;
@@ -193,7 +227,8 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
       SurfacePoint site = siteLocations[iSite];
 
       // === Compute the nearest distribution
-      VertexData<double> unitRHSKarcher = computeRHSWithWeights({site}, phiWeights, shortTime);
+      std::vector<double> weight {phiWeights[iSite]-maxWeight};
+      VertexData<double> unitRHSKarcher = computeRHSWithWeights({site}, weight, shortTime);
       VertexData<double> thisFracDKarcher = vSolver.scalarDiffuse(unitRHSKarcher);
 
       for (Vertex v : mesh.vertices()) {

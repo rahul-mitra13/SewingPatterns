@@ -4,6 +4,8 @@
 #include "geometrycentral/surface/trace_geodesic.h"
 #include "geometrycentral/surface/vector_heat_method.h"
 
+#include "polyscope/surface_mesh.h"
+
 namespace geometrycentral {
 namespace surface {
 
@@ -30,7 +32,7 @@ struct VoronoiOptions {
 extern const VoronoiOptions defaultVoronoiOptions;
 
 VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
-                                                           VoronoiOptions options, VertexData<double>& measure);
+                                                           VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
 
 } // namespace surface
 } // namespace geometrycentral

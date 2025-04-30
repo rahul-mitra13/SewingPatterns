@@ -3430,7 +3430,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         absCurlMeasure[v] = std::fabs(curlMeasure[v]);
     }
     //options.initialDistribution = absCurlMeasure;
-    VoronoiResult voronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, options, posMeasure);
+    VoronoiResult voronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, options, posMeasure, psMesh);
     std::cout << "size of site locations = " << voronoiCenters.siteLocations.size() << std::endl;
     std::cout << "size of site distributions = " << voronoiCenters.siteDistributions.size() << std::endl;
     std::cout << "has distributions? = " << voronoiCenters.hasDistributions << std::endl;
