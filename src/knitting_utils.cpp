@@ -3389,21 +3389,24 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //now divide the measure into positive and negative 
     VertexData<double> posMeasure(globalMesh, 0.0);
     VertexData<double> negMeasure(globalMesh, 0.0);
+    double totalPosMeasure = 0;
+    for (Vertex v : globalMesh.vertices()){
+        if (curlMeasure[v] > 0){
+            posMeasure[v] = curlMeasure[v];
+            totalPosMeasure += globalGeometry.vertexDualAreas[v] * posMeasure[v];
+        }
+        else negMeasure[v] = std::fabs(curlMeasure[v]);
+    }
+
+    // //debugging on a simple square
     // for (Vertex v : globalMesh.vertices()){
-    //     if (curlMeasure[v] > 0){
-    //         posMeasure[v] = curlMeasure[v];
-    //     }
-    //     else negMeasure[v] = std::fabs(curlMeasure[v]);
+    //     //if (globalGeometry.vertexPositions[v].z < 0 && globalGeometry.vertexPositions[v].x < 0) posMeasure[v] = 1.0;
+    //     // posMeasure[v] = std::fabs(globalGeometry.vertexPositions[v].x);
+    //     posMeasure[v] = globalTimeFunction[v];
+    //     // posMeasure[v] = globalGeometry.vertexPositions[v].x * globalGeometry.vertexPositions[v].x;
+    //     // posMeasure[v] = std::exp(globalGeometry.vertexPositions[v].x);
     // }
 
-    //debugging on a simple square
-    for (Vertex v : globalMesh.vertices()){
-        //if (globalGeometry.vertexPositions[v].z < 0 && globalGeometry.vertexPositions[v].x < 0) posMeasure[v] = 1.0;
-        // posMeasure[v] = std::fabs(globalGeometry.vertexPositions[v].x);
-        posMeasure[v] = globalTimeFunction[v];
-        // posMeasure[v] = globalGeometry.vertexPositions[v].x * globalGeometry.vertexPositions[v].x;
-        // posMeasure[v] = std::exp(globalGeometry.vertexPositions[v].x);
-    }
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
     //psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     std::unique_ptr<ManifoldSurfaceMesh> manifoldGlobalMesh = globalMesh.toManifoldMesh();
@@ -3421,10 +3424,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     double curlSum = 0.;
     int numSings = 0.;
     VoronoiOptions options = defaultVoronoiOptions;
-    options.nSites = 2;
+    options.nSites = std::round(totalPosMeasure / period);
     options.useDelaunay = false;
     options.computeDistributions = true;
-    options.iterations = 30;
+    options.iterations = 200;
     VertexData<double> absCurlMeasure(globalMesh, 0);
     for (Vertex v : globalMesh.vertices()){
         absCurlMeasure[v] = std::fabs(curlMeasure[v]);

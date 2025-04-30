@@ -54,28 +54,21 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
   };
 
 
-  // This computes ∑_j e^(φ_j/4t)
-  auto computeRHSWithWeights = [&](const std::vector<SurfacePoint>& points, std::vector<double>& weights, double shortTime) -> VertexData<double> {
-    VertexData<double> rhs(mesh, 0);
+  // This computes e^(φ_j/4t) δ(x_j) for every site j
+  auto computeRHSWithWeights = [&](const std::vector<SurfacePoint>& points, std::vector<double>& weights, double shortTime) -> std::vector<VertexData<double>> {
 
-    //find the max of the weights 
-    double maxWeight = DBL_MIN;
-    for (size_t i = 0; i < weights.size(); i++){
-      if (weights[i] > maxWeight) maxWeight = weights[i];
-    }
-    // //update the weights subtracting off the max weights so that the exponent doesn't blow up
-    // for (size_t i = 0; i < weights.size(); i++){
-    //   weights[i] -= maxWeight;
-    // }
-    maxWeight = 0; // cancel the effect, we do it outside now
+    std::vector<VertexData<double>> rhs;
+    double maxWeight = *std::max_element(weights.begin(), weights.end());
 
     //divide by factor of (4 * shortTime)
     for (size_t i = 0; i < points.size(); i++){
+      VertexData<double> rhsi(mesh, 0);
       SurfacePoint facePoint = points[i].inSomeFace();
       Halfedge he = facePoint.face.halfedge();
-      rhs[he.vertex()] += exp((weights[i] - maxWeight)/(4 * shortTime)) * facePoint.faceCoords.x;
-      rhs[he.next().vertex()] +=  exp((weights[i] - maxWeight)/(4 * shortTime)) * facePoint.faceCoords.y;
-      rhs[he.next().next().vertex()] += exp((weights[i] - maxWeight)/(4 * shortTime)) * facePoint.faceCoords.z;
+      rhsi[he.vertex()] += exp((weights[i] - maxWeight)/(4 * shortTime)) * facePoint.faceCoords.x;
+      rhsi[he.next().vertex()] +=  exp((weights[i] - maxWeight)/(4 * shortTime)) * facePoint.faceCoords.y;
+      rhsi[he.next().next().vertex()] += exp((weights[i] - maxWeight)/(4 * shortTime)) * facePoint.faceCoords.z;
+      rhs.push_back(rhsi);
     }
 
     return rhs;
@@ -102,7 +95,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
 
   //trying to find equal mass power cells 
   size_t descIter = 1;
-  double stepSize = 1e-6;
+  // double stepSize = 1e-6;
   std::vector<double> phiWeights(nSites, 0.);
   double shortTime;
   geom.requireEdgeLengths();
@@ -135,35 +128,25 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
 
     std::cout << "Logging info..." << std::endl;
     std::cout << "LLoyd iteration number " << iIter << std::endl;
-
-    double maxWeight = *std::max_element(phiWeights.begin(), phiWeights.end());
-    H(maxWeight);
     
     // Compute the normalizer distribution
-    VertexData<double> normD(mesh);
-    for (int i = 0; i < siteLocations.size(); i++) {
-      std::vector<double> weight {phiWeights[i]-maxWeight};
-      VertexData<double> normDi = vSolver.scalarDiffuse(computeRHSWithWeights({siteLocations[i]}, weight, shortTime));
-      for (Vertex v : mesh.vertices())
-        normD[v] += normDi[v];
-    }
+    std::vector<VertexData<double>> rhs = computeRHSWithWeights(siteLocations, phiWeights, shortTime);
+    VertexData<double> normRHS(mesh, 0); // sum on all sites
+    for (int i = 0; i < siteLocations.size(); i++)
+      normRHS += rhs[i];
+    VertexData<double> normD = vSolver.scalarDiffuse(normRHS);
 
-    // VertexData<double> normRHS = computeRHSWithWeights(siteLocations, phiWeights, shortTime);
-    // VertexData<double> normD = vSolver.scalarDiffuse(normRHS);
-
-    VertexData<double> rho(mesh, 0.0);
+    VertexData<double> rho(mesh, 0.0); // just for sanity check
     
     //gradient descent to find the weights 
     for (size_t i = 0; i < descIter; i++){
-      double mean = 0.;
+      double mean = 0;
       std::vector<double> newPhiWeights(nSites, 0.);
       for (size_t j = 0; j < nSites; j++){//don't we want to move this loop out of the gradient descent loop? 
 
         double newWeight = 0.; 
         SurfacePoint site = siteLocations[j];
-        std::vector<double> weight {phiWeights[j]-maxWeight};
-        VertexData<double> unitRHSWeights = computeRHSWithWeights({site}, weight, shortTime);
-        VertexData<double> thisFracDWeights = vSolver.scalarDiffuse(unitRHSWeights);//scalarDiffuse takes something that's a mass and returns a density
+        VertexData<double> thisFracDWeights = vSolver.scalarDiffuse(rhs[j]);//scalarDiffuse takes something that's a mass and returns a density
 
         for (Vertex v : mesh.vertices()) {
           rho[v] += thisFracDWeights[v] / normD[v];
@@ -184,7 +167,8 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
 
         std::cout << "updateWSum = " << updateWSum << std::endl;
         //newWeight = phiWeights[j] + (((1/iIter) * shortTime) * (desiredMass - updateWSum));//do a time-decaying step size here
-        newWeight = phiWeights[j] + ((shortTime) * (desiredMass - updateWSum));//don't do a time-decaying step size
+        newWeight = phiWeights[j] + (1e-2 * (desiredMass - updateWSum));//don't do a time-decaying step size
+        // newWeight = phiWeights[j] + ((shortTime) * (desiredMass - updateWSum));//don't do a time-decaying step size
         mean += newWeight; 
         //update the new phi weights
         newPhiWeights[j] = newWeight;
@@ -206,17 +190,12 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
       std::cout << "weight at site " << i << ": " << phiWeights[i] << std::endl;
     }
 
-    // Update maxWeight
-    maxWeight = *std::max_element(phiWeights.begin(), phiWeights.end());
-
     // Compute the normalizer distribution
-    for (Vertex v : mesh.vertices()) normD[v] = 0;
-    for (int i = 0; i < siteLocations.size(); i++) {
-      std::vector<double> weight {phiWeights[i]-maxWeight};
-      VertexData<double> normDi = vSolver.scalarDiffuse(computeRHSWithWeights({siteLocations[i]}, weight, shortTime));
-      for (Vertex v : mesh.vertices())
-        normD[v] += normDi[v];
-    }
+    rhs = computeRHSWithWeights(siteLocations, phiWeights, shortTime);
+    normRHS = VertexData<double>(mesh, 0); // sum on all sites
+    for (int i = 0; i < siteLocations.size(); i++)
+      normRHS += rhs[i];
+    normD = vSolver.scalarDiffuse(normRHS);
 
 
     double energy = 0;
@@ -227,9 +206,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
       SurfacePoint site = siteLocations[iSite];
 
       // === Compute the nearest distribution
-      std::vector<double> weight {phiWeights[iSite]-maxWeight};
-      VertexData<double> unitRHSKarcher = computeRHSWithWeights({site}, weight, shortTime);
-      VertexData<double> thisFracDKarcher = vSolver.scalarDiffuse(unitRHSKarcher);
+      VertexData<double> thisFracDKarcher = vSolver.scalarDiffuse(rhs[iSite]);
 
       for (Vertex v : mesh.vertices()) {
         thisFracDKarcher[v] /= normD[v];
@@ -290,20 +267,22 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
     result.hasDistributions = true;
 
     // Compute the normalizer distribution
-    VertexData<double> normRHS = computeRHS(siteLocations);
+    std::vector<VertexData<double>> rhs = computeRHSWithWeights(siteLocations, phiWeights, shortTime);
+    VertexData<double> normRHS(mesh, 0); // sum on all sites
+    for (int i = 0; i < siteLocations.size(); i++)
+      normRHS += rhs[i];
     VertexData<double> normD = vSolver.scalarDiffuse(normRHS);
 
     for (size_t iSite = 0; iSite < nSites; iSite++) {
       SurfacePoint site = siteLocations[iSite];
 
       // === Compute the nearest distribution
-      VertexData<double> unitRHS = computeRHS({site});
-      VertexData<double> thisFracD = vSolver.scalarDiffuse(unitRHS);
+      VertexData<double> thisFracD = vSolver.scalarDiffuse(rhs[iSite]);
       for (Vertex v : mesh.vertices()) thisFracD[v] /= normD[v];
 
       //WEIGHT THE DISTRIBUTION BY THE CURL MEASURE
       for (Vertex v : mesh.vertices()){ 
-        thisFracD[v] *= measure[v];
+        thisFracD[v] *= measure[v] * geom.vertexDualAreas[v];
       }
 
       result.siteDistributions.push_back(thisFracD);
