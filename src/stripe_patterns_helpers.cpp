@@ -835,32 +835,52 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>, std::vector<St
   // For each halfedge, find all isolines traversing it
   HalfedgeData<std::vector<double>> halfedgeIsoValues = getHalfEdgeIsoValues(globalGeometry, stripeValues, stripesIndices, period);
 
+  // Compute index of each bigon
+  EdgeData<int> edgeIndex(globalMesh);
+  for (Edge e : globalMesh.edges()) {
+    Halfedge he1 = e.halfedge();
+    Halfedge he2 = he1.twin();
+    double form1 = stripeValues[he1.next().corner()] - stripeValues[he1.corner()];
+    double form2 = stripeValues[he2.next().corner()] - stripeValues[he2.corner()];
+    double d1 = form1 + form2;
+    edgeIndex[e] = std::round(d1 / period);
+    // ensure(std::abs((int)isoLinePointsPerHalfedge[he1].size() - (int)isoLinePointsPerHalfedge[he2].size()) == std::abs(index));
+  }
+
+
   //first generate all the points (intersections of isolines and edges)
+  // HalfedgeData<bool> visited(globalMesh);
   for (Halfedge h : globalMesh.halfedges()){
 
     if (h.face().isBoundaryLoop() || stripesIndices[h.face()] != 0) continue;//skip singular faces and boundary faces
-    std::vector<double> heSet = halfedgeIsoValues[h]; // isolines traversing h
+    // if (visited[h.twin()]) {
+    //   // TODO
+    // } else 
+    {
+      std::vector<double> heSet = halfedgeIsoValues[h]; // isolines traversing h
 
-    for (int i = 0; i < heSet.size(); i++){
-      double bary;
-      if (halfedgeContainsLevelSet(stripeValues[h.corner()], stripeValues[h.next().corner()], bary, heSet[i])){//this will always be true, except if the halfedge is parallel to the level set
-        //interpolating from tip to tail
-        Vector3 pos = (bary * globalGeometry.vertexPositions[h.tailVertex()] +
-                       (1 - bary) * globalGeometry.vertexPositions[h.tipVertex()]);
-        
-        PolyLinePoint currPoint;
-        currPoint.position = pos;
-        currPoint.f = h.face();
-        currPoint.e = h.edge();
-        currPoint.he = h;
-        currPoint.isoval = heSet[i];
+      for (int i = 0; i < heSet.size(); i++){
+        double bary;
+        if (halfedgeContainsLevelSet(stripeValues[h.corner()], stripeValues[h.next().corner()], bary, heSet[i])){//this will always be true, except if the halfedge is parallel to the level set
+          //interpolating from tip to tail
+          Vector3 pos = (bary * globalGeometry.vertexPositions[h.tailVertex()] +
+                        (1 - bary) * globalGeometry.vertexPositions[h.tipVertex()]);
+          
+          PolyLinePoint currPoint;
+          currPoint.position = pos;
+          currPoint.f = h.face();
+          currPoint.e = h.edge();
+          currPoint.he = h;
+          currPoint.isoval = heSet[i];
 
-        isoLinePointsPerFace[h.face()].push_back(isoLinePoints.size());
-        isoLinePointsPerHalfedge[h].push_back(isoLinePoints.size());
-        isoLinePoints.push_back(currPoint);
+          isoLinePointsPerFace[h.face()].push_back(isoLinePoints.size());
+          isoLinePointsPerHalfedge[h].push_back(isoLinePoints.size());
+          isoLinePoints.push_back(currPoint);
+        }
       }
     }
   }
+
 
   // Build edges between points. It's crucial that this is done on the original points, not the unique ones,
   // otherwise the isoval does not make sense.
