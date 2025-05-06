@@ -3382,6 +3382,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
 
     //---------------------Testing-------------------------//
+
+    //ONLY IMPLEMENTED IN THE GLOBAL SETTING FOR NOW
+
     //Attempting to find the center of distributions using Vector Heat Method
     VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     globalTimeFunctionGradientsNormalized, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
@@ -3390,12 +3393,16 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     VertexData<double> posMeasure(globalMesh, 0.0);
     VertexData<double> negMeasure(globalMesh, 0.0);
     double totalPosMeasure = 0;
+    double totalNegMeasure = 0;
     for (Vertex v : globalMesh.vertices()){
         if (curlMeasure[v] > 0){
             posMeasure[v] = curlMeasure[v];
             totalPosMeasure += globalGeometry.vertexDualAreas[v] * posMeasure[v];
         }
-        else negMeasure[v] = std::fabs(curlMeasure[v]);
+        else{
+            negMeasure[v] = std::fabs(curlMeasure[v]);
+            totalNegMeasure += globalGeometry.vertexDualAreas[v] * negMeasure[v];
+        }
     }
 
     //debugging on a simple square
@@ -3408,79 +3415,80 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     // }
 
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
-    //psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
+    psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     std::unique_ptr<ManifoldSurfaceMesh> manifoldGlobalMesh = globalMesh.toManifoldMesh();
-    
-    // SurfacePoint posCenter = findCenter(*manifoldGlobalMesh, globalGeometry, posMeasure, 2);
-    // SurfacePoint negCenter = findCenter(*manifoldGlobalMesh, globalGeometry, negMeasure, 2);
-    // Vector3 posCenterPoint = posCenter.interpolate(globalGeometry.inputVertexPositions);
-    // std::vector<Vector3> centerPosCloud{posCenterPoint};
-    // auto posPoint = polyscope::registerPointCloud("positve center", centerPosCloud);
-    // posPoint->setPointRadius(5.);
-    // Vector3 negCenterPoint = negCenter.interpolate(globalGeometry.inputVertexPositions);
-    // std::vector<Vector3> centerNegCloud{negCenterPoint};
-    // auto negPoint = polyscope::registerPointCloud("negative center", centerNegCloud);
-    // negPoint->setPointRadius(5.);
-    double curlSum = 0.;
     int numSings = 0.;
-    VoronoiOptions options = defaultVoronoiOptions;
-    options.nSites = std::round(totalPosMeasure / period);
-    //options.nSites = 5;
-    options.useDelaunay = false;
-    options.computeDistributions = true;
-    options.iterations = 100;
-    VertexData<double> absCurlMeasure(globalMesh, 0);
-    for (Vertex v : globalMesh.vertices()){
-        absCurlMeasure[v] = std::fabs(curlMeasure[v]);
+    VoronoiOptions posOptions = defaultVoronoiOptions;
+    posOptions.nSites = std::round(totalPosMeasure / period);
+    posOptions.useDelaunay = false;
+    posOptions.computeDistributions = true;
+    posOptions.iterations = 100;
+    VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, posOptions, posMeasure, psMesh);
+    std::vector<Vector3> positiveCenters;
+    for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
+       positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
     }
-    //options.initialDistribution = absCurlMeasure;
-    VoronoiResult voronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, options, posMeasure, psMesh);
-    std::cout << "size of site locations = " << voronoiCenters.siteLocations.size() << std::endl;
-    std::cout << "size of site distributions = " << voronoiCenters.siteDistributions.size() << std::endl;
-    std::cout << "has distributions? = " << voronoiCenters.hasDistributions << std::endl;
-    std::vector<Vector3> centers;
-    for (int i = 0; i < voronoiCenters.siteLocations.size(); i++){
-       centers.push_back(voronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+    polyscope::registerPointCloud("positive voronoi sites", positiveCenters);
+    std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
+   
+    VoronoiOptions negOptions = defaultVoronoiOptions;
+    negOptions.nSites = posOptions.nSites; //std::round(totalNegMeasure / period);
+    negOptions.useDelaunay = false;
+    negOptions.computeDistributions = true;
+    negOptions.iterations = 100;
+    VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, posOptions, negMeasure, psMesh);
+    std::vector<Vector3> negativeCenters;
+    for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
+       negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
     }
-    polyscope::registerPointCloud("positive voronoi sites", centers);
+    polyscope::registerPointCloud("negative voronoi sites", negativeCenters);
+    std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
 
-    // psMesh.addVertexScalarQuantity("normD at iteration 0 ", voronoiCenters.normD);
-    // psMesh.addVertexScalarQuantity("normRHS at iteration 0 ", voronoiCenters.normRHS);
-
-    std::vector<VertexData<double>> siteDistributions = voronoiCenters.siteDistributions;
-    VertexData<double> masses(globalMesh, 0);
-    //running into some bug when calling site distributions
-    for (size_t i = 0; i < siteDistributions.size(); i++){
+    //print the masses
+    for (size_t i = 0; i < posSiteDistributions.size(); i++){
         double mass = 0;
         for (Vertex v : globalMesh.vertices()){
-            if (std::fabs(siteDistributions[i][v]) > 1e-8){
-                mass += siteDistributions[i][v];
+            if (std::fabs(posSiteDistributions[i][v]) > 1e-8){
+                mass += posSiteDistributions[i][v];
             }
         }
-        
-        std::cout << "mass at site " << i << " = " << mass << std::endl;
-        psMesh.addVertexScalarQuantity("site distribution " + std::to_string(i), siteDistributions[i]);
+        std::cout << "positive mass at site " << i << " = " << mass << std::endl;
+        psMesh.addVertexScalarQuantity("positve site distribution " + std::to_string(i), posSiteDistributions[i]);
+    }
+    for (size_t i = 0; i < negSiteDistributions.size(); i++){
+        double mass = 0;
+        for (Vertex v : globalMesh.vertices()){
+            if (std::fabs(negSiteDistributions[i][v]) > 1e-8){
+                mass += negSiteDistributions[i][v];
+            }
+        }
+        std::cout << "negative mass at site " << i << " = " << mass << std::endl;
+        psMesh.addVertexScalarQuantity("negative site distribution " + std::to_string(i), negSiteDistributions[i]);
     }
 
-    // psMesh.addVertexScalarQuantity("masses", masses);
-    std::cout << "number of steps = " << voronoiCenters.steps[0].size() << std::endl;
-    for (size_t i = 0; i < siteDistributions.size(); i++){
-        std::vector<Vector3> stepsTaken;
-        std::vector<SurfacePoint> steps = voronoiCenters.steps[i];
-        for (size_t j = 0; j < steps.size(); j++){
-            stepsTaken.push_back(steps[j].interpolate(globalGeometry.vertexPositions));
-        }
-        for (size_t k = 0; k < stepsTaken.size(); k++){
-            polyscope::registerPointCloud("pos site: " + std::to_string(i) + ", step: " + std::to_string(k), std::vector<Vector3>{stepsTaken[k]});
-        }
+    //store a vector of vertex ids and singularity indices (for optimal matching)
+    std::vector<std::pair<Vertex, int>> singularities;
+    for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
+        SurfacePoint facePoint = posVoronoiCenters.siteLocations[i].inSomeFace();
+        Face f = facePoint.face;
+        if (facePoint.faceCoords.x == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().vertex(), 1));
+        else if (facePoint.faceCoords.y == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().vertex(), 1));
+        else if (facePoint.faceCoords.z == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().next().vertex() , 1));
     }
 
-    // voronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, options, negMeasure);
-    // centers.clear();
-    // for (int i = 0; i < voronoiCenters.siteLocations.size(); i++){
-    //    centers.push_back(voronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-    // }
-    // polyscope::registerPointCloud("negative voronoi sites", centers);
+    for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
+        SurfacePoint facePoint = negVoronoiCenters.siteLocations[i].inSomeFace();
+        Face f = facePoint.face;
+        if (facePoint.faceCoords.x == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().vertex(), -1));
+        else if (facePoint.faceCoords.y == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().vertex(), -1));
+        else if (facePoint.faceCoords.z == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().next().vertex() , -1));
+    }
+
+    
+    //perform optimal matching 
+    HalfedgeData<double> heWeights = gluedHeWeights;
+    std::vector<std::pair<Vertex, Vertex>> matchedVertices = performOptimalMatching(globalGeometry, heWeights, singularities);  
+
 
     //-------------------End of testing-------------------//
 

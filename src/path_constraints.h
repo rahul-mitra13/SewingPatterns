@@ -20,6 +20,9 @@
 #include <utility>
 #include <vector>
 
+//include gurobi
+#include "gurobi_c++.h"
+
 
 
 using namespace geometrycentral;
@@ -46,3 +49,10 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
 //set the halfedges that have been take by some edge path i.e., gluedPath to infinity 
 void updateGluedHalfedgeWeights(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, std::vector<double>& gluedPath,
                                 HalfedgeData<double>& gluedHeWeights);
+
+
+//given a set of singularities perform an optimal matching between them 
+std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, std::vector<std::pair<Vertex, int>>& singularities);
+
+//compute the path cost between 2 vertices
+double computePathCost(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, Vertex& startVert, Vertex& endVert);
