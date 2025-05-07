@@ -301,6 +301,7 @@ double computePathCost(VertexPositionGeometry& globalGeometry, HalfedgeData<doub
 }
 
 //given a set of singularities perform an optimal matching between them 
+//always done in the global setting for now 
 std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, std::vector<std::pair<Vertex, int>>& singularities){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
@@ -385,6 +386,7 @@ std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeom
         for (int i = 0; i < numSingVertices; i++){
             for (int j = 0; j < numSingVertices; j++){
                 if (T[i][j].get(GRB_DoubleAttr_X) > 0 && (singularities[i].second > 0 && singularities[j].second < 0)){
+                    std::cout << "match vertex " << singularities[i].first << " to vertex " << singularities[j].first << std::endl;
                     toReturn.push_back(std::make_pair(singularities[i].first, singularities[j].first));//always return pairs in (posVertex, negVertex) order
                 }
             }

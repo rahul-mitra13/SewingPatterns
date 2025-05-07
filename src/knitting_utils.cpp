@@ -3489,6 +3489,14 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     HalfedgeData<double> heWeights = gluedHeWeights;
     std::vector<std::pair<Vertex, Vertex>> matchedVertices = performOptimalMatching(globalGeometry, heWeights, singularities);  
 
+    for (int i = 0; i < matchedVertices.size(); i++){
+        std::pair<Vertex, Vertex> p = matchedVertices[i];
+        std::vector<Vector3> pC; 
+        pC.push_back(globalGeometry.vertexPositions[p.first]);
+        pC.push_back(globalGeometry.vertexPositions[p.second]);
+        polyscope::registerPointCloud("matched pair " + std::to_string(i), pC);
+    }
+
 
     //-------------------End of testing-------------------//
 
