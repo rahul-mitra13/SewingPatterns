@@ -353,8 +353,9 @@ std::vector<std::pair<int, int>> buildPairOfStitchedEdges(VertexPositionGeometry
         for (Halfedge v1he : v1.outgoingHalfedges()){
             //iterate over the outgoing halfedges of v2
             for (Halfedge v2he : v2.outgoingHalfedges()){
-                if ((std::find(vertexMappingsPairs.begin(), vertexMappingsPairs.end(), std::make_pair(v1he.tipVertex().getIndex(), v2he.tipVertex().getIndex()))
-                != vertexMappingsPairs.end()) || (std::find(vertexMappingsPairs.begin(), vertexMappingsPairs.end(), std::make_pair(v2he.tipVertex().getIndex(), v1he.tipVertex().getIndex()))
+                if ((std::find(vertexMappingsPairs.begin(), vertexMappingsPairs.end(), std::make_pair(static_cast<int> (v1he.tipVertex().getIndex()), static_cast<int> (v2he.tipVertex().getIndex())))
+                != vertexMappingsPairs.end()) || (std::find(vertexMappingsPairs.begin(), vertexMappingsPairs.end(), std::make_pair(static_cast<int> (v2he.tipVertex().getIndex()), 
+                static_cast<int>(v1he.tipVertex().getIndex())))
                 != vertexMappingsPairs.end()))
                 mappedEdges.push_back(std::make_pair(v1he.edge().getIndex(), v2he.edge().getIndex()));
                 break;
