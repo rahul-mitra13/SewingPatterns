@@ -3494,8 +3494,27 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         std::vector<Vector3> pC; 
         pC.push_back(globalGeometry.vertexPositions[p.first]);
         pC.push_back(globalGeometry.vertexPositions[p.second]);
-        polyscope::registerPointCloud("matched pair " + std::to_string(i), pC);
+        polyscope::registerPointCloud("matched pair " + std::to_string(i), pC)->setEnabled(false);
     }
+
+    //set the edge indices from the singularities found using the OT method 
+    //just do it naively using outgoing halfedges from singular vertex 
+    for (auto p : singularities){
+        edgeIndices[p.first.halfedge().edge().getIndex()] = -1.0 * p.second;
+    }
+    model.setEdgeIndices(edgeIndices);
+    model.setHomologyGenerators(homologyGenerators);
+    std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
+    //plot the stripes
+    std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
+    std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
+                                                edgeMap, components);
+    courseStripes = polyscope::registerCurveNetwork("our stripes ", uniquePos, uniqueEdges);
+    courseStripes -> setRadius(0.001);
+    courseStripes -> setEnabled(false);
+
+
+
 
 
     //-------------------End of testing-------------------//
