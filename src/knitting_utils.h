@@ -42,6 +42,11 @@
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
+//find the sign of a value
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
 //compute time function using a vector of pairs of vertex mappings instead of the map because we miss stitches then 
 //
 //@param[in]    geometry        VertexPositionGeometry                  input geometry
@@ -256,7 +261,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                                                     globalBoundaryConditions& boundaryConditions, double period,
                                                                     Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::SparseMatrix<double, Eigen::RowMajor>& G,
                                                                     FaceData<Vector3>& courseOneFormGrad, std::map<int, std::vector<Halfedge>>& gluedOneRingMap,
-                                                                    std::vector<std::vector<double>> allSaddleLoops, std::vector<std::vector<double>> homologyGenerators);
+                                                                    std::vector<std::vector<double>> allSaddleLoops, std::vector<std::vector<double>> homologyGenerators,
+                                                                    Options &opts);
 
 //@clean
 //compute course 1-form

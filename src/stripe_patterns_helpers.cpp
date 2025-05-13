@@ -382,7 +382,7 @@ HalfedgeData<std::vector<double>> getHalfEdgeIsoValues(IntrinsicGeometryInterfac
 bool halfedgeContainsLevelSet(double val1, double val2, double& bary, double currIsoVal){
   
   //pertubation
-  double pert = 0.00001;
+  double pert = 1e-9;
   
   if (std::abs(val1 - val2) < pert) return false; // this eliminates halfedges that are exactly parallel to the isoline
   
@@ -811,17 +811,16 @@ void findCurveNetworkConnectedComponents(VertexPositionGeometry& globalGeometry,
     // }
 }
 
-std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> findStripeConnectedComponents(VertexPositionGeometry& globalGeometry, 
+std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>, std::vector<StripeConnectedComponent>> findStripeConnectedComponents(VertexPositionGeometry& globalGeometry, 
                                   EdgeLengthGeometry& gluedGeometry, 
                                   const CornerData<double>& stripeValues,
                                   const FaceData<int>& stripesIndices, double period,
-                                  std::map<int, int>& edgeMap,
-                                  std::unordered_map<size_t, std::vector<PolyLinePoint>>& components){
+                                  const std::map<int, int>& edgeMap){
   
+  // TODO: why is edgeMap not used?
+
   SurfaceMesh& globalMesh = globalGeometry.mesh; 
   SurfaceMesh& gluedMesh = gluedGeometry.mesh;
-  //clear out the map first 
-  components.clear();
 
   globalGeometry.requireFaceIndices();
   globalGeometry.requireVertexPositions();
@@ -833,42 +832,58 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> findStripeConn
   FaceData<std::vector<int>> isoLinePointsPerFace(globalMesh);
   HalfedgeData<std::vector<int>> isoLinePointsPerHalfedge(globalMesh);
 
-  std::vector<Vector3> isoLinePointCoords;
-
   // For each halfedge, find all isolines traversing it
   HalfedgeData<std::vector<double>> halfedgeIsoValues = getHalfEdgeIsoValues(globalGeometry, stripeValues, stripesIndices, period);
 
-  //first generate all the points
+  // Compute index of each bigon
+  EdgeData<int> edgeIndex(globalMesh);
+  for (Edge e : globalMesh.edges()) {
+    Halfedge he1 = e.halfedge();
+    Halfedge he2 = he1.twin();
+    double form1 = stripeValues[he1.next().corner()] - stripeValues[he1.corner()];
+    double form2 = stripeValues[he2.next().corner()] - stripeValues[he2.corner()];
+    double d1 = form1 + form2;
+    edgeIndex[e] = std::round(d1 / period);
+    // ensure(std::abs((int)isoLinePointsPerHalfedge[he1].size() - (int)isoLinePointsPerHalfedge[he2].size()) == std::abs(index));
+  }
+
+
+  //first generate all the points (intersections of isolines and edges)
+  // HalfedgeData<bool> visited(globalMesh);
   for (Halfedge h : globalMesh.halfedges()){
 
     if (h.face().isBoundaryLoop() || stripesIndices[h.face()] != 0) continue;//skip singular faces and boundary faces
-    std::vector<double> heSet = halfedgeIsoValues[h]; // isolines traversing h
+    // if (visited[h.twin()]) {
+    //   // TODO
+    // } else 
+    {
+      std::vector<double> heSet = halfedgeIsoValues[h]; // isolines traversing h
 
-    for (int i = 0; i < heSet.size(); i++){
-      double bary;
-      if (halfedgeContainsLevelSet(stripeValues[h.corner()], stripeValues[h.next().corner()], bary, heSet[i])){//this will always be true, except if the halfedge is parallel to the level set
-        //interpolating from tip to tail
-        Vector3 pos = (bary * globalGeometry.vertexPositions[h.tailVertex()] +
-                       (1 - bary) * globalGeometry.vertexPositions[h.tipVertex()]);
-        
-        PolyLinePoint currPoint;
-        currPoint.position = pos;
-        currPoint.f = h.face();
-        currPoint.e = h.edge();
-        currPoint.he = h;
-        currPoint.isoval = heSet[i];
+      for (int i = 0; i < heSet.size(); i++){
+        double bary;
+        if (halfedgeContainsLevelSet(stripeValues[h.corner()], stripeValues[h.next().corner()], bary, heSet[i])){//this will always be true, except if the halfedge is parallel to the level set
+          //interpolating from tip to tail
+          Vector3 pos = (bary * globalGeometry.vertexPositions[h.tailVertex()] +
+                        (1 - bary) * globalGeometry.vertexPositions[h.tipVertex()]);
+          
+          PolyLinePoint currPoint;
+          currPoint.position = pos;
+          currPoint.f = h.face();
+          currPoint.e = h.edge();
+          currPoint.he = h;
+          currPoint.isoval = heSet[i];
 
-        isoLinePointsPerFace[h.face()].push_back(isoLinePoints.size());
-        isoLinePointsPerHalfedge[h].push_back(isoLinePoints.size());
-        isoLinePoints.push_back(currPoint);
-        isoLinePointCoords.push_back(pos);
-
+          isoLinePointsPerFace[h.face()].push_back(isoLinePoints.size());
+          isoLinePointsPerHalfedge[h].push_back(isoLinePoints.size());
+          isoLinePoints.push_back(currPoint);
+        }
       }
     }
   }
 
-  // polyscope::registerPointCloud("isoLinePoints", isoLinePointCoords);
 
+  // Build edges between points. It's crucial that this is done on the original points, not the unique ones,
+  // otherwise the isoval does not make sense.
   std::vector<std::array<int, 2>> edges;
   //now make the polyline 
   for (Face f : globalMesh.faces()) {
@@ -893,13 +908,13 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> findStripeConn
       PolyLinePoint p = isoLinePoints[i];
       for (int j : isoLinePointsPerHalfedge[he.twin()]) {
         PolyLinePoint q = isoLinePoints[j];
-        if (norm(p.position - q.position) < 1e-8) // epsilon choice seems OK
+        if (norm(p.position - q.position) < pert) // epsilon choice seems OK
           clusters.merge(i, j);
       }
       // Also search on the face. This is useful when an isoline passes exactly through a mesh vertex
       for (int j : isoLinePointsPerFace[he.face()]) {
         PolyLinePoint q = isoLinePoints[j];
-        if (norm(p.position - q.position) < 1e-8) // epsilon choice seems OK
+        if (norm(p.position - q.position) < pert) // epsilon choice seems OK
           clusters.merge(i, j);
       }
     }
@@ -907,22 +922,23 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> findStripeConn
 
   //now remove all the duplicate points 
   std::vector<PolyLinePoint> uniqueVertices;
+  std::vector<Vector3> vertexPositions;
   std::vector<int> vertexMapping(isoLinePoints.size(), -1);
-  std::vector<PolyLinePoint> newVertices; // what's the difference with uniqueVertices?
   
   // Find leaders
   for (int i = 0; i < isoLinePoints.size(); i++) {
     if (clusters.find(i) == i) { // if this is a leader
       vertexMapping[i] = uniqueVertices.size();
       uniqueVertices.push_back(isoLinePoints[i]);
-      newVertices.push_back(isoLinePoints[i]);
+      vertexPositions.push_back(isoLinePoints[i].position);
     }
   }
   // Assign the remaining mappings
-  for (int i = 0; i < isoLinePoints.size(); i++)
+  for (int i = 0; i < isoLinePoints.size(); i++) {
     vertexMapping[i] = vertexMapping[clusters.find(i)];
+  }
 
-  // Create new edges with updated vertex indices
+  // Create new edges with updated vertex indices + adjacency list
   std::vector<std::array<int, 2>> newEdges;
   for (auto e : edges) {
       int v1 = vertexMapping[e[0]];
@@ -939,41 +955,72 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>> findStripeConn
   std::sort(newEdges.begin(), newEdges.end());
   newEdges.erase(std::unique(newEdges.begin(), newEdges.end()), newEdges.end());
 
-  //finally find the connected components
-  // Initialize disjoint set for vertices
-  DisjointSets vertexSets(newVertices.size());
-
-  // Union-find: process each edge to connect the vertices
+  // Also build adjacency list
+  std::map<int, std::vector<int>> adj; // adjacency list
   for (auto e : newEdges) {
-    auto v1 = e[0];
-    auto v2 = e[1];
-    vertexSets.merge(v1, v2);
+    adj[e[0]].push_back(e[1]);
+    adj[e[1]].push_back(e[0]);
   }
 
-  // Map each set leader to its component
-  std::unordered_map<size_t, std::vector<size_t>> indexedComponents;
+  std::vector<StripeConnectedComponent> components;
 
-  std::vector<Vector3> newVertexPositions;
-  for (size_t v = 0; v < newVertices.size(); ++v) {
-    newVertexPositions.push_back(newVertices[v].position);
-    size_t leader = vertexSets.find(v);
-    indexedComponents[leader].push_back(v);
+  // Sanity check: 1 ≤ deg(v) ≤ 2 
+  // If these checks don't pass, it's almost certainly an epsilon issue. Good luck.
+  for (int v = 0; v < uniqueVertices.size(); v++) {
+
+    if (adj[v].size() > 2) {
+      std::vector<Vector3> pointCloud {uniqueVertices[v].position};
+      for (int w : adj[v])
+        pointCloud.push_back(uniqueVertices[w].position);
+      polyscope::registerPointCloud("debug", pointCloud);
+      return std::tie(vertexPositions, newEdges, components);
+    }
+
+    ensure (adj[v].size() > 0);
+    ensure (adj[v].size() <= 2);
   }
 
-  //reset the component index
-  size_t componentIndex = 0;
-  // std::cout << "number of components = " << indexedComponents.size() << std::endl;
-  for (const auto& comp : indexedComponents) {
-      //std::cout << "Component " << componentIndex++ << ": ";
-      componentIndex++;
-      for (size_t v : comp.second) {
-      //    std::cout << v << " ";
-          components[componentIndex].push_back(newVertices[v]);
+  // Find connected components + cycles using BFS
+  std::vector<bool> visited(uniqueVertices.size(), false);
+  
+  // Start with open paths
+  for (int start = 0; start < uniqueVertices.size(); start++) if (!visited[start] && adj[start].size() == 1) {
+    StripeConnectedComponent component;
+    component.isClosed = false;
+    int u = start;
+    bool done = false;
+    while (!done) {
+      visited[u] = true;
+      component.points.push_back(uniqueVertices[u]);
+      done = true;
+      for (int v : adj[u]) {
+        if (!visited[v])
+          u = v, done = false;
       }
-      //std::cout << std::endl;
+    }
+    components.push_back(component);
   }
 
-  return std::tie(newVertexPositions, newEdges);
+  // Proceed with closed paths
+  for (int start = 0; start < uniqueVertices.size(); start++) if (!visited[start]) {
+    StripeConnectedComponent component;
+    component.isClosed = true;
+    int u = start;
+    bool done = false;
+    while (!done) {
+      visited[u] = true;
+      component.points.push_back(uniqueVertices[u]);
+      done = true;
+      for (int v : adj[u]) {
+        if (!visited[v])
+          u = v, done = false;
+      }
+    }
+    components.push_back(component);
+  }
+  
+
+  return std::tie(vertexPositions, newEdges, components);
 
 }
 
@@ -1341,4 +1388,16 @@ computeStripePattern(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry&
 
   return std::tie(textureCoordinates, zeroIndices);
 
+}
+
+polyscope::CurveNetwork* registerShortRows(std::string name, std::vector<StripeConnectedComponent> &components) {
+  std::vector<Vector3> nodes;
+  std::vector<std::array<size_t,2>> edges;
+  for (StripeConnectedComponent &component : components) if (!component.isClosed) {
+    for (int i = 0; i < component.points.size(); i++) {
+      nodes.push_back(component.points[i].position);
+      if (i > 0) edges.push_back({nodes.size()-2, nodes.size()-1});
+    }
+  }
+  return polyscope::registerCurveNetwork(name, nodes, edges);
 }

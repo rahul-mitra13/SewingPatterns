@@ -1,5 +1,7 @@
 #include "KnitGraph.h"
 
+using namespace std;
+
 KnitGraph::KnitGraph(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, double coursePeriod, double walePeriod,
                       CornerData<double>& courseOneForm, EdgeData<double>& courseSingularEdges, CornerData<double>& waleOneForm, EdgeData<double>& waleSingularEdges,
                       std::map<int, int>& globalToGluedEdgeMap){
@@ -42,7 +44,7 @@ void KnitGraph::buildGraph(){
     std::vector<Vector3> vertexPositions;
     for (knitGraphVertex &v : vertices)
         vertexPositions.push_back(v.position);
-    polyscope::registerPointCloud("knit graph vertices before merge", vertexPositions)->setPointRadius(0.001);
+    polyscope::registerPointCloud("knit graph vertices before merge", vertexPositions)->setPointRadius(0.001)->setEnabled(false);
 
     //handle the merge in the intrinsic setting 
     intrinsicMerge();
@@ -53,14 +55,20 @@ void KnitGraph::buildGraph(){
     //reorder vertex indices
     makeRealVertices();
 
+    // Plot real vertices
+    std::vector<Vector3> realVertexPositions;
+    for (knitGraphVertex &v : realVertices)
+        realVertexPositions.push_back(v.position);
+    polyscope::registerPointCloud("knit graph vertices (real)", realVertexPositions)->setPointRadius(0.001)->setEnabled(false);
+
     // std::vector<Vector3> realVertexPositions;
     // for (knitGraphVertex &v : realVertices)
     //     realVertexPositions.push_back(v.position);
     // polyscope::registerPointCloud("real vertices", realVertexPositions)->setPointRadius(0.001);
 
 
-    //tag the increases and decreases 
-    tagIncreasesDecreases();
+    // //tag the increases and decreases 
+    // tagIncreasesDecreases();
     
     //render the knit graph
     renderGraph();
@@ -473,24 +481,24 @@ void KnitGraph::intrinsicMerge(){
     EdgeData<int> numVirtualVertices(gluedGeometry->mesh, 0);
     for (const knitGraphVertex& v : vertices) if (v.isVirtual) {
 
-        // Prevent merging on singular edges
-        if (v.isAlphaVirtual && std::fabs(courseSingularEdgesGlued[v.edge.value()]) > 0) continue; // end of course stripe: skip
-        if (v.isBetaVirtual  && std::fabs(waleSingularEdgesGlued[v.edge.value()]) > 0)   continue; // end of wale stripe: skip
+        // // Prevent merging on singular edges
+        // if (v.isAlphaVirtual && std::fabs(courseSingularEdgesGlued[v.edge.value()]) > 0) continue; // end of course stripe: skip
+        // if (v.isBetaVirtual  && std::fabs(waleSingularEdgesGlued[v.edge.value()]) > 0)   continue; // end of wale stripe: skip
 
         numVirtualVertices[v.halfedge.value().edge()]++;
         halfedgeVertices[v.halfedge.value()].push_back(v);
     }
 
-    // Check that each edge has an even number of virtual vertices
-    for (Edge e : (gluedGeometry->mesh).edges()){
-        if (e.isBoundary()) continue;
-        if (numVirtualVertices[e] % 2 != 0){
-            std::cout << "something wrong on edge " << e << std::endl;
-            std::cout << "non singular edge has an uneven number of virtual vertices " << std::endl;
-            polyscope::show();
-            exit(1);    
-        }
-    }
+    // // Check that each edge has an even number of virtual vertices
+    // for (Edge e : (gluedGeometry->mesh).edges()){
+    //     if (e.isBoundary()) continue;
+    //     if (numVirtualVertices[e] % 2 != 0){
+    //         std::cout << "something wrong on edge " << e << std::endl;
+    //         std::cout << "non singular edge has an uneven number of virtual vertices " << std::endl;
+    //         polyscope::show();
+    //         exit(1);    
+    //     }
+    // }
 
     // Custom comparator function
     auto compareByJK = [](const knitGraphVertex &a, const knitGraphVertex &b) -> bool {
@@ -531,16 +539,76 @@ void KnitGraph::intrinsicMerge(){
     //make the connections 
     for (Edge e : (gluedGeometry->mesh).edges()){
         if (e.isBoundary()) continue;
-        if (numVirtualVertices[e] % 2 != 0) continue;
+
         std::vector<knitGraphVertex> he1Vertices = halfedgeVertices[e.halfedge()];
         std::vector<knitGraphVertex> he2Vertices = halfedgeVertices[e.halfedge().twin()];
-        if (he1Vertices.size() != he2Vertices.size()){
-            std::cout << "Something went wrong at edge " << e << std::endl;
-            exit(1);
+
+        // classical singularity with 1 stripe being born: nothing to do
+        if (he1Vertices.size() + he2Vertices.size() == 1)
+            continue;
+
+        vector<pair<int, int>> matchings;
+
+        // more funky singularity: we need to match
+        if (numVirtualVertices[e] % 2 != 0) { 
+
+            // Check which side of the triangles he1 and he2 are located
+            // TODO: find a way to do this without epsilons
+            int side1, side2;
+            for (int i = 0; i < 3; i++) {
+                if (abs(he1Vertices[0].baryCoords[i]) < 1e-8)
+                    side1 = (i+1)%3;
+                if (abs(he2Vertices[0].baryCoords[i]) < 1e-8)
+                    side2 = (i+1)%3;
+            }
+
+            // Fetch coordinate along edge
+            vector<double> coordsAlongHe1, coordsAlongHe2;
+            for (knitGraphVertex &v : he1Vertices)
+                coordsAlongHe1.push_back(v.baryCoords[side1]);
+            for (knitGraphVertex &v : he2Vertices)
+                coordsAlongHe2.push_back(1 - v.baryCoords[side2]); // need to invert to be in the same basis
+
+            // Find out best matchings (greedy approach)
+            if (he1Vertices.size() < he2Vertices.size()) { // match every vertex of he1 to closest vertex of he2
+                for (int i1 = 0; i1 < he1Vertices.size(); i1++) {
+                    int i2closest = -1;
+                    for (int i2 = 0; i2 < he2Vertices.size(); i2++)
+                        if (he1Vertices[i1].isAlphaVirtual == he2Vertices[i2].isAlphaVirtual && (i2closest == -1 || abs(coordsAlongHe1[i1] - coordsAlongHe2[i2]) < abs(coordsAlongHe1[i1] - coordsAlongHe2[i2closest])))
+                            i2closest = i2;
+                    if (i2closest == -1) {
+                        cout << "Error: No match found for vertex " << he1Vertices[i1].id << endl;
+                        polyscope::show();
+                    } else {
+                        matchings.push_back({i1, i2closest});
+                    }
+                }
+            } else { // match every vertex of he2 to closest vertex of he1
+                for (int i2 = 0; i2 < he2Vertices.size(); i2++) {
+                    int i1closest = -1;
+                    for (int i1 = 0; i1 < he1Vertices.size(); i1++)
+                        if (he1Vertices[i1].isAlphaVirtual == he2Vertices[i2].isAlphaVirtual && (i1closest == -1 || abs(coordsAlongHe1[i1] - coordsAlongHe2[i2]) < abs(coordsAlongHe1[i1closest] - coordsAlongHe2[i2])))
+                            i1closest = i1;
+                    if (i1closest == -1) {
+                        cout << "Error: No match found for vertex " << he2Vertices[i2].id << endl;
+                        polyscope::show();
+                    } else {
+                        matchings.push_back({i1closest, i2});
+                    }
+                }
+            }
+        } else {
+            // Edge is regular: matching is trivial
+            for (int i = 0; i < he1Vertices.size(); i++) {
+                matchings.push_back({i, (he1Vertices.size() - i) - 1});
+            }
         }
-        for (int i = 0; i < he1Vertices.size(); i++){
-            knitGraphVertex v1 = he1Vertices[i];
-            knitGraphVertex v2 = he2Vertices[(he1Vertices.size() - i) - 1];
+
+
+        // Now actually connect all matchings
+        for (auto [i1, i2] : matchings) {
+            knitGraphVertex v1 = he1Vertices[i1];
+            knitGraphVertex v2 = he2Vertices[i2];
             if (v1.row_in == -1 && v2.row_in == -1 && v1.row_out == -1 && v2.row_out == -1){//this is a column merge
                 if (v1.col_in[0] == -1 && v2.col_in[0] != -1){
                     vertices[v1.id].col_in[0]  = v2.id;
@@ -571,6 +639,7 @@ void KnitGraph::intrinsicMerge(){
         bool isGluedPath;
         
         // Find row_in and row_out
+        ensure(v0.row_out != -1);
         v = vertices[v0.row_out];
         isGluedPath = false;
         while(v.isVirtual) {
@@ -587,6 +656,7 @@ void KnitGraph::intrinsicMerge(){
         }
 
         // Find col_in[0] and col_out[0]
+        ensure(v0.col_out[0] != -1);
         v = vertices[v0.col_out[0]];
         isGluedPath = false;
         while (v.isVirtual) {
@@ -1071,6 +1141,13 @@ void KnitGraph::sanityCheck(){
                 buggy_vertices.push_back(v.position);
                 num_errors++;
                 std::cout << "Column 0 mismatch at vertex " << v.id << std::endl;
+                H(v.id);
+                H(v.col_in[0]);
+                H(v.col_in[1]);
+                H(v.col_out[0]);
+                H(v.col_out[1]);
+                H(realVertices[v.col_in[0]].col_out[0]);
+                H(realVertices[v.col_in[0]].col_out[1]);
             }
         }
         if (v.col_out[0] != -1){
@@ -1078,6 +1155,13 @@ void KnitGraph::sanityCheck(){
                 buggy_vertices.push_back(v.position);
                 num_errors++;
                 std::cout << "Column 0 mismatch at vertex " << v.id << std::endl;
+                H(v.id);
+                H(v.col_in[0]);
+                H(v.col_in[1]);
+                H(v.col_out[0]);
+                H(v.col_out[1]);
+                H(realVertices[v.col_out[0]].col_in[0]);
+                H(realVertices[v.col_out[0]].col_in[1]);
             }
         }
 
@@ -1097,13 +1181,15 @@ void KnitGraph::sanityCheck(){
         }
     }
 
-    for (auto const &vi : realVertices){
-        for (auto &vj : realVertices){
-            if (norm(vi.position - vj.position) < eps && vi.id != vj.id){
-                std::cout << "2 real vertices are in the same place " << std::endl;
-            } 
-        }
-    }
+    // // This is super expensive, disable for now
+    // for (auto const &vi : realVertices){
+    //     for (auto &vj : realVertices){
+    //         if (norm(vi.position - vj.position) < eps && vi.id != vj.id){
+    //             std::cout << "2 real vertices are in the same place " << std::endl;
+    //         } 
+    //     }
+    // }
+
     if (num_errors == 0){
         std::cout << "Sanity check passed " << std::endl << std::endl;
     }

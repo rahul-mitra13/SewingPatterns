@@ -55,6 +55,21 @@ template<class T> std::ostream &operator<<(std::ostream &os, std::vector<T> v) {
   return os;
 }
 
+// Our own assert() equivalent
+#undef ensure
+#define ensure(x)                                         \
+  if (!(x)) {                                             \
+    std::cout << "Assertion failed: " << #x << std::endl; \
+    exit(1);                                               \
+  }
+
+// Global configuration options
+struct Options {
+
+  // Add Polyscope quantities for every iteration of the algorithm
+  bool showAllIterations = true;
+
+};
 
 //boundary conditions on the GLUED MESH
 struct globalBoundaryConditions{
@@ -253,6 +268,8 @@ std::vector<std::vector<int>> findConnectedComponents(EdgeLengthGeometry& gluedG
 // In the meantime, here's a wrapper that correctly prepares corner data;
 // just call it and feed the output to addCornerScalarQuantity.
 std::vector<double> prepareCornerData(CornerData<double> cornerData);
+
+std::vector<double> prepareHalfedgeData(HalfedgeData<double> halfedgeData);
 
 // A Union Find data structure
 // We use it for the vertex mappings in the glued mesh.
