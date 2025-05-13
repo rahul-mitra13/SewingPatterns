@@ -3385,6 +3385,13 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     //ONLY IMPLEMENTED IN THE GLOBAL SETTING FOR NOW
 
+    //rotate the gradients so that we measure curl in the wale direction
+    // globalGeometry.requireFaceNormals();
+    // //rotate the gradients to measure the wale curl 
+    // for (Face f : globalMesh.faces()){
+    //     globalTimeFunctionGradientsNormalized[f] = globalTimeFunctionGradientsNormalized[f].rotateAround(globalGeometry.faceNormals[f], M_PI/2.);
+    // }
+
     //Attempting to find the center of distributions using Vector Heat Method
     VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     globalTimeFunctionGradientsNormalized, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
@@ -3432,11 +3439,14 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
    
     VoronoiOptions negOptions = defaultVoronoiOptions;
-    negOptions.nSites = posOptions.nSites; //std::round(totalNegMeasure / period);
+    negOptions.nSites = std::round(totalNegMeasure / period);
     negOptions.useDelaunay = false;
     negOptions.computeDistributions = true;
     negOptions.iterations = 100;
-    VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, posOptions, negMeasure, psMesh);
+    std::cout << "# positive sites " << posOptions.nSites << std::endl;
+    std::cout << "# negative sites " << negOptions.nSites << std::endl;
+    //exit(0);
+    VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, negOptions, negMeasure, psMesh);
     std::vector<Vector3> negativeCenters;
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
        negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
