@@ -3519,8 +3519,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
     //plot the stripes
     std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
-    std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
-                                                edgeMap, components);
+    std::tie(uniquePos, uniqueEdges, components) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, edgeMap);
     courseStripes = polyscope::registerCurveNetwork("our stripes ", uniquePos, uniqueEdges);
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);

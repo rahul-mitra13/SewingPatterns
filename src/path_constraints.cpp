@@ -91,18 +91,6 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
     //startVert, endVert are in the glued mesh setting 
     Vertex startVert, endVert;
 
-<<<<<<< HEAD
-    if (dot((globalGeometry.vertexPositions[e1.halfedge().tipVertex()] - globalGeometry.vertexPositions[e1.halfedge().tailVertex()]).normalize(), 
-            globalFaceGradients[e1.halfedge().face()]) > dot((globalGeometry.vertexPositions[e1.halfedge().twin().tipVertex()] - globalGeometry.vertexPositions[e1.halfedge().twin().tailVertex()]).normalize(), 
-            globalFaceGradients[e1.halfedge().twin().face()])){
-        
-        if (gluedSigmaTilde[e1.halfedge()] < gluedSigmaTilde[e1.halfedge().twin()]){
-            std::cout << "something went wrong " << std::endl;
-            //exit(1);
-        }
-        startVert = gluedMesh.vertex(vertexMap[e1.halfedge().tipVertex().getIndex()]);
-        
-=======
     //don't take paths through singular edges 
     // gluedHeWeights[e1.halfedge()] = DBL_MAX;
     // gluedHeWeights[e1.halfedge().twin()] = DBL_MAX;
@@ -126,7 +114,6 @@ std::tuple<std::vector<double>, std::vector<double>> constructEdgePath(VertexPos
     } else{
         ensure(gluedSigmaTilde[he1.twin()] > gluedSigmaTilde[he1]);
         startVert = gluedMesh.vertex(vertexMap[he1.twin().tipVertex().getIndex()]);
->>>>>>> St_Gobain_Experiments
     }
     if (dot(he2vec, he2grad) > dot(he2twinvec, he2twingrad)) {
         ensure(gluedSigmaTilde[he2] > gluedSigmaTilde[he2.twin()]);

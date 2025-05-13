@@ -88,10 +88,10 @@ EdgeData<int> stripeIsoValEdges(EmbeddedGeometryInterface& geometry,
 
 //find the connected components in a stripe pattern
 std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>, std::vector<StripeConnectedComponent>> findStripeConnectedComponents(VertexPositionGeometry& globalGeometry, 
-                                  EdgeLengthGeometry& gluedGeometry, 
-                                  const CornerData<double>& stripeValues,
-                                  const FaceData<int>& stripesIndices, double period,
-                                  const std::map<int, int>& edgeMap);
+                                                                                                                                       EdgeLengthGeometry& gluedGeometry, 
+                                                                                                                                       const CornerData<double>& stripeValues,
+                                                                                                                                       const FaceData<int>& stripesIndices, double period,
+                                                                                                                                       const std::map<int, int>& edgeMap);
 
 //find a set of edge singularity pairs on the same isoline as the stripe patterns
 std::vector<std::pair<int, int>> findEdgeSingularityPairFromStripeIsoVals(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,
