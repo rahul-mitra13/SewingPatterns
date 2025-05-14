@@ -3397,6 +3397,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //Attempting to find the center of distributions using Vector Heat Method
     VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     globalTimeFunctionGradientsNormalized, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
+                                    
+    //flag of faces we've placed singularities on 
+    std::vector<int> usedFaces(globalMesh.nFaces(), 0);
+    
     psMesh.addVertexScalarQuantity("initial curl measure ", curlMeasure);
     //now divide the measure into positive and negative 
     VertexData<double> posMeasure(globalMesh, 0.0);
@@ -3413,6 +3417,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             totalNegMeasure += globalGeometry.vertexDualAreas[v] * negMeasure[v];
         }
     }
+
 
     //debugging on a simple square
     // for (Vertex v : globalMesh.vertices()){
@@ -3447,7 +3452,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     negOptions.iterations = 100;
     std::cout << "# positive sites " << posOptions.nSites << std::endl;
     std::cout << "# negative sites " << negOptions.nSites << std::endl;
-    //exit(0);
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, negOptions, negMeasure, psMesh);
     std::vector<Vector3> negativeCenters;
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
@@ -3512,7 +3516,14 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //set the edge indices from the singularities found using the OT method 
     //just do it naively using outgoing halfedges from singular vertex 
     for (auto p : singularities){
-        edgeIndices[p.first.halfedge().edge().getIndex()] = -1.0 * p.second;
+        if (usedFaces[p.first.halfedge().face().getIndex()] == 0 &&
+            usedFaces[p.first.halfedge().twin().face().getIndex()] == 0){
+            
+            edgeIndices[p.first.halfedge().edge().getIndex()] = -1.0 * p.second;
+            usedFaces[p.first.halfedge().face().getIndex()] = 1;
+            usedFaces[p.first.halfedge().twin().face().getIndex()] = 1;
+        }
+
     }
     model.setEdgeIndices(edgeIndices);
     model.setHomologyGenerators(homologyGenerators);
@@ -3536,13 +3547,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                     gradSigmaTilde, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
     psMesh.addVertexScalarQuantity("vertex curl after " + std::to_string(numRuns - 1) + " singularity insertions (before subtracting)", vertexCurl);
     
-    //course weighting of vertex curl 
-    VertexData<double> courseWeighting(globalMesh);
-    //multiply the vertex curl with the multiplicative weights 
-    VertexData<double> allDist(gluedMesh, 1.0);
-    VertexData<double> allDistGlobal(globalMesh, 1.0);
-    double maxVal = std::numeric_limits<double>::min();
-    double maxSourceVal = std::numeric_limits<double>::min();
+    
     if (heatSourceVerts.size() != 0){//keep singularities away from saddle vertices
         allDist = heatSolver.computeDistance(heatSourceVerts);
         //for all the source vertices, find the max value 
