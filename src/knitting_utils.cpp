@@ -3398,10 +3398,22 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     globalTimeFunctionGradientsNormalized, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
 
+    psMesh.addVertexScalarQuantity("initial curl measure ", curlMeasure);
+
+
+    for (Vertex v : globalMesh.vertices()) {
+        H(period / globalGeometry.vertexDualAreas[v]);
+        if (curlMeasure[v] > 0)
+            curlMeasure[v] = fmin(curlMeasure[v], 1./3 * period / globalGeometry.vertexDualAreas[v]);
+        else 
+            curlMeasure[v] = fmax(curlMeasure[v], -1.0 * 1./3 * period / globalGeometry.vertexDualAreas[v]);
+
+    }
+                                    
     //flag of faces we've placed singularities on 
     std::vector<int> usedFaces(globalMesh.nFaces(), 0);
     
-    psMesh.addVertexScalarQuantity("initial curl measure ", curlMeasure);
+    psMesh.addVertexScalarQuantity("initial curl measure (capped)", curlMeasure);
     //now divide the measure into positive and negative 
     VertexData<double> posMeasure(globalMesh, 0.0);
     VertexData<double> negMeasure(globalMesh, 0.0);
@@ -3417,8 +3429,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             totalNegMeasure += globalGeometry.vertexDualAreas[v] * negMeasure[v];
         }
     }
-
-
+    totalPosMeasure /= 3;
+    totalNegMeasure /= 3;
+    
     //debugging on a simple square
     // for (Vertex v : globalMesh.vertices()){
     //     //if (globalGeometry.vertexPositions[v].z < 0 && globalGeometry.vertexPositions[v].x < 0) posMeasure[v] = 1.0;
@@ -3436,7 +3449,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     posOptions.nSites = std::round(totalPosMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
-    posOptions.iterations = 100;
+    posOptions.iterations = 30;
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, posOptions, posMeasure, psMesh);
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
@@ -3449,7 +3462,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     negOptions.nSites = std::round(totalNegMeasure / period);
     negOptions.useDelaunay = false;
     negOptions.computeDistributions = true;
-    negOptions.iterations = 100;
+    negOptions.iterations = 30;
     std::cout << "# positive sites " << posOptions.nSites << std::endl;
     std::cout << "# negative sites " << negOptions.nSites << std::endl;
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, negOptions, negMeasure, psMesh);
