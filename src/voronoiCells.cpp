@@ -94,7 +94,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
   result.steps.resize(nSites);
 
   //trying to find equal mass power cells 
-  size_t descIter = 1;
+  size_t descIter = 100;
   // double stepSize = 1e-6;
   std::vector<double> phiWeights(nSites, 0.);
   double shortTime;
@@ -125,22 +125,30 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
     std::cout << "Logging info..." << std::endl;
     std::cout << "LLoyd iteration number " << iIter << std::endl;
     
-    // Compute the normalizer distribution
     std::vector<VertexData<double>> rhs = computeRHSWithWeights(siteLocations, phiWeights, shortTime);
-    VertexData<double> normRHS(mesh, 0); // sum on all sites
-    for (int i = 0; i < siteLocations.size(); i++)
-      normRHS += rhs[i];
-    VertexData<double> normD = vSolver.scalarDiffuse(normRHS);
-
+    VertexData<double> normD;
     VertexData<double> rho(mesh, 0.0); // just for sanity check
+    VertexData<double> normRHS(mesh, 0); // sum on all sites
     
+    std::vector<double> cellMasses(nSites);
+
     //gradient descent to find the weights 
     for (size_t i = 0; i < descIter; i++){
-      double mean = 0;
-      std::vector<double> newPhiWeights(nSites, 0.);
-      for (size_t j = 0; j < nSites; j++){//don't we want to move this loop out of the gradient descent loop? 
 
-        double newWeight = 0.; 
+      rhs = computeRHSWithWeights(siteLocations, phiWeights, shortTime);
+
+      // Compute the normalizer distribution
+      normRHS.fill(0);
+      for (int i = 0; i < siteLocations.size(); i++)
+        normRHS += rhs[i];
+      normD = vSolver.scalarDiffuse(normRHS);
+
+      // double mean = 0;
+
+      double gradNorm = 0;
+
+      for (size_t j = 0; j < nSites; j++){
+
         SurfacePoint site = siteLocations[j];
         VertexData<double> thisFracDWeights = vSolver.scalarDiffuse(rhs[j]);//scalarDiffuse takes something that's a mass and returns a density
 
@@ -148,23 +156,33 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
           rho[v] += thisFracDWeights[v] / normD[v];
         }
 
-        double updateWSum = 0.0;
         //normalize and weigh the distibution by the curl measure 
         //also integrate lol
+        double updateWSum = 0.0;
         for (Vertex v : mesh.vertices()){
           thisFracDWeights[v] *= (geom.vertexDualAreas[v] * measure[v]) / normD[v];//multiplying by area (density -> mass)
           //thisFracDWeights[v] *= measure[v]/normD[v];
           updateWSum += thisFracDWeights[v];
         }
 
-        std::cout << "updateWSum = " << updateWSum << std::endl;
+        gradNorm += (desiredMass-updateWSum) * (desiredMass-updateWSum);
+
+        // std::cout << "updateWSum = " << updateWSum << std::endl;
         //newWeight = phiWeights[j] + (((1/iIter) * shortTime) * (desiredMass - updateWSum));//do a time-decaying step size here
-        newWeight = phiWeights[j] + (1e-2 * (desiredMass - updateWSum));//don't do a time-decaying step size
+        phiWeights[j] += 1e-0 * (desiredMass - updateWSum);//don't do a time-decaying step size
         // newWeight = phiWeights[j] + ((shortTime) * (desiredMass - updateWSum));//don't do a time-decaying step size
-        mean += newWeight; 
-        //update the new phi weights
-        newPhiWeights[j] = newWeight;
+        // mean += newWeight; 
+
+        cellMasses[j] = updateWSum;
       }
+
+      gradNorm = sqrt(gradNorm);
+      // H(gradNorm);
+      std::cout << "gradNorm: " << gradNorm << "\t\r" << std::flush;
+
+
+      if (gradNorm < 1e-6)
+        break;
 
       psMesh.addVertexScalarQuantity("rho", rho);
       
@@ -173,14 +191,18 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
       // for (size_t k = 0; k < nSites; k++){
       //   newPhiWeights[k] -= mean;
       // }
-      phiWeights = newPhiWeights;
+      // phiWeights = newPhiWeights;
     }
 
 
-    std::cout << "weights after gradient descent: " << std::endl;
-    for (int i = 0; i < phiWeights.size(); i++){
-      std::cout << "weight at site " << i << ": " << phiWeights[i] << std::endl;
-    }
+    // std::cout << "weights after gradient descent: " << std::endl;
+    // for (int i = 0; i < phiWeights.size(); i++){
+    //   std::cout << "weight at site " << i << ": " << phiWeights[i] << std::endl;
+    // }
+
+    std::cout << "Cell masses:" << std::endl;
+    for (int i = 0; i < nSites; i++)
+      std::cout << cellMasses[i] << std::endl;
 
     // Compute the normalizer distribution
     rhs = computeRHSWithWeights(siteLocations, phiWeights, shortTime);
@@ -212,7 +234,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
       //visualize the cells
       //result.cellEvolution[iSite][iIter] = thisFracDKarcher;
 
-
+      // TODO: Swap loops
       for (size_t iSubIter = 0; iSubIter < options.nSubIterations; iSubIter++) {
 
         // === Compute the log map
