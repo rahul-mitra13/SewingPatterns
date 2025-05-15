@@ -3604,7 +3604,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     posOptions.nSites = std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
-    posOptions.iterations = 300;
+    posOptions.iterations = 500;
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, posOptions, posMeasure, psMesh);
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
@@ -3630,7 +3630,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     negOptions.nSites = posOptions.nSites;
     negOptions.useDelaunay = false;
     negOptions.computeDistributions = true;
-    negOptions.iterations = 300;
+    negOptions.iterations = 500;
     std::cout << "# positive sites " << posOptions.nSites << std::endl;
     std::cout << "# negative sites " << negOptions.nSites << std::endl;
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, negOptions, negMeasure, psMesh);
@@ -3663,14 +3663,14 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         else if (facePoint.faceCoords.z == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().next().vertex() , 1));
     }
 
-    // for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
-    //     std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
-    //     std::vector<Vector3> stepPos;
-    //     for (int i = 0; i < steps.size(); i++){
-    //         stepPos.push_back(steps[i].interpolate(globalGeometry.vertexPositions));
-    //     }
-    //     polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos);
-    // }
+    for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
+        std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
+        std::vector<Vector3> stepPos;
+        for (int i = 0; i < steps.size(); i++){
+            stepPos.push_back(steps[i].interpolate(globalGeometry.vertexPositions));
+        }
+        polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos)->setEnabled(false);
+    }
 
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
         SurfacePoint facePoint = negVoronoiCenters.siteLocations[i].inSomeFace();

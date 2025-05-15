@@ -39,7 +39,19 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
     return result;
   }
 
-  VectorHeatMethodSolver vSolver(geom, options.tCoef);
+  // Define one vector heat method solver per thread
+  vector<VectorHeatMethodSolver> vSolvers;
+  for (int i = 0; i < omp_get_max_threads(); i++)
+    vSolvers.emplace_back(geom, options.tCoef);
+  VectorHeatMethodSolver& vSolver = vSolvers[0]; // temporarily, for the serial code
+
+  // For some reason, running a dummy scalarDiffuse first
+  // fixes thread issues lol. Many thanks to
+  // https://github.com/nmwsharp/geometry-central/issues/108
+  VertexData<double> dummyRHS(mesh, 42.0);
+  for (int i = 0; i < omp_get_max_threads(); i++)
+    vSolvers[i].scalarDiffuse(dummyRHS);
+  
 
   auto computeRHS = [&](const std::vector<SurfacePoint>& points) -> VertexData<double> {
     VertexData<double> rhs(mesh, 0);
@@ -96,9 +108,9 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
   result.steps.resize(nSites);
 
   //trying to find equal mass power cells 
-  size_t descIter = 100;
+  size_t descIter = 500;
   // double stepSize = 1e-6;
-  std::vector<double> phiWeights(nSites, 0.);
+  std::vector<double> phiWeights(nSites, 0.), oldPhiWeights(nSites);
   double shortTime;
   geom.requireEdgeLengths();
   //compute the diffusion time 
@@ -119,7 +131,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
   desiredMass /= nSites;
   std::cout << "desiredMass per cell = " << desiredMass << std::endl;
 
-  
+  // H(SUITESPARSE_USE_OPENMP);
 
   // == Iterations
   for (size_t iIter = 0; iIter < options.iterations; iIter++) {//Lloyd iterations
@@ -129,7 +141,13 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
     
     // UPDATE WEIGHTS WITH FIXED SITES (using Karcher mean)
 
-    std::vector<VertexData<double>> rhs = computeRHSWithWeights(siteLocations, phiWeights, shortTime);
+    double alpha = 1, beta = 0.2;
+    // double alpha = 1, beta = 0; // standard gradient descent 
+
+    // Nesterov acceleration
+    vector<double> phiWeightsY(nSites);
+
+    std::vector<VertexData<double>> rhs;
     VertexData<double> normD;
     VertexData<double> rho(mesh, 0.0); // just for sanity check
     VertexData<double> normRHS(mesh, 0); // sum on all sites
@@ -139,7 +157,15 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
     //gradient descent to find the weights 
     for (size_t i = 0; i < descIter; i++){
 
-      rhs = computeRHSWithWeights(siteLocations, phiWeights, shortTime);
+      // Compute the y_k of Nesterov's AGD
+      for (int j = 0; j < nSites; j++) {
+        phiWeightsY[j] = phiWeights[j] + beta * (phiWeights[j] - oldPhiWeights[j]);
+        oldPhiWeights[j] = phiWeights[j]; // don't need old anymore, we can update
+      }
+
+      // Now compute gradient of y_k
+
+      rhs = computeRHSWithWeights(siteLocations, phiWeightsY, shortTime);
 
       // Compute the normalizer distribution
       normRHS.fill(0);
@@ -149,24 +175,37 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
 
       // double mean = 0;
 
+      // We want to do the mesh registration serially
+      vector<VertexData<double>> fracDWeights;
+      for (int i = 0; i < omp_get_max_threads(); i++)
+        fracDWeights.emplace_back(VertexData<double>(mesh, 0));
+
+        
+
       double gradNorm = 0;
 
+      #pragma omp parallel for reduction(+:gradNorm)
       for (size_t j = 0; j < nSites; j++){
 
-        SurfacePoint site = siteLocations[j];
-        VertexData<double> thisFracDWeights = vSolver.scalarDiffuse(rhs[j]);//scalarDiffuse takes something that's a mass and returns a density
+        int tid = omp_get_thread_num(); // thread ID
 
-        for (Vertex v : mesh.vertices()) {
-          rho[v] += thisFracDWeights[v] / normD[v];
-        }
+        SurfacePoint site = siteLocations[j];
+        vSolvers[tid].scalarDiffuse(rhs[j], fracDWeights[tid]);
+        // cout << fracDWeights[tid] << endl;
+        // fracDWeights[tid] = vSolvers[tid].scalarDiffuse(rhs[j]);//scalarDiffuse takes something that's a mass and returns a density
+
+        // Disabled because data race
+        // for (Vertex v : mesh.vertices()) {
+        //   rho[v] += thisFracDWeights[v] / normD[v];
+        // }
 
         //normalize and weigh the distibution by the curl measure 
         //also integrate lol
         double updateWSum = 0.0;
         for (Vertex v : mesh.vertices()) {
-          thisFracDWeights[v] *= (geom.vertexDualAreas[v] * measure[v]) / normD[v];//multiplying by area (density -> mass)
+          fracDWeights[tid][v] *= (geom.vertexDualAreas[v] * measure[v]) / normD[v];//multiplying by area (density -> mass)
           //thisFracDWeights[v] *= measure[v]/normD[v];
-          updateWSum += thisFracDWeights[v];
+          updateWSum += fracDWeights[tid][v];
         }
 
         gradNorm += (desiredMass-updateWSum) * (desiredMass-updateWSum);
@@ -174,10 +213,15 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
         // std::cout << "updateWSum = " << updateWSum << std::endl;
         //newWeight = phiWeights[j] + (((1/iIter) * shortTime) * (desiredMass - updateWSum));//do a time-decaying step size here
 
-        phiWeights[j] += 1e-0 * (desiredMass - updateWSum);//don't do a time-decaying step size
+        phiWeights[j] = phiWeightsY[j] + alpha * (desiredMass - updateWSum);
 
-        // Nesterov (need to fix)
-        // double alpha = 1e-3, beta = 0.99;
+        // phiWeights[j] += 1e-0 * (desiredMass - updateWSum);//don't do a time-decaying step size
+
+        // // Nesterov (need to fix)
+        // double y = phiWeights[j] + beta * (phiWeights[j] - oldPhiWeights[j]);
+        // oldPhiWeights[j] = phiWeights[j]; // update old
+        // phiWeights[j] += 
+
         // double z = beta * phiWeights[j] + 1e-0 * (desiredMass - updateWSum);
         // phiWeights[j] = phiWeights[j] + alpha * z;
 
@@ -192,7 +236,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
       std::cout << "gradNorm: " << gradNorm << "\t\r" << std::flush;
 
 
-      if (gradNorm < 1e-6)
+      if (gradNorm < 1e-3)
         break;
 
       psMesh.addVertexScalarQuantity("rho", rho);
@@ -221,6 +265,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
     double energy = 0;
     // std::vector<SurfacePoint> newSiteLocations;
 
+    options.nSubIterations = 1;
     for (size_t iSubIter = 0; iSubIter < options.nSubIterations; iSubIter++) {
 
       // Compute the normsalizer distribution
@@ -231,22 +276,33 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
       normD = vSolver.scalarDiffuse(normRHS);
 
       energy = 0;
-      double sumUpdateNorm = 0;
+      vector<double> updateNorm(nSites);
 
+      int totalTime = 0;
+
+      // We want to do the mesh registration serially
+      vector<VertexData<double>> fracDKarcher;
+      for (int i = 0; i < omp_get_max_threads(); i++)
+        fracDKarcher.emplace_back(VertexData<double>(mesh, 0));
+
+
+      // #pragma omp parallel for
       for (size_t iSite = 0; iSite < nSites; iSite++) {
-      
+
+        int tid = omp_get_thread_num(); // thread ID
+
         SurfacePoint site = siteLocations[iSite];
 
         // === Compute the nearest distribution
-        VertexData<double> thisFracDKarcher = vSolver.scalarDiffuse(rhs[iSite]);
+        vSolvers[tid].scalarDiffuse(rhs[iSite], fracDKarcher[tid]);
 
         for (Vertex v : mesh.vertices()) {
-          thisFracDKarcher[v] /= normD[v];
+          fracDKarcher[tid][v] /= normD[v];
         }
 
         //WEIGHT THE DISTRIBUTION BY THE CURL MEASURE (vertex dual areas below when finding weight)
         for (Vertex v : mesh.vertices()){ 
-          thisFracDKarcher[v] *= measure[v];
+          fracDKarcher[tid][v] *= measure[v];
         }
 
         //visualize the cells
@@ -254,7 +310,13 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
 
 
         // === Compute the log map
-        VertexData<Vector2> logmap = vSolver.computeLogMap(site);
+        // auto t1 = chrono::high_resolution_clock::now();
+        VertexData<Vector2> logmap = vSolvers[tid].computeLogMap(site);
+        // auto t2 = chrono::high_resolution_clock::now();
+        // totalTime += chrono::duration_cast<chrono::microseconds>(t2 - t1).count();
+
+        
+
 
         // Evaluate energy and gradient contribution
         Vector2 updateSum{0, 0};
@@ -262,22 +324,23 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
 
         for (Vertex v : mesh.vertices()) {
 
-          double weight = thisFracDKarcher[v] * geom.vertexDualAreas[v];
+          double weight = fracDKarcher[tid][v] * geom.vertexDualAreas[v];
           Vector2 logVal = logmap[v];
           double dist = logVal.norm();
 
           updateSum += weight * logVal;
           updateWSum += weight;
 
-          energy += dist * dist * weight;
+          // energy += dist * dist * weight; // TODO: use a per-site array to avoid data race
         }
 
         //updateSum /= updateWSum;
         Vector2 update = updateSum / updateWSum;
-        sumUpdateNorm += update.norm();
+        updateNorm[iSite] = update.norm();
 
         // Take a step
         TraceGeodesicResult traceResult = traceGeodesic(geom, site, options.stepSize * update);
+
         site = traceResult.endPoint;
         //viz the path it's taking 
         result.steps[iSite].push_back(site);
@@ -285,6 +348,9 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
         siteLocations[iSite] = site;
       }
 
+      // H(totalTime);
+      double sumUpdateNorm = 0;
+      for (int i = 0; i < nSites; i++) sumUpdateNorm += updateNorm[i];
       cout << "sumUpdateNorm = " << sumUpdateNorm << "\t\r" << flush;
 
       // newSiteLocations.push_back(site);

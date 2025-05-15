@@ -1,3 +1,5 @@
+#include <omp.h>
+
 //geometry-central includes 
 #include "geometrycentral/surface/manifold_surface_mesh.h"
 #include "geometrycentral/surface/meshio.h"
@@ -315,6 +317,17 @@ void callBacks() {
 }
 
 int main(int argc, char **argv) {
+
+  // Check how many CPUs are available
+#if defined(_OPENMP)
+  int nThreads = omp_get_max_threads();
+  P("OpenMP is available with " << nThreads << " threads");
+#else
+  int nThreads = 1;
+  P("OpenMP is not available!");
+#endif
+
+
   polyscope::init();
   std::ifstream jsonFile(argv[1]);
   nlohmann::json data = nlohmann::json::parse(jsonFile);

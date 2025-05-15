@@ -118,6 +118,29 @@ if(MSVC AND MT)
   set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
 endif()
 
+# Add OpenMP
+# If we're on Apple Silicon, we use Homebrew's libomp
+if (APPLE)
+  set(OpenMP_C_FLAGS "-Xpreprocessor -fopenmp")
+  set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp")
+  set(OpenMP_C_LIB_NAMES "omp")
+  set(OpenMP_CXX_LIB_NAMES "omp")
+  set(OpenMP_omp_LIBRARY omp)
+  include_directories("/opt/homebrew/opt/libomp/include")
+  link_directories("/opt/homebrew/opt/libomp/lib")
+endif()
+
+# Setup OpenMP
+find_package(OpenMP)
+if(OpenMP_FOUND OR OPENMP_FOUND)
+  message("OpenMP FOUND")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+else()
+  message("OpenMP NOT FOUND")
+endif()
+
+
 # Create an executable
 add_executable(
         SewingPatterns
@@ -144,7 +167,7 @@ target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/de
 
 if(CXX)
   target_link_libraries(SewingPatterns optimized ${GUROBI_CXX_LIBRARY}
-                        debug ${GUROBI_CXX_DEBUG_LIBRARY})
+                        debug ${GUROBI_CXX_DEBUG_LIBRARY} ${OpenMP_CXX_LIBRARIES})
 endif()
 
 #target_link_libraries(SewingPatterns ${SUITESPARSE_LIBRARIES})
