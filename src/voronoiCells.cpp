@@ -96,7 +96,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
   result.steps.resize(nSites);
 
   //trying to find equal mass power cells 
-  size_t descIter = 1000;
+  size_t descIter = 100;
   // double stepSize = 1e-6;
   std::vector<double> phiWeights(nSites, 0.);
   double shortTime;
@@ -163,7 +163,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
         //normalize and weigh the distibution by the curl measure 
         //also integrate lol
         double updateWSum = 0.0;
-        for (Vertex v : mesh.vertices()){
+        for (Vertex v : mesh.vertices()) {
           thisFracDWeights[v] *= (geom.vertexDualAreas[v] * measure[v]) / normD[v];//multiplying by area (density -> mass)
           //thisFracDWeights[v] *= measure[v]/normD[v];
           updateWSum += thisFracDWeights[v];
@@ -173,7 +173,14 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
 
         // std::cout << "updateWSum = " << updateWSum << std::endl;
         //newWeight = phiWeights[j] + (((1/iIter) * shortTime) * (desiredMass - updateWSum));//do a time-decaying step size here
+
         phiWeights[j] += 1e-0 * (desiredMass - updateWSum);//don't do a time-decaying step size
+
+        // Nesterov (need to fix)
+        // double alpha = 1e-3, beta = 0.99;
+        // double z = beta * phiWeights[j] + 1e-0 * (desiredMass - updateWSum);
+        // phiWeights[j] = phiWeights[j] + alpha * z;
+
         // newWeight = phiWeights[j] + ((shortTime) * (desiredMass - updateWSum));//don't do a time-decaying step size
         // mean += newWeight; 
 
@@ -211,39 +218,40 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
     cout << "Cell mass bounds: " << minCellMass << ", " << maxCellMass << endl;
 
     // UPDATE SITES WITH FIXED WEIGHTS (using Karcher mean)
-
-    // Compute the normalizer distribution
-    rhs = computeRHSWithWeights(siteLocations, phiWeights, shortTime);
-    normRHS = VertexData<double>(mesh, 0); // sum on all sites
-    for (int i = 0; i < siteLocations.size(); i++)
-      normRHS += rhs[i];
-    normD = vSolver.scalarDiffuse(normRHS);
-
-
     double energy = 0;
-    std::vector<SurfacePoint> newSiteLocations;
+    // std::vector<SurfacePoint> newSiteLocations;
 
-    for (size_t iSite = 0; iSite < nSites; iSite++) {
+    for (size_t iSubIter = 0; iSubIter < options.nSubIterations; iSubIter++) {
+
+      // Compute the normsalizer distribution
+      rhs = computeRHSWithWeights(siteLocations, phiWeights, shortTime);
+      normRHS = VertexData<double>(mesh, 0); // sum on all sites
+      for (int i = 0; i < siteLocations.size(); i++)
+        normRHS += rhs[i];
+      normD = vSolver.scalarDiffuse(normRHS);
+
+      energy = 0;
+      double sumUpdateNorm = 0;
+
+      for (size_t iSite = 0; iSite < nSites; iSite++) {
       
-      SurfacePoint site = siteLocations[iSite];
+        SurfacePoint site = siteLocations[iSite];
 
-      // === Compute the nearest distribution
-      VertexData<double> thisFracDKarcher = vSolver.scalarDiffuse(rhs[iSite]);
+        // === Compute the nearest distribution
+        VertexData<double> thisFracDKarcher = vSolver.scalarDiffuse(rhs[iSite]);
 
-      for (Vertex v : mesh.vertices()) {
-        thisFracDKarcher[v] /= normD[v];
-      }
+        for (Vertex v : mesh.vertices()) {
+          thisFracDKarcher[v] /= normD[v];
+        }
 
-      //WEIGHT THE DISTRIBUTION BY THE CURL MEASURE (vertex dual areas below when finding weight)
-      for (Vertex v : mesh.vertices()){ 
-        thisFracDKarcher[v] *= measure[v];
-      }
+        //WEIGHT THE DISTRIBUTION BY THE CURL MEASURE (vertex dual areas below when finding weight)
+        for (Vertex v : mesh.vertices()){ 
+          thisFracDKarcher[v] *= measure[v];
+        }
 
-      //visualize the cells
-      //result.cellEvolution[iSite][iIter] = thisFracDKarcher;
+        //visualize the cells
+        //result.cellEvolution[iSite][iIter] = thisFracDKarcher;
 
-      // TODO: Swap loops
-      for (size_t iSubIter = 0; iSubIter < options.nSubIterations; iSubIter++) {
 
         // === Compute the log map
         VertexData<Vector2> logmap = vSolver.computeLogMap(site);
@@ -263,20 +271,27 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
 
           energy += dist * dist * weight;
         }
+
         //updateSum /= updateWSum;
         Vector2 update = updateSum / updateWSum;
+        sumUpdateNorm += update.norm();
 
         // Take a step
         TraceGeodesicResult traceResult = traceGeodesic(geom, site, options.stepSize * update);
         site = traceResult.endPoint;
         //viz the path it's taking 
         result.steps[iSite].push_back(site);
+
+        siteLocations[iSite] = site;
       }
 
-      newSiteLocations.push_back(site);
-    }
+      cout << "sumUpdateNorm = " << sumUpdateNorm << "\t\r" << flush;
 
-    siteLocations = newSiteLocations;
+      // newSiteLocations.push_back(site);
+    }
+    cout << endl;
+
+    // siteLocations = newSiteLocations;
     if (VORONOI_PRINT) std::cout << "Finished iteration " << iIter << "  energy " << energy << std::endl;
     std::cout << "-------------------------" << std::endl;
   }
