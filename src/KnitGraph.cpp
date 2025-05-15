@@ -67,8 +67,8 @@ void KnitGraph::buildGraph(){
     // polyscope::registerPointCloud("real vertices", realVertexPositions)->setPointRadius(0.001);
 
 
-    // //tag the increases and decreases 
-    // tagIncreasesDecreases();
+    // tag the increases and decreases 
+    //tagIncreasesDecreases();
     
     //render the knit graph
     renderGraph();
@@ -1224,6 +1224,26 @@ void KnitGraph::writeKnitGraphToTxtFile(const std::string& file_name){
 
     // file.close();
     std::cout << "wrote knit graph to txt file " << std::endl;
+}
+
+//write knit graph as line element 
+void KnitGraph::writeKnitGraphLineElement(){
+
+   std::ofstream outfile("lineElement.obj");
+    for (auto &v : realVertices){
+        outfile << " v " << v.position.x << " " << v.position.y << " " << v.position.z << std::endl;
+    }
+
+    for (auto &v : realVertices){
+        if (v.row_out != -1) outfile << "l " << v.id + 1 << " " << v.row_out + 1 << std::endl;
+        if (v.col_out[0] != -1) outfile << "l " << v.id + 1  << " " << v.col_out[0] + 1 << std::endl;
+        if (v.col_out[1] != -1) outfile << "l " << v.id + 1 << " " << v.col_out[1] + 1 << std::endl;
+    }
+
+    outfile.close();
+
+
+
 }
 
 

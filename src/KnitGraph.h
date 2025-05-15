@@ -170,5 +170,8 @@ class KnitGraph{
 
             //write knit graph to txt file
             void writeKnitGraphToTxtFile(const std::string& file_name);
+
+            //write knit graph as line element
+            void writeKnitGraphLineElement();
 };
 

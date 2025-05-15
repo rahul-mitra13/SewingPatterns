@@ -179,12 +179,13 @@ void showStripePatterns(){
                                                                     allSaddleLoops, homologyGenerators, opts);
 
   
-  globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
-  // Store course singular edges for rendering later
+  // globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
+  // // Store course singular edges for rendering later
   RichSurfaceMeshData richData(globalGeometry->mesh);
   richData.addMeshConnectivity();
   richData.addGeometry(*globalGeometry);
-  richData.addEdgeProperty("courseSingularEdge", courseSingularEdgesGlobal);
+  richData.addEdgeProperty("courseSingularEdges", courseSingularEdgesGlobal);
+  richData.addCornerProperty("courseStripeValues", courseStripeValues);
 
 
   // // FaceData<int> stripeIndicesSigmaCourse(*globalMesh, 0);
@@ -197,21 +198,22 @@ void showStripePatterns(){
 
 
   // // //WALE STRIPES
-  //find Knöppel singularities in the WALE DIRECTION 
-  //just run Knoppel's algorithm on these models 
-  //and then run our 1-form optimization with the singularities
-  // CornerData<double> waleStripeValues;
-  // EdgeData<double> waleSingularEdgesGlobal;
-  // FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
-  // std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
-  //                                                                   edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, timeFunctionGlued,
-  //                                                                   courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
-  //                                                                   courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
-  //                                                                   homologyGenerators);
+  // find Knöppel singularities in the WALE DIRECTION 
+  // just run Knoppel's algorithm on these models 
+  // and then run our 1-form optimization with the singularities
+  CornerData<double> waleStripeValues;
+  EdgeData<double> waleSingularEdgesGlobal;
+  FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
+  std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
+                                                                    edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, timeFunctionGlued,
+                                                                    courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
+                                                                    courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
+                                                                    homologyGenerators);
   // // Store wale singular edges for rendering later
-  // richData.addEdgeProperty("waleSingularEdges", waleSingularEdgesGlobal);
+  richData.addEdgeProperty("waleSingularEdges", waleSingularEdgesGlobal);
+  richData.addCornerProperty("waleStripeValues", waleStripeValues);
 
-  // richData.write("singularEdges.ply");
+  richData.write("info.ply");
 
   // std::vector<Vector3> positionsWale;
   // std::vector<std::array<int, 2>> edgesWale;
@@ -234,11 +236,12 @@ void showStripePatterns(){
 
 
   // generate the knit graph
-  // graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
-  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-  //                     edgeMap);
-  // graph.buildGraph();
+  graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
+                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+                      edgeMap);
+  graph.buildGraph();
 
+  graph.writeKnitGraphLineElement();
   // graph.writeKnitGraphToTxtFile("model.obj");
 
 
