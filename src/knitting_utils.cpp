@@ -1899,17 +1899,18 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             totalNegMeasure += globalGeometry.vertexDualAreas[v] * negMeasure[v];
         }
     }
-    double avgTotalMeasure = (totalPosMeasure + totalNegMeasure) / 2;
+    H(totalPosMeasure);
+    H(totalNegMeasure);
 
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     std::unique_ptr<ManifoldSurfaceMesh> manifoldGlobalMesh = globalMesh.toManifoldMesh();
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = std::round(avgTotalMeasure / period);
+    posOptions.nSites = std::round(totalPosMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
-    posOptions.iterations = 300;
+    posOptions.iterations = 500;
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, posOptions, posMeasure, psMesh);
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
@@ -1932,10 +1933,10 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
    
     VoronoiOptions negOptions = defaultVoronoiOptions;
-    negOptions.nSites = posOptions.nSites;
+    negOptions.nSites = std::round(totalNegMeasure / period); // we don't care if this is different that posOptions.nSites
     negOptions.useDelaunay = false;
     negOptions.computeDistributions = true;
-    negOptions.iterations = 300;
+    negOptions.iterations = 500;
     std::cout << "# positive sites " << posOptions.nSites << std::endl;
     std::cout << "# negative sites " << negOptions.nSites << std::endl;
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, negOptions, negMeasure, psMesh);

@@ -108,7 +108,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
   result.steps.resize(nSites);
 
   //trying to find equal mass power cells 
-  size_t descIter = 500;
+  size_t descIter = 1000;
   // double stepSize = 1e-6;
   std::vector<double> phiWeights(nSites, 0.), oldPhiWeights(nSites);
   double shortTime;
@@ -141,8 +141,8 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
     
     // UPDATE WEIGHTS WITH FIXED SITES (using Karcher mean)
 
-    double alpha = 1, beta = 0.2;
-    // double alpha = 1, beta = 0; // standard gradient descent 
+    double alpha = 2, beta = 0.2;
+    // double alpha = 2, beta = 0; // standard gradient descent 
 
     // Nesterov acceleration
     vector<double> phiWeightsY(nSites);

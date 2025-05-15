@@ -156,10 +156,13 @@ void showStripePatterns(){
   FaceData<Vector3> timeFunctionGradientGlobal = computeTimeFunctionFaceGrad(*globalGeometry, timeFunctionGlobal);
   //normalize the gradient of the timeFunction 
   FaceData<Vector3> timeFunctionGradientGlobalNormalized(*globalMesh);
+  FaceData<Vector3> timeFunctionGradientGlobalRotated(*globalMesh);
   for (Face f : globalMesh -> faces()){
     timeFunctionGradientGlobalNormalized[f] = timeFunctionGradientGlobal[f].normalize();
+    timeFunctionGradientGlobalRotated[f] = timeFunctionGradientGlobal[f].rotateAround(globalGeometry->faceNormals[f], PI/2.);
   }
   globalPSMesh -> addFaceVectorQuantity("normalized time function gradient", timeFunctionGradientGlobalNormalized);
+
 
   G = grad;
 
