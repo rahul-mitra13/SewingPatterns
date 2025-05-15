@@ -10,9 +10,9 @@ namespace geometrycentral {
 namespace surface {
 
 struct VoronoiResult {
-  std::vector<SurfacePoint> siteLocations;           // sites at the centers of the Voronoi cells
-  std::vector<VertexData<double>> siteDistributions; // soft indicator functions for each Voronoi cell
-  bool hasDistributions = false;                     // is siteDistributions populated?
+  std::vector<SurfacePoint> siteLocations;               // sites at the centers of the Voronoi cells
+  std::vector<VertexData<double>> siteDistributions;    // soft indicator functions for each Voronoi cell
+  bool hasDistributions = false;                       // is siteDistributions populated?
   std::vector<std::vector<SurfacePoint>> steps;       // DEBUG: steps taken from each starting point
 };
 

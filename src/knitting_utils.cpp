@@ -3337,7 +3337,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //     //add the masked vertices to the heat sources
     //     heatSourceVerts.push_back(gluedMesh.vertex(vertexMap[v]));
     // }
-    // psMesh.addVertexScalarQuantity("masked vertices", maskedVertices);
+    // psMesh.addVertexScalarQuantity("masked vertices", maskedVertices)
 
 
     //handle saddle loops in the intrinsic setting
@@ -3397,30 +3397,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //Attempting to find the center of distributions using Vector Heat Method
     VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     globalTimeFunctionGradientsNormalized, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
-
-    for (int i = 0; i < allSaddleLoops.size(); i++){
-        std::vector<double> path = allSaddleLoops[i];
-        for (int j = 0; j < path.size(); j++){
-            if (std::fabs(path[j]) > 0){
-                Edge e = gluedGeometry.mesh.edge(j);
-                // heatSourceVerts.push_back(e.halfedge().tailVertex());
-                // heatSourceVerts.push_back(e.halfedge().tipVertex());
-                Vertex v1 = e.halfedge().tailVertex();
-                Vertex v2 = e.halfedge().tipVertex();
-
-                // if (curlMeasure[v1] > 0)
-                //     curlMeasure[v1] = fmin(curlMeasure[v1], period / globalGeometry.vertexDualAreas[v1]);
-                // else 
-                //     curlMeasure[v1] = fmax(curlMeasure[v1], -1.0 * period / globalGeometry.vertexDualAreas[v1]);
-                
-                // if (curlMeasure[v2] > 0)
-                //     curlMeasure[v2] = fmin(curlMeasure[v2], period / globalGeometry.vertexDualAreas[v2]);
-                // else 
-                //     curlMeasure[v2] = fmax(curlMeasure[v2], -1.0 * period / globalGeometry.vertexDualAreas[v2]);
-
-            }
-        }
-    }
 
     psMesh.addVertexScalarQuantity("initial curl measure ", curlMeasure);
 
@@ -3529,6 +3505,15 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         else if (facePoint.faceCoords.z == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().next().vertex() , 1));
     }
 
+    for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
+        std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
+        std::vector<Vector3> stepPos;
+        for (int i = 0; i < steps.size(); i++){
+            stepPos.push_back(steps[i].interpolate(globalGeometry.vertexPositions));
+        }
+        polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos);
+    }
+
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
         SurfacePoint facePoint = negVoronoiCenters.siteLocations[i].inSomeFace();
         Face f = facePoint.face;
@@ -3539,16 +3524,16 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     
     //perform optimal matching 
-    HalfedgeData<double> heWeights = gluedHeWeights;
-    std::vector<std::pair<Vertex, Vertex>> matchedVertices = performOptimalMatching(globalGeometry, heWeights, singularities);  
+    // HalfedgeData<double> heWeights = gluedHeWeights;
+    // std::vector<std::pair<Vertex, Vertex>> matchedVertices = performOptimalMatching(globalGeometry, heWeights, singularities);  
 
-    for (int i = 0; i < matchedVertices.size(); i++){
-        std::pair<Vertex, Vertex> p = matchedVertices[i];
-        std::vector<Vector3> pC; 
-        pC.push_back(globalGeometry.vertexPositions[p.first]);
-        pC.push_back(globalGeometry.vertexPositions[p.second]);
-        polyscope::registerPointCloud("matched pair " + std::to_string(i), pC)->setEnabled(false);
-    }
+    // for (int i = 0; i < matchedVertices.size(); i++){
+    //     std::pair<Vertex, Vertex> p = matchedVertices[i];
+    //     std::vector<Vector3> pC; 
+    //     pC.push_back(globalGeometry.vertexPositions[p.first]);
+    //     pC.push_back(globalGeometry.vertexPositions[p.second]);
+    //     polyscope::registerPointCloud("matched pair " + std::to_string(i), pC)->setEnabled(false);
+    // }
 
     //set the edge indices from the singularities found using the OT method 
     //just do it naively using outgoing halfedges from singular vertex 
@@ -3571,10 +3556,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     courseStripes = polyscope::registerCurveNetwork("our stripes ", uniquePos, uniqueEdges);
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
-
-
-
-
 
     //-------------------End of testing-------------------//
 
