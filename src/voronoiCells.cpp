@@ -3,6 +3,8 @@
 #include "float.h"
 #include "helpers.h"
 
+using namespace std;
+
 namespace geometrycentral {
 namespace surface {
 
@@ -94,7 +96,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
   result.steps.resize(nSites);
 
   //trying to find equal mass power cells 
-  size_t descIter = 100;
+  size_t descIter = 1000;
   // double stepSize = 1e-6;
   std::vector<double> phiWeights(nSites, 0.);
   double shortTime;
@@ -125,6 +127,8 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
     std::cout << "Logging info..." << std::endl;
     std::cout << "LLoyd iteration number " << iIter << std::endl;
     
+    // UPDATE WEIGHTS WITH FIXED SITES (using Karcher mean)
+
     std::vector<VertexData<double>> rhs = computeRHSWithWeights(siteLocations, phiWeights, shortTime);
     VertexData<double> normD;
     VertexData<double> rho(mesh, 0.0); // just for sanity check
@@ -194,15 +198,19 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
       // phiWeights = newPhiWeights;
     }
 
+    cout << endl;
+
 
     // std::cout << "weights after gradient descent: " << std::endl;
     // for (int i = 0; i < phiWeights.size(); i++){
     //   std::cout << "weight at site " << i << ": " << phiWeights[i] << std::endl;
     // }
 
-    std::cout << "Cell masses:" << std::endl;
-    for (int i = 0; i < nSites; i++)
-      std::cout << cellMasses[i] << std::endl;
+    double minCellMass = *min_element(cellMasses.begin(), cellMasses.end());
+    double maxCellMass = *max_element(cellMasses.begin(), cellMasses.end());
+    cout << "Cell mass bounds: " << minCellMass << ", " << maxCellMass << endl;
+
+    // UPDATE SITES WITH FIXED WEIGHTS (using Karcher mean)
 
     // Compute the normalizer distribution
     rhs = computeRHSWithWeights(siteLocations, phiWeights, shortTime);

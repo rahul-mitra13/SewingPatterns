@@ -3425,13 +3425,11 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial curl measure ", curlMeasure);
 
 
-    for (Vertex v : globalMesh.vertices()) {
-        H(period / globalGeometry.vertexDualAreas[v]);
-        if (curlMeasure[v] > 0)
-            curlMeasure[v] = fmin(curlMeasure[v], 1./3 * period / globalGeometry.vertexDualAreas[v]);
-        else 
-            curlMeasure[v] = fmax(curlMeasure[v], -1.0 * 1./3 * period / globalGeometry.vertexDualAreas[v]);
 
+    // Cap curl measure to avoid high concentration of singularities
+    for (Vertex v : globalMesh.vertices()) {
+        curlMeasure[v] = fmin(curlMeasure[v], period / (3*globalGeometry.vertexDualAreas[v]));
+        curlMeasure[v] = fmax(curlMeasure[v], -period / (3*globalGeometry.vertexDualAreas[v]));
     }
                                     
     //flag of faces we've placed singularities on 
@@ -3453,9 +3451,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             totalNegMeasure += globalGeometry.vertexDualAreas[v] * negMeasure[v];
         }
     }
-    totalPosMeasure /= 3;
-    totalNegMeasure /= 3;
-    
+    double avgTotalMeasure = (totalPosMeasure + totalNegMeasure) / 2;
+
     //debugging on a simple square
     // for (Vertex v : globalMesh.vertices()){
     //     //if (globalGeometry.vertexPositions[v].z < 0 && globalGeometry.vertexPositions[v].x < 0) posMeasure[v] = 1.0;
@@ -3470,10 +3467,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::unique_ptr<ManifoldSurfaceMesh> manifoldGlobalMesh = globalMesh.toManifoldMesh();
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = std::round(totalPosMeasure / period);
+    posOptions.nSites = std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
-    posOptions.iterations = 30;
+    posOptions.iterations = 50;
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, posOptions, posMeasure, psMesh);
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
@@ -3481,21 +3478,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
     polyscope::registerPointCloud("positive voronoi sites", positiveCenters);
     std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
-   
-    VoronoiOptions negOptions = defaultVoronoiOptions;
-    negOptions.nSites = std::round(totalNegMeasure / period);
-    negOptions.useDelaunay = false;
-    negOptions.computeDistributions = true;
-    negOptions.iterations = 30;
-    std::cout << "# positive sites " << posOptions.nSites << std::endl;
-    std::cout << "# negative sites " << negOptions.nSites << std::endl;
-    VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, negOptions, negMeasure, psMesh);
-    std::vector<Vector3> negativeCenters;
-    for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
-       negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-    }
-    polyscope::registerPointCloud("negative voronoi sites", negativeCenters);
-    std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
 
     //print the masses
     for (size_t i = 0; i < posSiteDistributions.size(); i++){
@@ -3508,6 +3490,24 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         std::cout << "positive mass at site " << i << " = " << mass << std::endl;
         psMesh.addVertexScalarQuantity("positve site distribution " + std::to_string(i), posSiteDistributions[i]);
     }
+
+   
+    VoronoiOptions negOptions = defaultVoronoiOptions;
+    negOptions.nSites = posOptions.nSites;
+    negOptions.useDelaunay = false;
+    negOptions.computeDistributions = true;
+    negOptions.iterations = 50;
+    std::cout << "# positive sites " << posOptions.nSites << std::endl;
+    std::cout << "# negative sites " << negOptions.nSites << std::endl;
+    VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(*manifoldGlobalMesh, globalGeometry, negOptions, negMeasure, psMesh);
+    std::vector<Vector3> negativeCenters;
+    for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
+       negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+    }
+    polyscope::registerPointCloud("negative voronoi sites", negativeCenters);
+    std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
+
+    //print the masses
     for (size_t i = 0; i < negSiteDistributions.size(); i++){
         double mass = 0;
         for (Vertex v : globalMesh.vertices()){
