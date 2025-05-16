@@ -28,7 +28,7 @@ struct VoronoiOptions {
 };
 extern const VoronoiOptions defaultVoronoiOptions;
 
-VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
+VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
                                                            VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
 
 std::vector<SurfacePoint> alignPointsOnIsoline(ManifoldSurfaceMesh& mesh, IntrinsicGeometryInterface& geom, VoronoiResult& result);

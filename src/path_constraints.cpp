@@ -20,7 +20,7 @@ double maximumDotProduct(VertexPositionGeometry& globalGeometry, FaceData<Vector
     
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     double maxDotProd = -DBL_MAX;
-    for (Halfedge he : globalMesh.halfedges()){
+    for (Halfedge he : globalMesh.halfedges()) if (he.isInterior()) {
         Vector3 vector = (globalGeometry.vertexPositions[he.tipVertex()] - globalGeometry.vertexPositions[he.tailVertex()]).normalize();
         double dotProd = dot(vector, rotatedFaceGradients[he.face()]);
         if (dotProd > maxDotProd){
@@ -40,37 +40,39 @@ HalfedgeData<double> constructGluedHalfedgeWeights(VertexPositionGeometry& globa
     HalfedgeData<double> heWeights(gluedMesh, 0.);
     for (Face f : globalMesh.faces()){
 
-        Halfedge hij = f.halfedge();
+        Face fGlued = gluedMesh.face(f.getIndex()); // corresponding face in glued mesh
+
+        Halfedge hij = f.halfedge(), hijGlued = fGlued.halfedge();
         double dotIJ = dot((globalGeometry.vertexPositions[hij.tipVertex()] - globalGeometry.vertexPositions[hij.tailVertex()]).normalize(), 
                             rotatedFaceGradients[f].normalize());
-        heWeights[hij] = dotIJ < 0. ? penaltyFactor * ((1 - dotIJ) / 2.) : (1 - dotIJ) / 2;
+        heWeights[hijGlued] = dotIJ < 0. ? penaltyFactor * ((1 - dotIJ) / 2.) : (1 - dotIJ) / 2;
         //also set weights for boundary halfedges 
         if (!hij.twin().isInterior()){
             double dotIJTwin = dot((globalGeometry.vertexPositions[hij.tailVertex()] - globalGeometry.vertexPositions[hij.tipVertex()]).normalize(), 
                             rotatedFaceGradients[f].normalize());
-            heWeights[hij.twin()] = dotIJTwin < 0. ? penaltyFactor * (1 - dotIJTwin)/2. : (1 - dotIJTwin)/2.;
+            heWeights[hijGlued.twin()] = dotIJTwin < 0. ? penaltyFactor * (1 - dotIJTwin)/2. : (1 - dotIJTwin)/2.;
         }
 
-        Halfedge hjk = hij.next();
+        Halfedge hjk = hij.next(), hjkGlued = hijGlued.next();
         double dotJK = dot((globalGeometry.vertexPositions[hjk.tipVertex()] - globalGeometry.vertexPositions[hjk.tailVertex()]).normalize(), 
                             rotatedFaceGradients[f].normalize());
-        heWeights[hjk] = dotJK < 0. ? penaltyFactor * (1 - dotJK) / 2. : (1 - dotJK) / 2;
+        heWeights[hjkGlued] = dotJK < 0. ? penaltyFactor * (1 - dotJK) / 2. : (1 - dotJK) / 2;
         //also set weights for boundary halfedges 
         if (!hjk.twin().isInterior()){
             double dotJKTwin = dot((globalGeometry.vertexPositions[hjk.tailVertex()] - globalGeometry.vertexPositions[hjk.tipVertex()]).normalize(), 
                             rotatedFaceGradients[f].normalize());
-            heWeights[hjk.twin()] = dotJKTwin < 0. ? penaltyFactor * (1 - dotJKTwin) / 2. : (1 - dotJKTwin) / 2.;
+            heWeights[hjkGlued.twin()] = dotJKTwin < 0. ? penaltyFactor * (1 - dotJKTwin) / 2. : (1 - dotJKTwin) / 2.;
 
         }
-        Halfedge hki = hjk.next();
+        Halfedge hki = hjk.next(), hkiGlued = hjkGlued.next();
         double dotKI = dot((globalGeometry.vertexPositions[hki.tipVertex()] - globalGeometry.vertexPositions[hki.tailVertex()]).normalize(), 
                             rotatedFaceGradients[f].normalize());
-        heWeights[hki] = dotKI < 0. ? penaltyFactor * (1 - dotKI) / 2. : (1 - dotKI) / 2.;
+        heWeights[hkiGlued] = dotKI < 0. ? penaltyFactor * (1 - dotKI) / 2. : (1 - dotKI) / 2.;
         //also set weights for boundary halfedges 
         if (!hki.twin().isInterior()){
             double dotKITwin = dot((globalGeometry.vertexPositions[hki.tailVertex()] - globalGeometry.vertexPositions[hki.tipVertex()]).normalize(), 
                             rotatedFaceGradients[f].normalize());
-            heWeights[hki.twin()] = dotKITwin < 0. ? penaltyFactor * (1 - dotKITwin) / 2. : (1 - dotKITwin) / 2.;
+            heWeights[hkiGlued.twin()] = dotKITwin < 0. ? penaltyFactor * (1 - dotKITwin) / 2. : (1 - dotKITwin) / 2.;
         }
     }
     return heWeights;

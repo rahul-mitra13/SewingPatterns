@@ -15,29 +15,29 @@ const bool VORONOI_PRINT = false;
 // The default trace options
 const VoronoiOptions defaultVoronoiOptions;
 
-VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
+VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
                                                            VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh) {
 
-  if (options.useDelaunay) {
-    std::unique_ptr<SignpostIntrinsicTriangulation> intTri(new SignpostIntrinsicTriangulation(mesh, geom));
-    intTri->flipToDelaunay();
+  // if (options.useDelaunay) {
+  //   std::unique_ptr<SignpostIntrinsicTriangulation> intTri(new SignpostIntrinsicTriangulation(mesh, geom));
+  //   intTri->flipToDelaunay();
 
-    // Translate initial sites to intrinsic triangulation if any were given
-    for (size_t iS = 0; iS < options.initialSites.size(); iS++) {
-      options.initialSites[iS] = intTri->equivalentPointOnIntrinsic(options.initialSites[iS]);
-    }
+  //   // Translate initial sites to intrinsic triangulation if any were given
+  //   for (size_t iS = 0; iS < options.initialSites.size(); iS++) {
+  //     options.initialSites[iS] = intTri->equivalentPointOnIntrinsic(options.initialSites[iS]);
+  //   }
 
-    // Get solutions on intrinsic triangulation
-    options.useDelaunay = false;
-    VoronoiResult result = computeGeodesicCentroidalVoronoiTessellationWithWeights(*intTri->intrinsicMesh, *intTri, options, measure, psMesh);
+  //   // Get solutions on intrinsic triangulation
+  //   options.useDelaunay = false;
+  //   VoronoiResult result = computeGeodesicCentroidalVoronoiTessellationWithWeights(*intTri->intrinsicMesh, *intTri, options, measure, psMesh);
 
-    // Translate solutions back to original triangulation
-    for (size_t iS = 0; iS < result.siteLocations.size(); iS++) {
-      result.siteLocations[iS] = intTri->equivalentPointOnInput(result.siteLocations[iS]);
-    }
+  //   // Translate solutions back to original triangulation
+  //   for (size_t iS = 0; iS < result.siteLocations.size(); iS++) {
+  //     result.siteLocations[iS] = intTri->equivalentPointOnInput(result.siteLocations[iS]);
+  //   }
 
-    return result;
-  }
+  //   return result;
+  // }
 
   // Define one vector heat method solver per thread
   vector<VectorHeatMethodSolver> vSolvers;
@@ -45,13 +45,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
     vSolvers.emplace_back(geom, options.tCoef);
   VectorHeatMethodSolver& vSolver = vSolvers[0]; // temporarily, for the serial code
 
-  // For some reason, running a dummy scalarDiffuse first
-  // fixes thread issues lol. Many thanks to
-  // https://github.com/nmwsharp/geometry-central/issues/108
-  VertexData<double> dummyRHS(mesh, 42.0);
-  for (int i = 0; i < omp_get_max_threads(); i++)
-    vSolvers[i].scalarDiffuse(dummyRHS);
-  
+
 
   auto computeRHS = [&](const std::vector<SurfacePoint>& points) -> VertexData<double> {
     VertexData<double> rhs(mesh, 0);
@@ -99,6 +93,17 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
       siteLocations.push_back(fp);
     }
   }
+
+
+  // For some reason, running a dummy scalarDiffuse / computeLogMap first
+  // fixes thread issues lol. Many thanks to
+  // https://github.com/nmwsharp/geometry-central/issues/108
+  VertexData<double> dummyRHS(mesh, 42.0);
+  SurfacePoint dummySite = siteLocations[0];
+  for (int i = 0; i < omp_get_max_threads(); i++) {
+    vSolvers[i].scalarDiffuse(dummyRHS);
+    vSolvers[i].computeLogMap(dummySite);
+  }  
 
   size_t nSites = siteLocations.size();
 
@@ -190,7 +195,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
         int tid = omp_get_thread_num(); // thread ID
 
         SurfacePoint site = siteLocations[j];
-        vSolvers[tid].scalarDiffuse(rhs[j], fracDWeights[tid]);
+        fracDWeights[tid] = vSolvers[tid].scalarDiffuse(rhs[j]);
         // cout << fracDWeights[tid] << endl;
         // fracDWeights[tid] = vSolvers[tid].scalarDiffuse(rhs[j]);//scalarDiffuse takes something that's a mass and returns a density
 
@@ -286,7 +291,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
         fracDKarcher.emplace_back(VertexData<double>(mesh, 0));
 
 
-      // #pragma omp parallel for
+      #pragma omp parallel for
       for (size_t iSite = 0; iSite < nSites; iSite++) {
 
         int tid = omp_get_thread_num(); // thread ID
@@ -294,7 +299,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
         SurfacePoint site = siteLocations[iSite];
 
         // === Compute the nearest distribution
-        vSolvers[tid].scalarDiffuse(rhs[iSite], fracDKarcher[tid]);
+        fracDKarcher[tid] = vSolvers[tid].scalarDiffuse(rhs[iSite]);
 
         for (Vertex v : mesh.vertices()) {
           fracDKarcher[tid][v] /= normD[v];
@@ -308,15 +313,11 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(ManifoldSu
         //visualize the cells
         //result.cellEvolution[iSite][iIter] = thisFracDKarcher;
 
-
         // === Compute the log map
         // auto t1 = chrono::high_resolution_clock::now();
         VertexData<Vector2> logmap = vSolvers[tid].computeLogMap(site);
         // auto t2 = chrono::high_resolution_clock::now();
         // totalTime += chrono::duration_cast<chrono::microseconds>(t2 - t1).count();
-
-        
-
 
         // Evaluate energy and gradient contribution
         Vector2 updateSum{0, 0};
