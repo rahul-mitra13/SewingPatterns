@@ -174,24 +174,44 @@ void showStripePatterns(){
   // P("revealCurl done");
   // polyscope::show();
 
+  std::string richDataFile;
+  richDataFile = "split.ply";
+
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
   EdgeData<double> courseSingularEdgesGlobal(globalGeometry -> mesh);
   FaceData<Vector3> courseOneFormGrad(globalGeometry -> mesh);
-  std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
+  CornerData<double> waleStripeValues;
+  EdgeData<double> waleSingularEdgesGlobal;
+  FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
+
+  if (richDataFile.size() > 0) { // if a file is specified, load it
+    RichSurfaceMeshData richData(globalGeometry->mesh, richDataFile);
+    courseStripeValues = richData.getCornerProperty<double>("courseStripeValues");
+    courseSingularEdgesGlobal = richData.getEdgeProperty<double>("courseSingularEdges");
+    waleStripeValues = richData.getCornerProperty<double>("waleStripeValues");
+    waleSingularEdgesGlobal = richData.getEdgeProperty<double>("waleSingularEdges");
+  } else {
+    std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
                                                                     globalBdyConditions, coursePeriod, V, F, G, courseOneFormGrad, gluedOneRingMap, 
                                                                     allSaddleLoops, homologyGenerators, opts);
-
-  
-  // globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
-  // // Store course singular edges for rendering later
-  RichSurfaceMeshData richData(globalGeometry->mesh);
-  richData.addMeshConnectivity();
-  richData.addGeometry(*globalGeometry);
-  richData.addEdgeProperty("courseSingularEdges", courseSingularEdgesGlobal);
-  richData.addCornerProperty("courseStripeValues", courseStripeValues);
-
+    std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
+                                                                      edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, timeFunctionGlued,
+                                                                      courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
+                                                                      courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
+                                                                      homologyGenerators);
+    // globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
+    // // Store course singular edges for rendering later
+    RichSurfaceMeshData richData(globalGeometry->mesh);
+    richData.addMeshConnectivity();
+    richData.addGeometry(*globalGeometry);
+    richData.addEdgeProperty("courseSingularEdges", courseSingularEdgesGlobal);
+    richData.addCornerProperty("courseStripeValues", courseStripeValues);
+    richData.addEdgeProperty("waleSingularEdges", waleSingularEdgesGlobal);
+    richData.addCornerProperty("waleStripeValues", waleStripeValues);
+    richData.write("info.ply");
+  }
 
   // // FaceData<int> stripeIndicesSigmaCourse(*globalMesh, 0);
   // // std::vector<Vector3> positionsCourse;
@@ -206,19 +226,7 @@ void showStripePatterns(){
   // find Knöppel singularities in the WALE DIRECTION 
   // just run Knoppel's algorithm on these models 
   // and then run our 1-form optimization with the singularities
-  CornerData<double> waleStripeValues;
-  EdgeData<double> waleSingularEdgesGlobal;
-  FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
-  std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
-                                                                    edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, timeFunctionGlued,
-                                                                    courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
-                                                                    courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
-                                                                    homologyGenerators);
-  // // Store wale singular edges for rendering later
-  richData.addEdgeProperty("waleSingularEdges", waleSingularEdgesGlobal);
-  richData.addCornerProperty("waleStripeValues", waleStripeValues);
 
-  richData.write("info.ply");
 
   // std::vector<Vector3> positionsWale;
   // std::vector<std::array<int, 2>> edgesWale;
