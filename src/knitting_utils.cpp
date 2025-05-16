@@ -1964,9 +1964,22 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
         SurfacePoint facePoint = posVoronoiCenters.siteLocations[i].inSomeFace();
         Face f = facePoint.face;
-        if (facePoint.faceCoords.x == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().vertex(), 1));
-        else if (facePoint.faceCoords.y == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().vertex(), 1));
-        else if (facePoint.faceCoords.z == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().next().vertex() , 1));
+        Edge singularEdge;
+        double maxDotProd = -DBL_MAX;
+        // if (facePoint.faceCoords.x == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().vertex(), 1));
+        // else if (facePoint.faceCoords.y == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().vertex(), 1));
+        // else if (facePoint.faceCoords.z == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().next().vertex() , 1));
+        for (Halfedge he : f.adjacentHalfedges()){
+            Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
+                                globalGeometry.vertexPositions[he.tailVertex()]).normalize();
+            if (std::fabs(dot(heVec, waleCurlFunctionGrad[f])) > maxDotProd){
+                maxDotProd = std::fabs(dot(heVec, waleCurlFunctionGrad[he.face()]));
+                singularEdge = he.edge();
+            }
+        }
+        //increment the indices really close so indices cancel out
+        edgeIndices[singularEdge.getIndex()] = -1.0;
+        waleSingularEdgesGlobal[singularEdge] = 1.0;
     }
 
     // for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
@@ -1981,28 +1994,41 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
         SurfacePoint facePoint = negVoronoiCenters.siteLocations[i].inSomeFace();
         Face f = facePoint.face;
-        if (facePoint.faceCoords.x == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().vertex(), -1));
-        else if (facePoint.faceCoords.y == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().vertex(), -1));
-        else if (facePoint.faceCoords.z == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().next().vertex() , -1));
-    }
-
-    //set the edge indices from the singularities found using the OT method 
-    //select the outgoing halfedge that is most aligned with the gradient of the time function
-    for (auto p : singularities){
-        //find the halfedge that is most aligned with the gradient of the time function
         Edge singularEdge;
-        double maxDotProd = DBL_MIN;
-        for (Halfedge he : p.first.outgoingHalfedges()){
-            Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - globalGeometry.vertexPositions[he.tailVertex()]).normalize();
-            if (std::fabs(dot(heVec, waleCurlFunctionGrad[he.face()])) > maxDotProd){
+        double maxDotProd = -DBL_MAX;
+        // if (facePoint.faceCoords.x == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().vertex(), -1));
+        // else if (facePoint.faceCoords.y == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().vertex(), -1));
+        // else if (facePoint.faceCoords.z == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().next().vertex() , -1));
+        for (Halfedge he : f.adjacentHalfedges()){
+            Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
+                                globalGeometry.vertexPositions[he.tailVertex()]).normalize();
+            if (std::fabs(dot(heVec, waleCurlFunctionGrad[f])) > maxDotProd){
                 maxDotProd = std::fabs(dot(heVec, waleCurlFunctionGrad[he.face()]));
                 singularEdge = he.edge();
             }
         }
         //increment the indices really close so indices cancel out
-        edgeIndices[singularEdge.getIndex()] += (-1.0 * p.second);
-        waleSingularEdgesGlobal[singularEdge] = p.second;
+        edgeIndices[singularEdge.getIndex()] = 1.0;
+        waleSingularEdgesGlobal[singularEdge] = -1.0;
     }
+
+    //set the edge indices from the singularities found using the OT method 
+    //select the outgoing halfedge that is most aligned with the gradient of the time function
+    // for (auto p : singularities){
+    //     //find the halfedge that is most aligned with the gradient of the time function
+    //     Edge singularEdge;
+    //     double maxDotProd = DBL_MIN;
+    //     for (Halfedge he : p.first.outgoingHalfedges()){
+    //         Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - globalGeometry.vertexPositions[he.tailVertex()]).normalize();
+    //         if (std::fabs(dot(heVec, waleCurlFunctionGrad[he.face()])) > maxDotProd){
+    //             maxDotProd = std::fabs(dot(heVec, waleCurlFunctionGrad[he.face()]));
+    //             singularEdge = he.edge();
+    //         }
+    //     }
+    //     //increment the indices really close so indices cancel out
+    //     edgeIndices[singularEdge.getIndex()] += (-1.0 * p.second);
+    //     waleSingularEdgesGlobal[singularEdge] = p.second;
+    // }
 
 
     modelWale.setEdgeIndices(edgeIndices);
@@ -3639,7 +3665,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
        negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
     }
-    polyscope::registerPointCloud("negative voronoi sites (wale)", negativeCenters);
+    polyscope::registerPointCloud("negative voronoi sites (course)", negativeCenters);
     std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
 
     //print the masses
@@ -3659,26 +3685,53 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
         SurfacePoint facePoint = posVoronoiCenters.siteLocations[i].inSomeFace();
         Face f = facePoint.face;
-        if (facePoint.faceCoords.x == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().vertex(), 1));
-        else if (facePoint.faceCoords.y == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().vertex(), 1));
-        else if (facePoint.faceCoords.z == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().next().vertex() , 1));
+        Edge singularEdge;
+        double maxDotProd = -DBL_MAX;
+        // if (facePoint.faceCoords.x == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().vertex(), 1));
+        // else if (facePoint.faceCoords.y == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().vertex(), 1));
+        // else if (facePoint.faceCoords.z == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().next().vertex() , 1));
+        for (Halfedge he : f.adjacentHalfedges()){
+            Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
+                                globalGeometry.vertexPositions[he.tailVertex()]).normalize();
+            if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
+                maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
+                singularEdge = he.edge();
+            }
+        }
+        //increment the indices really close so indices cancel out
+        edgeIndices[singularEdge.getIndex()] = -1.0;
+        edgeSingularities[singularEdge] = 1.0;
+
     }
 
-    for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
-        std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
-        std::vector<Vector3> stepPos;
-        for (int i = 0; i < steps.size(); i++){
-            stepPos.push_back(steps[i].interpolate(globalGeometry.vertexPositions));
-        }
-        polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos)->setEnabled(false);
-    }
+    // for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
+    //     std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
+    //     std::vector<Vector3> stepPos;
+    //     for (int i = 0; i < steps.size(); i++){
+    //         stepPos.push_back(steps[i].interpolate(globalGeometry.vertexPositions));
+    //     }
+    //     polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos)->setEnabled(false);
+    // }
 
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
         SurfacePoint facePoint = negVoronoiCenters.siteLocations[i].inSomeFace();
         Face f = facePoint.face;
-        if (facePoint.faceCoords.x == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().vertex(), -1));
-        else if (facePoint.faceCoords.y == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().vertex(), -1));
-        else if (facePoint.faceCoords.z == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().next().vertex() , -1));
+        Edge singularEdge;
+        double maxDotProd = -DBL_MAX;
+        // if (facePoint.faceCoords.x == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().vertex(), -1));
+        // else if (facePoint.faceCoords.y == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().vertex(), -1));
+        // else if (facePoint.faceCoords.z == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().next().vertex() , -1));
+        for (Halfedge he : f.adjacentHalfedges()){
+            Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
+                                globalGeometry.vertexPositions[he.tailVertex()]).normalize();
+            if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
+                maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
+                singularEdge = he.edge();
+            }
+        }
+        //increment the indices really close so indices cancel out
+        edgeIndices[singularEdge.getIndex()] = 1.0;
+        edgeSingularities[singularEdge] = -1.0;
     }
 
     
@@ -3696,30 +3749,32 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     //set the edge indices from the singularities found using the OT method 
     //select the outgoing halfedge that is most aligned with the gradient of the time function
-    for (auto p : singularities){
-        // if (usedFaces[p.first.halfedge().face().getIndex()] == 0 &&
-        //     usedFaces[p.first.halfedge().twin().face().getIndex()] == 0){
+    // for (auto p : singularities){
+    //     // if (usedFaces[p.first.halfedge().face().getIndex()] == 0 &&
+    //     //     usedFaces[p.first.halfedge().twin().face().getIndex()] == 0){
             
-        //     edgeIndices[p.first.halfedge().edge().getIndex()] = -1.0 * p.second;
-        //     usedFaces[p.first.halfedge().face().getIndex()] = 1;
-        //     usedFaces[p.first.halfedge().twin().face().getIndex()] = 1;
-        // }
+    //     //     edgeIndices[p.first.halfedge().edge().getIndex()] = -1.0 * p.second;
+    //     //     usedFaces[p.first.halfedge().face().getIndex()] = 1;
+    //     //     usedFaces[p.first.halfedge().twin().face().getIndex()] = 1;
+    //     // }
 
-        //find the halfedge that is most aligned with the gradient of the time function
-        Edge singularEdge;
-        double maxDotProd = -DBL_MAX;
-        for (Halfedge he : p.first.outgoingHalfedges()){
-            Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
-                                globalGeometry.vertexPositions[he.tailVertex()]).normalize();
-            if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()])) > maxDotProd){
-                maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
-                singularEdge = he.edge();
-            }
-        }
-        //increment the indices really close so indices cancel out
-        edgeIndices[singularEdge.getIndex()] += (-1.0 * p.second);
-        edgeSingularities[singularEdge] = p.second;
-    }
+    //     //find the halfedge that is most aligned with the gradient of the time function
+    //     Edge singularEdge;
+    //     double maxDotProd = -DBL_MAX;
+    //     for (Halfedge he : p.first.outgoingHalfedges()){
+    //         Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
+    //                             globalGeometry.vertexPositions[he.tailVertex()]).normalize();
+    //         if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()])) > maxDotProd){
+    //             maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
+    //             singularEdge = he.edge();
+    //         }
+    //     }
+    //     //increment the indices really close so indices cancel out
+    //     edgeIndices[singularEdge.getIndex()] += (-1.0 * p.second);
+    //     edgeSingularities[singularEdge] = p.second;
+    // }
+
+
     model.setEdgeIndices(edgeIndices);
     model.setHomologyGenerators(homologyGenerators);
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
