@@ -543,7 +543,7 @@ void KnitGraph::intrinsicMerge(){
         std::vector<knitGraphVertex> he1Vertices = halfedgeVertices[e.halfedge()];
         std::vector<knitGraphVertex> he2Vertices = halfedgeVertices[e.halfedge().twin()];
 
-        // classical singularity with 1 stripe being born: nothing to do
+        // classical singularity with 1 stripe being born/dying: nothing to do
         if (he1Vertices.size() + he2Vertices.size() == 1)
             continue;
 

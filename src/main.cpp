@@ -317,7 +317,7 @@ void showStripePatterns(){
   graph.buildGraph();
 
   graph.writeKnitGraphLineElement();
-  //graph.writeKnitGraphToTxtFile("model.obj");
+  graph.writeKnitGraphToTxtFile("model.obj");
 
 
 }
