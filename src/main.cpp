@@ -201,6 +201,10 @@ void showStripePatterns(){
                                                                       courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
                                                                       courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
                                                                       homologyGenerators);
+    
+    // globalPSMesh->addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
+    // globalPSMesh->addEdgeScalarQuantity("wale singular edges", waleSingularEdgesGlobal);
+
     // globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
     // // Store course singular edges for rendering later
     RichSurfaceMeshData richData(globalGeometry->mesh);
@@ -223,7 +227,7 @@ void showStripePatterns(){
       stripeValuesWithOffset[co] -= coursePeriod/4;
   std::tie(positionsCourse, edgesCourse, components) = findStripeConnectedComponents(*globalGeometry, *gluedELG, stripeValuesWithOffset, stripeIndicesSigmaCourse, coursePeriod, edgeMap);
   //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
-  polyscope::registerCurveNetwork("sigma tilde stripes with offset", positionsCourse, edgesCourse)->setRadius(0.0005)->setColor({50.0/255, 205.0/255, 50.0/255})->setEnabled(false);
+  polyscope::registerCurveNetwork("course stripes with offset", positionsCourse, edgesCourse)->setRadius(0.0005)->setColor({50.0/255, 205.0/255, 50.0/255})->setEnabled(false);
 
   // Plot wale stripe values with offset (to debug knit graph)
   CornerData<double> waleStripeValuesWithOffset(waleStripeValues);
@@ -250,8 +254,28 @@ void showStripePatterns(){
         waleSingularEdgesNeg.push_back({(int)waleSingularEdgePointsNeg.size()-2, (int)waleSingularEdgePointsNeg.size()-1});
       }
   }
-  polyscope::registerCurveNetwork("wale singular edges (+1)", waleSingularEdgePointsPos, waleSingularEdgesPos)->setRadius(0.003)->setColor({1,0,0})->setEnabled(false);
-  polyscope::registerCurveNetwork("wale singular edges (-1)", waleSingularEdgePointsNeg, waleSingularEdgesNeg)->setRadius(0.003)->setColor({0,0,1})->setEnabled(false);
+  polyscope::registerCurveNetwork("wale singular edges (+1)", waleSingularEdgePointsPos, waleSingularEdgesPos)->setRadius(0.001)->setColor({1,0,0})->setEnabled(false);
+  polyscope::registerCurveNetwork("wale singular edges (-1)", waleSingularEdgePointsNeg, waleSingularEdgesNeg)->setRadius(0.001)->setColor({0,0,1})->setEnabled(false);
+
+
+  // Draw course singular edges as a curve network
+  std::vector<Vector3> courseSingularEdgePointsPos;
+  std::vector<Vector3> courseSingularEdgePointsNeg;
+  std::vector<std::array<int,2>> courseSingularEdgesPos;
+  std::vector<std::array<int,2>> courseSingularEdgesNeg;
+  for (Edge e : globalMesh->edges()) if (courseSingularEdgesGlobal[e] != 0) {
+      if (courseSingularEdgesGlobal[e] > 0) {
+        courseSingularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
+        courseSingularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
+        courseSingularEdgesPos.push_back({(int)courseSingularEdgePointsPos.size()-2, (int)courseSingularEdgePointsPos.size()-1});
+      } else {
+        courseSingularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
+        courseSingularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
+        courseSingularEdgesNeg.push_back({(int)courseSingularEdgePointsNeg.size()-2, (int)courseSingularEdgePointsNeg.size()-1});
+      }
+  }
+  polyscope::registerCurveNetwork("course singular edges (+1)", courseSingularEdgePointsPos, courseSingularEdgesPos)->setRadius(0.001)->setColor({0.5,0.5,0})->setEnabled(false);
+  polyscope::registerCurveNetwork("course singular edges (-1)", courseSingularEdgePointsNeg, courseSingularEdgesNeg)->setRadius(0.001)->setColor({0,0.5,0.5})->setEnabled(false);
 
 
   // // std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, courseStripeValues, stripeIndicesSigmaCourse, coursePeriod);
@@ -293,7 +317,7 @@ void showStripePatterns(){
   graph.buildGraph();
 
   graph.writeKnitGraphLineElement();
-  // graph.writeKnitGraphToTxtFile("model.obj");
+  //graph.writeKnitGraphToTxtFile("model.obj");
 
 
 }

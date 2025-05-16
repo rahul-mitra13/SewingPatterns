@@ -68,7 +68,7 @@ void KnitGraph::buildGraph(){
 
 
     // tag the increases and decreases 
-    //tagIncreasesDecreases();
+    tagIncreasesDecreases();
     
     //render the knit graph
     renderGraph();
