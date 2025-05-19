@@ -165,6 +165,9 @@ class KnitGraph{
             //tag increases and decreases
             void tagIncreasesDecreases();
 
+            //trace short rows to check for helices 
+            void traceShortRows();
+
             //sanity check the graph 
             void sanityCheck();
 

@@ -72,7 +72,7 @@ class Model{
         bool useEdgeAveraging = false;
         bool useFaceDifferenceViz = false;
         bool useHelicingCorrection = false;
-        bool forceSaddle = false;
+        bool forceSaddle = true;//force the saddle vertices
            
         //set optimization period 
         void setPeriod(double period);

@@ -49,9 +49,6 @@ void KnitGraph::buildGraph(){
     //handle the merge in the intrinsic setting 
     intrinsicMerge();
 
-    // //merge vertices together 
-    // epsilonMerging();
-
     //reorder vertex indices
     makeRealVertices();
 
@@ -72,6 +69,9 @@ void KnitGraph::buildGraph(){
     
     //render the knit graph
     renderGraph();
+
+    //trace the short rows 
+    traceShortRows();
 
     //sanity check the graph
     sanityCheck();
@@ -538,7 +538,7 @@ void KnitGraph::intrinsicMerge(){
 
     //make the connections 
     for (Edge e : (gluedGeometry->mesh).edges()){
-        if (e.isBoundary()) continue;
+        if (e.isBoundary()) continue;//don't need to handle boundary vertices
 
         std::vector<knitGraphVertex> he1Vertices = halfedgeVertices[e.halfedge()];
         std::vector<knitGraphVertex> he2Vertices = halfedgeVertices[e.halfedge().twin()];
@@ -1241,9 +1241,29 @@ void KnitGraph::writeKnitGraphLineElement(){
     }
 
     outfile.close();
+}
 
+//trace the short rows in the graph 
+void KnitGraph::traceShortRows(){   
 
+    int ctr = 0;
+    for (auto &v : realVertices){
 
+        if (v.row_in == -1){
+            std::vector<Vector3> pos;
+            std::vector<std::array<int, 2>> edges;
+            auto walker = v;
+            while(walker.row_out != -1){
+                pos.push_back(walker.position);
+                walker = realVertices[walker.row_out];
+            }
+            for (int i = 0; i < pos.size() - 1; i++){
+                edges.push_back(std::array{i, i + 1});
+            }
+            polyscope::registerCurveNetwork("traced short row " + std::to_string(ctr), pos, edges)->setRadius(0.00125);
+            ctr++;
+        }
+    }
 }
 
 
