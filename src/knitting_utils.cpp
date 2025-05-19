@@ -3563,8 +3563,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //model.setFaceGradients(gradSigmaTilde);
     //newDistance = computeDistanceFromUnitNorm(globalGeometry, gradSigmaTilde);
     oldObj = currObj;
-    //std::cout << "distance from unit norm after " << std::to_string(numRuns - 1) << " singularity insertion " << newDistance << std::endl;
-    //oldDistance = newDistance;
+    std::cout << "distance from unit norm after " << std::to_string(numRuns - 1) << " singularity insertion " << newDistance << std::endl;
+    oldDistance = newDistance;
 
 
     //---------------------Testing-------------------------//
@@ -3738,7 +3738,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         singularities.push_back(std::make_pair(singularEdge.halfedge().tailVertex(), -1));//just use the tail vertex of the halfedge?
         vertexToEdgeMap[singularEdge.halfedge().tailVertex()] = singularEdge;//save it in the map, useful for optimal matching later
     }
-
     
     //perform optimal matching 
     HalfedgeData<double> heWeights = gluedHeWeights;
@@ -3750,7 +3749,11 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         pC.push_back(globalGeometry.vertexPositions[p.first]);
         pC.push_back(globalGeometry.vertexPositions[p.second]);
         polyscope::registerPointCloud("matched pair " + std::to_string(i), pC)->setEnabled(true);
+        singularEdges.push_back(std::make_pair(vertexToEdgeMap[p.first].getIndex(), vertexToEdgeMap[p.second].getIndex()));
     }
+
+    //set the singular edges
+    model.setSingularEdges(singularEdges);
 
     //set the edge indices from the singularities found using the OT method 
     //select the outgoing halfedge that is most aligned with the gradient of the time function
@@ -3796,6 +3799,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     model.setEdgePathConstraints(edgePathConstraints);
     model.setEdgeIndices(edgeIndices);
     model.setHomologyGenerators(homologyGenerators);
+    model.forceSaddle = true;
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
     //plot the stripes
     std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
@@ -4275,9 +4279,9 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                                                     comparisonGrad[he2.face().getIndex()][2]} + Vector3{comparisonGrad[he2Twin.face().getIndex()][0], comparisonGrad[he2Twin.face().getIndex()][1], 
                                                     comparisonGrad[he2Twin.face().getIndex()][2]});
                 gradientVector2 = gradientVector2.normalize();
-
                 //something going wrong in these constraints? 
                 if ((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2Vector, gradientVector2) > dot(he2TwinVector, gradientVector2))){
+                    
                     //add constraints on singular edges 
                     // model.addConstr(sigma[he1.getIndex()] == sigma[he2.twin().getIndex()]);
                     // model.addConstr(sigma[he1.getIndex()] >= sigma[he1.twin().getIndex()]);
@@ -4289,14 +4293,18 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                     // model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
                     
                     //just place the constraints for the positive singularity face for now 
-                    model.addConstr(sigma[he1.twin().getIndex()] <= 0.);
-                    model.addConstr(sigma[he1.next().getIndex()] >= 0.);
-                    model.addConstr(sigma[he1.next().next().getIndex()] >= 0.);
+                    // model.addConstr(sigma[he1.twin().getIndex()] <= 0.);
+                    // model.addConstr(sigma[he1.next().getIndex()] >= 0.);
+                    // model.addConstr(sigma[he1.next().next().getIndex()] >= 0.);
 
                     //add the constraints for the negative singularity face 
-                    model.addConstr(sigma[he2.twin().getIndex()] >= 0.);
-                    model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
-                    model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
+                    // model.addConstr(sigma[he2.twin().getIndex()] >= 0.);
+                    // model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
+                    // model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
+                    
+                    std::cout << "in case 1 " << std::endl; 
+                    //ensuring equality constraints 
+                    model.addConstr(sigma[he1.twin().getIndex()] == -1.0 * sigma[he2.twin().getIndex()]);
 
                 }
                 else if ((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2TwinVector, gradientVector2) > dot(he2Vector, gradientVector2))){
@@ -4311,15 +4319,18 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                     // model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
 
                     //just place the constraints for the positive singularity face for now  
-                    model.addConstr(sigma[he1.twin().getIndex()] <= 0.);
-                    model.addConstr(sigma[he1.next().getIndex()] >= 0.);
-                    model.addConstr(sigma[he1.next().next().getIndex()] >= 0.);
+                    // model.addConstr(sigma[he1.twin().getIndex()] <= 0.);
+                    // model.addConstr(sigma[he1.next().getIndex()] >= 0.);
+                    // model.addConstr(sigma[he1.next().next().getIndex()] >= 0.);
 
-                    //add the constraints for the negative singularity face now 
-                    model.addConstr(sigma[he2.getIndex()] >= 0.);
-                    model.addConstr(sigma[he2.next().getIndex()] <= 0.);
-                    model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
+                    // //add the constraints for the negative singularity face now 
+                    // model.addConstr(sigma[he2.getIndex()] >= 0.);
+                    // model.addConstr(sigma[he2.next().getIndex()] <= 0.);
+                    // model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
 
+                    std::cout << "in case 2 " << std::endl; 
+                    //ensuring equality constraints 
+                    model.addConstr(sigma[he1.twin().getIndex()] == -1.0 * sigma[he2.twin().getIndex()]);
 
                 }
                 else if((dot(he1TwinVector, gradientVector1) > dot(he1Vector, gradientVector1)) && (dot(he2Vector, gradientVector2) > dot(he2TwinVector, gradientVector2))){
@@ -4334,14 +4345,18 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                     // model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
 
                     //just place the constraints for the positive singularity face for now  
-                    model.addConstr(sigma[he1.getIndex()] <= 0.);
-                    model.addConstr(sigma[he1.twin().next().getIndex()] >= 0.);
-                    model.addConstr(sigma[he1.twin().next().next().getIndex()] >= 0.);
+                    // model.addConstr(sigma[he1.getIndex()] <= 0.);
+                    // model.addConstr(sigma[he1.twin().next().getIndex()] >= 0.);
+                    // model.addConstr(sigma[he1.twin().next().next().getIndex()] >= 0.);
 
-                    //add the constraints for the negative singularity face 
-                    model.addConstr(sigma[he2.twin().getIndex()] >= 0.);
-                    model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
-                    model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
+                    // //add the constraints for the negative singularity face 
+                    // model.addConstr(sigma[he2.twin().getIndex()] >= 0.);
+                    // model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
+                    // model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
+                    
+                    std::cout << "in case 3 " << std::endl; 
+                    //ensuring equality constraints 
+                    model.addConstr(sigma[he1.getIndex()] == -1.0 * sigma[he2.getIndex()]);
 
                 }
                 else if((dot(he1TwinVector, gradientVector1) > dot(he1Vector, gradientVector1)) && (dot(he2TwinVector, gradientVector2) > dot(he2Vector, gradientVector2))){
@@ -4356,14 +4371,22 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                     // model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
 
                     //just place the constraints for the positive singularity face for now  
-                    model.addConstr(sigma[he1.getIndex()] <= 0.);
-                    model.addConstr(sigma[he1.twin().next().getIndex()] >= 0.);
-                    model.addConstr(sigma[he1.twin().next().next().getIndex()] >= 0);
+                    // model.addConstr(sigma[he1.getIndex()] <= 0.);
+                    // model.addConstr(sigma[he1.twin().next().getIndex()] >= 0.);
+                    // model.addConstr(sigma[he1.twin().next().next().getIndex()] >= 0);
 
-                    //add the constraints for the negative singularity face now 
-                    model.addConstr(sigma[he2.getIndex()] >= 0.);
-                    model.addConstr(sigma[he2.next().getIndex()] <= 0.);
-                    model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
+                    // //add the constraints for the negative singularity face now 
+                    // model.addConstr(sigma[he2.getIndex()] >= 0.);
+                    // model.addConstr(sigma[he2.next().getIndex()] <= 0.);
+                    // model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
+
+
+                    std::cout << "in case 4 " << std::endl; 
+                    //ensuring equality constraints 
+                    model.addConstr(sigma[he1.getIndex()] == -1.0 * sigma[he2.twin().getIndex()]);
+                }
+                else{
+                    std::cout << "didn't hit any of the conditions " << std::endl;
                 }
             }
         }
