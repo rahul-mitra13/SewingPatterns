@@ -704,14 +704,14 @@ VoronoiResult alignPointsOnIsoline(SurfaceMesh& mesh, IntrinsicGeometryInterface
           // std::cout << "posTimeFuncVal - negTimeFuncVal = "  << (posTimeFuncVal - negTimeFuncVal) << std::endl;
           // std::cout << "gradh = " << gradh << std::endl;
         
-          alignmentTerm = -(options.lambda * (posTimeFuncVal - negTimeFuncVal)) * gradh;
+          alignmentTerm = -(posTimeFuncVal - negTimeFuncVal) * gradh;
         }
 
         cout << "lambda = " << options.lambda << endl;
         cout << "alignmentTerm = " << alignmentTerm << endl;
 
         //add the alignment term to the update
-        Vector2 update = (updateSum / updateWSum) + alignmentTerm;
+        Vector2 update = (1 - options.lambda) * (updateSum / updateWSum) +  (options.lambda) * alignmentTerm;
 
         updateNorm[iSite] = update.norm();
 

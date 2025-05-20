@@ -3627,7 +3627,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 5; //std::round(avgTotalMeasure / period);
+    posOptions.nSites = 2; //std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     posOptions.iterations = 500;
@@ -3745,7 +3745,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     alignmentOptions.pairedSites = pairedSites;
     alignmentOptions.usingPosCurl = true;
     alignmentOptions.iterations = 1000;
-    alignmentOptions.lambda = 10.0;
+    alignmentOptions.lambda = 1.0;
     VoronoiResult posAlignedCenters = alignPointsOnIsoline(globalMesh, globalGeometry, alignmentOptions, posMeasure, psMesh);
     std::vector<Vector3> alignedPosCenters;
     for (int i = 0; i < posAlignedCenters.siteLocations.size(); i++){
