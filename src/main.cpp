@@ -196,11 +196,11 @@ void showStripePatterns(){
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
                                                                     globalBdyConditions, coursePeriod, V, F, G, courseOneFormGrad, gluedOneRingMap, 
                                                                     allSaddleLoops, homologyGenerators, opts);
-    std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
-                                                                      edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, timeFunctionGlued,
-                                                                      courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
-                                                                      courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
-                                                                      homologyGenerators);
+    // std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
+    //                                                                   edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, timeFunctionGlued,
+    //                                                                   courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
+    //                                                                   courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
+    //                                                                   homologyGenerators);
 
     
     // // globalPSMesh->addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
@@ -240,23 +240,23 @@ void showStripePatterns(){
   // polyscope::registerCurveNetwork("wale stripes with offset", positionsWale, edgesWale)->setRadius(0.0005)->setColor({1,140./255,0})->setEnabled(false);
 
   // Draw wale singular edges as a curve network
-  std::vector<Vector3> waleSingularEdgePointsPos;
-  std::vector<Vector3> waleSingularEdgePointsNeg;
-  std::vector<std::array<int,2>> waleSingularEdgesPos;
-  std::vector<std::array<int,2>> waleSingularEdgesNeg;
-  for (Edge e : globalMesh->edges()) if (waleSingularEdgesGlobal[e] != 0) {
-      if (waleSingularEdgesGlobal[e] > 0) {
-        waleSingularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
-        waleSingularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
-        waleSingularEdgesPos.push_back({(int)waleSingularEdgePointsPos.size()-2, (int)waleSingularEdgePointsPos.size()-1});
-      } else {
-        waleSingularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
-        waleSingularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
-        waleSingularEdgesNeg.push_back({(int)waleSingularEdgePointsNeg.size()-2, (int)waleSingularEdgePointsNeg.size()-1});
-      }
-  }
-  polyscope::registerCurveNetwork("wale singular edges (+1)", waleSingularEdgePointsPos, waleSingularEdgesPos)->setRadius(0.001)->setColor({1,0,0})->setEnabled(false);
-  polyscope::registerCurveNetwork("wale singular edges (-1)", waleSingularEdgePointsNeg, waleSingularEdgesNeg)->setRadius(0.001)->setColor({0,0,1})->setEnabled(false);
+  // std::vector<Vector3> waleSingularEdgePointsPos;
+  // std::vector<Vector3> waleSingularEdgePointsNeg;
+  // std::vector<std::array<int,2>> waleSingularEdgesPos;
+  // std::vector<std::array<int,2>> waleSingularEdgesNeg;
+  // for (Edge e : globalMesh->edges()) if (waleSingularEdgesGlobal[e] != 0) {
+  //     if (waleSingularEdgesGlobal[e] > 0) {
+  //       waleSingularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
+  //       waleSingularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
+  //       waleSingularEdgesPos.push_back({(int)waleSingularEdgePointsPos.size()-2, (int)waleSingularEdgePointsPos.size()-1});
+  //     } else {
+  //       waleSingularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
+  //       waleSingularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
+  //       waleSingularEdgesNeg.push_back({(int)waleSingularEdgePointsNeg.size()-2, (int)waleSingularEdgePointsNeg.size()-1});
+  //     }
+  // }
+  // polyscope::registerCurveNetwork("wale singular edges (+1)", waleSingularEdgePointsPos, waleSingularEdgesPos)->setRadius(0.001)->setColor({1,0,0})->setEnabled(false);
+  // polyscope::registerCurveNetwork("wale singular edges (-1)", waleSingularEdgePointsNeg, waleSingularEdgesNeg)->setRadius(0.001)->setColor({0,0,1})->setEnabled(false);
 
 
   // Draw course singular edges as a curve network
@@ -312,13 +312,13 @@ void showStripePatterns(){
 
 
   // generate the knit graph
-  graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
-                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-                      edgeMap);
-  graph.buildGraph();
+  // graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
+  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+  //                     edgeMap);
+  // graph.buildGraph();
 
-  graph.writeKnitGraphLineElement();
-  graph.writeKnitGraphToTxtFile("model.obj");
+  // graph.writeKnitGraphLineElement();
+  // graph.writeKnitGraphToTxtFile("model.obj");
 
 
 }

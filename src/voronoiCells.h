@@ -26,12 +26,31 @@ struct VoronoiOptions {
   double tCoef = 1;                       // diffusion time for vector heat method
   size_t nSubIterations = 1;              // number of iterations to use when computing Karcher means
 };
+
+
+struct alignOptions {
+
+  VertexData<double> timeFunction;  //time function over the mesh 
+  std::vector<std::pair<SurfacePoint, SurfacePoint>> pairedSites;   //paired sites obtained from the previous optimization stored in (pos site, neg site) order 
+  bool usingPosCurl = false; 
+  double lambda = 1;                      //weighting term
+  size_t iterations = 5;                  // number of iterations to run for
+  double tCoef = 1;                       // diffusion time for vector heat method
+  size_t nSubIterations = 1;              // number of iterations to use when computing Karcher means
+  double stepSize = 1;                    // step size for steps towards cell centers
+  bool computeDistributions = false;      // return the indicator functions for each cell (`result.siteDistributions`)
+};
+
+
+
 extern const VoronoiOptions defaultVoronoiOptions;
 
 VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
                                                            VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
 
-std::vector<SurfacePoint> alignPointsOnIsoline(ManifoldSurfaceMesh& mesh, IntrinsicGeometryInterface& geom, VoronoiResult& result);
+VoronoiResult alignPointsOnIsoline(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
+                                    alignOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
+
 
 } // namespace surface
 } // namespace geometrycentral
