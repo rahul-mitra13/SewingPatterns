@@ -3506,6 +3506,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     //construct edge weights for halfedge path
     FaceData<Vector3> rotatedFaceGradients = clockWiseRotatedGradients(globalGeometry, globalTimeFunctionGradientsNormalized);
+    psMesh.addFaceVectorQuantity("clockwise rotated gradients", rotatedFaceGradients);
     double maxDotProd = maximumDotProduct(globalGeometry, rotatedFaceGradients);
     HalfedgeData<double> gluedHeWeights = constructGluedHalfedgeWeights(globalGeometry, gluedGeometry, rotatedFaceGradients, maxDotProd);
 
@@ -3525,9 +3526,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
 
     //handle saddle loops in the intrinsic setting
-    for(int i = 0; i < allSaddleLoops.size(); i++){
-        edgePathConstraints.push_back(std::make_pair(allSaddleLoops[i], 0.0));
-    }
+    // for(int i = 0; i < allSaddleLoops.size(); i++){
+    //     edgePathConstraints.push_back(std::make_pair(allSaddleLoops[i], 0.0));
+    // }
     for (int i = 0; i < allSaddleLoops.size(); i++){
         std::vector<double> path = allSaddleLoops[i];
         for (int j = 0; j < path.size(); j++){
@@ -3626,7 +3627,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 10; //std::round(avgTotalMeasure / period)
+    posOptions.nSites = std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     posOptions.iterations = 500;
@@ -3652,7 +3653,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
    
     VoronoiOptions negOptions = defaultVoronoiOptions;
-    negOptions.nSites = 10; //posOptions.nSites
+    negOptions.nSites = posOptions.nSites;
     negOptions.useDelaunay = false;
     negOptions.computeDistributions = true;
     negOptions.iterations = 500;
@@ -3789,18 +3790,17 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         auto p = matchedVertices[i];
         Edge posEdge = vertexToEdgeMap[p.first];
         Edge negEdge = vertexToEdgeMap[p.second];
-        std::tie(globalPath, gluedPath) = constructEdgePath(globalGeometry, gluedGeometry, negEdge, posEdge,
-                                                            vertexMap, edgeMap, globalTimeFunctionGradientsNormalized, gluedHeWeights, gluedSigmaTilde, connectSaddles);
+        std::tie(globalPath, gluedPath) = constructEdgePath(globalGeometry, gluedGeometry, posEdge, negEdge,
+                                                            vertexMap, edgeMap, globalTimeFunctionGradientsNormalized, heWeights, gluedSigmaTilde, connectSaddles);
         psMesh.addEdgeScalarQuantity("path for pair " + std::to_string(i), globalPath);
         //don't retake edges from another path
-        updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, gluedHeWeights);
+        updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, heWeights);
         edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
     }
 
     model.setEdgePathConstraints(edgePathConstraints);
     model.setEdgeIndices(edgeIndices);
     model.setHomologyGenerators(homologyGenerators);
-    model.forceSaddle = true;
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
     //plot the stripes
     std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
@@ -4318,16 +4318,16 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                     std::cout << "In case 1 " << std::endl; 
 
                     //ensure the saddle is in the bigon for the positive edge
-                    // model.addConstr(sigma[he1.getIndex()] >= 0);
-                    // model.addConstr(sigma[he1.twin().getIndex()] <= 0);
+                    model.addConstr(sigma[he1.getIndex()] >= 0);
+                    model.addConstr(sigma[he1.twin().getIndex()] <= 0);
 
                     //ensure the saddle is in the bigon for the negative edge
-                    // model.addConstr(sigma[he2.getIndex()] >= 0);
-                    // model.addConstr(sigma[he2.twin().getIndex()] <= 0);
+                    model.addConstr(sigma[he2.getIndex()] >= 0);
+                    model.addConstr(sigma[he2.twin().getIndex()] <= 0);
 
 
                     //ensuring equality constraints 
-                    model.addConstr(sigma[he1.twin().getIndex()] == -1.0 * sigma[he2.twin().getIndex()]);
+                    model.addConstr(sigma[he1.twin().getIndex()] == -1.0 * sigma[he2.getIndex()]);
 
                 }
                 else if ((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2TwinVector, gradientVector2) > dot(he2Vector, gradientVector2))){
@@ -4352,14 +4352,15 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                     // model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
 
 
-                    std::cout << "In case 2 " << std::endl; 
+                    std::cout << "In case 2 " << std::endl;
+
                     //ensure the saddle is in the bigon for the positive edge
-                    // model.addConstr(sigma[he1.getIndex()] >= 0);
-                    // model.addConstr(sigma[he1.twin().getIndex()] <= 0);
+                    model.addConstr(sigma[he1.getIndex()] >= 0);
+                    model.addConstr(sigma[he1.twin().getIndex()] <= 0);
 
                     //ensure the saddle is in the bigon for the negative edge
-                    // model.addConstr(sigma[he2.twin().getIndex()] >= 0);
-                    // model.addConstr(sigma[he2.getIndex()] <= 0);
+                    model.addConstr(sigma[he2.twin().getIndex()] >= 0);
+                    model.addConstr(sigma[he2.getIndex()] <= 0);
 
                     //ensuring equality constraints 
                     model.addConstr(sigma[he1.twin().getIndex()] == -1.0 * sigma[he2.twin().getIndex()]);
@@ -4388,13 +4389,14 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
 
                     
                     std::cout << "In case 3 " << std::endl;
+
                     //ensure the saddle is in the bigon for the positive edge
-                    // model.addConstr(sigma[he1.twin().getIndex()] >= 0);
-                    // model.addConstr(sigma[he1.getIndex()] <= 0);
+                    model.addConstr(sigma[he1.twin().getIndex()] >= 0);
+                    model.addConstr(sigma[he1.getIndex()] <= 0);
 
                     //ensure the saddle is in the bigon for the negative edge
-                    // model.addConstr(sigma[he2.getIndex()] >= 0);
-                    // model.addConstr(sigma[he2.twin().getIndex()] <= 0);
+                    model.addConstr(sigma[he2.getIndex()] >= 0);
+                    model.addConstr(sigma[he2.twin().getIndex()] <= 0);
                     
                     //ensuring equality constraints 
                     model.addConstr(sigma[he1.getIndex()] == -1.0 * sigma[he2.getIndex()]);
@@ -4423,12 +4425,12 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
 
                     std::cout << "In case 4 " << std::endl; 
                     //ensure the saddle is in the bigon for the positive edge
-                    // model.addConstr(sigma[he1.twin().getIndex()] >= 0);
-                    // model.addConstr(sigma[he1.getIndex()] <= 0);
+                    model.addConstr(sigma[he1.twin().getIndex()] >= 0);
+                    model.addConstr(sigma[he1.getIndex()] <= 0);
 
                     //ensure the saddle is in the bigon for the negative edge
-                    // model.addConstr(sigma[he2.twin().getIndex()] >= 0);
-                    // model.addConstr(sigma[he2.getIndex()] <= 0);
+                    model.addConstr(sigma[he2.twin().getIndex()] >= 0);
+                    model.addConstr(sigma[he2.getIndex()] <= 0);
 
                     //ensuring equality constraints 
                     model.addConstr(sigma[he1.getIndex()] == -1.0 * sigma[he2.twin().getIndex()]);

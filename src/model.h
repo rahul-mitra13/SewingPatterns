@@ -71,8 +71,8 @@ class Model{
         //flags for debugging purposes and using a different comparison in the objective 
         bool useEdgeAveraging = false;
         bool useFaceDifferenceViz = false;
-        bool useHelicingCorrection = false;
-        bool forceSaddle = true;//force the saddle vertices
+        bool useHelicingCorrection = true;
+        bool forceSaddle = false;//force the saddle vertices
            
         //set optimization period 
         void setPeriod(double period);
