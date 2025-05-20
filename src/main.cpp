@@ -201,6 +201,7 @@ void showStripePatterns(){
                                                                       courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
                                                                       courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
                                                                       homologyGenerators);
+
     
     // globalPSMesh->addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
     // globalPSMesh->addEdgeScalarQuantity("wale singular edges", waleSingularEdgesGlobal);

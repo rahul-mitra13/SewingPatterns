@@ -3741,6 +3741,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     
     //perform optimal matching 
     HalfedgeData<double> heWeights = gluedHeWeights;
+    psMesh.addHalfedgeScalarQuantity("halfedge weights", heWeights);
     std::vector<std::pair<Vertex, Vertex>> matchedVertices = performOptimalMatching(globalGeometry, heWeights, singularities);  
 
     for (int i = 0; i < matchedVertices.size(); i++){
@@ -3808,7 +3809,19 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
 
-    psMesh.addHalfedgeScalarQuantity("1-form halfedge quantities ", gluedSigmaTilde);
+    psMesh.addHalfedgeScalarQuantity("Sigma ", gluedSigmaTilde);
+
+    //visualize the saddle vertices
+    std::vector<Vector3> saddleVertexPositions;
+    for (Vertex v : globalMesh.vertices()){
+        int ctr = 0;
+        for (Halfedge he : v.outgoingHalfedges()){
+            if (sgn(gluedSigmaTilde[he]) != sgn(gluedSigmaTilde[he.next().next().twin()])) ctr++;
+        }
+        int index = (2 - ctr) / 2;
+        if (index == -1) saddleVertexPositions.push_back(globalGeometry.vertexPositions[v]);
+    }
+    polyscope::registerPointCloud("saddle vertices", saddleVertexPositions);
 
     //-------------------End of testing-------------------//
 
@@ -4302,7 +4315,17 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                     // model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
                     // model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
                     
-                    std::cout << "in case 1 " << std::endl; 
+                    std::cout << "In case 1 " << std::endl; 
+
+                    //ensure the saddle is in the bigon for the positive edge
+                    // model.addConstr(sigma[he1.getIndex()] >= 0);
+                    // model.addConstr(sigma[he1.twin().getIndex()] <= 0);
+
+                    //ensure the saddle is in the bigon for the negative edge
+                    // model.addConstr(sigma[he2.getIndex()] >= 0);
+                    // model.addConstr(sigma[he2.twin().getIndex()] <= 0);
+
+
                     //ensuring equality constraints 
                     model.addConstr(sigma[he1.twin().getIndex()] == -1.0 * sigma[he2.twin().getIndex()]);
 
@@ -4328,7 +4351,16 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                     // model.addConstr(sigma[he2.next().getIndex()] <= 0.);
                     // model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
 
-                    std::cout << "in case 2 " << std::endl; 
+
+                    std::cout << "In case 2 " << std::endl; 
+                    //ensure the saddle is in the bigon for the positive edge
+                    // model.addConstr(sigma[he1.getIndex()] >= 0);
+                    // model.addConstr(sigma[he1.twin().getIndex()] <= 0);
+
+                    //ensure the saddle is in the bigon for the negative edge
+                    // model.addConstr(sigma[he2.twin().getIndex()] >= 0);
+                    // model.addConstr(sigma[he2.getIndex()] <= 0);
+
                     //ensuring equality constraints 
                     model.addConstr(sigma[he1.twin().getIndex()] == -1.0 * sigma[he2.twin().getIndex()]);
 
@@ -4353,8 +4385,17 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                     // model.addConstr(sigma[he2.twin().getIndex()] >= 0.);
                     // model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
                     // model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
+
                     
-                    std::cout << "in case 3 " << std::endl; 
+                    std::cout << "In case 3 " << std::endl;
+                    //ensure the saddle is in the bigon for the positive edge
+                    // model.addConstr(sigma[he1.twin().getIndex()] >= 0);
+                    // model.addConstr(sigma[he1.getIndex()] <= 0);
+
+                    //ensure the saddle is in the bigon for the negative edge
+                    // model.addConstr(sigma[he2.getIndex()] >= 0);
+                    // model.addConstr(sigma[he2.twin().getIndex()] <= 0);
+                    
                     //ensuring equality constraints 
                     model.addConstr(sigma[he1.getIndex()] == -1.0 * sigma[he2.getIndex()]);
 
@@ -4380,13 +4421,21 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                     // model.addConstr(sigma[he2.next().getIndex()] <= 0.);
                     // model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
 
+                    std::cout << "In case 4 " << std::endl; 
+                    //ensure the saddle is in the bigon for the positive edge
+                    // model.addConstr(sigma[he1.twin().getIndex()] >= 0);
+                    // model.addConstr(sigma[he1.getIndex()] <= 0);
 
-                    std::cout << "in case 4 " << std::endl; 
+                    //ensure the saddle is in the bigon for the negative edge
+                    // model.addConstr(sigma[he2.twin().getIndex()] >= 0);
+                    // model.addConstr(sigma[he2.getIndex()] <= 0);
+
                     //ensuring equality constraints 
                     model.addConstr(sigma[he1.getIndex()] == -1.0 * sigma[he2.twin().getIndex()]);
                 }
                 else{
-                    std::cout << "didn't hit any of the conditions " << std::endl;
+                    std::cout << "Didn't hit any of the equality cases " << std::endl;
+                    exit(1);
                 }
             }
         }
