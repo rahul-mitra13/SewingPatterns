@@ -69,7 +69,7 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, 
 
 //compute the gradient of the a function defined as a scalar over vertices in the glued mesh setting 
 //Don't think the formula I'm using in here is right
-FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, VertexData<double>& vertexScalarFunction);
+//FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, VertexData<double>& vertexScalarFunction);
 
 //compute a vector (in ambient space) per vertex that is aligned with the gradient of a scalar field
 //

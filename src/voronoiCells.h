@@ -49,7 +49,12 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
                                                            VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
 
 VoronoiResult alignPointsOnIsoline(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
-                                    alignOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
+                                  alignOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
+
+
+//TO-DO: jointly optmize the positions of both the positive sites and the negtive site 
+VoronoiResult alignPointsOnIsoline(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
+                                  alignOptions options, VertexData<double>& posMeasure, VertexData<double>& negMeasure, polyscope::SurfaceMesh &psMesh);
 
 
 } // namespace surface

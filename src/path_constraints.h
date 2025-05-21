@@ -56,3 +56,15 @@ std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeom
 
 //compute the path cost between 2 vertices
 double computePathCost(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, Vertex& startVert, Vertex& endVert);
+
+
+//--------------New path tracing mechanism-------------------//
+//find an isopath between two vertices
+std::vector<double> findIsoPath(SurfaceMesh& mesh, VertexData<double>& timeFunction, Vertex vStart, Vertex vEnd);
+
+//find triangle strip containing an isoline
+FaceData<int> traceIsolineToEdge(SurfaceMesh& mesh,
+                                             const VertexData<double>& timeFunction,
+                                             Edge startEdge,
+                                             Edge endEdge,
+                                             double isoVal);

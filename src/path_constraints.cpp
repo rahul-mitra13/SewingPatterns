@@ -398,3 +398,155 @@ std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeom
     return toReturn;
 
 }
+
+
+//----------------New path constraint mechanisms----------------//
+//trace an isoline between to vertices 
+std::vector<double> findIsoPath(SurfaceMesh& mesh,
+                                  VertexData<double>& timeFunction,
+                                  Vertex vStart,
+                                  Vertex vEnd) {
+
+    // Target function value to stay near
+    double target = 0.5 * (timeFunction[vStart] + timeFunction[vEnd]);
+
+    // Priority queue: (cost, vertex)
+    using QueueEntry = std::pair<double, Vertex>;
+    auto cmp = [](const QueueEntry& a, const QueueEntry& b) { return a.first > b.first; };
+    std::priority_queue<QueueEntry, std::vector<QueueEntry>, decltype(cmp)> queue(cmp);
+
+    // Bookkeeping
+    VertexData<double> dist(mesh, std::numeric_limits<double>::infinity());
+    VertexData<Halfedge> prevHalfedge(mesh); // for path reconstruction
+
+    dist[vStart] = 0.0;
+    queue.push({0.0, vStart});
+
+    std::unordered_set<Vertex> visited;
+
+    while (!queue.empty()) {
+        auto [curCost, v] = queue.top();
+        queue.pop();
+
+        if (visited.count(v)) continue;
+        visited.insert(v);
+
+        if (v == vEnd) break;
+
+        for (Halfedge he : v.outgoingHalfedges()) {
+            if (he.isInterior()) {
+                Vertex neigh = he.tipVertex();
+
+                double cost = std::abs(timeFunction[neigh] - target);
+                double newDist = dist[v] + cost;
+
+                if (newDist < dist[neigh]) {
+                    dist[neigh] = newDist;
+                    prevHalfedge[neigh] = he;
+                    queue.push({newDist, neigh});
+                }
+            }
+        }
+    }
+
+    // Reconstruct path
+    std::vector<Halfedge> path;
+    Vertex v = vEnd;
+
+    while (v != vStart) {
+        if ((prevHalfedge[v] == Halfedge())) {
+            throw std::runtime_error("No path found between vStart and vEnd");
+        }
+        Halfedge he = prevHalfedge[v];
+        path.push_back(he);
+        v = he.tailVertex();
+    }
+
+    std::reverse(path.begin(), path.end());
+
+    //convert path to edge scalar
+    std::vector<double> edgePath(mesh.nEdges(), 0.0);
+    for (Halfedge he : path){
+        if (he.orientation())
+            edgePath[he.edge().getIndex()] = 1.0;
+        else 
+            edgePath[he.edge().getIndex()] = -1.0;
+    }
+
+    return edgePath;
+}
+
+// Check if isoVal crosses the edge between v1 and v2
+bool edgeIsCrossed(double f1, double f2, double isoVal) {
+    return (f1 - isoVal) * (f2 - isoVal) < 0.0;
+}
+
+// Return the two faces adjacent to an edge (could be boundary)
+std::vector<Face> adjacentFaces(Edge e) {
+    std::vector<Face> faces;
+    Halfedge he = e.halfedge();
+    faces.push_back(he.face());
+    faces.push_back(he.twin().face());
+    return faces;
+}
+
+// Trace isoline and collect all intersected faces, stopping when reaching a face adjacent to endEdge
+FaceData<int> traceIsolineToEdge(SurfaceMesh& mesh,
+                                             const VertexData<double>& timeFunction,
+                                             Edge startEdge,
+                                             Edge endEdge,
+                                             double isoVal) {
+    FaceData<int> toReturn(mesh, 0);                                            
+    std::unordered_set<Face> visitedFaces;
+    std::unordered_set<Edge> visitedEdges;
+    std::vector<Edge> frontier = {startEdge};
+
+    // Mark which faces we consider target
+    std::unordered_set<Face> targetFaces;
+    for (Face f : adjacentFaces(endEdge)) {
+        targetFaces.insert(f);
+    }
+
+    while (!frontier.empty()) {
+        Edge e = frontier.back();
+        frontier.pop_back();
+
+        if (visitedEdges.count(e)) continue;
+        visitedEdges.insert(e);
+
+        for (Face f : adjacentFaces(e)) {
+            if (visitedFaces.count(f)) continue;
+
+            visitedFaces.insert(f);
+            if (targetFaces.count(f)) {
+                //return visitedFaces; // early termination
+                return toReturn;
+            }
+
+            // For each edge in face, check if isoVal crosses
+            Halfedge heStart = f.halfedge();
+            Halfedge he = heStart;
+            do {
+                Vertex v1 = he.tailVertex();
+                Vertex v2 = he.tipVertex();
+                double f1 = timeFunction[v1];
+                double f2 = timeFunction[v2];
+
+                if (edgeIsCrossed(f1, f2, isoVal)) {
+                    frontier.push_back(he.edge());
+                }
+
+                he = he.next();
+            } while (he != heStart);
+        }
+    }
+
+    std::cerr << "Warning: Reached end of traversal without hitting endEdge." << std::endl;
+
+    std::cout << "size of strip = " << visitedFaces.size() << std::endl;
+    for (Face f : visitedFaces){
+        toReturn[f] = 1.0;
+    }
+
+    return toReturn;
+}

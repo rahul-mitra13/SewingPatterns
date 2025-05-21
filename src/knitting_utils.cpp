@@ -189,27 +189,27 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, 
 
 //compute the gradient of the a function defined as a scalar over vertices in the glued mesh setting 
 //don't think the formula I'm using in here is right
-FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, VertexData<double>& vertexScalarFunction){
+// FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, VertexData<double>& vertexScalarFunction){
 
-    SurfaceMesh& mesh = geometry.mesh; 
-    geometry.requireFaceAreas();
-    geometry.requireEdgeCotanWeights();
-    geometry.requireCornerAngles();
-    FaceData<Vector3> gradients(mesh);
+//     SurfaceMesh& mesh = geometry.mesh; 
+//     geometry.requireFaceAreas();
+//     geometry.requireEdgeCotanWeights();
+//     geometry.requireCornerAngles();
+//     FaceData<Vector3> gradients(mesh);
 
-    //don't know if this is the right thing to do here
-    for (Face f : mesh.faces()){
-        double fi = vertexScalarFunction[f.halfedge().vertex()];
-        double fj = vertexScalarFunction[f.halfedge().next().vertex()];
-        double fk = vertexScalarFunction[f.halfedge().next().next().vertex()];
-        double area = geometry.faceAreas[f];
-        BarycentricVector X_ik_perp = (BarycentricVector(f, Vector3{1., 0, -1.})).rotate90(geometry);
-        BarycentricVector X_ji_perp = (BarycentricVector(f, Vector3{-1., 1., 0.})).rotate90(geometry);
-        BarycentricVector gradF = ((fj - fi) * X_ik_perp + (fk - fi) * X_ji_perp)/ (2. * area); 
-        BarycentricVector gradFNormalized = gradF / norm(geometry, gradF);
-        gradients[f] = Vector3{gradFNormalized.faceCoords[0], gradFNormalized.faceCoords[1], gradFNormalized.faceCoords[2]};
-    }
-    return gradients;
+//     //don't know if this is the right thing to do here
+//     for (Face f : mesh.faces()){
+//         double fi = vertexScalarFunction[f.halfedge().vertex()];
+//         double fj = vertexScalarFunction[f.halfedge().next().vertex()];
+//         double fk = vertexScalarFunction[f.halfedge().next().next().vertex()];
+//         double area = geometry.faceAreas[f];
+//         BarycentricVector X_ik_perp = (BarycentricVector(f, Vector3{1., 0, -1.})).rotate90(geometry);
+//         BarycentricVector X_ji_perp = (BarycentricVector(f, Vector3{-1., 1., 0.})).rotate90(geometry);
+//         BarycentricVector gradF = ((fj - fi) * X_ik_perp + (fk - fi) * X_ji_perp)/ (2. * area); 
+//         BarycentricVector gradFNormalized = gradF / norm(geometry, gradF);
+//         gradients[f] = Vector3{gradFNormalized.faceCoords[0], gradFNormalized.faceCoords[1], gradFNormalized.faceCoords[2]};
+//     }
+//     return gradients;
     
 
     // for (Face f : mesh.faces()){
@@ -230,7 +230,7 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, Vert
     //     gradients[f][2] = 1./(2.*area) * (((f1 - f3) * cottheta2) + ((f2 - f3) * cottheta1));
     // }
     // return gradients;
-}
+//}
 
 //compute a vector (in ambient space) per vertex that is aligned with the gradient of a scalar field
 VertexData<Vector3> computeVertexValuedField(VertexPositionGeometry& geometry, VertexData<double>& vertexScalarFunction, double angle){
@@ -3627,7 +3627,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 15; //std::round(avgTotalMeasure / period);
+    posOptions.nSites = 10;//std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     posOptions.iterations = 500;
@@ -3743,7 +3743,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
     alignmentOptions.pairedSites = pairedSites;
     alignmentOptions.usingPosCurl = true;
-    alignmentOptions.iterations = 1000;
+    alignmentOptions.iterations = 1500;
     alignmentOptions.lambda = 1.0;
     VoronoiResult posAlignedCenters = alignPointsOnIsoline(globalMesh, globalGeometry, alignmentOptions, posMeasure, psMesh);
     std::vector<Vector3> alignedPosCenters;
@@ -3752,13 +3752,17 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
     polyscope::registerPointCloud("positive voronoi sites (aligned course)", alignedPosCenters)->setEnabled(false);
 
+    //store the paired time functions
+    std::vector<std::pair<double, double>> pairedTimeFunctions;
 
     //now appropriatately specify the singular edges
     for (int i = 0; i < posAlignedCenters.siteLocations.size(); i++){
         SurfacePoint posSite = posAlignedCenters.siteLocations[i];
         SurfacePoint negSite = pairedSites[i].second;//find the corresponding paired negative site
+
         //handle positive case 
         SurfacePoint posFacePoint = posSite.inSomeFace();
+        double posVal = posSite.interpolate(globalTimeFunction);
         Face f = posSite.face;
         Edge posSingularEdge;
         double maxDotProd = -DBL_MAX;
@@ -3775,6 +3779,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
         //handle negative case
         SurfacePoint negFacePoint = negSite.inSomeFace();
+        double negVal = negSite.interpolate(globalTimeFunction);
         f = negSite.face;
         Edge negSingularEdge;
         maxDotProd = -DBL_MAX;
@@ -3790,6 +3795,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         edgeSingularities[negSingularEdge] = -1.0;
 
         singularEdges.push_back(std::make_pair(posSingularEdge.getIndex(), negSingularEdge.getIndex()));
+
+        pairedTimeFunctions.push_back(std::make_pair(posVal, negVal));
     }
 
     std::cout << "Finished aligning the sites " << std::endl;
@@ -3805,14 +3812,41 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //construct edge paths between singular edges
     for (int i = 0; i < singularEdges.size(); i++){
         auto p = singularEdges[i];
+        auto timeFuncPair = pairedTimeFunctions[i];
         Edge posEdge = globalMesh.edge(p.first);
         Edge negEdge = globalMesh.edge(p.second);
-        std::tie(globalPath, gluedPath) = constructEdgePath(globalGeometry, gluedGeometry, posEdge, negEdge,
-                                                            vertexMap, edgeMap, globalTimeFunctionGradientsNormalized, heWeights, gluedSigmaTilde, connectSaddles);
-        psMesh.addEdgeScalarQuantity("path for pair " + std::to_string(i), globalPath);
+        //std::tie(globalPath, gluedPath) = constructEdgePath(globalGeometry, gluedGeometry, posEdge, negEdge,
+        //                                                    vertexMap, edgeMap, globalTimeFunctionGradientsNormalized, heWeights, gluedSigmaTilde, connectSaddles);
+        //psMesh.addEdgeScalarQuantity("path for pair " + std::to_string(i), globalPath);
         //don't retake edges from another path
-        updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, heWeights);
-        edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
+        //updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, heWeights);
+        //edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
+        
+
+        
+        //testing triangle stripe code 
+        // FaceData<int> strip = traceIsolineToEdge(globalGeometry.mesh, globalTimeFunction, posEdge, negEdge, 0.5 * (timeFuncPair.first + timeFuncPair.second));
+        // psMesh.addFaceScalarQuantity("triangle strip for pair " + std::to_string(i), strip);
+
+        Eigen::MatrixXd iV;
+        Eigen::MatrixXd iE;
+        std::vector<int> f;
+        std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, 0.5 * (timeFuncPair.first + timeFuncPair.second));
+        FaceData<int> isoFaces(gluedMesh, 0);
+        for (int fI : f){
+            isoFaces[fI] = 1;
+        }
+        psMesh.addFaceScalarQuantity("iso face for pair " + std::to_string(i), isoFaces);
+    
+        //pick the lower edge for both positive edge and negative edge 
+        Vertex startVert = globalTimeFunction[posEdge.halfedge().tipVertex()] > globalTimeFunction[posEdge.halfedge().tailVertex()] ? posEdge.halfedge().tipVertex() : posEdge.halfedge().tailVertex();
+        Vertex endVert = globalTimeFunction[negEdge.halfedge().tipVertex()] > globalTimeFunction[negEdge.halfedge().tailVertex()] ? negEdge.halfedge().tipVertex() : negEdge.halfedge().tailVertex();
+
+        std::vector<double> testPath = findIsoPath(globalGeometry.mesh, globalTimeFunction, startVert, endVert);
+        psMesh.addEdgeScalarQuantity("path for pair " + std::to_string(i), testPath);
+        
+        //using our new testPaths instead
+        edgePathConstraints.push_back(std::make_pair(testPath, 0.));
     }
 
     model.setEdgePathConstraints(edgePathConstraints);
@@ -5357,7 +5391,7 @@ void visualizeAllEdgeLoops(VertexPositionGeometry& geometry, std::vector<Vertex>
 }
 
 //the only function I ever need to care about
-std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geometry, const std::vector<Vertex> &saddleVertices, const VertexData<double>& timeFunc) {
+std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geometry, const std::vector<Vertex>& saddleVertices, const VertexData<double>& timeFunc) {
 
     std::vector<std::vector<double>>  allSaddleLoops;
     

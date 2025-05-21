@@ -768,10 +768,7 @@ VoronoiResult alignPointsOnIsoline(SurfaceMesh& mesh, IntrinsicGeometryInterface
     }
   }
   return result;
- 
-
 }
-
 
 } // namespace surface
 } // namespace geometrycentral
