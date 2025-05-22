@@ -70,26 +70,7 @@ std::vector<double> findIsoPath(SurfaceMesh& mesh, VertexData<double>& timeFunct
 //                                              double isoVal);
 
 
-// Traces the isoline at a given isovalue starting from startEdge to endEdge
-std::vector<Edge> traceIsoline(
-    const SurfaceMesh& mesh,
-    const VertexData<double>& timeFunction,
-    double isoVal,
-    Edge startEdge,
-    Edge endEdge
-);
-
-// Traces the isoline at a given isovalue starting from startHe to endHe
-//same as above just uses halfedges instead of edges
-std::vector<Halfedge> traceIsoline(
-    const SurfaceMesh& mesh,
-    const VertexData<double>& timeFunction,
-    double isoVal,
-    Halfedge startHe,
-    Halfedge endHe
-);
-
-//trace the faces that an isoline passes through
+//trace the faces that an isoline passes through in the correct direction
 std::vector<Face> traceIsolineFaces(
     const VertexPositionGeometry& globalGeometry,
     const VertexData<double>& timeFunction,

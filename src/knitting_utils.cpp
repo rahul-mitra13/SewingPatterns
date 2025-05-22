@@ -3743,7 +3743,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
     alignmentOptions.pairedSites = pairedSites;
     alignmentOptions.usingPosCurl = true;
-    alignmentOptions.iterations = 1500;
+    alignmentOptions.iterations = 2500;
     alignmentOptions.lambda = 1.0;
     VoronoiResult posAlignedCenters = alignPointsOnIsoline(globalMesh, globalGeometry, alignmentOptions, posMeasure, psMesh);
     std::vector<Vector3> alignedPosCenters;
