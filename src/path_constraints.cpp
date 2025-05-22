@@ -401,6 +401,8 @@ std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeom
 
 
 //----------------New path constraint mechanisms----------------//
+
+
 //trace an isoline between to vertices 
 std::vector<double> findIsoPath(SurfaceMesh& mesh,
                                   VertexData<double>& timeFunction,
@@ -476,77 +478,208 @@ std::vector<double> findIsoPath(SurfaceMesh& mesh,
     return edgePath;
 }
 
-// Check if isoVal crosses the edge between v1 and v2
-bool edgeIsCrossed(double f1, double f2, double isoVal) {
-    return (f1 - isoVal) * (f2 - isoVal) < 0.0;
-}
 
-// Return the two faces adjacent to an edge (could be boundary)
-std::vector<Face> adjacentFaces(Edge e) {
-    std::vector<Face> faces;
-    Halfedge he = e.halfedge();
-    faces.push_back(he.face());
-    faces.push_back(he.twin().face());
-    return faces;
-}
+std::optional<std::pair<Halfedge, Halfedge>> findIsovalueCrossingInFace(
+    Face face,
+    const SurfaceMesh& mesh,
+    const VertexData<double>& timeFunction,
+    double isoVal
+) {
+    std::vector<Halfedge> crossingHalfedges;
 
-// Trace isoline and collect all intersected faces, stopping when reaching a face adjacent to endEdge
-FaceData<int> traceIsolineToEdge(SurfaceMesh& mesh,
-                                             const VertexData<double>& timeFunction,
-                                             Edge startEdge,
-                                             Edge endEdge,
-                                             double isoVal) {
-    FaceData<int> toReturn(mesh, 0);                                            
-    std::unordered_set<Face> visitedFaces;
-    std::unordered_set<Edge> visitedEdges;
-    std::vector<Edge> frontier = {startEdge};
+    for (Halfedge he : face.adjacentHalfedges()) {
+        double valA = timeFunction[he.tailVertex()];
+        double valB = timeFunction[he.tipVertex()];
 
-    // Mark which faces we consider target
-    std::unordered_set<Face> targetFaces;
-    for (Face f : adjacentFaces(endEdge)) {
-        targetFaces.insert(f);
-    }
-
-    while (!frontier.empty()) {
-        Edge e = frontier.back();
-        frontier.pop_back();
-
-        if (visitedEdges.count(e)) continue;
-        visitedEdges.insert(e);
-
-        for (Face f : adjacentFaces(e)) {
-            if (visitedFaces.count(f)) continue;
-
-            visitedFaces.insert(f);
-            if (targetFaces.count(f)) {
-                //return visitedFaces; // early termination
-                return toReturn;
-            }
-
-            // For each edge in face, check if isoVal crosses
-            Halfedge heStart = f.halfedge();
-            Halfedge he = heStart;
-            do {
-                Vertex v1 = he.tailVertex();
-                Vertex v2 = he.tipVertex();
-                double f1 = timeFunction[v1];
-                double f2 = timeFunction[v2];
-
-                if (edgeIsCrossed(f1, f2, isoVal)) {
-                    frontier.push_back(he.edge());
-                }
-
-                he = he.next();
-            } while (he != heStart);
+        if ((valA - isoVal) * (valB - isoVal) < 0.0) {
+            crossingHalfedges.push_back(he.twin());
         }
     }
 
-    std::cerr << "Warning: Reached end of traversal without hitting endEdge." << std::endl;
-
-    std::cout << "size of strip = " << visitedFaces.size() << std::endl;
-    for (Face f : visitedFaces){
-        toReturn[f] = 1.0;
+    if (crossingHalfedges.size() == 2) {
+        return std::make_pair(crossingHalfedges[0], crossingHalfedges[1]);
     }
 
-    return toReturn;
+    return std::nullopt;
+}
+
+// Traces the isoline at a given isovalue starting from startEdge to endEdge
+std::vector<Edge> traceIsoline(
+    const SurfaceMesh& mesh,
+    const VertexData<double>& timeFunction,
+    double isoVal,
+    Edge startEdge,
+    Edge endEdge
+) {
+    std::vector<Edge> pathEdges;
+    std::set<Edge> visitedEdges;
+
+    Halfedge startHe = startEdge.halfedge();
+    Face fA = startHe.face();
+    Face fB = startHe.twin().face();
+    Face currentFace = (fA != Face()) ? fA : fB;        
+    Edge currentEdge = startEdge;
+
+    while (currentEdge != endEdge && currentFace != Face()) {
+        if (visitedEdges.count(currentEdge)) {
+            std::cerr << "Cycle detected or edge already visited. Aborting.\n";
+            break;
+        }
+        visitedEdges.insert(currentEdge);
+        pathEdges.push_back(currentEdge);
+
+        auto maybeCrossing = findIsovalueCrossingInFace(currentFace, mesh, timeFunction, isoVal);
+        if (!maybeCrossing) {
+            std::cerr << "No valid isoline crossing in face " << currentFace.getIndex() << "\n";
+            break;
+        }
+
+        Halfedge he1 = maybeCrossing->first;
+        Halfedge he2 = maybeCrossing->second;
+
+        // Pick the next crossing edge (not the one we came from)
+        Edge nextEdge;
+        if (he1.edge() != currentEdge) nextEdge = he1.edge();
+        else nextEdge = he2.edge();
+
+        // Advance to the neighboring face
+        Halfedge twinHe = nextEdge.halfedge();
+        if (twinHe.face() == currentFace) twinHe = twinHe.twin();
+        currentFace = twinHe.face();
+        currentEdge = nextEdge;
+    }
+
+    // Add end edge if reached
+    if (currentEdge == endEdge) {
+        pathEdges.push_back(endEdge);
+    } else {
+        std::cerr << "Did not reach endEdge.\n";
+    }
+
+    return pathEdges;
+}
+
+//same as above but does the tracing directly in the setting of halfedges
+std::vector<Halfedge> traceIsoline(
+    const SurfaceMesh& mesh,
+    const VertexData<double>& timeFunction,
+    double isoVal,
+    Halfedge startHe,
+    Halfedge endHe
+) {
+    std::vector<Halfedge> pathHalfedges;
+    std::set<Halfedge> visitedHalfedges;
+
+    // Determine which face to start from
+    Face fA = startHe.face();
+    Face fB = startHe.twin().face();
+    Face currentFace = (fA != Face()) ? fA : fB;
+    Halfedge currentHe = startHe;
+
+    while (currentHe != endHe && currentFace != Face()) {
+        if (visitedHalfedges.count(currentHe)) {
+            std::cerr << "Cycle or repeat detected. Aborting.\n";
+            break;
+        }
+        visitedHalfedges.insert(currentHe);
+        pathHalfedges.push_back(currentHe);
+
+        // Get the two halfedges in the face where the isovalue crosses
+        auto maybeCrossing = findIsovalueCrossingInFace(currentFace, mesh, timeFunction, isoVal);
+        if (!maybeCrossing) {
+            std::cerr << "No isoline crossing in face " << currentFace.getIndex() << "\n";
+            break;
+        }
+
+        Halfedge he1 = maybeCrossing->first;
+        Halfedge he2 = maybeCrossing->second;
+
+        // Choose next halfedge (not the one we just came from)
+        Halfedge nextHe;
+        if (he1.edge() != currentHe.edge()) nextHe = he1;
+        else nextHe = he2;
+
+        // Flip to the opposite face
+        Halfedge twin = nextHe.twin();
+        currentFace = twin.face();
+        currentHe = twin;
+    }
+
+    // Final step: add the last halfedge if it matches
+    if (currentHe == endHe) {
+        pathHalfedges.push_back(endHe);
+    } else {
+        std::cerr << "Did not reach endHalfedge.\n";
+    }
+
+    return pathHalfedges;
+}
+
+//trace the faces that an isoline passes through
+std::vector<Face> traceIsolineFaces(
+    const VertexPositionGeometry& globalGeometry,
+    const VertexData<double>& timeFunction,
+    const FaceData<Vector3>& rotatedFaceGradients,
+    double isoVal,
+    Halfedge startHe,
+    Halfedge endHe
+){
+
+    std::unordered_set<Face> visitedFaces;
+    std::vector<Face> pathFaces;
+
+    
+    Face currentFace = startHe.face();//face to start at 
+    Face endFace = endHe.face();//face to end at
+
+    //expand face
+    std::queue<Face> frontier;
+    frontier.push(currentFace);
+    //pathFaces.emplace_back(currentFace);
+    visitedFaces.insert(currentFace);
+    visitedFaces.insert(endFace);
+
+    double eps = -0.1;//don't really like this term but we'll keep it (maybe, can relax if the matching runs to convergence)
+
+    while(!frontier.empty()){
+
+        Face f = frontier.front();
+        frontier.pop();
+        if (f == endFace) break;
+
+
+        for (Halfedge he : f.adjacentHalfedges()){
+
+
+            double valA = timeFunction[he.tailVertex()];
+            double valB = timeFunction[he.tipVertex()];
+            if ((valA - isoVal) * (valB - isoVal) < 0.0){//isovalue crosses this halfedge
+                Halfedge twinHe = he.twin();
+                Face neighbor = twinHe.face();
+
+                //only consider faces that move in the right direction
+                Vector3 neighborBary = ((1./3.) * (globalGeometry.vertexPositions[neighbor.halfedge().tailVertex()] + globalGeometry.vertexPositions[neighbor.halfedge().next().tailVertex()]
+                                                + globalGeometry.vertexPositions[neighbor.halfedge().next().next().tailVertex()]));
+                Vector3 faceBary = ((1./3.) * (globalGeometry.vertexPositions[f.halfedge().tailVertex()] + globalGeometry.vertexPositions[f.halfedge().next().tailVertex()]
+                                                + globalGeometry.vertexPositions[f.halfedge().next().next().tailVertex()]));
+                Vector3 directionVector = (neighborBary - faceBary).normalize();
+                if (dot(directionVector, rotatedFaceGradients[f]) < eps) continue;//relying on the fact that paths in the wrong direction will be very wrong
+
+                if (neighbor == endFace){
+                    return pathFaces;
+                }
+                if (visitedFaces.find(neighbor) == visitedFaces.end()) {
+                    pathFaces.emplace_back(neighbor);
+                    frontier.push(neighbor);
+                    visitedFaces.insert(neighbor);
+                }
+            }
+        }
+    }
+
+    std::cout << "didn't get to endFace " << std::endl;
+    std::exit(0);
+
+    return pathFaces;
+
 }

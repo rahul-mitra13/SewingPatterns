@@ -3754,15 +3754,21 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     //store the paired time functions
     std::vector<std::pair<double, double>> pairedTimeFunctions;
+    //paired halfedges
+    std::vector<std::pair<Halfedge, Halfedge>> pairedHalfedges;
+    std::vector<Vector3> allPoints;
 
     //now appropriatately specify the singular edges
     for (int i = 0; i < posAlignedCenters.siteLocations.size(); i++){
         SurfacePoint posSite = posAlignedCenters.siteLocations[i];
         SurfacePoint negSite = pairedSites[i].second;//find the corresponding paired negative site
+        allPoints.emplace_back(posSite.interpolate(globalGeometry.vertexPositions));
+        allPoints.emplace_back(negSite.interpolate(globalGeometry.vertexPositions));
 
         //handle positive case 
         SurfacePoint posFacePoint = posSite.inSomeFace();
         double posVal = posSite.interpolate(globalTimeFunction);
+        Halfedge posHe;
         Face f = posSite.face;
         Edge posSingularEdge;
         double maxDotProd = -DBL_MAX;
@@ -3772,6 +3778,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
                     maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
                     posSingularEdge = he.edge();
+                    posHe = he;
             }
         }
         edgeIndices[posSingularEdge.getIndex()] = -1.0;
@@ -3780,6 +3787,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //handle negative case
         SurfacePoint negFacePoint = negSite.inSomeFace();
         double negVal = negSite.interpolate(globalTimeFunction);
+        Halfedge negHe;
         f = negSite.face;
         Edge negSingularEdge;
         maxDotProd = -DBL_MAX;
@@ -3789,15 +3797,18 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
                     maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
                     negSingularEdge = he.edge();
+                    negHe = he;
             }
         }
         edgeIndices[negSingularEdge.getIndex()] = 1.0;
         edgeSingularities[negSingularEdge] = -1.0;
 
         singularEdges.push_back(std::make_pair(posSingularEdge.getIndex(), negSingularEdge.getIndex()));
-
         pairedTimeFunctions.push_back(std::make_pair(posVal, negVal));
+        pairedHalfedges.push_back(std::make_pair(posHe, negHe));
     }
+
+    polyscope::registerPointCloud("all singularity points", allPoints);
 
     std::cout << "Finished aligning the sites " << std::endl;
     //polyscope::show();
@@ -3813,6 +3824,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     for (int i = 0; i < singularEdges.size(); i++){
         auto p = singularEdges[i];
         auto timeFuncPair = pairedTimeFunctions[i];
+        auto HePair = pairedHalfedges[i];
         Edge posEdge = globalMesh.edge(p.first);
         Edge negEdge = globalMesh.edge(p.second);
         //std::tie(globalPath, gluedPath) = constructEdgePath(globalGeometry, gluedGeometry, posEdge, negEdge,
@@ -3821,23 +3833,21 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //don't retake edges from another path
         //updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, heWeights);
         //edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
-        
+        double isoVal = 0.5 * (timeFuncPair.first + timeFuncPair.second);
 
-        
+
         //testing triangle stripe code 
-        // FaceData<int> strip = traceIsolineToEdge(globalGeometry.mesh, globalTimeFunction, posEdge, negEdge, 0.5 * (timeFuncPair.first + timeFuncPair.second));
-        // psMesh.addFaceScalarQuantity("triangle strip for pair " + std::to_string(i), strip);
+        std::vector<Face> faces = traceIsolineFaces(globalGeometry, globalTimeFunction, rotatedFaceGradients, isoVal, HePair.first, HePair.second);
+        FaceData<int> facePath(globalGeometry.mesh, 0);
+        for (Face f : faces) facePath[f] = 1;
+        psMesh.addFaceScalarQuantity("faces for pair " + std::to_string(i), facePath);
 
         Eigen::MatrixXd iV;
         Eigen::MatrixXd iE;
         std::vector<int> f;
-        std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, 0.5 * (timeFuncPair.first + timeFuncPair.second));
-        FaceData<int> isoFaces(gluedMesh, 0);
-        for (int fI : f){
-            isoFaces[fI] = 1;
-        }
-        psMesh.addFaceScalarQuantity("iso face for pair " + std::to_string(i), isoFaces);
-    
+        std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, isoVal);
+        polyscope::registerCurveNetwork("isoval for pair " + std::to_string(i), iV, iE)->setRadius(0.00125);
+
         //pick the lower edge for both positive edge and negative edge 
         Vertex startVert = globalTimeFunction[posEdge.halfedge().tipVertex()] > globalTimeFunction[posEdge.halfedge().tailVertex()] ? posEdge.halfedge().tipVertex() : posEdge.halfedge().tailVertex();
         Vertex endVert = globalTimeFunction[negEdge.halfedge().tipVertex()] > globalTimeFunction[negEdge.halfedge().tailVertex()] ? negEdge.halfedge().tipVertex() : negEdge.halfedge().tailVertex();

@@ -63,8 +63,38 @@ double computePathCost(VertexPositionGeometry& globalGeometry, HalfedgeData<doub
 std::vector<double> findIsoPath(SurfaceMesh& mesh, VertexData<double>& timeFunction, Vertex vStart, Vertex vEnd);
 
 //find triangle strip containing an isoline
-FaceData<int> traceIsolineToEdge(SurfaceMesh& mesh,
-                                             const VertexData<double>& timeFunction,
-                                             Edge startEdge,
-                                             Edge endEdge,
-                                             double isoVal);
+// FaceData<int> traceIsolineToEdge(SurfaceMesh& mesh,
+//                                              const VertexData<double>& timeFunction,
+//                                              Edge startEdge,
+//                                              Edge endEdge,
+//                                              double isoVal);
+
+
+// Traces the isoline at a given isovalue starting from startEdge to endEdge
+std::vector<Edge> traceIsoline(
+    const SurfaceMesh& mesh,
+    const VertexData<double>& timeFunction,
+    double isoVal,
+    Edge startEdge,
+    Edge endEdge
+);
+
+// Traces the isoline at a given isovalue starting from startHe to endHe
+//same as above just uses halfedges instead of edges
+std::vector<Halfedge> traceIsoline(
+    const SurfaceMesh& mesh,
+    const VertexData<double>& timeFunction,
+    double isoVal,
+    Halfedge startHe,
+    Halfedge endHe
+);
+
+//trace the faces that an isoline passes through
+std::vector<Face> traceIsolineFaces(
+    const VertexPositionGeometry& globalGeometry,
+    const VertexData<double>& timeFunction,
+    const FaceData<Vector3>& rotatedFaceGradients,
+    double isoVal,
+    Halfedge startHe,
+    Halfedge endHe
+);
