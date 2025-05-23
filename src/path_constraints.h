@@ -71,9 +71,12 @@ std::vector<double> findIsoPath(SurfaceMesh& mesh, VertexData<double>& timeFunct
 
 
 //trace the faces that an isoline passes through in the correct direction
-std::vector<Face> traceIsolineFaces(
+//first argument is the vector of faces 
+//second is argument is currently being used as an error code 
+std::tuple<std::vector<Face>, int>  traceIsolineFaces(
     const VertexPositionGeometry& globalGeometry,
     const VertexData<double>& timeFunction,
+    const FaceData<Vector3>& timeFunctionGradients,
     const FaceData<Vector3>& rotatedFaceGradients,
     double isoVal,
     Halfedge startHe,

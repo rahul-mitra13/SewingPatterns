@@ -3627,7 +3627,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 10;//std::round(avgTotalMeasure / period);
+    posOptions.nSites = 10; //std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     posOptions.iterations = 500;
@@ -3682,10 +3682,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //store a vector of vertex ids and singularity indices (for optimal matching)
     std::vector<std::pair<Vertex, int>> singularities;
 
-    //map singular vertices to singular edges 
-    std::map<Vertex, Edge> vertexToEdgeMap;
     //map vertices to surface points 
     std::map<Vertex, SurfacePoint> vertexToSurfacePointMap;
+
 
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
         SurfacePoint facePoint = posVoronoiCenters.siteLocations[i].inSomeFace();
@@ -3704,7 +3703,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //edgeIndices[singularEdge.getIndex()] = -1.0;
         //edgeSingularities[singularEdge] = 1.0;
         singularities.push_back(std::make_pair(singularEdge.halfedge().tailVertex(), 1));//used for optimal matching
-        //vertexToEdgeMap[singularEdge.halfedge().tailVertex()] = singularEdge;//save it in the map, useful for optimal matching later
         vertexToSurfacePointMap[singularEdge.halfedge().tailVertex()] = posVoronoiCenters.siteLocations[i];//save it in the map, useful for aligning later
     }
 
@@ -3725,7 +3723,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //edgeIndices[singularEdge.getIndex()] = 1.0;
         //edgeSingularities[singularEdge] = -1.0;
         singularities.push_back(std::make_pair(singularEdge.halfedge().tailVertex(), -1));//used for optimal matching
-        //vertexToEdgeMap[singularEdge.halfedge().tailVertex()] = singularEdge;//save it in the map, useful for optimal matching later
         vertexToSurfacePointMap[singularEdge.halfedge().tailVertex()] = negVoronoiCenters.siteLocations[i];//save it in the map, useful for aligning later
     }
     
@@ -3756,15 +3753,14 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<std::pair<double, double>> pairedTimeFunctions;
     //paired halfedges
     std::vector<std::pair<Halfedge, Halfedge>> pairedHalfedges;
-    std::vector<Vector3> allPoints;
+    //map singular edges to their corresponding isovals
+    std::map<Edge, double> edgeToIsoVal;
 
     //now appropriatately specify the singular edges
     for (int i = 0; i < posAlignedCenters.siteLocations.size(); i++){
         SurfacePoint posSite = posAlignedCenters.siteLocations[i];
         SurfacePoint negSite = pairedSites[i].second;//find the corresponding paired negative site
-        allPoints.emplace_back(posSite.interpolate(globalGeometry.vertexPositions));
-        allPoints.emplace_back(negSite.interpolate(globalGeometry.vertexPositions));
-
+        
         //handle positive case 
         SurfacePoint posFacePoint = posSite.inSomeFace();
         double posVal = posSite.interpolate(globalTimeFunction);
@@ -3806,9 +3802,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         singularEdges.push_back(std::make_pair(posSingularEdge.getIndex(), negSingularEdge.getIndex()));
         pairedTimeFunctions.push_back(std::make_pair(posVal, negVal));
         pairedHalfedges.push_back(std::make_pair(posHe, negHe));
+        edgeToIsoVal[posSingularEdge] = 0.5 * (posVal + negVal);
+        edgeToIsoVal[negSingularEdge] = 0.5 * (posVal + negVal);
     }
-
-    polyscope::registerPointCloud("all singularity points", allPoints);
 
     std::cout << "Finished aligning the sites " << std::endl;
     //polyscope::show();
@@ -3827,6 +3823,18 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         auto HePair = pairedHalfedges[i];
         Edge posEdge = globalMesh.edge(p.first);
         Edge negEdge = globalMesh.edge(p.second);
+
+        //draw a curve network to debug the face paths
+        std::vector<Vector3> courseSingularEdgePoints;
+        std::vector<std::array<int,2>> courseSingularEdges;
+        courseSingularEdgePoints.push_back(globalGeometry.vertexPositions[posEdge.firstVertex()]);
+        courseSingularEdgePoints.push_back(globalGeometry.vertexPositions[posEdge.secondVertex()]);
+        courseSingularEdges.push_back({(int)courseSingularEdgePoints.size()-2, (int)courseSingularEdgePoints.size()-1});
+        courseSingularEdgePoints.push_back(globalGeometry.vertexPositions[negEdge.firstVertex()]);
+        courseSingularEdgePoints.push_back(globalGeometry.vertexPositions[negEdge.secondVertex()]);
+        courseSingularEdges.push_back({(int)courseSingularEdgePoints.size()-2, (int)courseSingularEdgePoints.size()-1});
+        polyscope::registerCurveNetwork("course singular edge pair " + std::to_string(i), courseSingularEdgePoints, courseSingularEdges)->setEnabled(false);
+
         //std::tie(globalPath, gluedPath) = constructEdgePath(globalGeometry, gluedGeometry, posEdge, negEdge,
         //                                                    vertexMap, edgeMap, globalTimeFunctionGradientsNormalized, heWeights, gluedSigmaTilde, connectSaddles);
         //psMesh.addEdgeScalarQuantity("path for pair " + std::to_string(i), globalPath);
@@ -3835,8 +3843,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
         double isoVal = 0.5 * (timeFuncPair.first + timeFuncPair.second);
         //testing triangle stripe code 
-        std::vector<Face> faces = traceIsolineFaces(globalGeometry, globalTimeFunction, rotatedFaceGradients, isoVal, HePair.first, HePair.second);
-
+        std::vector<Face> faces;
+        int code; 
+        std::tie(faces, code) = traceIsolineFaces(globalGeometry, globalTimeFunction, globalTimeFunctionGradientsNormalized, rotatedFaceGradients, isoVal, HePair.first, HePair.second);
+    
         //we assume we're going to construct paths from the tips of the singular edges (actually halfedges)
         Face firstFace = faces.front();
         Face lastFace = faces.back();
@@ -3857,6 +3867,13 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         std::vector<int> f;
         std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, isoVal);
         polyscope::registerCurveNetwork("isoval for pair " + std::to_string(i), iV, iE)->setRadius(0.001)->setEnabled(false);
+
+        if (code == -1){
+            std::cout << "face path didn't get to the end face " << std::endl;
+            polyscope::show();
+            exit(1);
+        }
+
 
         //pick the higher vertex for both positive edge and negative edge 
         // Vertex startVert = globalTimeFunction[posEdge.halfedge().tipVertex()] > globalTimeFunction[posEdge.halfedge().tailVertex()] ? posEdge.halfedge().tipVertex() : posEdge.halfedge().tailVertex();
