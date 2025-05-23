@@ -3819,7 +3819,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::cout << "Set singular edges as constraints " << std::endl;
 
     bool connectSaddles = false;
-
+    
     //construct edge paths between singular edges
     for (int i = 0; i < singularEdges.size(); i++){
         auto p = singularEdges[i];
@@ -3834,10 +3834,20 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, heWeights);
         //edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
         double isoVal = 0.5 * (timeFuncPair.first + timeFuncPair.second);
-
-
         //testing triangle stripe code 
         std::vector<Face> faces = traceIsolineFaces(globalGeometry, globalTimeFunction, rotatedFaceGradients, isoVal, HePair.first, HePair.second);
+
+        //we assume we're going to construct paths from the tips of the singular edges (actually halfedges)
+        Face firstFace = faces.front();
+        Face lastFace = faces.back();
+        Vertex vStart = globalTimeFunction[posEdge.halfedge().tipVertex()] > globalTimeFunction[posEdge.halfedge().tailVertex()] ? posEdge.halfedge().tipVertex() : posEdge.halfedge().tailVertex();
+        Vertex vEnd = globalTimeFunction[negEdge.halfedge().tipVertex()] > globalTimeFunction[negEdge.halfedge().tailVertex()] ? negEdge.halfedge().tipVertex() : negEdge.halfedge().tailVertex();
+        
+        if (std::find(firstFace.adjacentVertices().begin(), firstFace.adjacentVertices().end(), vStart) == firstFace.adjacentVertices().end())//the tip startVertex we want is not in the set
+            faces.insert(faces.begin(), HePair.first.face());
+        if (std::find(lastFace.adjacentVertices().begin(), lastFace.adjacentVertices().end(), vEnd) == lastFace.adjacentVertices().end())//the tip endVertex we want is not in the set
+            faces.push_back(HePair.second.face());
+
         FaceData<int> facePath(globalGeometry.mesh, 0);
         for (Face f : faces) facePath[f] = 1;
         psMesh.addFaceScalarQuantity("faces for pair " + std::to_string(i), facePath);
@@ -3846,13 +3856,13 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         Eigen::MatrixXd iE;
         std::vector<int> f;
         std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, isoVal);
-        polyscope::registerCurveNetwork("isoval for pair " + std::to_string(i), iV, iE)->setRadius(0.00125);
+        polyscope::registerCurveNetwork("isoval for pair " + std::to_string(i), iV, iE)->setRadius(0.001)->setEnabled(false);
 
-        //pick the lower edge for both positive edge and negative edge 
-        Vertex startVert = globalTimeFunction[posEdge.halfedge().tipVertex()] > globalTimeFunction[posEdge.halfedge().tailVertex()] ? posEdge.halfedge().tipVertex() : posEdge.halfedge().tailVertex();
-        Vertex endVert = globalTimeFunction[negEdge.halfedge().tipVertex()] > globalTimeFunction[negEdge.halfedge().tailVertex()] ? negEdge.halfedge().tipVertex() : negEdge.halfedge().tailVertex();
+        //pick the higher vertex for both positive edge and negative edge 
+        // Vertex startVert = globalTimeFunction[posEdge.halfedge().tipVertex()] > globalTimeFunction[posEdge.halfedge().tailVertex()] ? posEdge.halfedge().tipVertex() : posEdge.halfedge().tailVertex();
+        // Vertex endVert = globalTimeFunction[negEdge.halfedge().tipVertex()] > globalTimeFunction[negEdge.halfedge().tailVertex()] ? negEdge.halfedge().tipVertex() : negEdge.halfedge().tailVertex();
 
-        std::vector<double> testPath = findIsoPath(globalGeometry.mesh, globalTimeFunction, startVert, endVert);
+        std::vector<double> testPath = findIsoPath(globalGeometry.mesh, globalTimeFunction, vStart, vEnd);
         psMesh.addEdgeScalarQuantity("path for pair " + std::to_string(i), testPath);
         
         //using our new testPaths instead
