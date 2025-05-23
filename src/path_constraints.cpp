@@ -485,26 +485,24 @@ computeIsolineFaceIntersection(const Face face, double iso,
                                const VertexPositionGeometry& geom) {
     std::vector<std::tuple<Vector3, Halfedge>> intersections;
 
-    Halfedge he = face.halfedge();
-    for (int i = 0; i < 3; ++i) {
+    for (Halfedge he : face.adjacentHalfedges()){
         Vertex v0 = he.vertex();
         Vertex v1 = he.next().vertex();
 
         double f0 = fValues[v0];
         double f1 = fValues[v1];
 
-        if ((f0 - iso) * (f1 - iso) < 0.0) { // scalar crosses iso
+        if ((f0 - iso) * (f1 - iso) < 0.0 || f0 == iso || f1 == iso) { // scalar crosses iso
             double t = (iso - f0) / (f1 - f0);
             Vector3 p0 = geom.inputVertexPositions[v0];
             Vector3 p1 = geom.inputVertexPositions[v1];
             Vector3 p = (1.0 - t) * p0 + t * p1;
             intersections.emplace_back(p, he);
         }
-
-        he = he.next();
     }
 
     if (intersections.size() != 2) {
+        std::cout << "size of interections = " << intersections.size() << std::endl;
         throw std::runtime_error("Expected isoline to intersect face in exactly 2 edges.");
     }
 
