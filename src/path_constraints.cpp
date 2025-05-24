@@ -519,17 +519,8 @@ std::tuple<std::vector<Face>, int> traceIsolineFaces(
 
     std::unordered_set<Face> visitedFaces;
     std::vector<Face> pathFaces;
-
-    std::cout << "Number of faces in the mesh = " << globalGeometry.mesh.nFaces() << std::endl;
-    std::cout << "Index of start face = " << startHe.face().getIndex() << std::endl;
-    std::cout << "Index of end face = " << endHe.face().getIndex() << std::endl;
-
-
     Face currentFace = startHe.face();//face to start at 
     Face endFace = endHe.face();//face to end at
-
-
-
     //expand face
     std::queue<Face> frontier;
     frontier.push(currentFace);

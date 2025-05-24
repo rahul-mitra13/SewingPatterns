@@ -3834,11 +3834,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         std::cout << "index to use = " << i << std::endl;
     }
 
-    polyscope::show();
+    
 
     std::cout << "Finished aligning the sites " << std::endl;
-    //polyscope::show();
-
+    
     //set the singular edges
     model.setSingularEdges(singularEdges);
 
