@@ -479,7 +479,7 @@ std::vector<double> findIsoPath(SurfaceMesh& mesh,
 }
 
 
-std::array<std::tuple<Vector3, Halfedge>, 2>
+std::vector<std::tuple<Vector3, Halfedge>>
 computeIsolineFaceIntersection(const Face face, double iso,
                                const VertexData<double>& fValues,
                                const VertexPositionGeometry& geom) {
@@ -501,12 +501,14 @@ computeIsolineFaceIntersection(const Face face, double iso,
         }
     }
 
-    if (intersections.size() != 2) {
-        std::cout << "size of interections = " << intersections.size() << std::endl;
-        throw std::runtime_error("Expected isoline to intersect face in exactly 2 edges.");
-    }
+    // if (intersections.size() != 2) {
+    //     std::cout << "size of interections = " << intersections.size() << std::endl;
+    //     throw std::runtime_error("Expected isoline to intersect face in exactly 2 edges.");
+    // }
 
-    return {intersections[0], intersections[1]};
+    // return {intersections[0], intersections[1]};
+
+    return intersections;
 }
 
 
@@ -544,7 +546,6 @@ std::tuple<std::vector<Face>, int> traceIsolineFaces(
         frontier.pop();
         if (f == endFace) break;
 
-
         // for (Halfedge he : f.adjacentHalfedges()){
 
         //     double valA = timeFunction[he.tailVertex()];
@@ -573,9 +574,13 @@ std::tuple<std::vector<Face>, int> traceIsolineFaces(
         //     }
         // }
 
-        auto [he1Info, he2Info] = computeIsolineFaceIntersection(f, isoVal, timeFunction, globalGeometry);
-        auto [p1, he1] = he1Info;
-        auto [p2, he2] = he2Info;
+        auto intersections = computeIsolineFaceIntersection(f, isoVal, timeFunction, globalGeometry);
+        if (intersections.size() != 2){
+            std::cout << "intersection size = " << intersections.size() << std::endl;
+            break;
+        }
+        auto [p1, he1] = intersections[0];
+        auto [p2, he2] = intersections[1];
         Vector3 v1 = (p2 - p1).normalize();
         Vector3 v2 = (p1 - p2).normalize();
         Face neighbor;
@@ -588,8 +593,12 @@ std::tuple<std::vector<Face>, int> traceIsolineFaces(
         if (neighbor == endFace){
             return std::make_pair(pathFaces, 0);
         }
-        pathFaces.emplace_back(neighbor);
-        frontier.push(neighbor);
+        if (visitedFaces.find(neighbor) == visitedFaces.end()){
+            pathFaces.emplace_back(neighbor);
+            frontier.push(neighbor);
+            visitedFaces.insert(neighbor);
+        }
+        
     }
 
     if (isoVal < std::min(timeFunction[startHe.tipVertex()], timeFunction[startHe.tailVertex()]) || isoVal > std::max(timeFunction[startHe.tipVertex()], timeFunction[startHe.tailVertex()])){

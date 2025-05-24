@@ -3627,7 +3627,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 10; //std::round(avgTotalMeasure / period);
+    posOptions.nSites = 30; //std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     posOptions.iterations = 500;
@@ -3740,7 +3740,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
     alignmentOptions.pairedSites = pairedSites;
     alignmentOptions.usingPosCurl = true;
-    alignmentOptions.iterations = 2500;
+    alignmentOptions.iterations = 4000;
     alignmentOptions.lambda = 1.0;
     VoronoiResult posAlignedCenters = alignPointsOnIsoline(globalMesh, globalGeometry, alignmentOptions, posMeasure, psMesh);
     std::vector<Vector3> alignedPosCenters;
@@ -3748,7 +3748,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
        alignedPosCenters.push_back(posAlignedCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
     }
     polyscope::registerPointCloud("positive voronoi sites (aligned course)", alignedPosCenters)->setEnabled(false);
-
+    
     //store the paired time functions
     std::vector<std::pair<double, double>> pairedTimeFunctions;
     //paired halfedges
@@ -3842,11 +3842,19 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //updateGluedHalfedgeWeights(globalGeometry, gluedGeometry, gluedPath, heWeights);
         //edgePathConstraints.push_back(std::make_pair(gluedPath, 0.));
         double isoVal = 0.5 * (timeFuncPair.first + timeFuncPair.second);
+        
         //testing triangle stripe code 
         std::vector<Face> faces;
         int code; 
         std::tie(faces, code) = traceIsolineFaces(globalGeometry, globalTimeFunction, globalTimeFunctionGradientsNormalized, rotatedFaceGradients, isoVal, HePair.first, HePair.second);
-    
+
+        //error checking
+        if (faces.size() == 0){
+            std::cout << "The size of the face strip is 0 " << std::endl;
+            polyscope::show();
+            exit(1);
+        }
+
         //we assume we're going to construct paths from the tips of the singular edges (actually halfedges)
         Face firstFace = faces.front();
         Face lastFace = faces.back();
@@ -3868,6 +3876,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, isoVal);
         polyscope::registerCurveNetwork("isoval for pair " + std::to_string(i), iV, iE)->setRadius(0.001)->setEnabled(false);
 
+        //error checking
         if (code == -1){
             std::cout << "face path didn't get to the end face " << std::endl;
             polyscope::show();
