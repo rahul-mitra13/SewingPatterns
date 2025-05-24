@@ -3627,7 +3627,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 30; //std::round(avgTotalMeasure / period);
+    posOptions.nSites = std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     posOptions.iterations = 500;
@@ -3740,7 +3740,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
     alignmentOptions.pairedSites = pairedSites;
     alignmentOptions.usingPosCurl = true;
-    alignmentOptions.iterations = 4000;
+    alignmentOptions.iterations = 500;
     alignmentOptions.lambda = 1.0;
     VoronoiResult posAlignedCenters = alignPointsOnIsoline(globalMesh, globalGeometry, alignmentOptions, posMeasure, psMesh);
     std::vector<Vector3> alignedPosCenters;
@@ -3806,6 +3806,36 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         edgeToIsoVal[negSingularEdge] = 0.5 * (posVal + negVal);
     }
 
+    bool connectSaddles = false;
+
+    //don't consider indices where no valide triangle strip exists 
+    std::vector<int> indicesToUse; 
+    for (int i = 0; i < singularEdges.size(); i++){
+        auto p = singularEdges[i];
+        auto timeFuncPair = pairedTimeFunctions[i];
+        auto HePair = pairedHalfedges[i];
+        Edge posEdge = globalMesh.edge(p.first);
+        Edge negEdge = globalMesh.edge(p.second);
+        double isoVal = 0.5 * (timeFuncPair.first + timeFuncPair.second);
+        assert(HePair.first.getIndex() > 0 && HePair.first.getIndex() < globalMesh.nHalfedges());
+        assert(HePair.second.getIndex() > 0 && HePair.second.getIndex() < globalMesh.nHalfedges());
+        //testing triangle stripe code 
+        std::vector<Face> faces;
+        int code; 
+        std::tie(faces, code) = traceIsolineFaces(globalGeometry, globalTimeFunction, globalTimeFunctionGradientsNormalized, rotatedFaceGradients, isoVal, 
+                                                    HePair.first, HePair.second);
+        //a face path exists and we got to the end face
+        if (faces.size() != 0 && code != -1){
+            indicesToUse.push_back(i);
+        }
+    }
+
+    for (int i : indicesToUse){
+        std::cout << "index to use = " << i << std::endl;
+    }
+
+    polyscope::show();
+
     std::cout << "Finished aligning the sites " << std::endl;
     //polyscope::show();
 
@@ -3813,11 +3843,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     model.setSingularEdges(singularEdges);
 
     std::cout << "Set singular edges as constraints " << std::endl;
-
-    bool connectSaddles = false;
-    
+ 
     //construct edge paths between singular edges
-    for (int i = 0; i < singularEdges.size(); i++){
+    for (int i : indicesToUse){
         auto p = singularEdges[i];
         auto timeFuncPair = pairedTimeFunctions[i];
         auto HePair = pairedHalfedges[i];
