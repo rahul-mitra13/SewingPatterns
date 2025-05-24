@@ -3808,7 +3808,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     bool connectSaddles = false;
 
-    //don't consider indices where no valide triangle strip exists 
+    //don't consider indices where no valid triangle strip exists 
+    //should eventually fix this 
+    //TO-DO: * ensure edge singularities lie in the same cylindrical compononent
+    //       * ensure the average isovalue passes through both faces
     std::vector<int> indicesToUse; 
     for (int i = 0; i < singularEdges.size(); i++){
         auto p = singularEdges[i];
@@ -3817,8 +3820,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         Edge posEdge = globalMesh.edge(p.first);
         Edge negEdge = globalMesh.edge(p.second);
         double isoVal = 0.5 * (timeFuncPair.first + timeFuncPair.second);
-        assert(HePair.first.getIndex() > 0 && HePair.first.getIndex() < globalMesh.nHalfedges());
-        assert(HePair.second.getIndex() > 0 && HePair.second.getIndex() < globalMesh.nHalfedges());
         //testing triangle stripe code 
         std::vector<Face> faces;
         int code; 
@@ -3833,11 +3834,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     for (int i : indicesToUse){
         std::cout << "index to use = " << i << std::endl;
     }
-
-    
-
     std::cout << "Finished aligning the sites " << std::endl;
-    
     //set the singular edges
     model.setSingularEdges(singularEdges);
 
@@ -3881,21 +3878,28 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             polyscope::show();
             exit(1);
         }
-
+        
         //we assume we're going to construct paths from the tips of the singular edges (actually halfedges)
         Face firstFace = faces.front();
         Face lastFace = faces.back();
         Vertex vStart = globalTimeFunction[posEdge.halfedge().tipVertex()] > globalTimeFunction[posEdge.halfedge().tailVertex()] ? posEdge.halfedge().tipVertex() : posEdge.halfedge().tailVertex();
         Vertex vEnd = globalTimeFunction[negEdge.halfedge().tipVertex()] > globalTimeFunction[negEdge.halfedge().tailVertex()] ? negEdge.halfedge().tipVertex() : negEdge.halfedge().tailVertex();
         
+        //ensure that we have the correct start/end face in the strip
         if (std::find(firstFace.adjacentVertices().begin(), firstFace.adjacentVertices().end(), vStart) == firstFace.adjacentVertices().end())//the tip startVertex we want is not in the set
             faces.insert(faces.begin(), HePair.first.face());
         if (std::find(lastFace.adjacentVertices().begin(), lastFace.adjacentVertices().end(), vEnd) == lastFace.adjacentVertices().end())//the tip endVertex we want is not in the set
             faces.push_back(HePair.second.face());
+        
+        EdgeData<double> stripEdgePath = findEdgePathFromStrip(globalGeometry,  faces, 
+                                                            globalTimeFunction, isoVal, edgeSingularities);
 
         FaceData<int> facePath(globalGeometry.mesh, 0);
         for (Face f : faces) facePath[f] = 1;
         psMesh.addFaceScalarQuantity("faces for pair " + std::to_string(i), facePath);
+        psMesh.addEdgeScalarQuantity("edge strip path " + std::to_string(i), stripEdgePath);
+
+
 
         Eigen::MatrixXd iV;
         Eigen::MatrixXd iE;
@@ -4276,6 +4280,35 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
 }
 
+//find an edge path from a triangle strip 
+//TO-DO:
+// * go "under" singular edges that lie completely on the path whose isoval is less than the current isoval
+// * go "over" singular edges that lie completely on the path whose isoval is greater than the current isoval
+EdgeData<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry,  std::vector<Face> faces, 
+                                     VertexData<double>& timeFunction, double isoVal, EdgeData<double>& edgeSingularities){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    EdgeData<double> result(globalMesh, 0.0);
+
+    for (Face f : faces){
+        for (Halfedge he : f.adjacentHalfedges()) {
+            Vertex v0 = he.vertex();
+            Vertex v1 = he.next().vertex();
+
+            double f0 = timeFunction[v0];
+            double f1 = timeFunction[v1];
+
+            if (f0 > isoVal && f1 > isoVal) {
+                Edge e = he.edge();
+
+                // Optional: only add canonical reps to avoid duplicates
+                result[e] = 1.0;
+            }
+        }
+    }
+    return result;
+
+}
 
 
 std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 

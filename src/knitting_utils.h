@@ -269,6 +269,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
                                                         std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh);
 
+//find an appropriate edge path from a paritcular triangle strip 
+EdgeData<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry,  std::vector<Face> faces, 
+                                     VertexData<double>& timeFunction, double isoVal, EdgeData<double>& edgeSingularities);
+
 //@clean
 //update forbidden faces 
 //in particular, if some isoline passes through a set of faces ensure we don't select another pair of faces 
