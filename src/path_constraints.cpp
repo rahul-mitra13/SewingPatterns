@@ -500,14 +500,6 @@ computeIsolineFaceIntersection(const Face face, double iso,
             intersections.emplace_back(p, he);
         }
     }
-
-    // if (intersections.size() != 2) {
-    //     std::cout << "size of interections = " << intersections.size() << std::endl;
-    //     throw std::runtime_error("Expected isoline to intersect face in exactly 2 edges.");
-    // }
-
-    // return {intersections[0], intersections[1]};
-
     return intersections;
 }
 
@@ -537,42 +529,11 @@ std::tuple<std::vector<Face>, int> traceIsolineFaces(
     visitedFaces.insert(currentFace);
     visitedFaces.insert(endFace);
 
-    //relying on the fact that paths in the wrong direction will be very wrong
-    double eps = -0.3;//don't really like this eps term but we'll keep it (maybe, can relax if the matching runs to convergence)
-
     while(!frontier.empty()){
 
         Face f = frontier.front();
         frontier.pop();
         if (f == endFace) break;
-
-        // for (Halfedge he : f.adjacentHalfedges()){
-
-        //     double valA = timeFunction[he.tailVertex()];
-        //     double valB = timeFunction[he.tipVertex()];
-        //     if ((valA - isoVal) * (valB - isoVal) < 0.0){//isovalue crosses this halfedge
-        //         Halfedge twinHe = he.twin();
-        //         Face neighbor = twinHe.face();
-
-        //         //only consider faces that move in the right direction
-        //         // Vector3 neighborBary = ((1./3.) * (globalGeometry.vertexPositions[neighbor.halfedge().tailVertex()] + globalGeometry.vertexPositions[neighbor.halfedge().next().tailVertex()]
-        //         //                                 + globalGeometry.vertexPositions[neighbor.halfedge().next().next().tailVertex()]));
-        //         // Vector3 faceBary = ((1./3.) * (globalGeometry.vertexPositions[f.halfedge().tailVertex()] + globalGeometry.vertexPositions[f.halfedge().next().tailVertex()]
-        //         //                                 + globalGeometry.vertexPositions[f.halfedge().next().next().tailVertex()]));
-        //         // Vector3 directionVector = (neighborBary - faceBary).normalize();
-        //         // if (dot(directionVector, rotatedFaceGradients[f]) < eps) continue;
-
-                
-        //         if (neighbor == endFace){
-        //             return std::make_pair(pathFaces, 0);
-        //         }
-        //         if (visitedFaces.find(neighbor) == visitedFaces.end()) {
-        //             pathFaces.emplace_back(neighbor);
-        //             frontier.push(neighbor);
-        //             visitedFaces.insert(neighbor);
-        //         }
-        //     }
-        // }
 
         auto intersections = computeIsolineFaceIntersection(f, isoVal, timeFunction, globalGeometry);
         if (intersections.size() != 2){
