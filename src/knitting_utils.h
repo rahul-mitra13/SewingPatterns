@@ -270,7 +270,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                                                         std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh);
 
 //find an appropriate edge path from a paritcular triangle strip 
-HalfedgeData<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry,  std::vector<Face> faces, 
+std::vector<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry,  std::vector<Face> faces, 
                                      VertexData<double>& timeFunction, double isoVal, EdgeData<double>& edgeSingularities,
                                      std::map<Edge, double>& edgeToIsoVal, std::pair<int, int>& singEdgePair);
 

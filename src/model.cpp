@@ -20,6 +20,13 @@ void Model::setEdgePathConstraints(std::vector<std::pair<std::vector<double>, do
     this->edgePathConstraints = edgePathConstraints;
 }
 
+void Model::setHalfedgePathConstraints(std::vector<std::pair<std::vector<double>, double>>& halfedgePathConstraints){
+
+    this->halfedgePathConstraints = halfedgePathConstraints;
+}
+
+
+
 void Model::setSingularFaceIndices(std::vector<std::pair<int, int>>& singularFaces){
 
     this->singularFaces = singularFaces;
@@ -145,6 +152,11 @@ std::vector<int> Model::getFaceIndices(){
 std::vector<std::pair<std::vector<double>, double>> Model::getEdgePathConstraints(){
 
     return this->edgePathConstraints;
+}
+
+std::vector<std::pair<std::vector<double>, double>> Model::getHalfedgePathConstraints(){
+
+    return this->halfedgePathConstraints;
 }
 
 std::vector<int> Model::getBdyEdges(){

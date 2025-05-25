@@ -298,7 +298,8 @@ double computePathCost(VertexPositionGeometry& globalGeometry, HalfedgeData<doub
 
 //given a set of singularities perform an optimal matching between them 
 //always done in the global setting for now 
-std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, std::vector<std::pair<Vertex, int>>& singularities){
+std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, std::vector<std::pair<Vertex, int>>& singularities,
+                                                             VertexData<double>& globalTimeFunction){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     
@@ -320,6 +321,7 @@ std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeom
             else if (singValI == singValJ) C(i, j) = 10000; //put large weights on singularities of the same sign
             else{
                 C(i, j) = computePathCost(globalGeometry, heWeights, singularities[i].first, singularities[j].first);
+                //C(i, j) = std::fabs(globalTimeFunction[singularities[i].first] - globalTimeFunction[singularities[j].first]);//match vertices on the same time function isoline
             }
         }
     }

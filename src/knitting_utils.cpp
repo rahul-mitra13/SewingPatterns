@@ -3627,7 +3627,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 25;//std::round(avgTotalMeasure / period);
+    posOptions.nSites = 30; //std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     posOptions.iterations = 500;
@@ -3728,7 +3728,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     
     //perform optimal matching 
     HalfedgeData<double> heWeights = gluedHeWeights;
-    std::vector<std::pair<Vertex, Vertex>> matchedVertices = performOptimalMatching(globalGeometry, heWeights, singularities);
+    std::vector<std::pair<Vertex, Vertex>> matchedVertices = performOptimalMatching(globalGeometry, heWeights, singularities, globalTimeFunction);
 
     //specify options for alignment
     alignOptions alignmentOptions;
@@ -3845,6 +3845,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     model.setSingularEdges(singularEdges);
 
     std::cout << "Set singular edges as constraints " << std::endl;
+
+    std::vector<std::pair<std::vector<double>, double>> halfedgePathConstraints;
  
     //construct edge paths between singular edges
     for (int i : indicesToUse){
@@ -3897,7 +3899,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         if (std::find(lastFace.adjacentVertices().begin(), lastFace.adjacentVertices().end(), vEnd) == lastFace.adjacentVertices().end())//the tip endVertex we want is not in the set
             faces.push_back(HePair.second.face());
         
-        HalfedgeData<double> stripHalfedgePath = findEdgePathFromStrip(globalGeometry,  faces, 
+        std::vector<double> stripHalfedgePath = findEdgePathFromStrip(globalGeometry,  faces, 
                                                             globalTimeFunction, isoVal, edgeSingularities, edgeToIsoVal,
                                                             p);
 
@@ -3906,12 +3908,13 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         psMesh.addFaceScalarQuantity("faces for pair " + std::to_string(i), facePath);
         psMesh.addHalfedgeScalarQuantity("halfedge strip path " + std::to_string(i), stripHalfedgePath);
         std::vector<double> edgePath(globalMesh.nEdges(), 0.0);
-        for (Halfedge he : globalMesh.halfedges()){
-            if (stripHalfedgePath[he]){
-                if (he.orientation()) edgePath[he.edge().getIndex()] = 1.0;
-                else edgePath[he.edge().getIndex()] = -1.0;
-            }
-        }
+        // for (Halfedge he : globalMesh.halfedges()){
+        //     if (stripHalfedgePath[he]){
+        //         if (he.orientation()) [he.edge().getIndex()] = 1.0;
+        //         else edgePath[he.edge().getIndex()] = -1.0;
+        //     }
+        // }
+        halfedgePathConstraints.push_back(std::make_pair(stripHalfedgePath, 0.0));
         Eigen::MatrixXd iV;
         Eigen::MatrixXd iE;
         std::vector<int> f;
@@ -3934,13 +3937,14 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         // psMesh.addEdgeScalarQuantity("path for pair " + std::to_string(i), testPath);
         
         //using our new strip halfedge paths instead
-        edgePathConstraints.push_back(std::make_pair(edgePath, 0.));
+        //edgePathConstraints.push_back(std::make_pair(edgePath, 0.0));
     }
 
     psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
-    polyscope::show();
+    //polyscope::show();
 
-    model.setEdgePathConstraints(edgePathConstraints);
+    //model.setEdgePathConstraints(edgePathConstraints);
+    model.setHalfedgePathConstraints(halfedgePathConstraints);
     model.setEdgeIndices(edgeIndices);
     model.setHomologyGenerators(homologyGenerators);
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
@@ -4298,13 +4302,12 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 //TO-DO:
 // * go "under" singular edges that lie completely on the path whose isoval is less than the current isoval
 // * go "over" singular edges that lie completely on the path whose isoval is greater than the current isoval
-HalfedgeData<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry,  std::vector<Face> faces, 
+std::vector<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry,  std::vector<Face> faces, 
                                      VertexData<double>& timeFunction, double isoVal, EdgeData<double>& edgeSingularities,
                                      std::map<Edge, double>& edgeToIsoVal, std::pair<int, int>& singEdgePair){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
-    EdgeData<double> result(globalMesh, 0.0);
-    HalfedgeData<double> usedHes(globalMesh, 0.0);
+    std::vector<double> result(globalMesh.nHalfedges(), 0.0);
     //path of halfedges
     std::vector<Halfedge> hePath;
     Edge posEdge = globalMesh.edge(singEdgePair.first);
@@ -4348,7 +4351,7 @@ HalfedgeData<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometr
                 hePath.push_back(he);
                 Edge e = he.edge();
                 // Optional: only add canonical reps to avoid duplicates
-                result[e] = 1.0;
+                //result[e] = 1.0;
             }
 
 
@@ -4356,10 +4359,10 @@ HalfedgeData<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometr
     }
     
     for (Halfedge he : hePath){
-        usedHes[he] = 1.0;
+        result[he.getIndex()] = 1.0;
     }
 
-    return usedHes;
+    return result;
 
 }
 
@@ -4374,6 +4377,8 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
     //query information from the model 
     std::vector<int> bdyEdges = gbModel.getBdyEdges();
     std::vector<std::pair<std::vector<double>, double>> edgePathConstraints = gbModel.getEdgePathConstraints();
+    std::vector<std::pair<std::vector<double>, double>> halfedgePathConstraints = gbModel.getHalfedgePathConstraints();
+
     gluedGeometry.requireDECOperators();
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
     double period = gbModel.getPeriod();
@@ -4383,6 +4388,10 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
     std::vector<std::vector<double>> homologyGenerators = gbModel.getHomologyGenerators();
 
     std::cout << "size of singular edges = " << singularEdges.size() << std::endl;
+    std::cout << "size of edgePathConstraints = " << edgePathConstraints.size() << std::endl;
+    std::cout << "size of halfedgePathConstraints = " << halfedgePathConstraints.size() << std::endl;
+    polyscope::show();
+
     //require the face areas
     gluedGeometry.requireFaceAreas();
     //require edge lengths 
@@ -4674,6 +4683,19 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                 model.addConstr(pathIntegral == period * edgePathConstraints[i].second);
             else
                 model.addConstr(pathIntegral == 0.);
+        }
+
+        //add halfedge path constraints 
+        for (int i = 0; i < halfedgePathConstraints.size(); i++){
+            std::vector<double> path = halfedgePathConstraints[i].first;
+            GRBLinExpr pathIntegral = 0;
+            for (int k = 0; k < gluedMesh.nHalfedges(); k++){
+                pathIntegral += path[k] * sigma[k];
+            }
+            if (std::fabs(halfedgePathConstraints[i].second) > 0)
+                model.addConstr(pathIntegral == period * halfedgePathConstraints[i].second);
+            else
+                model.addConstr(pathIntegral == 0.0);
         }
 
         //compute a piecewise linear function over the vertices of the mesh 
