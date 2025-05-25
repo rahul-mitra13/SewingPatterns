@@ -3627,7 +3627,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 30;//std::round(avgTotalMeasure / period);
+    posOptions.nSites = 25;//std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     posOptions.iterations = 500;
@@ -3806,7 +3806,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         edgeToIsoVal[negSingularEdge] = 0.5 * (posVal + negVal);
     }
 
-    bool connectSaddles = false;
+    //bool connectSaddles = true;
 
     //don't consider indices where no valid triangle strip exists 
     //should eventually fix this 
@@ -3903,7 +3903,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
         FaceData<int> facePath(globalGeometry.mesh, 0);
         for (Face f : faces) facePath[f] = 1;
-        psMesh.addFaceScalarQuantity("faces for pair " + std::to_string(i), facePath);
+        //psMesh.addFaceScalarQuantity("faces for pair " + std::to_string(i), facePath);
         psMesh.addHalfedgeScalarQuantity("halfedge strip path " + std::to_string(i), stripHalfedgePath);
         std::vector<double> edgePath(gluedMesh.nEdges(), 0.0);
         for (Halfedge he : gluedMesh.halfedges()){
@@ -3936,6 +3936,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //using our new strip halfedge paths instead
         edgePathConstraints.push_back(std::make_pair(edgePath, 0.));
     }
+
+    psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
+    polyscope::show();
 
     model.setEdgePathConstraints(edgePathConstraints);
     model.setEdgeIndices(edgeIndices);

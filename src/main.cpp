@@ -196,7 +196,7 @@ void showStripePatterns(){
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
                                                                     globalBdyConditions, coursePeriod, V, F, G, courseOneFormGrad, gluedOneRingMap, 
                                                                     allSaddleLoops, homologyGenerators, opts);
-    
+    polyscope::show();//stop execution here to debug
     // Draw course singular edges as a curve network
     std::vector<Vector3> courseSingularEdgePointsPos;
     std::vector<Vector3> courseSingularEdgePointsNeg;
