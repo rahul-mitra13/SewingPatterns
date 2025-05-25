@@ -3627,7 +3627,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = std::round(avgTotalMeasure / period);
+    posOptions.nSites = 30;//std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     posOptions.iterations = 500;
@@ -3740,7 +3740,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
     alignmentOptions.pairedSites = pairedSites;
     alignmentOptions.usingPosCurl = true;
-    alignmentOptions.iterations = 500;
+    alignmentOptions.iterations = 2500;
     alignmentOptions.lambda = 1.0;
     VoronoiResult posAlignedCenters = alignPointsOnIsoline(globalMesh, globalGeometry, alignmentOptions, posMeasure, psMesh);
     std::vector<Vector3> alignedPosCenters;
@@ -3829,6 +3829,12 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         if (faces.size() != 0 && code != -1){
             indicesToUse.push_back(i);
         }
+        else{//remove these entry from edgeIndices and edgeSingularities
+            edgeIndices[p.first] = 0.0;
+            edgeIndices[p.second] = 0.0;
+            edgeSingularities[posEdge] = 0.0;
+            edgeSingularities[negEdge] = 0.0;
+        }
     }
 
     for (int i : indicesToUse){
@@ -3891,16 +3897,21 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         if (std::find(lastFace.adjacentVertices().begin(), lastFace.adjacentVertices().end(), vEnd) == lastFace.adjacentVertices().end())//the tip endVertex we want is not in the set
             faces.push_back(HePair.second.face());
         
-        EdgeData<double> stripEdgePath = findEdgePathFromStrip(globalGeometry,  faces, 
-                                                            globalTimeFunction, isoVal, edgeSingularities);
+        HalfedgeData<double> stripHalfedgePath = findEdgePathFromStrip(globalGeometry,  faces, 
+                                                            globalTimeFunction, isoVal, edgeSingularities, edgeToIsoVal,
+                                                            p);
 
         FaceData<int> facePath(globalGeometry.mesh, 0);
         for (Face f : faces) facePath[f] = 1;
         psMesh.addFaceScalarQuantity("faces for pair " + std::to_string(i), facePath);
-        psMesh.addEdgeScalarQuantity("edge strip path " + std::to_string(i), stripEdgePath);
-
-
-
+        psMesh.addHalfedgeScalarQuantity("halfedge strip path " + std::to_string(i), stripHalfedgePath);
+        std::vector<double> edgePath(gluedMesh.nEdges(), 0.0);
+        for (Halfedge he : gluedMesh.halfedges()){
+            if (stripHalfedgePath[he]){
+                if (he.orientation()) edgePath[he.edge().getIndex()] = 1.0;
+                else edgePath[he.edge().getIndex()] = -1.0;
+            }
+        }
         Eigen::MatrixXd iV;
         Eigen::MatrixXd iE;
         std::vector<int> f;
@@ -3919,11 +3930,11 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         // Vertex startVert = globalTimeFunction[posEdge.halfedge().tipVertex()] > globalTimeFunction[posEdge.halfedge().tailVertex()] ? posEdge.halfedge().tipVertex() : posEdge.halfedge().tailVertex();
         // Vertex endVert = globalTimeFunction[negEdge.halfedge().tipVertex()] > globalTimeFunction[negEdge.halfedge().tailVertex()] ? negEdge.halfedge().tipVertex() : negEdge.halfedge().tailVertex();
 
-        std::vector<double> testPath = findIsoPath(globalGeometry.mesh, globalTimeFunction, vStart, vEnd);
-        psMesh.addEdgeScalarQuantity("path for pair " + std::to_string(i), testPath);
+        // std::vector<double> testPath = findIsoPath(globalGeometry.mesh, globalTimeFunction, vStart, vEnd);
+        // psMesh.addEdgeScalarQuantity("path for pair " + std::to_string(i), testPath);
         
-        //using our new testPaths instead
-        edgePathConstraints.push_back(std::make_pair(testPath, 0.));
+        //using our new strip halfedge paths instead
+        edgePathConstraints.push_back(std::make_pair(edgePath, 0.));
     }
 
     model.setEdgePathConstraints(edgePathConstraints);
@@ -4284,14 +4295,46 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 //TO-DO:
 // * go "under" singular edges that lie completely on the path whose isoval is less than the current isoval
 // * go "over" singular edges that lie completely on the path whose isoval is greater than the current isoval
-EdgeData<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry,  std::vector<Face> faces, 
-                                     VertexData<double>& timeFunction, double isoVal, EdgeData<double>& edgeSingularities){
+HalfedgeData<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry,  std::vector<Face> faces, 
+                                     VertexData<double>& timeFunction, double isoVal, EdgeData<double>& edgeSingularities,
+                                     std::map<Edge, double>& edgeToIsoVal, std::pair<int, int>& singEdgePair){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     EdgeData<double> result(globalMesh, 0.0);
+    HalfedgeData<double> usedHes(globalMesh, 0.0);
+    //path of halfedges
+    std::vector<Halfedge> hePath;
+    Edge posEdge = globalMesh.edge(singEdgePair.first);
+    Edge negEdge = globalMesh.edge(singEdgePair.second);
 
     for (Face f : faces){
         for (Halfedge he : f.adjacentHalfedges()) {
+            if (edgeSingularities[he.edge()] && he.edge() != posEdge
+                && he.edge() != negEdge){//we have hit a singular edge
+                Edge singularEdge = he.edge();
+                double singIsoVal = edgeToIsoVal[singularEdge];
+                if (singIsoVal < isoVal){//if the singularity isovalue is less than the current isovalue, route "below" the edge
+                    if (timeFunction[singularEdge.halfedge().tailVertex()] < timeFunction[singularEdge.halfedge().tipVertex()]){
+                        hePath.push_back(singularEdge.halfedge().twin());
+                        hePath.push_back(singularEdge.halfedge());
+                    }
+                    else{
+                        hePath.push_back(singularEdge.halfedge());
+                        hePath.push_back(singularEdge.halfedge().twin());
+                    }
+                }
+                else{//singularity isovalue is greater than the current isovalue, route "above" the edge
+                    if (timeFunction[singularEdge.halfedge().tailVertex()] < timeFunction[singularEdge.halfedge().tipVertex()]){
+                        hePath.push_back(singularEdge.halfedge());
+                        hePath.push_back(singularEdge.halfedge().twin());
+                    }
+                    else{
+                        hePath.push_back(singularEdge.halfedge().twin());
+                        hePath.push_back(singularEdge.halfedge());
+                    }
+                }
+            }
+
             Vertex v0 = he.vertex();
             Vertex v1 = he.next().vertex();
 
@@ -4299,14 +4342,21 @@ EdgeData<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry,  
             double f1 = timeFunction[v1];
 
             if (f0 > isoVal && f1 > isoVal) {
+                hePath.push_back(he);
                 Edge e = he.edge();
-
                 // Optional: only add canonical reps to avoid duplicates
                 result[e] = 1.0;
             }
+
+
         }
     }
-    return result;
+    
+    for (Halfedge he : hePath){
+        usedHes[he] = 1.0;
+    }
+
+    return usedHes;
 
 }
 

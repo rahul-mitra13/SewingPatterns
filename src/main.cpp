@@ -215,9 +215,7 @@ void showStripePatterns(){
     }
     polyscope::registerCurveNetwork("course singular edges (+1)", courseSingularEdgePointsPos, courseSingularEdgesPos)->setRadius(0.001)->setColor({0.5,0.5,0})->setEnabled(false);
     polyscope::registerCurveNetwork("course singular edges (-1)", courseSingularEdgePointsNeg, courseSingularEdgesNeg)->setRadius(0.001)->setColor({0,0.5,0.5})->setEnabled(false);
-    polyscope::show();
-    exit(0);
-
+    
     std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
                                                                       edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, timeFunctionGlued,
                                                                       courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
