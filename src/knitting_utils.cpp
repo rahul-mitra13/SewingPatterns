@@ -3627,7 +3627,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 30; //std::round(avgTotalMeasure / period);
+    posOptions.nSites = 40; //std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     posOptions.iterations = 500;
@@ -3639,7 +3639,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     polyscope::registerPointCloud("positive voronoi sites (not aligned)", positiveCenters)->setEnabled(false);
     std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
 
-    //print the masses
+    //print the positive masses
     for (size_t i = 0; i < posSiteDistributions.size(); i++){
         double mass = 0;
         for (Vertex v : globalMesh.vertices()){
@@ -3667,7 +3667,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     polyscope::registerPointCloud("negative voronoi sites ", negativeCenters)->setEnabled(false);
     std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
 
-    //print the masses
+    //print the negative masses
     for (size_t i = 0; i < negSiteDistributions.size(); i++){
         double mass = 0;
         for (Vertex v : globalMesh.vertices()){
@@ -3679,66 +3679,84 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         psMesh.addVertexScalarQuantity("negative site distribution (course)" + std::to_string(i), negSiteDistributions[i]);
     }
 
-    //store a vector of vertex ids and singularity indices (for optimal matching)
-    std::vector<std::pair<Vertex, int>> singularities;
-
-    //map vertices to surface points 
-    std::map<Vertex, SurfacePoint> vertexToSurfacePointMap;
-
-
-    for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
-        SurfacePoint facePoint = posVoronoiCenters.siteLocations[i].inSomeFace();
-        Face f = facePoint.face;
-        Edge singularEdge;
-        double maxDotProd = -DBL_MAX;
-        for (Halfedge he : f.adjacentHalfedges()){
-            Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
-                                globalGeometry.vertexPositions[he.tailVertex()]).normalize();
-            if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
-                maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
-                singularEdge = he.edge();
-            }
-        }
-        //increment the indices really close so indices cancel out
-        //edgeIndices[singularEdge.getIndex()] = -1.0;
-        //edgeSingularities[singularEdge] = 1.0;
-        singularities.push_back(std::make_pair(singularEdge.halfedge().tailVertex(), 1));//used for optimal matching
-        vertexToSurfacePointMap[singularEdge.halfedge().tailVertex()] = posVoronoiCenters.siteLocations[i];//save it in the map, useful for aligning later
+    //perform optimal matching using all the surface points directly
+    std::vector<std::pair<SurfacePoint, int>> allSites;
+    for (SurfacePoint s : posVoronoiCenters.siteLocations){
+        allSites.push_back(std::make_pair(s, 1));
     }
-
-    for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
-        SurfacePoint facePoint = negVoronoiCenters.siteLocations[i].inSomeFace();
-        Face f = facePoint.face;
-        Edge singularEdge;
-        double maxDotProd = -DBL_MAX;
-        for (Halfedge he : f.adjacentHalfedges()){
-            Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
-                                globalGeometry.vertexPositions[he.tailVertex()]).normalize();
-            if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
-                maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
-                singularEdge = he.edge();
-            }
-        }
-        //increment the indices really close so indices cancel out
-        //edgeIndices[singularEdge.getIndex()] = 1.0;
-        //edgeSingularities[singularEdge] = -1.0;
-        singularities.push_back(std::make_pair(singularEdge.halfedge().tailVertex(), -1));//used for optimal matching
-        vertexToSurfacePointMap[singularEdge.halfedge().tailVertex()] = negVoronoiCenters.siteLocations[i];//save it in the map, useful for aligning later
+    for (SurfacePoint s : negVoronoiCenters.siteLocations){
+        allSites.push_back(std::make_pair(s, -1));
     }
+    std::vector<std::pair<SurfacePoint, SurfacePoint>> matchedSurfacePoints = performOptimalSurfacePointMatching(globalGeometry, gluedHeWeights,
+                                                                                allSites, globalTimeFunction);
     
-    //perform optimal matching 
-    HalfedgeData<double> heWeights = gluedHeWeights;
-    std::vector<std::pair<Vertex, Vertex>> matchedVertices = performOptimalMatching(globalGeometry, heWeights, singularities, globalTimeFunction);
+    for (int i = 0; i < matchedSurfacePoints.size(); i++){
+        std::vector<Vector3> matchedSPs;
+        matchedSPs.push_back(matchedSurfacePoints[i].first.interpolate(globalGeometry.vertexPositions));
+        matchedSPs.push_back(matchedSurfacePoints[i].second.interpolate(globalGeometry.vertexPositions));
+        polyscope::registerPointCloud("matched surface point pair " + std::to_string(i), matchedSPs);
+    }
+
+    //store a vector of vertex ids and singularity indices (for optimal matching)
+    // std::vector<std::pair<Vertex, int>> singularities;
+
+    // //map vertices to surface points 
+    // std::map<Vertex, SurfacePoint> vertexToSurfacePointMap;
+
+
+    // for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
+    //     SurfacePoint facePoint = posVoronoiCenters.siteLocations[i].inSomeFace();
+    //     Face f = facePoint.face;
+    //     Edge singularEdge;
+    //     double maxDotProd = -DBL_MAX;
+    //     for (Halfedge he : f.adjacentHalfedges()){
+    //         Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
+    //                             globalGeometry.vertexPositions[he.tailVertex()]).normalize();
+    //         if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
+    //             maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
+    //             singularEdge = he.edge();
+    //         }
+    //     }
+    //     //increment the indices really close so indices cancel out
+    //     //edgeIndices[singularEdge.getIndex()] = -1.0;
+    //     //edgeSingularities[singularEdge] = 1.0;
+    //     singularities.push_back(std::make_pair(singularEdge.halfedge().tailVertex(), 1));//used for optimal matching
+    //     vertexToSurfacePointMap[singularEdge.halfedge().tailVertex()] = posVoronoiCenters.siteLocations[i];//save it in the map, useful for aligning later
+    // }
+
+    // for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
+    //     SurfacePoint facePoint = negVoronoiCenters.siteLocations[i].inSomeFace();
+    //     Face f = facePoint.face;
+    //     Edge singularEdge;
+    //     double maxDotProd = -DBL_MAX;
+    //     for (Halfedge he : f.adjacentHalfedges()){
+    //         Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
+    //                             globalGeometry.vertexPositions[he.tailVertex()]).normalize();
+    //         if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
+    //             maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
+    //             singularEdge = he.edge();
+    //         }
+    //     }
+    //     //increment the indices really close so indices cancel out
+    //     //edgeIndices[singularEdge.getIndex()] = 1.0;
+    //     //edgeSingularities[singularEdge] = -1.0;
+    //     singularities.push_back(std::make_pair(singularEdge.halfedge().tailVertex(), -1));//used for optimal matching
+    //     vertexToSurfacePointMap[singularEdge.halfedge().tailVertex()] = negVoronoiCenters.siteLocations[i];//save it in the map, useful for aligning later
+    // }
+    
+    // //perform optimal matching 
+    // HalfedgeData<double> heWeights = gluedHeWeights;
+    // std::vector<std::pair<Vertex, Vertex>> matchedVertices = performOptimalMatching(globalGeometry, heWeights, singularities, globalTimeFunction);
 
     //specify options for alignment
     alignOptions alignmentOptions;
     alignmentOptions.timeFunction = globalTimeFunction;
-    std::vector<std::pair<SurfacePoint, SurfacePoint>> pairedSites;
-    for (int i = 0; i < matchedVertices.size(); i++){
-        auto p = matchedVertices[i];
-        pairedSites.push_back(std::make_pair(vertexToSurfacePointMap[p.first], vertexToSurfacePointMap[p.second]));
-    }
-    alignmentOptions.pairedSites = pairedSites;
+    // std::vector<std::pair<SurfacePoint, SurfacePoint>> pairedSites;
+    // for (int i = 0; i < matchedVertices.size(); i++){
+    //     auto p = matchedVertices[i];
+    //     pairedSites.push_back(std::make_pair(vertexToSurfacePointMap[p.first], vertexToSurfacePointMap[p.second]));
+    // }
+    alignmentOptions.pairedSites = matchedSurfacePoints;
     alignmentOptions.usingPosCurl = true;
     alignmentOptions.iterations = 2500;
     alignmentOptions.lambda = 1.0;
@@ -3759,7 +3777,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //now appropriatately specify the singular edges
     for (int i = 0; i < posAlignedCenters.siteLocations.size(); i++){
         SurfacePoint posSite = posAlignedCenters.siteLocations[i];
-        SurfacePoint negSite = pairedSites[i].second;//find the corresponding paired negative site
+        SurfacePoint negSite = matchedSurfacePoints[i].second;//find the corresponding paired negative site
         
         //handle positive case 
         SurfacePoint posFacePoint = posSite.inSomeFace();
@@ -4386,11 +4404,6 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
     std::vector<int> edgeIndices = gbModel.getEdgeIndices();
     std::vector<std::array<double, 3>> comparisonGrad = gbModel.getFaceGradients();
     std::vector<std::vector<double>> homologyGenerators = gbModel.getHomologyGenerators();
-
-    std::cout << "size of singular edges = " << singularEdges.size() << std::endl;
-    std::cout << "size of edgePathConstraints = " << edgePathConstraints.size() << std::endl;
-    std::cout << "size of halfedgePathConstraints = " << halfedgePathConstraints.size() << std::endl;
-    polyscope::show();
 
     //require the face areas
     gluedGeometry.requireFaceAreas();

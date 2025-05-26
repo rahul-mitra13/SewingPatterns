@@ -296,7 +296,7 @@ double computePathCost(VertexPositionGeometry& globalGeometry, HalfedgeData<doub
 
 }
 
-//given a set of singularities perform an optimal matching between them 
+//given a set of singularities on vertices perform an optimal matching between them 
 //always done in the global setting for now 
 std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, std::vector<std::pair<Vertex, int>>& singularities,
                                                              VertexData<double>& globalTimeFunction){
@@ -320,8 +320,8 @@ std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeom
             }
             else if (singValI == singValJ) C(i, j) = 10000; //put large weights on singularities of the same sign
             else{
-                C(i, j) = computePathCost(globalGeometry, heWeights, singularities[i].first, singularities[j].first);
-                //C(i, j) = std::fabs(globalTimeFunction[singularities[i].first] - globalTimeFunction[singularities[j].first]);//match vertices on the same time function isoline
+                //C(i, j) = computePathCost(globalGeometry, heWeights, singularities[i].first, singularities[j].first);
+                C(i, j) = std::fabs(globalTimeFunction[singularities[i].first] - globalTimeFunction[singularities[j].first]);//match vertices on the same time function isoline
             }
         }
     }
@@ -398,6 +398,113 @@ std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeom
     }
 
     return toReturn;
+}
+
+//given a set of singularities (as surface points) perform an optimal matching between them 
+//always done in the global setting for now 
+//returns a pair of matched indices into positiveSites and negativeSites
+std::vector<std::pair<SurfacePoint, SurfacePoint>> performOptimalSurfacePointMatching(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, 
+                                                             std::vector<std::pair<SurfacePoint, int>> sites, VertexData<double>& globalTimeFunction){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    
+    int numSites = sites.size();
+    std::vector<std::pair<SurfacePoint, SurfacePoint>> toReturn;
+
+    //compute the cost matrix 
+    Eigen::MatrixXd C(numSites, numSites);
+    C.setZero();
+
+    //construct the cost matrix 
+    for (int i = 0; i < numSites; i++){
+        int singValI = sites[i].second;
+        for (int j = 0; j < numSites; j++){
+            int singValJ = sites[j].second;
+            if (singValI < 0 && singValJ > 0){
+                C(i, j) = 10000;//put high costs on paths from negative singularities to positive singularities
+            }
+            else if (singValI == singValJ) C(i, j) = 10000; //put large weights on singularities of the same sign
+            else{
+                double timeFuncI = sites[i].first.interpolate(globalTimeFunction);
+                double timeFuncJ = sites[j].first.interpolate(globalTimeFunction);
+                C(i, j) = std::fabs(timeFuncI - timeFuncJ);//match vertices on the same time function isoline
+            }
+        }
+    }
+
+    //solve the optimization model
+    using namespace std;
+    try {
+        
+        // Create an environment
+        GRBEnv env = GRBEnv(true);
+        env.set("LogFile", "1-form computation.log");
+        env.start();
+
+        // Create an empty model
+        GRBModel model = GRBModel(env);
+
+        //add a matrix of Gurobi variables that signify the matching
+        std::vector<std::vector<GRBVar>> T;
+    
+        for (int i = 0; i < numSites; i++){
+            std::vector<GRBVar> currRow;
+            for (int j = 0; j < numSites; j++){
+                GRBVar t = model.addVar(0.0, 1.0, 1.0, GRB_BINARY);
+                currRow.push_back(t);
+            }
+            T.push_back(currRow);
+        }
+
+        //first constraint (T\mathbb{1} = \mathbb{1})
+        for (int i = 0; i < numSites; i++){
+            GRBLinExpr lhs = 0;
+            for (int j = 0; j < numSites; j++){
+                lhs += T[i][j];
+            }
+            model.addConstr(lhs == 1.0);
+        }
+
+        //second constraint (\mathbb{1}^T T = \mathbb{1})
+        for (int i = 0; i < numSites; i++){
+            GRBLinExpr lhs = 0;
+            for (int j = 0; j < numSites; j++){
+                lhs += T[j][i];
+            }
+            model.addConstr(lhs == 1.0);
+        }
+
+        //add the objective
+        GRBLinExpr matProd = 0;
+        for (int i = 0; i < numSites; i++){
+            for (int j = 0; j < numSites; j++){
+                matProd += C(i, j) * T[i][j];
+            }
+        }
+
+        GRBLinExpr obj = matProd;
+
+        model.setObjective(obj, GRB_MINIMIZE);
+        model.optimize();
+        
+        for (int i = 0; i < numSites; i++){
+            for (int j = 0; j < numSites; j++){
+                if (T[i][j].get(GRB_DoubleAttr_X) > 0 && (sites[i].second > 0 && sites[j].second < 0)){
+                    std::cout << "match surface point " << sites[i].first << " to surface point " << sites[j].first << std::endl;
+                    toReturn.push_back(std::make_pair(sites[i].first, sites[j].first));//always return pairs in (posSite, negSite) order
+                }
+            }
+        }
+
+    } catch(GRBException e) {
+        cout << "Error code = " << e.getErrorCode() << endl;
+        cout << e.getMessage() << endl;
+    } catch(...) {
+        cout << "Exception during optimization" << endl;
+    }
+
+    return toReturn;
+
 
 }
 

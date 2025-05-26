@@ -55,6 +55,12 @@ void updateGluedHalfedgeWeights(VertexPositionGeometry& globalGeometry, EdgeLeng
 std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, std::vector<std::pair<Vertex, int>>& singularities,
                                                              VertexData<double>& globalTimeFunction);
 
+//given a set of singularities (as surface points) perform an optimal matching between them 
+//always done in the global setting for now 
+//returns a pair of matched indices into positiveSites and negativeSites
+std::vector<std::pair<SurfacePoint, SurfacePoint>> performOptimalSurfacePointMatching(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, 
+                                                    std::vector<std::pair<SurfacePoint, int>> sites, VertexData<double>& globalTimeFunction);
+
 //compute the path cost between 2 vertices
 double computePathCost(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, Vertex& startVert, Vertex& endVert);
 
