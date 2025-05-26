@@ -296,9 +296,10 @@ double computePathCost(VertexPositionGeometry& globalGeometry, HalfedgeData<doub
 
 }
 
-//given a set of singularities perform an optimal matching between them 
+//given a set of singularities on vertices perform an optimal matching between them 
 //always done in the global setting for now 
-std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, std::vector<std::pair<Vertex, int>>& singularities){
+std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, std::vector<std::pair<Vertex, int>>& singularities,
+                                                             VertexData<double>& globalTimeFunction){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     
@@ -319,7 +320,8 @@ std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeom
             }
             else if (singValI == singValJ) C(i, j) = 10000; //put large weights on singularities of the same sign
             else{
-                C(i, j) = computePathCost(globalGeometry, heWeights, singularities[i].first, singularities[j].first);
+                //C(i, j) = computePathCost(globalGeometry, heWeights, singularities[i].first, singularities[j].first);
+                C(i, j) = std::fabs(globalTimeFunction[singularities[i].first] - globalTimeFunction[singularities[j].first]);//match vertices on the same time function isoline
             }
         }
     }
@@ -396,11 +398,120 @@ std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeom
     }
 
     return toReturn;
+}
+
+//given a set of singularities (as surface points) perform an optimal matching between them 
+//always done in the global setting for now 
+//returns a pair of matched indices into positiveSites and negativeSites
+std::vector<std::pair<SurfacePoint, SurfacePoint>> performOptimalSurfacePointMatching(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, 
+                                                             std::vector<std::pair<SurfacePoint, int>> sites, VertexData<double>& globalTimeFunction){
+
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+    
+    int numSites = sites.size();
+    std::vector<std::pair<SurfacePoint, SurfacePoint>> toReturn;
+
+    //compute the cost matrix 
+    Eigen::MatrixXd C(numSites, numSites);
+    C.setZero();
+
+    //construct the cost matrix 
+    for (int i = 0; i < numSites; i++){
+        int singValI = sites[i].second;
+        for (int j = 0; j < numSites; j++){
+            int singValJ = sites[j].second;
+            if (singValI < 0 && singValJ > 0){
+                C(i, j) = 10000;//put high costs on paths from negative singularities to positive singularities
+            }
+            else if (singValI == singValJ) C(i, j) = 10000; //put large weights on singularities of the same sign
+            else{
+                double timeFuncI = sites[i].first.interpolate(globalTimeFunction);
+                double timeFuncJ = sites[j].first.interpolate(globalTimeFunction);
+                C(i, j) = std::fabs(timeFuncI - timeFuncJ);//match vertices on the same time function isoline
+            }
+        }
+    }
+
+    //solve the optimization model
+    using namespace std;
+    try {
+        
+        // Create an environment
+        GRBEnv env = GRBEnv(true);
+        env.set("LogFile", "1-form computation.log");
+        env.start();
+
+        // Create an empty model
+        GRBModel model = GRBModel(env);
+
+        //add a matrix of Gurobi variables that signify the matching
+        std::vector<std::vector<GRBVar>> T;
+    
+        for (int i = 0; i < numSites; i++){
+            std::vector<GRBVar> currRow;
+            for (int j = 0; j < numSites; j++){
+                GRBVar t = model.addVar(0.0, 1.0, 1.0, GRB_BINARY);
+                currRow.push_back(t);
+            }
+            T.push_back(currRow);
+        }
+
+        //first constraint (T\mathbb{1} = \mathbb{1})
+        for (int i = 0; i < numSites; i++){
+            GRBLinExpr lhs = 0;
+            for (int j = 0; j < numSites; j++){
+                lhs += T[i][j];
+            }
+            model.addConstr(lhs == 1.0);
+        }
+
+        //second constraint (\mathbb{1}^T T = \mathbb{1})
+        for (int i = 0; i < numSites; i++){
+            GRBLinExpr lhs = 0;
+            for (int j = 0; j < numSites; j++){
+                lhs += T[j][i];
+            }
+            model.addConstr(lhs == 1.0);
+        }
+
+        //add the objective
+        GRBLinExpr matProd = 0;
+        for (int i = 0; i < numSites; i++){
+            for (int j = 0; j < numSites; j++){
+                matProd += C(i, j) * T[i][j];
+            }
+        }
+
+        GRBLinExpr obj = matProd;
+
+        model.setObjective(obj, GRB_MINIMIZE);
+        model.optimize();
+        
+        for (int i = 0; i < numSites; i++){
+            for (int j = 0; j < numSites; j++){
+                if (T[i][j].get(GRB_DoubleAttr_X) > 0 && (sites[i].second > 0 && sites[j].second < 0)){
+                    std::cout << "match surface point " << sites[i].first << " to surface point " << sites[j].first << std::endl;
+                    toReturn.push_back(std::make_pair(sites[i].first, sites[j].first));//always return pairs in (posSite, negSite) order
+                }
+            }
+        }
+
+    } catch(GRBException e) {
+        cout << "Error code = " << e.getErrorCode() << endl;
+        cout << e.getMessage() << endl;
+    } catch(...) {
+        cout << "Exception during optimization" << endl;
+    }
+
+    return toReturn;
+
 
 }
 
 
 //----------------New path constraint mechanisms----------------//
+
+
 //trace an isoline between to vertices 
 std::vector<double> findIsoPath(SurfaceMesh& mesh,
                                   VertexData<double>& timeFunction,
@@ -476,77 +587,95 @@ std::vector<double> findIsoPath(SurfaceMesh& mesh,
     return edgePath;
 }
 
-// Check if isoVal crosses the edge between v1 and v2
-bool edgeIsCrossed(double f1, double f2, double isoVal) {
-    return (f1 - isoVal) * (f2 - isoVal) < 0.0;
-}
 
-// Return the two faces adjacent to an edge (could be boundary)
-std::vector<Face> adjacentFaces(Edge e) {
-    std::vector<Face> faces;
-    Halfedge he = e.halfedge();
-    faces.push_back(he.face());
-    faces.push_back(he.twin().face());
-    return faces;
-}
+std::vector<std::tuple<Vector3, Halfedge>>
+computeIsolineFaceIntersection(const Face face, double iso,
+                               const VertexData<double>& fValues,
+                               const VertexPositionGeometry& geom) {
+    std::vector<std::tuple<Vector3, Halfedge>> intersections;
 
-// Trace isoline and collect all intersected faces, stopping when reaching a face adjacent to endEdge
-FaceData<int> traceIsolineToEdge(SurfaceMesh& mesh,
-                                             const VertexData<double>& timeFunction,
-                                             Edge startEdge,
-                                             Edge endEdge,
-                                             double isoVal) {
-    FaceData<int> toReturn(mesh, 0);                                            
-    std::unordered_set<Face> visitedFaces;
-    std::unordered_set<Edge> visitedEdges;
-    std::vector<Edge> frontier = {startEdge};
+    for (Halfedge he : face.adjacentHalfedges()){
+        Vertex v0 = he.vertex();
+        Vertex v1 = he.next().vertex();
 
-    // Mark which faces we consider target
-    std::unordered_set<Face> targetFaces;
-    for (Face f : adjacentFaces(endEdge)) {
-        targetFaces.insert(f);
-    }
+        double f0 = fValues[v0];
+        double f1 = fValues[v1];
 
-    while (!frontier.empty()) {
-        Edge e = frontier.back();
-        frontier.pop_back();
-
-        if (visitedEdges.count(e)) continue;
-        visitedEdges.insert(e);
-
-        for (Face f : adjacentFaces(e)) {
-            if (visitedFaces.count(f)) continue;
-
-            visitedFaces.insert(f);
-            if (targetFaces.count(f)) {
-                //return visitedFaces; // early termination
-                return toReturn;
-            }
-
-            // For each edge in face, check if isoVal crosses
-            Halfedge heStart = f.halfedge();
-            Halfedge he = heStart;
-            do {
-                Vertex v1 = he.tailVertex();
-                Vertex v2 = he.tipVertex();
-                double f1 = timeFunction[v1];
-                double f2 = timeFunction[v2];
-
-                if (edgeIsCrossed(f1, f2, isoVal)) {
-                    frontier.push_back(he.edge());
-                }
-
-                he = he.next();
-            } while (he != heStart);
+        if ((f0 - iso) * (f1 - iso) < 0.0 || f0 == iso || f1 == iso) { // scalar crosses iso
+            double t = (iso - f0) / (f1 - f0);
+            Vector3 p0 = geom.inputVertexPositions[v0];
+            Vector3 p1 = geom.inputVertexPositions[v1];
+            Vector3 p = (1.0 - t) * p0 + t * p1;
+            intersections.emplace_back(p, he);
         }
     }
+    return intersections;
+}
 
-    std::cerr << "Warning: Reached end of traversal without hitting endEdge." << std::endl;
 
-    std::cout << "size of strip = " << visitedFaces.size() << std::endl;
-    for (Face f : visitedFaces){
-        toReturn[f] = 1.0;
+//trace the faces that an isoline passes through
+//first argument is the vector of faces 
+//second is argument is currently being used as an error code 
+std::tuple<std::vector<Face>, int> traceIsolineFaces(
+    const VertexPositionGeometry& globalGeometry,
+    const VertexData<double>& timeFunction,
+    const FaceData<Vector3>& timeFunctionGradients,
+    const FaceData<Vector3>& rotatedFaceGradients,
+    double isoVal,
+    Halfedge startHe,
+    Halfedge endHe
+){
+
+    std::unordered_set<Face> visitedFaces;
+    std::vector<Face> pathFaces;
+    Face currentFace = startHe.face();//face to start at 
+    Face endFace = endHe.face();//face to end at
+    //expand face
+    std::queue<Face> frontier;
+    frontier.push(currentFace);
+    visitedFaces.insert(currentFace);
+    visitedFaces.insert(endFace);
+
+    while(!frontier.empty()){
+
+        Face f = frontier.front();
+        frontier.pop();
+        if (f == endFace) break;
+
+        auto intersections = computeIsolineFaceIntersection(f, isoVal, timeFunction, globalGeometry);
+        if (intersections.size() != 2){
+            std::cout << "intersection size = " << intersections.size() << std::endl;
+            break;
+        }
+        auto [p1, he1] = intersections[0];
+        auto [p2, he2] = intersections[1];
+        Vector3 v1 = (p2 - p1).normalize();
+        Vector3 v2 = (p1 - p2).normalize();
+        Face neighbor;
+        if (dot(v1, rotatedFaceGradients[f]) > 0){
+            neighbor = he2.twin().face();
+        }
+        else{
+            neighbor = he1.twin().face();
+        }
+        if (neighbor == endFace){
+            return std::make_pair(pathFaces, 0);
+        }
+        if (visitedFaces.find(neighbor) == visitedFaces.end()){
+            pathFaces.emplace_back(neighbor);
+            frontier.push(neighbor);
+            visitedFaces.insert(neighbor);
+        }
+        
     }
 
-    return toReturn;
+    if (isoVal < std::min(timeFunction[startHe.tipVertex()], timeFunction[startHe.tailVertex()]) || isoVal > std::max(timeFunction[startHe.tipVertex()], timeFunction[startHe.tailVertex()])){
+        std::cout << "average doesn't lie on start halfedge " << std::endl;
+    }
+    if (isoVal < std::min(timeFunction[endHe.tipVertex()], timeFunction[endHe.tailVertex()]) || isoVal > std::max(timeFunction[endHe.tipVertex()], timeFunction[endHe.tailVertex()])){
+        std::cout << "average doesn't lie on end halfedge " << std::endl;
+    }
+
+    return std::make_pair(pathFaces, -1);
+
 }

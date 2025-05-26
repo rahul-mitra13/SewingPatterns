@@ -52,7 +52,14 @@ void updateGluedHalfedgeWeights(VertexPositionGeometry& globalGeometry, EdgeLeng
 
 
 //given a set of singularities perform an optimal matching between them 
-std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, std::vector<std::pair<Vertex, int>>& singularities);
+std::vector<std::pair<Vertex, Vertex>> performOptimalMatching(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, std::vector<std::pair<Vertex, int>>& singularities,
+                                                             VertexData<double>& globalTimeFunction);
+
+//given a set of singularities (as surface points) perform an optimal matching between them 
+//always done in the global setting for now 
+//returns a pair of matched indices into positiveSites and negativeSites
+std::vector<std::pair<SurfacePoint, SurfacePoint>> performOptimalSurfacePointMatching(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, 
+                                                    std::vector<std::pair<SurfacePoint, int>> sites, VertexData<double>& globalTimeFunction);
 
 //compute the path cost between 2 vertices
 double computePathCost(VertexPositionGeometry& globalGeometry, HalfedgeData<double>& heWeights, Vertex& startVert, Vertex& endVert);
@@ -63,8 +70,22 @@ double computePathCost(VertexPositionGeometry& globalGeometry, HalfedgeData<doub
 std::vector<double> findIsoPath(SurfaceMesh& mesh, VertexData<double>& timeFunction, Vertex vStart, Vertex vEnd);
 
 //find triangle strip containing an isoline
-FaceData<int> traceIsolineToEdge(SurfaceMesh& mesh,
-                                             const VertexData<double>& timeFunction,
-                                             Edge startEdge,
-                                             Edge endEdge,
-                                             double isoVal);
+// FaceData<int> traceIsolineToEdge(SurfaceMesh& mesh,
+//                                              const VertexData<double>& timeFunction,
+//                                              Edge startEdge,
+//                                              Edge endEdge,
+//                                              double isoVal);
+
+
+//trace the faces that an isoline passes through in the correct direction
+//first argument is the vector of faces 
+//second is argument is currently being used as an error code 
+std::tuple<std::vector<Face>, int>  traceIsolineFaces(
+    const VertexPositionGeometry& globalGeometry,
+    const VertexData<double>& timeFunction,
+    const FaceData<Vector3>& timeFunctionGradients,
+    const FaceData<Vector3>& rotatedFaceGradients,
+    double isoVal,
+    Halfedge startHe,
+    Halfedge endHe
+);

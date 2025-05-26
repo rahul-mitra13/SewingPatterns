@@ -23,7 +23,14 @@ class Model{
         bool integrabilityContraint;
 
         //stores a pair of (edge indices, integral value of the path that those edge indices specify) 
+        //the length of the vector is mesh->nEdges()
         std::vector<std::pair<std::vector<double>, double>> edgePathConstraints;
+
+
+        //stores a pair of (edge indices, integral value of the path that those edge indices specify) 
+        //the length of the vector is mesh->nHalfedges()
+        std::vector<std::pair<std::vector<double>, double>> halfedgePathConstraints;
+
 
         //homology generator constraints 
         std::vector<std::vector<double>> homologyGenerators;
@@ -86,6 +93,9 @@ class Model{
         //set edge path constraints
         void setEdgePathConstraints(std::vector<std::pair<std::vector<double>, double>>& edgePathConstraints);
 
+        //set halfedge path constraints
+        void setHalfedgePathConstraints(std::vector<std::pair<std::vector<double>, double>>& edgePathConstraints);
+
         //set singular face indices 
         void setSingularFaceIndices(std::vector<std::pair<int, int>>& singularFaces);
 
@@ -127,6 +137,9 @@ class Model{
 
         //get edge path constraints 
         std::vector<std::pair<std::vector<double>, double>> getEdgePathConstraints();
+
+        //get halfedge path constraints 
+        std::vector<std::pair<std::vector<double>, double>> getHalfedgePathConstraints();
 
         //get period value 
         double getPeriod();
