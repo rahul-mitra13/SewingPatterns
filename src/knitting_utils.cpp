@@ -123,6 +123,8 @@ VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::ve
 //compute time function directly in the glued mesh setting 
 VertexData<double> computeTimeFunction(EdgeLengthGeometry& gluedGeometry, globalBoundaryConditions& bdyConditions){
 
+    P("Computing time function...");
+
     SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
     VertexData<double> gluedTimeFunction(gluedMesh);
     gluedGeometry.requireCotanLaplacian();
@@ -1780,6 +1782,12 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 std::cout << "not breaking after " << std::to_string(numWaleSingularities) << " singularity insertions " << std::endl;
                 std::cout << "new objective = " << currObj << std::endl;
                 std::cout << "old objective = " << oldObj << std::endl;
+
+                if (numWaleSingularities == maxWaleSingularities) {
+                    toBreak = true;
+                    break;
+                }
+
                 //oldDistance = newDistance;
                 oldObj = currObj;
                 //oldL1Distance = newL1Distance;
@@ -4132,6 +4140,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 if (opts.showAllIterations) psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (after subtracting)", edgeCurl);
                 if (opts.showAllIterations) psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numSingularities) + " singularity insertion", edgeSingularities);
                 //polyscope::registerCurveNetwork("edge singularities network after " + std::to_string(numSingularities) + " singularitiy insertion", singPos, edges);
+
+                if (numSingularities == 4)
+                    toBreak = true; // force a specific number of sing pairs for debugging
+
                 break;
             }
         }
@@ -4147,8 +4159,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
     std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
     std::tie(uniquePos, uniqueEdges, components) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, edgeMap);
-    courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numSingularities) + 
-                                                    " singularity insertions (no correction)", uniquePos, uniqueEdges);
+    courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numSingularities) + " singularity insertions (no correction)", uniquePos, uniqueEdges);
+    courseStripes->setEnabled(false);
 
     // With helicing correction
     model.useHelicingCorrection = true;
@@ -4167,7 +4179,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                                     " singularity insertions", uniquePos, uniqueEdges);
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
-    registerShortRows("short rows after " + std::to_string(numSingularities) + " singularity insertions", components);    
+    registerShortRows("short rows after " + std::to_string(numSingularities) + " singularity insertions", components)->setEnabled(false);    
 
     model.useHelicingCorrection = true;
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);

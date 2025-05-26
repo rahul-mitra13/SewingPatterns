@@ -3,6 +3,7 @@
 //geometry-central includes 
 #include "geometrycentral/surface/manifold_surface_mesh.h"
 #include "geometrycentral/surface/meshio.h"
+#include "geometrycentral/surface/surface_mesh_factories.h"
 #include "geometrycentral/surface/vertex_position_geometry.h"
 #include "geometrycentral/surface/direction_fields.h"
 #include "geometrycentral/surface/edge_length_geometry.h"
@@ -27,8 +28,11 @@
 #include "iterative_assignment.h"
 //#include "experiments.h"
 #include "KnitGraph.h"
+#include "gmsh_helpers.h"
 
 #include "homology_generators.h"
+
+using namespace std;
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -84,12 +88,13 @@ KnitGraph graph;
 
 // Global configuration options
 // TODO: setup command line interface with CLI11
-Options opts; 
-
+Options opts;
 
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
   
+  opts.showAllIterations = false;
+
   //set the wale period 
   //walePeriod = ((1.0/1.6) * coursePeriod);
   walePeriod = coursePeriod;
@@ -291,15 +296,15 @@ void showStripePatterns(){
   // and then run our 1-form optimization with the singularities
 
 
-  // std::vector<Vector3> positionsWale;
-  // std::vector<std::array<int, 2>> edgesWale;
-  // std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, walePeriod);
-  // auto waleStripes = polyscope::registerCurveNetwork("wale stripes", positionsWale, edgesWale);
-  // globalPSMesh -> addEdgeScalarQuantity("wale singularities", waleSingularEdgesGlobal);
-  // waleStripes -> setRadius(0.001);
-  // waleStripes -> setEnabled(false);
+  std::vector<Vector3> positionsWale;
+  std::vector<std::array<int, 2>> edgesWale;
+  std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, walePeriod);
+  auto waleStripes = polyscope::registerCurveNetwork("wale stripes", positionsWale, edgesWale);
+  globalPSMesh -> addEdgeScalarQuantity("wale singularities", waleSingularEdgesGlobal);
+  waleStripes -> setRadius(0.001);
+  waleStripes -> setEnabled(false);
 
-  // globalPSMesh->addCornerScalarQuantity("wale stripe values", prepareCornerData(waleStripeValues));
+  globalPSMesh->addCornerScalarQuantity("wale stripe values", prepareCornerData(waleStripeValues));
 
   // Plot wale stripe values with offset (to debug knit graph)
   // CornerData<double> waleStripeValuesWithOffset = waleStripeValues;
@@ -403,33 +408,56 @@ int main(int argc, char **argv) {
 
 
   polyscope::init();
-  std::ifstream jsonFile(argv[1]);
-  nlohmann::json data = nlohmann::json::parse(jsonFile);
 
-  //run sanity checks
-  std::tie(globalMeshPre, globalGeometryPre) = readManifoldSurfaceMesh(data["model_path"]);
+  std::filesystem::path inFilePath(argv[1]);
+  nlohmann::json data;
+  string modelPath;
+  if (inFilePath.extension() == ".json") {
 
+    std::ifstream inFileStream(inFilePath);
+    data = nlohmann::json::parse(inFileStream);
+    modelPath = data["model_path"].get<std::string>();
 
-  //make the mesh Delaunay 
-  //fixDelaunay(*globalMeshPre, *globalGeometryPre); // we make the mesh approximately Delaunay
+    //run sanity checks
+    std::tie(globalMeshPre, globalGeometryPre) = readManifoldSurfaceMesh(modelPath);
 
-  // // Remesh
-  // remesh(*globalMeshPre, *globalGeometryPre);
+    //make the mesh Delaunay 
+    //fixDelaunay(*globalMeshPre, *globalGeometryPre); // we make the mesh approximately Delaunay
 
-  std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometryPre);
-  globalMesh = std::make_unique<ManifoldSurfaceMesh>(F);
-  globalGeometry = std::make_unique<VertexPositionGeometry>(*globalMesh, V);
+    // // Remesh
+    // remesh(*globalMeshPre, *globalGeometryPre);
 
-  for (auto bl : globalMesh -> boundaryLoops()){
-    Face f = bl.asFace();
-    std::cout << "boundary vertex = " << f.halfedge().tailVertex() << std::endl;
+    std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometryPre);
+    globalMesh = std::make_unique<ManifoldSurfaceMesh>(F);
+    globalGeometry = std::make_unique<VertexPositionGeometry>(*globalMesh, V);
+
+    // For each boundary loop, print one of its vertices
+    // (this is to populate the json file).
+    for (auto bl : globalMesh -> boundaryLoops()){
+      Face f = bl.asFace();
+      std::cout << "boundary vertex = " << f.halfedge().tailVertex() << std::endl;
+    }
+
+    // Parse and setup vertex and edge mappings for glued meshes
+    vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(data["vertex_mappings"]);
+    edgeMappingsPairs = buildPairOfStitchedEdges(*globalGeometry, vertexMappingsPairs);  
+
+  } else if (inFilePath.extension() == ".msh") {
+
+    modelPath = inFilePath; // useful for later?
+    parseMsh(inFilePath, globalMesh, globalGeometry, globalBdyConditions);
+
+  } else {
+    std::cout << "Unrecognized file format." << std::endl;
+    throw std::exception();
   }
 
-  //EdgeData<double> negativeWeights(*globalMesh, 0.0);
+
   
   //find the gradient operator (want to do this just once)
   std::tie(V, F) = getVertexPositionsandFaceLists(*globalGeometry);
   igl::grad(V,F,grad);
+
   //find the max edge length so that default coursePeriod = 2 * max_e 
   double maxLength = -DBL_MAX;
   for (Edge e : globalMesh -> edges()){
@@ -458,7 +486,7 @@ int main(int argc, char **argv) {
     throw std::exception();
   }
 
-  globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(data["model_path"]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
+  globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(modelPath), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
 
   
   // Internally, Polyscope numbers the edges by looping over faces.
@@ -474,8 +502,6 @@ int main(int argc, char **argv) {
     }
   }
 
-  vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(data["vertex_mappings"]);
-  edgeMappingsPairs = buildPairOfStitchedEdges(*globalGeometry, vertexMappingsPairs);
   //set up the orientations for the 1-form viz while we're here
   for (Edge e : globalMesh->edges()){
     if (e.halfedge().tailVertex().getIndex() < e.halfedge().tipVertex().getIndex()){
@@ -495,12 +521,16 @@ int main(int argc, char **argv) {
   //create the glued edge length geometry
   gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, vertexMap, edgeMap, gluedOneRingMap);
 
-  //visualizing the cotan weights
-  // globalGeometry->requireEdgeCotanWeights();
-  // for (Edge e : globalMesh -> edges()){
-  //   if (globalGeometry->edgeCotanWeights[e] < 0) negativeWeights[e] = 1.0;
-  // }
-  // globalPSMesh->addEdgeScalarQuantity("negative cotan weights", negativeWeights);
+  // If mesh has no stitches, vertexMap and edgeMap are identity
+
+  // visualizing the cotan weights
+  EdgeData<double> negativeWeights(*globalMesh, 0.0);
+  globalGeometry->requireEdgeCotanWeights();
+  for (Edge e : globalMesh -> edges()){
+    if (globalGeometry->edgeCotanWeights[e] < 0) negativeWeights[e] = 1.0;
+  }
+  globalPSMesh->addEdgeScalarQuantity("negative cotan weights", negativeWeights);
+  globalPSMesh->addEdgeScalarQuantity("cotan weights", globalGeometry->edgeCotanWeights);
 
   // Halfedge permutation (global -> glued)
   // Note: this works as long as the global and glued faces have the same order.
@@ -512,8 +542,10 @@ int main(int argc, char **argv) {
       halfedgePerm.push_back(he.getIndex());  
   globalPSMesh->setHalfedgePermutation(halfedgePerm);
 
-  //process boundary conditions in the glued mesh setting 
-  globalBdyConditions = parseJson(*gluedELG, data, vertexMap, edgeMap);
+  //process boundary conditions in the glued mesh setting
+  if (inFilePath.extension() == ".json") {
+    globalBdyConditions = parseJson(*gluedELG, data, vertexMap, edgeMap);
+  }
 
   //render the stitched vertices
   renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
