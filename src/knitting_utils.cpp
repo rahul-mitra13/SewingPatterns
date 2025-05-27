@@ -3694,7 +3694,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         std::vector<Vector3> matchedSPs;
         matchedSPs.push_back(matchedSurfacePoints[i].first.interpolate(globalGeometry.vertexPositions));
         matchedSPs.push_back(matchedSurfacePoints[i].second.interpolate(globalGeometry.vertexPositions));
-        polyscope::registerPointCloud("matched surface point pair " + std::to_string(i), matchedSPs);
+        polyscope::registerPointCloud("matched surface point pair " + std::to_string(i), matchedSPs)->setEnabled(false);
     }
 
     //store a vector of vertex ids and singularity indices (for optimal matching)
@@ -3831,6 +3831,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //TO-DO: * ensure edge singularities lie in the same cylindrical compononent
     //       * ensure the average isovalue passes through both faces
     std::vector<int> indicesToUse; 
+    std::vector<int> indicesToRemove;
     for (int i = 0; i < singularEdges.size(); i++){
         auto p = singularEdges[i];
         auto timeFuncPair = pairedTimeFunctions[i];
@@ -3852,20 +3853,21 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             edgeIndices[p.second] = 0.0;
             edgeSingularities[posEdge] = 0.0;
             edgeSingularities[negEdge] = 0.0;
+            indicesToRemove.push_back(i);
         }
     }
 
-    for (int i : indicesToUse){
-        std::cout << "index to use = " << i << std::endl;
-    }
     std::cout << "Finished aligning the sites " << std::endl;
-    //set the singular edges
+    //set the singular edges where path exists
+    //this is where the weird blotches in the knit graph come from
+    //we are setting constraints using these singular edges but not using some of them 
+    //when specifying the edge indices
     model.setSingularEdges(singularEdges);
 
     std::cout << "Set singular edges as constraints " << std::endl;
 
     std::vector<std::pair<std::vector<double>, double>> halfedgePathConstraints;
- 
+    
     //construct edge paths between singular edges
     for (int i : indicesToUse){
         auto p = singularEdges[i];
@@ -4343,7 +4345,7 @@ std::vector<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry
                 && he.edge() != negEdge){//we have hit a singular edge and it's not the edge you're currently tracing
                 Edge singularEdge = he.edge();
                 double hitIsoVal = edgeToIsoVal[singularEdge];
-                if (hitIsoVal > isoVal){//if the singularity isovalue is less than the current isovalue, route "below" the edge
+                if (hitIsoVal > isoVal){//if the singularity isovalue is greater than the current isovalue, route "below" the edge
                     lensHePath[he.getIndex()] = -1.0;
                     lensHePath[he.twin().getIndex()] = -1.0;
                     // if (timeFunction[singularEdge.halfedge().tailVertex()] < timeFunction[singularEdge.halfedge().tipVertex()]){
