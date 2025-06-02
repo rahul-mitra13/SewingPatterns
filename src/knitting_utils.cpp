@@ -3973,11 +3973,12 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //plot the stripes
     std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
     std::tie(uniquePos, uniqueEdges, components) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, edgeMap);
+    psMesh.addCornerScalarQuantity("our stripe values", prepareCornerData(stripeValuesSigmaCourse));
     courseStripes = polyscope::registerCurveNetwork("our course stripes ", uniquePos, uniqueEdges);
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
 
-    psMesh.addHalfedgeScalarQuantity("Sigma ", gluedSigmaTilde);
+    psMesh.addHalfedgeScalarQuantity("our Sigma ", gluedSigmaTilde);
 
     //visualize the saddle vertices
     std::vector<Vector3> saddleVertexPositions;

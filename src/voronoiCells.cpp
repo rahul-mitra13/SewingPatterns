@@ -73,6 +73,12 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     }
   }
 
+  geom.requireShapeLengthScale();
+  double M = 0; // maximum measure
+  for (Vertex v : mesh.vertices())
+    M = max(M, measure[v]);
+  double L = geom.shapeLengthScale; // characteristic length
+  double lips = sqrt(options.nSites) * M * L / 2; // Lipschitz constant
 
   // For some reason, running a dummy scalarDiffuse / computeLogMap first
   // fixes thread issues lol. Many thanks to
