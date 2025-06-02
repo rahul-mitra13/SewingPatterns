@@ -3727,6 +3727,15 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         auto p = matchedVertices[i];
         matchedSurfacePoints.push_back(std::make_pair(vertexToSurfacePointMap[p.first], vertexToSurfacePointMap[p.second]));
     }
+
+    //render the matched surface points 
+    for (int i = 0; i <  matchedSurfacePoints.size(); i++){
+        auto p = matchedSurfacePoints[i];
+        std::vector<Vector3> matchedSP;
+        matchedSP.push_back(p.first.interpolate(globalGeometry.vertexPositions));
+        matchedSP.push_back(p.second.interpolate(globalGeometry.vertexPositions));
+        polyscope::registerPointCloud("matched SPs " + std::to_string(i), matchedSP)->setEnabled(false);
+    }
     alignmentOptions.pairedSites = matchedSurfacePoints;
     alignmentOptions.usingPosCurl = true;
     alignmentOptions.iterations = 2500;
@@ -3935,6 +3944,23 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //using our new strip halfedge paths instead
         //edgePathConstraints.push_back(std::make_pair(edgePath, 0.0));
     }
+
+    //visualize halfedge paths
+    for (int i = 0; i < halfedgePathConstraints.size(); i++){
+        auto p = halfedgePathConstraints[i].first;
+        std::vector<Vector3> pos;
+        for (int j = 0; j < p.size(); j++){
+            if (std::fabs(p[j]) > 1e-8){
+                Vector3 p1 = globalGeometry.vertexPositions[globalMesh.halfedge(j).tailVertex()];
+                Vector3 p2 = globalGeometry.vertexPositions[globalMesh.halfedge(j).tipVertex()];
+                pos.push_back(p1);
+                pos.push_back(p2);
+            }
+        }
+        psMesh.addHalfedgeScalarQuantity("halfedge path edges " + std::to_string(i), p);
+    }
+    polyscope::show();
+
 
     psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
     //polyscope::show();
