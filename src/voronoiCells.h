@@ -51,6 +51,10 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
 VoronoiResult alignPointsOnIsoline(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
                                   alignOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
 
+// Given a set of singularity pairs in `options`, aligns them (in place) to the midpoint of their time values.
+// Based on geodesic tracing so not exact, but fast.
+void alignPointsOnIsolineFast(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom, alignOptions& options, polyscope::SurfaceMesh &psMesh);
+
 
 //TO-DO: jointly optmize the positions of both the positive sites and the negtive site 
 VoronoiResult alignPointsOnIsoline(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom,

@@ -187,6 +187,43 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, 
     return faceGradients;
 }
 
+FaceData<Vector2> computeTimeFunctionFaceGradIntrinsic(const IntrinsicGeometryInterface& geometry, VertexData<double>& vertexScalarFunction) {
+
+    SurfaceMesh& mesh = geometry.mesh;
+
+    // Setup matrices that IGL needs
+    // Be careful with index convention! Edge i is opposite vertex i
+    Eigen::MatrixXd L(mesh.nFaces(), 3); // edge lengths
+    Eigen::MatrixXi F(mesh.nFaces(), 3); // face vertex indices
+    for (Face face : geometry.mesh.faces()) {
+        Halfedge he = face.halfedge();
+        for (int i = 0; i < 3; i++) {
+            L(face.getIndex(), i) = geometry.edgeLengths[he.edge()];
+            F(face.getIndex(), (i+1)%3) = he.tailVertex().getIndex();
+            he = he.next();
+        }
+    }
+
+    // Compute intrinsic gradient operator
+    SparseMatrix<double> G; // (2*F, V)
+    igl::grad_intrinsic(L, F, G);
+
+    // Set the scalar function in IGL format
+    Eigen::VectorXd u(mesh.nVertices());
+    for (Vertex v : mesh.vertices())
+        u(v.getIndex()) = vertexScalarFunction[v];
+
+    // Compute gradient and convert to GC format
+    Eigen::VectorXd Gu = G*u;
+    FaceData<Vector2> grad(geometry.mesh);
+    for (Face face : geometry.mesh.faces()) {
+        grad[face] = {Gu(face.getIndex()), Gu(face.getIndex()+mesh.nFaces())};
+    }
+
+    return grad;
+
+}
+
 //compute the gradient of the a function defined as a scalar over vertices in the glued mesh setting 
 //don't think the formula I'm using in here is right
 // FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, VertexData<double>& vertexScalarFunction){
@@ -3636,7 +3673,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
        positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
     }
-    polyscope::registerPointCloud("positive voronoi sites (not aligned)", positiveCenters)->setEnabled(false);
+    polyscope::registerPointCloud("Voronoi sites (+)", positiveCenters)->setEnabled(false);
     std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
 
     //print the positive masses
@@ -3664,7 +3701,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
        negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
     }
-    polyscope::registerPointCloud("negative voronoi sites ", negativeCenters)->setEnabled(false);
+    polyscope::registerPointCloud("Voronoi sites (-)", negativeCenters)->setEnabled(false);
     std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
 
     //print the negative masses
@@ -3740,13 +3777,20 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     alignmentOptions.usingPosCurl = true;
     alignmentOptions.iterations = 2500;
     alignmentOptions.lambda = 1.0;
-    VoronoiResult posAlignedCenters = alignPointsOnIsoline(globalMesh, globalGeometry, alignmentOptions, posMeasure, psMesh);
-    std::vector<Vector3> alignedPosCenters;
-    for (int i = 0; i < posAlignedCenters.siteLocations.size(); i++){
-       alignedPosCenters.push_back(posAlignedCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+    alignPointsOnIsolineFast(globalMesh, globalGeometry, alignmentOptions, psMesh);
+
+    // Plot aligned singularities
+    std::vector<Vector3> alignedPosCenters, alignedNegCenters;
+    for (auto &[s1,s2] : alignmentOptions.pairedSites) {
+        alignedPosCenters.push_back(s1.interpolate(globalGeometry.vertexPositions));
+        alignedNegCenters.push_back(s2.interpolate(globalGeometry.vertexPositions));
     }
-    polyscope::registerPointCloud("positive voronoi sites (aligned course)", alignedPosCenters)->setEnabled(false);
-    
+    polyscope::registerPointCloud("Voronoi sites aligned (+)", alignedPosCenters)->setEnabled(false);
+    polyscope::registerPointCloud("Voronoi sites aligned (-)", alignedNegCenters)->setEnabled(false);
+
+    // // Old approach using gradient descent
+    // VoronoiResult posAlignedCenters = alignPointsOnIsoline(globalMesh, globalGeometry, alignmentOptions, posMeasure, psMesh);
+
     //store the paired time functions
     std::vector<std::pair<double, double>> pairedTimeFunctions;
     //paired halfedges
@@ -3755,9 +3799,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::map<Edge, double> edgeToIsoVal;
 
     //now appropriatately specify the singular edges
-    for (int i = 0; i < posAlignedCenters.siteLocations.size(); i++){
-        SurfacePoint posSite = posAlignedCenters.siteLocations[i];
-        SurfacePoint negSite = matchedSurfacePoints[i].second;//find the corresponding paired negative site
+    for (auto &[posSite,negSite] : alignmentOptions.pairedSites) {
+    // for (int i = 0; i < posAlignedCenters.siteLocations.size(); i++){
         
         //handle positive case 
         SurfacePoint posFacePoint = posSite.inSomeFace();

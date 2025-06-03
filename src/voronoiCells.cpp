@@ -1,6 +1,7 @@
 #include "voronoiCells.h"
 #include "math.h"
 #include "float.h"
+#include "knitting_utils.h"
 #include "helpers.h"
 
 using namespace std;
@@ -378,6 +379,44 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     }
   }
   return result;
+}
+
+// Project surface point on the isoline of a given target time value.
+// `point` is modified in place.
+// Note that this is not exact as the geodesic might not be orthogonal to the time function isolines,
+// but it should be a pretty good guess.
+void projectOnIsoline(SurfacePoint& point, double target, SurfaceMesh& mesh, IntrinsicGeometryInterface& geom, alignOptions& options, FaceData<Vector2>& timeFunctionGrad) {
+
+  SurfacePoint initPoint = point; // keep a copy
+  Vector2 v = timeFunctionGrad[initPoint.face]; // search direction
+  v = v.normalize();
+
+  // Binary search in direction v to find the target time value
+  double lower = -1, upper = +1.1; // is it enough? For some reason if mid=0, traceGeodesic fails
+  while(upper - lower > 1e-6) {
+    double mid = (lower+upper) / 2;
+    TraceGeodesicResult traceResult = traceGeodesic(geom, initPoint, mid*v);
+    point = traceResult.endPoint;
+    double t = point.interpolate(options.timeFunction);
+    if (t > target)
+      upper = mid;
+    else 
+      lower = mid;
+  }
+}
+
+
+void alignPointsOnIsolineFast(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom, alignOptions& options, polyscope::SurfaceMesh &psMesh) {
+
+  // Compute the gradient of the time function in the tangent plane of faces
+  FaceData<Vector2> timeFunctionGrad = computeTimeFunctionFaceGradIntrinsic(geom, options.timeFunction);
+
+  // For each pair of sings, project both to the midpoint of their time values
+  for (auto &[s1,s2] : options.pairedSites) {  
+    double t1 = s1.interpolate(options.timeFunction), t2 = s2.interpolate(options.timeFunction);
+    projectOnIsoline(s1, (t1+t2)/2, mesh, geom, options, timeFunctionGrad);
+    projectOnIsoline(s2, (t1+t2)/2, mesh, geom, options, timeFunctionGrad);
+  }
 }
 
 VoronoiResult alignPointsOnIsoline(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
