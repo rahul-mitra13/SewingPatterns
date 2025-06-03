@@ -4002,11 +4002,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         }
         psMesh.addHalfedgeScalarQuantity("halfedge path edges " + std::to_string(i), p);
     }
-    polyscope::show();
-
 
     psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
-    //polyscope::show();
+    polyscope::show();
 
     //model.setEdgePathConstraints(edgePathConstraints);
     model.setHalfedgePathConstraints(halfedgePathConstraints);
@@ -4481,6 +4479,10 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
 
         // Create an empty model
         GRBModel model = GRBModel(env);
+
+        //relaxing the model
+        //trying to get Gurobi to remove constraints that cause infeasablity issues
+        //model.feasRelax(GRB_FEASRELAX_LINEAR, true, true, true);
 
         //set the timeout
         //model.getEnv().set(GRB_DoubleParam_TimeLimit, 30);
