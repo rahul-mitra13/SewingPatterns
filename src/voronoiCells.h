@@ -19,12 +19,14 @@ struct VoronoiResult {
 struct VoronoiOptions {
   size_t nSites = 1;                     // number of sites to place
   std::vector<SurfacePoint> initialSites; // desired locations for sites. If blank, locations are chosen randomly
-  size_t iterations = 5;                 // number of iterations to run for
-  double stepSize = 1;                    // step size for steps towards cell centers
+  size_t iterations = 10000;                 // number of iterations to run for
+  double stepSize = 1.0;                    // step size for steps towards cell centers
   bool useDelaunay = true;                // solve on an intrinsic Delaunay triangulation of the input
   bool computeDistributions = false;      // return the indicator functions for each cell (`result.siteDistributions`)
   double tCoef = 1;                       // diffusion time for vector heat method
   size_t nSubIterations = 1;              // number of iterations to use when computing Karcher means
+  double eps = 1e-6;                      // stopping criterion on the sum of Karcher mean updates
+  // double epsWeights = 1e-5;               // stopping criterion on the weight optimization gradient norm
 };
 
 

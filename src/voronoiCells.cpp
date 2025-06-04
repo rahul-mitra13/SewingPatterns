@@ -125,7 +125,9 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
   // H(SUITESPARSE_USE_OPENMP);
 
   // == Iterations
-  for (size_t iIter = 0; iIter < options.iterations; iIter++) {//Lloyd iterations
+  bool stop = false; // flag if stopping criterion on sumUpdateNorm is reached
+  double sumUpdateNorm = 1; // just a starting point to determine a tolerance on weights grad norm
+  for (size_t iIter = 0; iIter < options.iterations && !stop; iIter++) {//Lloyd iterations
 
     std::cout << "Logging info..." << std::endl;
     std::cout << "LLoyd iteration number " << iIter << std::endl;
@@ -226,12 +228,13 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
       // H(gradNorm);
       std::cout << "gradNorm: " << gradNorm << "\t\r" << std::flush;
 
-
-      if (gradNorm < 1e-3)
-        break;
-
       psMesh.addVertexScalarQuantity("rho", rho);
-      
+
+      if (gradNorm < 1e-2 * sumUpdateNorm) {
+        cout << endl << "Performed " << i+1 << " iterations for weights update.";
+        break;
+      }
+
       //ensure that the average of all the weights is 0
       // mean /= nSites;
       // for (size_t k = 0; k < nSites; k++){
@@ -277,7 +280,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
         fracDKarcher.emplace_back(VertexData<double>(mesh, 0));
 
 
-      #pragma omp parallel for
+      #pragma omp parallel for reduction(+:energy)
       for (size_t iSite = 0; iSite < nSites; iSite++) {
 
         int tid = omp_get_thread_num(); // thread ID
@@ -318,7 +321,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
           updateSum += weight * logVal;
           updateWSum += weight;
 
-          // energy += dist * dist * weight; // TODO: use a per-site array to avoid data race
+          energy += dist * dist * weight; // TODO: use a per-site array to avoid data race
         }
 
         //updateSum /= updateWSum;
@@ -335,10 +338,17 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
         siteLocations[iSite] = site;
       }
 
+      H(energy);
+
       // H(totalTime);
-      double sumUpdateNorm = 0;
+      sumUpdateNorm = 0;
       for (int i = 0; i < nSites; i++) sumUpdateNorm += updateNorm[i];
       cout << "sumUpdateNorm = " << sumUpdateNorm << "\t\r" << flush;
+
+      if (sumUpdateNorm < options.eps) {
+        stop = true;
+        break;
+      }
 
       // newSiteLocations.push_back(site);
     }

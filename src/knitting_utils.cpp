@@ -1946,7 +1946,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     posOptions.nSites = std::round(totalPosMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
-    posOptions.iterations = 500;
+    // posOptions.iterations = 500;
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
@@ -1972,7 +1972,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     negOptions.nSites = std::round(totalNegMeasure / period); // we don't care if this is different that posOptions.nSites
     negOptions.useDelaunay = false;
     negOptions.computeDistributions = true;
-    negOptions.iterations = 500;
+    // negOptions.iterations = 500;
     std::cout << "# positive sites " << posOptions.nSites << std::endl;
     std::cout << "# negative sites " << negOptions.nSites << std::endl;
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
@@ -2018,14 +2018,14 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         waleSingularEdgesGlobal[singularEdge] = 1.0;
     }
 
-    // for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
-    //     std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
-    //     std::vector<Vector3> stepPos;
-    //     for (int i = 0; i < steps.size(); i++){
-    //         stepPos.push_back(steps[i].interpolate(globalGeometry.vertexPositions));
-    //     }
-    //     polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos);
-    // }
+    for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
+        std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
+        std::vector<Vector3> stepPos;
+        for (int i = 0; i < steps.size(); i++){
+            stepPos.push_back(steps[i].interpolate(globalGeometry.vertexPositions));
+        }
+        polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos)->setEnabled(false);
+    }
 
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
         SurfacePoint facePoint = negVoronoiCenters.siteLocations[i].inSomeFace();
@@ -3664,10 +3664,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 30; //std::round(avgTotalMeasure / period);
+    posOptions.nSites = std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
-    posOptions.iterations = 500;
+    // posOptions.iterations = 500; // we have a stopping criterion now
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
@@ -3688,12 +3688,23 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         psMesh.addVertexScalarQuantity("positve site distribution " + std::to_string(i), posSiteDistributions[i]);
     }
 
+    for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
+        std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
+        std::vector<Vector3> stepPos;
+        for (int i = 0; i < steps.size(); i++){
+            stepPos.push_back(steps[i].interpolate(globalGeometry.vertexPositions));
+        }
+        polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos)->setEnabled(false);
+    }
+    // polyscope::show();
+
+
    
     VoronoiOptions negOptions = defaultVoronoiOptions;
     negOptions.nSites = posOptions.nSites;
     negOptions.useDelaunay = false;
     negOptions.computeDistributions = true;
-    negOptions.iterations = 500;
+    // negOptions.iterations = 500; // we have a stopping criterion now
     std::cout << "# positive sites " << posOptions.nSites << std::endl;
     std::cout << "# negative sites " << negOptions.nSites << std::endl;
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
