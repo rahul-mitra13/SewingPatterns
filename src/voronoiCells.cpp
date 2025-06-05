@@ -26,22 +26,6 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
   VectorHeatMethodSolver& vSolver = vSolvers[0]; // temporarily, for the serial code
 
 
-
-  auto computeRHS = [&](const std::vector<SurfacePoint>& points) -> VertexData<double> {
-    VertexData<double> rhs(mesh, 0);
-    for (const SurfacePoint& point : points) {
-      SurfacePoint facePoint = point.inSomeFace();
-      Halfedge he = facePoint.face.halfedge();
-
-      rhs[he.vertex()] += facePoint.faceCoords.x;
-      rhs[he.next().vertex()] += facePoint.faceCoords.y;
-      rhs[he.next().next().vertex()] += facePoint.faceCoords.z;
-    }
-
-    return rhs;
-  };
-
-
   // This computes e^(φ_j/4t) δ(x_j) for every site j
   auto computeRHSWithWeights = [&](const std::vector<SurfacePoint>& points, std::vector<double>& weights, double shortTime) -> std::vector<VertexData<double>> {
 
@@ -440,22 +424,6 @@ VoronoiResult alignPointsOnIsoline(SurfaceMesh& mesh, IntrinsicGeometryInterface
   for (int i = 0; i < omp_get_max_threads(); i++)
     vSolvers.emplace_back(geom, options.tCoef);
   VectorHeatMethodSolver& vSolver = vSolvers[0]; // temporarily, for the serial code
-
-
-
-  auto computeRHS = [&](const std::vector<SurfacePoint>& points) -> VertexData<double> {
-    VertexData<double> rhs(mesh, 0);
-    for (const SurfacePoint& point : points) {
-      SurfacePoint facePoint = point.inSomeFace();
-      Halfedge he = facePoint.face.halfedge();
-
-      rhs[he.vertex()] += facePoint.faceCoords.x;
-      rhs[he.next().vertex()] += facePoint.faceCoords.y;
-      rhs[he.next().next().vertex()] += facePoint.faceCoords.z;
-    }
-
-    return rhs;
-  };
 
 
   // This computes e^(φ_j/4t) δ(x_j) for every site j
