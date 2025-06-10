@@ -4400,29 +4400,10 @@ std::vector<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry
                 && he.edge() != negEdge){//we have hit a singular edge and it's not the edge you're currently tracing
                 Edge singularEdge = he.edge();
                 double hitIsoVal = edgeToIsoVal[singularEdge];
-                if (hitIsoVal > isoVal){//if the singularity isovalue is greater than the current isovalue, route "below" the edge
+                if (hitIsoVal > isoVal){//if the current singularity isovalue is lesser than the hit isovalue, route "below" the edge
                     lensHePath[he.getIndex()] = -1.0;
                     lensHePath[he.twin().getIndex()] = -1.0;
-                    // if (timeFunction[singularEdge.halfedge().tailVertex()] < timeFunction[singularEdge.halfedge().tipVertex()]){
-                    //     hePath.push_back(singularEdge.halfedge().twin());
-                    //     hePath.push_back(singularEdge.halfedge());
-                        
-                    // }
-                    // else{
-                    //     hePath.push_back(singularEdge.halfedge());
-                    //     hePath.push_back(singularEdge.halfedge().twin());
-                    // }
                 }
-                // else{//singularity isovalue is greater than the current isovalue, route "above" the edge
-                //     if (timeFunction[singularEdge.halfedge().tailVertex()] < timeFunction[singularEdge.halfedge().tipVertex()]){
-                //         hePath.push_back(singularEdge.halfedge());
-                //         hePath.push_back(singularEdge.halfedge().twin());
-                //     }
-                //     else{
-                //         hePath.push_back(singularEdge.halfedge().twin());
-                //         hePath.push_back(singularEdge.halfedge());
-                //     }
-                // }
             }
 
             Vertex v0 = he.vertex();
@@ -4434,23 +4415,12 @@ std::vector<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry
             if (f0 > isoVal && f1 > isoVal) {
                 hePath.push_back(he.twin());//add the halfedges in the correct direction (TODO: handle case when singular edge is at the top or bottom of the strip)
                 lensHePath[he.getIndex()] = -1.0;
-
                 Edge e = he.edge();
-                // Optional: only add canonical reps to avoid duplicates
-                //result[e] = 1.0;
             }
 
         }
     }
-    
-    // for (Halfedge he : hePath){
-    //     result[he.getIndex()] = 1.0;
-    // }
-
     return lensHePath;
-
-    //return result;
-
 }
 
 
