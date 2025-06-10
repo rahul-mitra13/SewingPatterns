@@ -1399,6 +1399,7 @@ void KnitGraph::writeKnitGraphLineElement(){
     }
 
     outfile.close();
+    std::cout << "wrote knit graph text file " << std::endl;
 }
 
 //trace the short rows in the graph 
