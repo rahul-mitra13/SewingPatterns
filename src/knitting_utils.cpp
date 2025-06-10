@@ -3903,6 +3903,21 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
     model.setSingularEdges(singularEdgesToUse);
 
+    // Set edgeSingularities[e] = ±i, where i is the ordering of the pair in time.
+    // Having the ordering will be useful for constructing the knit graph.
+    std::map<double, std::pair<Edge,Edge>> singularPairsByTime;
+    for (auto &[i1, i2] : singularEdgesToUse) {
+        Edge e1 = globalMesh.edge(i1);
+        Edge e2 = globalMesh.edge(i2);
+        singularPairsByTime[edgeToIsoVal[e1]] = {e1, e2};
+    }
+    int pairIndex = 1;
+    for (auto &[t, p] : singularPairsByTime) {
+        edgeSingularities[p.first] = +pairIndex;
+        edgeSingularities[p.second] = -pairIndex;
+        pairIndex++;
+    }
+
     std::cout << "Set singular edges as constraints " << std::endl;
 
     std::vector<std::pair<std::vector<double>, double>> halfedgePathConstraints;
@@ -4015,7 +4030,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
 
     psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
-    polyscope::show();
+    // polyscope::show();
 
     //model.setEdgePathConstraints(edgePathConstraints);
     model.setHalfedgePathConstraints(halfedgePathConstraints);
