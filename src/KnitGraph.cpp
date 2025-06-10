@@ -586,7 +586,15 @@ void KnitGraph::intrinsicMerge(){
 
     map<int, int> matchings; // -1 means short row
 
-    for (Edge startEdge : (gluedGeometry->mesh).edges()) if (!startEdge.isBoundary() && courseSingularEdgesGlued[startEdge] > 0) {
+    // Order positive edges in decreasing order of time
+    vector<Edge> orderedPosEdges;
+    map<int, Edge, greater<int>> posEdgesByTime;
+    for (Edge edge : (gluedGeometry->mesh).edges()) if (!edge.isBoundary() && courseSingularEdgesGlued[edge] > 0)
+        posEdgesByTime[courseSingularEdgesGlued[edge]] = edge;
+    for (auto &[time,edge] : posEdgesByTime)
+        orderedPosEdges.push_back(edge);
+
+    for (Edge startEdge : orderedPosEdges) {
         // Loop on positive course sings
 
         int startEdgeOrder = round(courseSingularEdgesGlued[startEdge]);
