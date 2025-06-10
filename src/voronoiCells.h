@@ -26,6 +26,7 @@ struct VoronoiOptions {
   double tCoef = 1;                       // diffusion time for vector heat method
   size_t nSubIterations = 1;              // number of iterations to use when computing Karcher means
   double eps = 1e-6;                      // stopping criterion on the sum of Karcher mean updates
+  int seed = 42;                          // random seed for site intialization
   // double epsWeights = 1e-5;               // stopping criterion on the weight optimization gradient norm
 };
 

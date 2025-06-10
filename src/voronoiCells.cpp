@@ -59,7 +59,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
   // }
 
   //use a random seed 
-  std::mt19937 rng(42);
+  std::mt19937 rng(options.seed);
   std::uniform_real_distribution<double> uniform01(0.0, 1.0);
   std::uniform_int_distribution<int> pointTypeDist(0, 2); // 0: vertex, 1: edge, 2: face
   for (size_t i = 0; i < options.nSites; ++i) {
@@ -91,7 +91,6 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
         siteLocations.push_back(pt);
       }
   }
-  //-----------------------------//
 
   geom.requireShapeLengthScale();
   double M = 0; // maximum measure
