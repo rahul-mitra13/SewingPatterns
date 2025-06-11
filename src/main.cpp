@@ -197,24 +197,6 @@ void showStripePatterns(){
                                                                     globalBdyConditions, coursePeriod, V, F, G, courseOneFormGrad, gluedOneRingMap, 
                                                                     allSaddleLoops, homologyGenerators, opts);
     // polyscope::show();//stop execution here to debug
-    // Draw course singular edges as a curve network
-    std::vector<Vector3> courseSingularEdgePointsPos;
-    std::vector<Vector3> courseSingularEdgePointsNeg;
-    std::vector<std::array<int,2>> courseSingularEdgesPos;
-    std::vector<std::array<int,2>> courseSingularEdgesNeg;
-    for (Edge e : globalMesh->edges()) if (courseSingularEdgesGlobal[e] != 0) {
-      if (courseSingularEdgesGlobal[e] > 0) {
-        courseSingularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
-        courseSingularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
-        courseSingularEdgesPos.push_back({(int)courseSingularEdgePointsPos.size()-2, (int)courseSingularEdgePointsPos.size()-1});
-      } else {
-        courseSingularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
-        courseSingularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
-        courseSingularEdgesNeg.push_back({(int)courseSingularEdgePointsNeg.size()-2, (int)courseSingularEdgePointsNeg.size()-1});
-      }
-    }
-    polyscope::registerCurveNetwork("course singular edges (+1)", courseSingularEdgePointsPos, courseSingularEdgesPos)->setRadius(0.001)->setColor({0.5,0.5,0})->setEnabled(false);
-    polyscope::registerCurveNetwork("course singular edges (-1)", courseSingularEdgePointsNeg, courseSingularEdgesNeg)->setRadius(0.001)->setColor({0,0.5,0.5})->setEnabled(false);
     
     std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
                                                                       edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, timeFunctionGlued,
@@ -240,6 +222,33 @@ void showStripePatterns(){
 
   globalPSMesh->addEdgeScalarQuantity("courseSingularEdges", courseSingularEdgesGlobal);
 
+  // Draw course singular edges as a curve network. Sort them by time function order
+  std::vector<Edge> courseSingularEdgePos, courseSingularEdgeNeg;
+  for (Edge e : globalMesh->edges()) if (courseSingularEdgesGlobal[e] != 0) {
+    if (courseSingularEdgesGlobal[e] > 0)
+      courseSingularEdgePos.push_back(e);
+    else
+      courseSingularEdgeNeg.push_back(e);
+  }
+  std::sort(courseSingularEdgePos.begin(), courseSingularEdgePos.end(), [&](Edge& a, Edge& b) { return courseSingularEdgesGlobal[a] < courseSingularEdgesGlobal[b]; });
+  std::sort(courseSingularEdgeNeg.begin(), courseSingularEdgeNeg.end(), [&](Edge& a, Edge& b) { return -courseSingularEdgesGlobal[a] < -courseSingularEdgesGlobal[b]; });
+  std::vector<Vector3> courseSingularEdgePointsPos;
+  std::vector<std::array<int,2>> courseSingularEdgesPos;
+  for (Edge e : courseSingularEdgePos) {
+    courseSingularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
+    courseSingularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
+    courseSingularEdgesPos.push_back({(int)courseSingularEdgePointsPos.size()-2, (int)courseSingularEdgePointsPos.size()-1});
+  }
+  std::vector<Vector3> courseSingularEdgePointsNeg;
+  std::vector<std::array<int,2>> courseSingularEdgesNeg;
+  for (Edge e : courseSingularEdgeNeg) {
+    courseSingularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
+    courseSingularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
+    courseSingularEdgesNeg.push_back({(int)courseSingularEdgePointsNeg.size()-2, (int)courseSingularEdgePointsNeg.size()-1});
+  }
+  polyscope::registerCurveNetwork("course singular edges (+1)", courseSingularEdgePointsPos, courseSingularEdgesPos)->setRadius(0.001)->setColor({0.5,0.5,0})->setEnabled(false);
+  polyscope::registerCurveNetwork("course singular edges (-1)", courseSingularEdgePointsNeg, courseSingularEdgesNeg)->setRadius(0.001)->setColor({0,0.5,0.5})->setEnabled(false);
+
   // Plot stripe values with offset (to debug knit graph)
   FaceData<int> stripeIndicesSigmaCourse(*globalMesh, 0); // face singularities (none)
   std::vector<Vector3> positionsCourse;
@@ -251,25 +260,6 @@ void showStripePatterns(){
   std::tie(positionsCourse, edgesCourse, components) = findStripeConnectedComponents(*globalGeometry, *gluedELG, stripeValuesWithOffset, stripeIndicesSigmaCourse, coursePeriod, edgeMap);
   //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
   polyscope::registerCurveNetwork("course stripes with offset", positionsCourse, edgesCourse)->setRadius(0.0005)->setColor({50.0/255, 205.0/255, 50.0/255})->setEnabled(false);
-
-  // Draw course singular edges as a curve network
-  std::vector<Vector3> courseSingularEdgePointsPos;
-  std::vector<Vector3> courseSingularEdgePointsNeg;
-  std::vector<std::array<int,2>> courseSingularEdgesPos;
-  std::vector<std::array<int,2>> courseSingularEdgesNeg;
-  for (Edge e : globalMesh->edges()) if (courseSingularEdgesGlobal[e] != 0) {
-      if (courseSingularEdgesGlobal[e] > 0) {
-        courseSingularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
-        courseSingularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
-        courseSingularEdgesPos.push_back({(int)courseSingularEdgePointsPos.size()-2, (int)courseSingularEdgePointsPos.size()-1});
-      } else {
-        courseSingularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
-        courseSingularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
-        courseSingularEdgesNeg.push_back({(int)courseSingularEdgePointsNeg.size()-2, (int)courseSingularEdgePointsNeg.size()-1});
-      }
-  }
-  polyscope::registerCurveNetwork("course singular edges (+1)", courseSingularEdgePointsPos, courseSingularEdgesPos)->setRadius(0.001)->setColor({1,0,0})->setEnabled(false);
-  polyscope::registerCurveNetwork("course singular edges (-1)", courseSingularEdgePointsNeg, courseSingularEdgesNeg)->setRadius(0.001)->setColor({0,0,1})->setEnabled(false);
 
   // Plot wale stripe values with offset (to debug knit graph)
   CornerData<double> waleStripeValuesWithOffset(waleStripeValues);
