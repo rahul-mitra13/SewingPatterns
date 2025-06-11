@@ -255,6 +255,7 @@ void revealCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& glue
 double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& globalTimeFunction, 
                                     EdgeData<double>& curl, std::map<int, int>& hashedUsedIsoVals, double stepSize);
 
+
 //@clean 
 //the below two functions use the energy min ||\del sigma - \nabla \sigma_{i - 1} / ||\nabla \sigma_{i - 1}|| ||^2
 //@out  courseOneFormGrad - gradient of the final course 1-form

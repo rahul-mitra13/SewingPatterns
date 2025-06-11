@@ -3378,9 +3378,6 @@ bool isValidEdgePair(VertexPositionGeometry& globalGeometry, EdgeData<double>& e
     return true;
 }
 
-
-
-
 //@clean 
 //the below two functions use the energy min ||\del sigma_i - \nabla \sigma_{i - 1} / ||\nabla \sigma_{i - 1}|| ||^2
 //if i = 1, use \nabla h / ||\nabla h||
@@ -3754,14 +3751,33 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<std::vector<VertexData<double>>> stepSiteDistribution = negVoronoiCenters.stepSiteDistribution;
     std::vector<VertexData<double>> buggySite1Dists = stepSiteDistribution[buggySite1];
     std::vector<VertexData<double>> buggySite2Dists = stepSiteDistribution[buggySite2];
-    for (auto &v : buggySite1Dists){
-        psMesh.addVertexScalarQuantity("evolving distribution", v);
-        polyscope::show();
-        // Sleep for ~30 ms to slow it down (optional)
-        std::this_thread::sleep_for(std::chrono::milliseconds(30));
-    }
-    std::cout << "Done showing distributions for site 1 " << std::endl;
-    polyscope::show();
+
+    // int step = 0;
+    // //write a nested callback to find the number of boundary components to constrain
+    // //Register the callback which creates the UI and does the hard work
+    // auto focusedPopupUI = [&]() {
+    //     static bool showWindow = true;
+    //     ImGui::SetNextWindowSize(ImVec2(1350, 0), ImGuiCond_Once);
+    //     ImGui::Begin("", &showWindow);
+    //     ImGui::PushItemWidth(400);
+    //     ImGui::Separator();
+    //     if (ImGui::InputInt("Time Step", &step));
+    //     if (ImGui::Button("Done"))
+    //         polyscope::popContext();
+    //     ImGui::SameLine();
+    // };
+
+    // polyscope::pushContext(focusedPopupUI);  
+
+
+    // for (auto &v : buggySite1Dists){
+    //     psMesh.addVertexScalarQuantity("evolving distribution", v);
+    //     polyscope::show();
+    //     // Sleep for ~30 ms to slow it down (optional)
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    // }
+    // std::cout << "Done showing distributions for site 1 " << std::endl;
+    // polyscope::show();
 
 
     //perform optimal matching using all the surface points directly
