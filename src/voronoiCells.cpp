@@ -115,6 +115,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
 
   VoronoiResult result;
   result.steps.resize(nSites);
+  result.stepSiteDistribution.resize(nSites);
 
   //trying to find equal mass power cells 
   size_t descIter = 1000;
@@ -211,7 +212,6 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
         // }
 
         //normalize and weigh the distibution by the curl measure 
-        //also integrate lol
         double updateWSum = 0.0;
         for (Vertex v : mesh.vertices()) {
           fracDWeights[tid][v] *= (geom.vertexDualAreas[v] * measure[v]) / normD[v];//multiplying by area (density -> mass)
@@ -259,7 +259,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
       //   newPhiWeights[k] -= mean;
       // }
       // phiWeights = newPhiWeights;
-    }
+    }//end of gradient descent
 
     cout << endl;
 
@@ -352,6 +352,8 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
         site = traceResult.endPoint;
         //viz the path it's taking 
         result.steps[iSite].push_back(site);
+        //viz the distribution at every step
+        result.stepSiteDistribution[iSite].push_back(fracDKarcher[tid]);
 
         siteLocations[iSite] = site;
       }
@@ -653,7 +655,7 @@ VoronoiResult alignPointsOnIsoline(SurfaceMesh& mesh, IntrinsicGeometryInterface
       //   newPhiWeights[k] -= mean;
       // }
       // phiWeights = newPhiWeights;
-    }
+    }//end of gradient of descent
 
     cout << endl;
 

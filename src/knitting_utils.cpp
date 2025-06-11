@@ -3664,7 +3664,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 30; //std::round(avgTotalMeasure / period);
+    posOptions.nSites = 40; //std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     posOptions.seed = 42;
@@ -3673,8 +3673,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
        positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+       polyscope::registerPointCloud("unaligned site (+) " + std::to_string(i), std::vector<Vector3>{posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions)});
     }
-    polyscope::registerPointCloud("Voronoi sites (+)", positiveCenters)->setEnabled(false);
+    polyscope::registerPointCloud("Voronoi sites aligned (+)", positiveCenters)->setEnabled(false);
     std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
 
     //print the positive masses
@@ -3686,7 +3687,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             }
         }
         std::cout << "positive mass at site " << i << " = " << mass << std::endl;
-        psMesh.addVertexScalarQuantity("positve site distribution " + std::to_string(i), posSiteDistributions[i]);
+        psMesh.addVertexScalarQuantity("unaligned site distribution (+) " + std::to_string(i), posSiteDistributions[i]);
     }
 
     for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
@@ -3697,10 +3698,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         }
         polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos)->setEnabled(false);
     }
-    // polyscope::show();
-
-
-   
+    
     VoronoiOptions negOptions = defaultVoronoiOptions;
     negOptions.nSites = posOptions.nSites;
     negOptions.useDelaunay = false;
@@ -3713,8 +3711,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<Vector3> negativeCenters;
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
        negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+       polyscope::registerPointCloud("unaligned site (-) " + std::to_string(i), std::vector<Vector3>{negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions)});
     }
-    polyscope::registerPointCloud("Voronoi sites (-)", negativeCenters)->setEnabled(false);
+    polyscope::registerPointCloud("Voronoi sites unaligned (-)", negativeCenters)->setEnabled(false);
     std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
 
     //print the negative masses
@@ -3726,8 +3725,44 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             }
         }
         std::cout << "negative mass at site " << i << " = " << mass << std::endl;
-        psMesh.addVertexScalarQuantity("negative site distribution (course)" + std::to_string(i), negSiteDistributions[i]);
+        psMesh.addVertexScalarQuantity("unaligned site distribution (-) " + std::to_string(i), negSiteDistributions[i]);
     }
+
+    //query the steps the buggy sites are taking
+    std::vector<std::vector<SurfacePoint>> steps = negVoronoiCenters.steps;
+    int buggySite1 = 20;
+    int buggySite2 = 29;
+    std::vector<Vector3> buggyPoints1;
+    std::vector<std::array<int, 2>> buggyEdges1;
+    std::vector<Vector3> buggyPoints2;
+    std::vector<std::array<int, 2>> buggyEdges2;
+    for (auto s : steps[buggySite1]){
+        buggyPoints1.push_back(s.interpolate(globalGeometry.vertexPositions));
+    }
+    for (auto s : steps[buggySite2]){
+        buggyPoints2.push_back(s.interpolate(globalGeometry.vertexPositions));
+    }
+    for (int i = 0; i + 1 < buggyPoints1.size(); ++i){
+        buggyEdges1.push_back({i, i + 1});
+    }
+    for (int i = 0; i + 1 < buggyPoints2.size(); ++i){
+        buggyEdges2.push_back({i, i + 1});
+    }
+    polyscope::registerPointCloud("site 20 trajectory ", buggyPoints1)->setEnabled(false);
+    polyscope::registerPointCloud("site 29 trajectory ", buggyPoints2)->setEnabled(false);
+
+    std::vector<std::vector<VertexData<double>>> stepSiteDistribution = negVoronoiCenters.stepSiteDistribution;
+    std::vector<VertexData<double>> buggySite1Dists = stepSiteDistribution[buggySite1];
+    std::vector<VertexData<double>> buggySite2Dists = stepSiteDistribution[buggySite2];
+    for (auto &v : buggySite1Dists){
+        psMesh.addVertexScalarQuantity("evolving distribution", v);
+        polyscope::show();
+        // Sleep for ~30 ms to slow it down (optional)
+        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    }
+    std::cout << "Done showing distributions for site 1 " << std::endl;
+    polyscope::show();
+
 
     //perform optimal matching using all the surface points directly
     // std::vector<std::pair<SurfacePoint, int>> allSites;
@@ -3787,36 +3822,27 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         polyscope::registerPointCloud("matched SPs " + std::to_string(i), matchedSP)->setEnabled(false);
     }
     alignmentOptions.pairedSites = matchedSurfacePoints;
-    //show sites before alignment
-    for (int i = 0; i < alignmentOptions.pairedSites.size(); i++){
-        auto [s1, s2] = alignmentOptions.pairedSites[i];
-        Vector3 p1 = {s1.interpolate(globalGeometry.vertexPositions)};
-        Vector3 p2 = {s2.interpolate(globalGeometry.vertexPositions)};
-        polyscope::registerPointCloud("site unaligned (+) " + std::to_string(i), std::vector<Vector3>{p1});
-        polyscope::registerPointCloud("site unaligned (-) " + std::to_string(i), std::vector<Vector3>{p2});
-    }
-
     alignmentOptions.usingPosCurl = true;
     alignmentOptions.iterations = 2500;
     alignmentOptions.lambda = 1.0;
     alignPointsOnIsolineFast(globalMesh, globalGeometry, alignmentOptions, psMesh);
 
     // Plot aligned singularities
-    std::vector<Vector3> alignedPosCenters, alignedNegCenters;
-    for (auto &[s1,s2] : alignmentOptions.pairedSites) {
-        alignedPosCenters.push_back(s1.interpolate(globalGeometry.vertexPositions));
-        alignedNegCenters.push_back(s2.interpolate(globalGeometry.vertexPositions));
-    }
-    polyscope::registerPointCloud("Voronoi sites aligned (+)", alignedPosCenters)->setEnabled(false);
-    polyscope::registerPointCloud("Voronoi sites aligned (-)", alignedNegCenters)->setEnabled(false);
+    // std::vector<Vector3> alignedPosCenters, alignedNegCenters;
+    // for (auto &[s1,s2] : alignmentOptions.pairedSites) {
+    //     alignedPosCenters.push_back(s1.interpolate(globalGeometry.vertexPositions));
+    //     alignedNegCenters.push_back(s2.interpolate(globalGeometry.vertexPositions));
+    // }
+    // polyscope::registerPointCloud("Voronoi sites aligned (+)", alignedPosCenters)->setEnabled(false);
+    // polyscope::registerPointCloud("Voronoi sites aligned (-)", alignedNegCenters)->setEnabled(false);
 
-    for (int i = 0; i < alignmentOptions.pairedSites.size(); i++){
-        auto [s1, s2] = alignmentOptions.pairedSites[i];
-        Vector3 p1 = {s1.interpolate(globalGeometry.vertexPositions)};
-        Vector3 p2 = {s2.interpolate(globalGeometry.vertexPositions)};
-        // polyscope::registerPointCloud("site aligned (+) " + std::to_string(i), std::vector<Vector3>{p1});
-        // polyscope::registerPointCloud("site aligned (-) " + std::to_string(i), std::vector<Vector3>{p2});
-    }
+    // for (int i = 0; i < alignmentOptions.pairedSites.size(); i++){
+    //     auto [s1, s2] = alignmentOptions.pairedSites[i];
+    //     Vector3 p1 = {s1.interpolate(globalGeometry.vertexPositions)};
+    //     Vector3 p2 = {s2.interpolate(globalGeometry.vertexPositions)};
+    //     polyscope::registerPointCloud("site aligned (+) " + std::to_string(i), std::vector<Vector3>{p1});
+    //     polyscope::registerPointCloud("site aligned (-) " + std::to_string(i), std::vector<Vector3>{p2});
+    // }
 
     // // Old approach using gradient descent to align centers
     // VoronoiResult posAlignedCenters = alignPointsOnIsoline(globalMesh, globalGeometry, alignmentOptions, posMeasure, psMesh);
@@ -3829,6 +3855,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::map<Edge, double> edgeToIsoVal;
 
     //now appropriatately specify the singular edges
+    //this relies on the assumption that 2 singular sites (surface points) don't end up on the same face 
+    //Even if they end up on adjacent faces, we shouldn't select the same edges 
+    //If the algorithm runs to convergence, we shouldn't be getting singularities so close together
+    //But we clearly run into issues where the above happens 
     for (auto &[posSite,negSite] : alignmentOptions.pairedSites) {
     // for (int i = 0; i < posAlignedCenters.siteLocations.size(); i++){
         
