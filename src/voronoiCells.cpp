@@ -48,14 +48,48 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
 
   // Set points to start
   std::vector<SurfacePoint> siteLocations = options.initialSites;
-  if (siteLocations.empty()) {
-    for (size_t i = 0; i < options.nSites; i++) {
-      Face startF = mesh.face(randomIndex(mesh.nFaces()));
-      double u = unitRand();
-      Vector3 bCoord{u, 0.5 * (1.0 - u), 0.5 * (1.0 - u)};
-      SurfacePoint fp{startF, bCoord};
-      siteLocations.push_back(fp);
-    }
+  // if (siteLocations.empty()) {
+  //   for (size_t i = 0; i < options.nSites; i++) {
+  //     Face startF = mesh.face(randomIndex(mesh.nFaces()));
+  //     double u = unitRand();
+  //     Vector3 bCoord{u, 0.5 * (1.0 - u), 0.5 * (1.0 - u)};
+  //     SurfacePoint fp{startF, bCoord};
+  //     siteLocations.push_back(fp);
+  //   }
+  // }
+
+  //use a random seed 
+  std::mt19937 rng(options.seed);
+  std::uniform_real_distribution<double> uniform01(0.0, 1.0);
+  std::uniform_int_distribution<int> pointTypeDist(0, 2); // 0: vertex, 1: edge, 2: face
+  for (size_t i = 0; i < options.nSites; ++i) {
+      int type = pointTypeDist(rng);
+
+      if (type == 0) {
+        // Random vertex
+        Vertex v = mesh.vertex(rng() % mesh.nVertices());
+        siteLocations.emplace_back(v);
+      } else if (type == 1) {
+        // Random edge interior
+        Edge e = mesh.edge(rng() % mesh.nEdges());
+        double t = uniform01(rng); // interpolation along the edge
+        siteLocations.emplace_back(e, t);
+      } else if (type == 2) {
+        // Random face interior
+        Face f = mesh.face(rng() % mesh.nFaces());
+
+        // Random barycentric coordinates
+        double u = uniform01(rng);
+        double v = uniform01(rng);
+        if (u + v > 1.0) {
+          u = 1.0 - u;
+          v = 1.0 - v;
+        }
+        double w = 1.0 - u - v;
+        Halfedge he = f.halfedge();
+        SurfacePoint pt(f, Vector3{u, v, w}); // SurfacePoint using barycentric coords in a triangle
+        siteLocations.push_back(pt);
+      }
   }
 
   geom.requireShapeLengthScale();

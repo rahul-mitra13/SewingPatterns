@@ -3667,6 +3667,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     posOptions.nSites = 30; //std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
+    posOptions.seed = 42;
     // posOptions.iterations = 500; // we have a stopping criterion now
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
     std::vector<Vector3> positiveCenters;
@@ -3704,6 +3705,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     negOptions.nSites = posOptions.nSites;
     negOptions.useDelaunay = false;
     negOptions.computeDistributions = true;
+    negOptions.seed = 42;
     // negOptions.iterations = 500; // we have a stopping criterion now
     std::cout << "# positive sites " << posOptions.nSites << std::endl;
     std::cout << "# negative sites " << negOptions.nSites << std::endl;
@@ -3785,6 +3787,15 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         polyscope::registerPointCloud("matched SPs " + std::to_string(i), matchedSP)->setEnabled(false);
     }
     alignmentOptions.pairedSites = matchedSurfacePoints;
+    //show sites before alignment
+    for (int i = 0; i < alignmentOptions.pairedSites.size(); i++){
+        auto [s1, s2] = alignmentOptions.pairedSites[i];
+        Vector3 p1 = {s1.interpolate(globalGeometry.vertexPositions)};
+        Vector3 p2 = {s2.interpolate(globalGeometry.vertexPositions)};
+        polyscope::registerPointCloud("site unaligned (+) " + std::to_string(i), std::vector<Vector3>{p1});
+        polyscope::registerPointCloud("site unaligned (-) " + std::to_string(i), std::vector<Vector3>{p2});
+    }
+
     alignmentOptions.usingPosCurl = true;
     alignmentOptions.iterations = 2500;
     alignmentOptions.lambda = 1.0;
@@ -3799,7 +3810,15 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     polyscope::registerPointCloud("Voronoi sites aligned (+)", alignedPosCenters)->setEnabled(false);
     polyscope::registerPointCloud("Voronoi sites aligned (-)", alignedNegCenters)->setEnabled(false);
 
-    // // Old approach using gradient descent
+    for (int i = 0; i < alignmentOptions.pairedSites.size(); i++){
+        auto [s1, s2] = alignmentOptions.pairedSites[i];
+        Vector3 p1 = {s1.interpolate(globalGeometry.vertexPositions)};
+        Vector3 p2 = {s2.interpolate(globalGeometry.vertexPositions)};
+        // polyscope::registerPointCloud("site aligned (+) " + std::to_string(i), std::vector<Vector3>{p1});
+        // polyscope::registerPointCloud("site aligned (-) " + std::to_string(i), std::vector<Vector3>{p2});
+    }
+
+    // // Old approach using gradient descent to align centers
     // VoronoiResult posAlignedCenters = alignPointsOnIsoline(globalMesh, globalGeometry, alignmentOptions, posMeasure, psMesh);
 
     //store the paired time functions
@@ -3865,7 +3884,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //TO-DO: * ensure edge singularities lie in the same cylindrical compononent
     //       * ensure the average isovalue passes through both faces
     std::vector<int> indicesToUse; 
-    std::vector<int> indicesToRemove;
     for (int i = 0; i < singularEdges.size(); i++){
         auto p = singularEdges[i];
         auto timeFuncPair = pairedTimeFunctions[i];
@@ -3887,16 +3905,12 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             edgeIndices[p.second] = 0.0;
             edgeSingularities[posEdge] = 0.0;
             edgeSingularities[negEdge] = 0.0;
-            indicesToRemove.push_back(i);
         }
     }
 
-    std::cout << "Finished aligning the sites " << std::endl;
-    //set the singular edges where path exists
-    //this is where the weird blotches in the knit graph come from
-    //we are setting constraints using these singular edges but not using some of them 
-    //when specifying the edge indices
+    std::cout << "Number of singularity pairs missing = " << posOptions.nSites - indicesToUse.size() << std::endl;
 
+    //set the singular edges where path exists
     std::vector<std::pair<int, int>> singularEdgesToUse;
     for (int i : indicesToUse){
         singularEdgesToUse.push_back(singularEdges[i]);
@@ -4017,15 +4031,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //visualize halfedge paths
     for (int i = 0; i < halfedgePathConstraints.size(); i++){
         auto p = halfedgePathConstraints[i].first;
-        std::vector<Vector3> pos;
-        for (int j = 0; j < p.size(); j++){
-            if (std::fabs(p[j]) > 1e-8){
-                Vector3 p1 = globalGeometry.vertexPositions[globalMesh.halfedge(j).tailVertex()];
-                Vector3 p2 = globalGeometry.vertexPositions[globalMesh.halfedge(j).tipVertex()];
-                pos.push_back(p1);
-                pos.push_back(p2);
-            }
-        }
         psMesh.addHalfedgeScalarQuantity("halfedge path edges " + std::to_string(i), p);
     }
 
@@ -4036,6 +4041,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     model.setHalfedgePathConstraints(halfedgePathConstraints);
     model.setEdgeIndices(edgeIndices);
     model.setHomologyGenerators(homologyGenerators);
+
+    polyscope::show();
+
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
     //plot the stripes
     std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
