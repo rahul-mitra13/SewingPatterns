@@ -585,6 +585,7 @@ void KnitGraph::intrinsicMerge(){
     // If not, we connect it across in a way that respects the ordering.
 
     map<int, int> matchings; // -1 means short row
+    vector<Edge> processedEdges; // for debugging
 
     // Order positive edges in decreasing order of time
     vector<Edge> orderedPosEdges;
@@ -597,6 +598,8 @@ void KnitGraph::intrinsicMerge(){
     for (Edge startEdge : orderedPosEdges) {
         // Loop on positive course sings
 
+        processedEdges.push_back(startEdge);
+
         int startEdgeOrder = round(courseSingularEdgesGlued[startEdge]);
 
         std::vector<knitGraphVertex> he1Vertices = halfedgeCourseVertices[startEdge.halfedge()];
@@ -606,71 +609,88 @@ void KnitGraph::intrinsicMerge(){
 
         ensure(he2Vertices.size() - he1Vertices.size() == 1);
 
-        // Pick the first unmatched vertex on he2Vertices
-        knitGraphVertex startVertex;
-        for (knitGraphVertex &v : he2Vertices) {
-            if (!matchings.count(v.id)) {
-                startVertex = v;
-                break;
-            }
-        }
-        matchings[startVertex.id] = -1;
+        bool success = false;
+        while (!success) {
 
-        // Trace short row. Now that we go in the direction of row_in (== right)!
-        knitGraphVertex walker = startVertex;
-        ensure(walker.row_in != -1);
-        while (true) {
-
-            if (walker.row_in == -1) {
-                // We hit a singular edge
-                ensure(walker.isVirtual); // walker must be virtual
-                ensure(!matchings.count(walker.id)); // walker must be unmatched
-                ensure(walker.edge.has_value());
-
-                Edge edge = walker.edge.value();
-                int edgeOrder = round(courseSingularEdgesGlued[edge]);
-
-                if (edgeOrder == -startEdgeOrder) {
-                    // It's a match! We're done
-                    matchings[walker.id] = -1;
+            // Pick the first unmatched vertex on he2Vertices
+            knitGraphVertex startVertex;
+            for (knitGraphVertex &v : he2Vertices) {
+                if (!matchings.count(v.id)) {
+                    startVertex = v;
                     break;
-                } else {
-                    // We need to cross this edge. Above or below?
-                    std::vector<knitGraphVertex> leftVertices = halfedgeCourseVertices[edge.halfedge()];
-                    std::vector<knitGraphVertex> rightVertices = halfedgeCourseVertices[edge.halfedge().twin()];
+                }
+            }
+            matchings[startVertex.id] = -1;
 
-                    if (sgn((int)rightVertices.size() - (int)leftVertices.size()) != sgn(edgeOrder))
-                        swap(leftVertices, rightVertices);
-                    ensure(sgn((int)rightVertices.size() - (int)leftVertices.size()) == sgn(edgeOrder)); // make sure the sides are correct!
+            // Trace short row. Now that we go in the direction of row_in (== right)!
+            knitGraphVertex walker = startVertex;
+            ensure(walker.row_in != -1);
+            while (true) {
 
-                    // Find index along half-edge
-                    int indexAlongHalfedge = -1;
-                    for (int i = 0; i < leftVertices.size(); i++) {
-                        if (leftVertices[i].id == walker.id) {
-                            indexAlongHalfedge = i;
+                if (walker.row_in == -1) {
+                    // We hit a singular edge
+                    ensure(walker.isVirtual); // walker must be virtual
+
+                    // if (matchings.count(walker.id)) {
+                    //     polyscope::registerPointCloud("matched walker", vector<Vector3>{startVertex.position, walker.position});
+                    //     showEdges("processedEdges", processedEdges, *globalGeometry);
+                    //     H(matchings[walker.id]);
+                    //     H(startVertex.id);
+                    //     polyscope::show();
+                    // }
+
+                    ensure(!matchings.count(walker.id)); // walker must be unmatched
+                    ensure(walker.edge.has_value());
+
+                    Edge edge = walker.edge.value();
+                    int edgeOrder = round(courseSingularEdgesGlued[edge]);
+
+                    if (edgeOrder == -startEdgeOrder) {
+                        // It's a match! We're done
+                        matchings[walker.id] = -1;
+                        success = true;
+                        break;
+                    } else {
+                        // We need to cross this edge. Above or below?
+                        std::vector<knitGraphVertex> leftVertices = halfedgeCourseVertices[edge.halfedge()];
+                        std::vector<knitGraphVertex> rightVertices = halfedgeCourseVertices[edge.halfedge().twin()];
+
+                        if (sgn((int)rightVertices.size() - (int)leftVertices.size()) != sgn(edgeOrder))
+                            swap(leftVertices, rightVertices);
+                        ensure(sgn((int)rightVertices.size() - (int)leftVertices.size()) == sgn(edgeOrder)); // make sure the sides are correct!
+
+                        // Find index along half-edge
+                        int indexAlongHalfedge = -1;
+                        for (int i = 0; i < leftVertices.size(); i++) {
+                            if (leftVertices[i].id == walker.id) {
+                                indexAlongHalfedge = i;
+                                break;
+                            }
+                        }
+
+                        knitGraphVertex connectTo;
+                        if (abs(edgeOrder) > startEdgeOrder) {
+                            // Go below
+                            connectTo = rightVertices[rightVertices.size()-1-indexAlongHalfedge];
+                        } else {
+                            // Go above (also happens if we looped to the starting edge)
+                            connectTo = rightVertices[leftVertices.size()-1-indexAlongHalfedge];
+                        }
+                        matchings[walker.id] = connectTo.id;
+                        matchings[connectTo.id] = walker.id;
+                        walker = connectTo;
+                        if (edgeOrder == startEdgeOrder) {
+                            // We looped around! Break and continue onto the next short row candidate
                             break;
                         }
                     }
-
-                    knitGraphVertex connectTo;
-                    if (abs(edgeOrder) > startEdgeOrder) {
-                        // Go below
-                        connectTo = rightVertices[rightVertices.size()-1-indexAlongHalfedge];
-                    } else {
-                        // Go above
-                        connectTo = rightVertices[leftVertices.size()-1-indexAlongHalfedge];
-                    }
-                    matchings[walker.id] = connectTo.id;
-                    matchings[connectTo.id] = walker.id;
-                    walker = connectTo;
+                } else {
+                    walker = vertices[walker.row_in];
                 }
-            } else {
-                walker = vertices[walker.row_in];
+
             }
 
         }
-
-
     }
 
 
