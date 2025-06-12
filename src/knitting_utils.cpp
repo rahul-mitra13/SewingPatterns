@@ -3670,7 +3670,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
        positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-       polyscope::registerPointCloud("unaligned site (+) " + std::to_string(i), std::vector<Vector3>{posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions)});
+       polyscope::registerPointCloud("unaligned site (+) " + std::to_string(i), std::vector<Vector3>{posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions)})->setEnabled(false);
     }
     polyscope::registerPointCloud("Voronoi sites aligned (+)", positiveCenters)->setEnabled(false);
     std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
@@ -3708,7 +3708,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<Vector3> negativeCenters;
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
        negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-       polyscope::registerPointCloud("unaligned site (-) " + std::to_string(i), std::vector<Vector3>{negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions)});
+       polyscope::registerPointCloud("unaligned site (-) " + std::to_string(i), std::vector<Vector3>{negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions)})->setEnabled(false);
     }
     polyscope::registerPointCloud("Voronoi sites unaligned (-)", negativeCenters)->setEnabled(false);
     std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
@@ -3752,34 +3752,31 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<VertexData<double>> buggySite1Dists = stepSiteDistribution[buggySite1];
     std::vector<VertexData<double>> buggySite2Dists = stepSiteDistribution[buggySite2];
 
-    // int step = 0;
-    // //write a nested callback to find the number of boundary components to constrain
-    // //Register the callback which creates the UI and does the hard work
-    // auto focusedPopupUI = [&]() {
-    //     static bool showWindow = true;
-    //     ImGui::SetNextWindowSize(ImVec2(1350, 0), ImGuiCond_Once);
-    //     ImGui::Begin("", &showWindow);
-    //     ImGui::PushItemWidth(400);
-    //     ImGui::Separator();
-    //     if (ImGui::InputInt("Time Step", &step));
-    //     if (ImGui::Button("Done"))
-    //         polyscope::popContext();
-    //     ImGui::SameLine();
-    // };
-
-    // polyscope::pushContext(focusedPopupUI);  
-
-
-    // for (auto &v : buggySite1Dists){
-    //     psMesh.addVertexScalarQuantity("evolving distribution", v);
-    //     polyscope::show();
-    //     // Sleep for ~30 ms to slow it down (optional)
-    //     std::this_thread::sleep_for(std::chrono::milliseconds(30));
-    // }
-    // std::cout << "Done showing distributions for site 1 " << std::endl;
-    // polyscope::show();
-
-
+    
+    //write a nested callback to debug the evolution of our method
+    //Register the callback which creates the UI and does the hard work
+    int step;
+    int iSite;
+    auto focusedPopupUI = [&](){
+        static bool showWindow = true;
+        ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
+        ImGui::Begin("Debug", &showWindow);
+        ImGui::PushItemWidth(400);
+        ImGui::Separator();
+        ImGui::InputInt("Site", &iSite);
+        ImGui::InputInt("Time Step", &step);
+        // Clamp to bounds after user input
+        iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
+        step = std::clamp(step, 0, static_cast<int>(stepSiteDistribution[iSite].size() - 1));
+        //need setEnabled(true) otherwise we run into OpenGL errors? weird
+        psMesh.addVertexScalarQuantity("distribution", stepSiteDistribution[iSite][step])->setEnabled(true);
+        polyscope::registerPointCloud("site ", std::vector<Vector3>{steps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+        if (ImGui::Button("Done"))
+            polyscope::popContext();
+        ImGui::SameLine();
+    };
+    polyscope::pushContext(focusedPopupUI);  
+    
     //perform optimal matching using all the surface points directly
     // std::vector<std::pair<SurfacePoint, int>> allSites;
     // for (SurfacePoint s : posVoronoiCenters.siteLocations){
