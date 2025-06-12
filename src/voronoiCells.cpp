@@ -48,16 +48,6 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
 
   // Set points to start
   std::vector<SurfacePoint> siteLocations = options.initialSites;
-  // if (siteLocations.empty()) {
-  //   for (size_t i = 0; i < options.nSites; i++) {
-  //     Face startF = mesh.face(randomIndex(mesh.nFaces()));
-  //     double u = unitRand();
-  //     Vector3 bCoord{u, 0.5 * (1.0 - u), 0.5 * (1.0 - u)};
-  //     SurfacePoint fp{startF, bCoord};
-  //     siteLocations.push_back(fp);
-  //   }
-  // }
-
   //use a random seed 
   std::mt19937 rng(options.seed);
   std::uniform_real_distribution<double> uniform01(0.0, 1.0);
