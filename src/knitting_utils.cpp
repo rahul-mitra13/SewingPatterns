@@ -3672,6 +3672,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
        positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
        polyscope::registerPointCloud("unaligned site (+) " + std::to_string(i), std::vector<Vector3>{posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions)})->setEnabled(false);
     }
+
+
     polyscope::registerPointCloud("Voronoi sites aligned (+)", positiveCenters)->setEnabled(false);
     std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
 
@@ -3771,6 +3773,14 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //need setEnabled(true) otherwise we run into OpenGL errors? weird
         psMesh.addVertexScalarQuantity("distribution", stepSiteDistribution[iSite][step])->setEnabled(true);
         polyscope::registerPointCloud("site ", std::vector<Vector3>{steps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+
+        //should do this outside the ImGUI
+        // std::vector<Vector3> currentSites; 
+        // for (int i = 0; i < posOptions.nSites; i++){
+        //     currentSites.push_back(steps[i][step].interpolate(globalGeometry.vertexPositions));
+        // }
+        // polyscope::registerPointCloud("all sites", currentSites);
+
         if (ImGui::Button("Done"))
             polyscope::popContext();
         ImGui::SameLine();

@@ -175,7 +175,7 @@ void showStripePatterns(){
   // polyscope::show();
 
   std::string richDataFile;
-  //richDataFile = "split_seed0.ply";
+  //richDataFile = "info.ply";
 
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
@@ -321,6 +321,7 @@ void showStripePatterns(){
   // waleStripes -> setEnabled(false);
 
 
+  polyscope::show();
   // generate the knit graph
   graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
                       courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,

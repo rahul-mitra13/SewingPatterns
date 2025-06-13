@@ -24,7 +24,7 @@ struct VoronoiOptions {
   double stepSize = 1.0;                    // step size for steps towards cell centers
   bool useDelaunay = true;                // solve on an intrinsic Delaunay triangulation of the input
   bool computeDistributions = false;      // return the indicator functions for each cell (`result.siteDistributions`)
-  double tCoef = 1;                       // diffusion time for vector heat method
+  double tCoef = 1.0;                       // diffusion time for vector heat method
   size_t nSubIterations = 1;              // number of iterations to use when computing Karcher means
   double eps = 1e-6;                      // stopping criterion on the sum of Karcher mean updates
   int seed = 42;                          // random seed for site intialization
