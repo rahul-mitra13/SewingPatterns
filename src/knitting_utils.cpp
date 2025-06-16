@@ -3544,20 +3544,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     double maxDotProd = maximumDotProduct(globalGeometry, rotatedFaceGradients);
     HalfedgeData<double> gluedHeWeights = constructGluedHalfedgeWeights(globalGeometry, gluedGeometry, rotatedFaceGradients, maxDotProd);
 
-    //masked vertex for bent cylinder masking experiment/figure
-    // std::vector<int> maskedVerticesIds = {2624, 2620, 624, 2824, 2820, 2816, 2812, 528, 3016, 3012, 3008, 525,
-    //                               526, 527, 52, 620, 621, 622, 623, 64, 716, 717, 2643, 2639, 619, 2843, 2839, 2835, 
-    //                               2831, 523, 3035, 3031, 3027, 3026, 3030, 3034, 522, 2830, 2834, 2838, 2842, 618, 2638, 2642, 
-    //                               2641, 2637, 617, 2841, 2837, 2833, 2820, 521, 3033, 3029, 3024, 3028, 3032, 520, 2828, 2832, 2836, 2840, 616,
-    //                               2636, 2640, 2829, 3025};
-    // VertexData<double> maskedVertices(globalMesh, 0.0);
-    // for (int v : maskedVerticesIds){
-    //     maskedVertices[v] = 1.0;
-    //     //add the masked vertices to the heat sources
-    //     heatSourceVerts.push_back(gluedMesh.vertex(vertexMap[v]));
-    // }
-    // psMesh.addVertexScalarQuantity("masked vertices", maskedVertices)
-
 
     //handle saddle loops in the intrinsic setting
     // for(int i = 0; i < allSaddleLoops.size(); i++){
@@ -3661,12 +3647,16 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 40; //std::round(avgTotalMeasure / period);
+    posOptions.nSites = std::round(avgTotalMeasure / period);
+    std::cout << "number of sings = " << posOptions.nSites << std::endl;
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     posOptions.seed = 42;
     // posOptions.iterations = 500; // we have a stopping criterion now
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
+    std::vector<std::vector<VertexData<double>>> posStepSiteDistribution = posVoronoiCenters.stepSiteDistribution;
+    std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
+    std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
        positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
@@ -3674,7 +3664,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
 
 
-    polyscope::registerPointCloud("Voronoi sites aligned (+)", positiveCenters)->setEnabled(false);
+    polyscope::registerPointCloud("Voronoi sites unaligned (+)", positiveCenters)->setEnabled(false);
     std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
 
     //print the positive masses
@@ -3697,6 +3687,13 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         }
         polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos)->setEnabled(false);
     }
+
+    for (int i = 0; i < posInitialSites.size(); i++){
+        Vector3 p = posInitialSites[i].interpolate(globalGeometry.vertexPositions);
+        polyscope::registerPointCloud("site " + std::to_string(i) + " initialization ", std::vector<Vector3>{p})->setEnabled(false);
+    }
+
+
     
     VoronoiOptions negOptions = defaultVoronoiOptions;
     negOptions.nSites = posOptions.nSites;
@@ -3707,6 +3704,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::cout << "# positive sites " << posOptions.nSites << std::endl;
     std::cout << "# negative sites " << negOptions.nSites << std::endl;
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
+    std::vector<std::vector<VertexData<double>>> negStepSiteDistribution = negVoronoiCenters.stepSiteDistribution;
+    std::vector<std::vector<SurfacePoint>> negSteps = negVoronoiCenters.steps;
     std::vector<Vector3> negativeCenters;
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
        negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
@@ -3726,39 +3725,12 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         std::cout << "negative mass at site " << i << " = " << mass << std::endl;
         psMesh.addVertexScalarQuantity("unaligned site distribution (-) " + std::to_string(i), negSiteDistributions[i]);
     }
-
-    //query the steps the buggy sites are taking
-    std::vector<std::vector<SurfacePoint>> steps = negVoronoiCenters.steps;
-    int buggySite1 = 20;
-    int buggySite2 = 29;
-    std::vector<Vector3> buggyPoints1;
-    std::vector<std::array<int, 2>> buggyEdges1;
-    std::vector<Vector3> buggyPoints2;
-    std::vector<std::array<int, 2>> buggyEdges2;
-    for (auto s : steps[buggySite1]){
-        buggyPoints1.push_back(s.interpolate(globalGeometry.vertexPositions));
-    }
-    for (auto s : steps[buggySite2]){
-        buggyPoints2.push_back(s.interpolate(globalGeometry.vertexPositions));
-    }
-    for (int i = 0; i + 1 < buggyPoints1.size(); ++i){
-        buggyEdges1.push_back({i, i + 1});
-    }
-    for (int i = 0; i + 1 < buggyPoints2.size(); ++i){
-        buggyEdges2.push_back({i, i + 1});
-    }
-    polyscope::registerPointCloud("site 20 trajectory ", buggyPoints1)->setEnabled(false);
-    polyscope::registerPointCloud("site 29 trajectory ", buggyPoints2)->setEnabled(false);
-
-    std::vector<std::vector<VertexData<double>>> stepSiteDistribution = negVoronoiCenters.stepSiteDistribution;
-    std::vector<VertexData<double>> buggySite1Dists = stepSiteDistribution[buggySite1];
-    std::vector<VertexData<double>> buggySite2Dists = stepSiteDistribution[buggySite2];
-
     
+
     //write a nested callback to debug the evolution of our method
     //Register the callback which creates the UI and does the hard work
-    int step;
-    int iSite;
+    int step = 0;
+    int iSite = 0;
     auto focusedPopupUI = [&](){
         static bool showWindow = true;
         ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
@@ -3769,10 +3741,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         ImGui::InputInt("Time Step", &step);
         // Clamp to bounds after user input
         iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
-        step = std::clamp(step, 0, static_cast<int>(stepSiteDistribution[iSite].size() - 1));
+        step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution[iSite].size() - 1));
         //need setEnabled(true) otherwise we run into OpenGL errors? weird
-        psMesh.addVertexScalarQuantity("distribution", stepSiteDistribution[iSite][step])->setEnabled(true);
-        polyscope::registerPointCloud("site ", std::vector<Vector3>{steps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+        psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
+        polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
 
         //should do this outside the ImGUI
         // std::vector<Vector3> currentSites; 
@@ -3786,6 +3758,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         ImGui::SameLine();
     };
     polyscope::pushContext(focusedPopupUI);  
+
+    polyscope::show();
+    
     
     //perform optimal matching using all the surface points directly
     // std::vector<std::pair<SurfacePoint, int>> allSites;
@@ -4047,7 +4022,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         FaceData<int> facePath(globalGeometry.mesh, 0);
         for (Face f : faces) facePath[f] = 1;
         psMesh.addFaceScalarQuantity("faces for pair " + std::to_string(i), facePath);
-        psMesh.addHalfedgeScalarQuantity("halfedge strip path " + std::to_string(i), stripHalfedgePath);
+        //psMesh.addHalfedgeScalarQuantity("halfedge strip path " + std::to_string(i), stripHalfedgePath);
         std::vector<double> edgePath(globalMesh.nEdges(), 0.0);
         // for (Halfedge he : globalMesh.halfedges()){
         //     if (stripHalfedgePath[he]){
@@ -4081,12 +4056,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //edgePathConstraints.push_back(std::make_pair(edgePath, 0.0));
     }
 
-    //visualize halfedge paths
-    for (int i = 0; i < halfedgePathConstraints.size(); i++){
-        auto p = halfedgePathConstraints[i].first;
-        psMesh.addHalfedgeScalarQuantity("halfedge path edges " + std::to_string(i), p);
-    }
-
     psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
     // polyscope::show();
 
@@ -4106,7 +4075,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
 
-    psMesh.addHalfedgeScalarQuantity("our Sigma ", gluedSigmaTilde);
+    //psMesh.addHalfedgeScalarQuantity("our Sigma ", gluedSigmaTilde);
 
     //visualize the saddle vertices
     std::vector<Vector3> saddleVertexPositions;
@@ -4119,6 +4088,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         if (index == -1) saddleVertexPositions.push_back(globalGeometry.vertexPositions[v]);
     }
     polyscope::registerPointCloud("saddle vertices", saddleVertexPositions);
+    
 
     //-------------------End of testing-------------------//
 
