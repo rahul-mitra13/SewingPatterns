@@ -45,6 +45,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
 
     return rhs;
   };
+  
 
   // Set points to start
   std::vector<SurfacePoint> siteLocations = options.initialSites;
@@ -82,6 +83,17 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
       }
   }
 
+  //debug on the square 
+  //f2592 and f6688 are next to each other 
+  // siteLocations.push_back(SurfacePoint(mesh.face(2592), Vector3{1./3., 1./3., 1./3.}));
+  // siteLocations.push_back(SurfacePoint(mesh.face(6688), Vector3{1./3., 1./3., 1./3.}));
+
+  size_t nSites = siteLocations.size();
+  VoronoiResult result;
+  result.steps.resize(nSites);
+  result.stepSiteDistribution.resize(nSites);
+  result.initialSites = siteLocations;
+
   geom.requireShapeLengthScale();
   double M = 0; // maximum measure
   for (Vertex v : mesh.vertices())
@@ -99,13 +111,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     vSolvers[i].computeLogMap(dummySite);
   }  
 
-  size_t nSites = siteLocations.size();
-
   geom.requireVertexDualAreas();
-
-  VoronoiResult result;
-  result.steps.resize(nSites);
-  result.stepSiteDistribution.resize(nSites);
 
   //trying to find equal mass power cells 
   size_t descIter = 1000;
@@ -144,7 +150,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     // UPDATE WEIGHTS WITH FIXED SITES (using Karcher mean)
 
     //double alpha = 2, beta = 0.2;
-    double alpha = 2, beta = 0; // standard gradient descent 
+    double alpha = 1.0, beta = 0; // standard gradient descent 
 
     // Nesterov acceleration
     vector<double> phiWeightsY(nSites);

@@ -15,12 +15,13 @@ struct VoronoiResult {
   bool hasDistributions = false;                       // is siteDistributions populated?
   std::vector<std::vector<SurfacePoint>> steps;       // DEBUG: steps taken from each starting point
   std::vector<std::vector<VertexData<double>>> stepSiteDistribution; // DEBUG: visualize the size distrubutions during the steps
+  std::vector<SurfacePoint> initialSites;             //DEBUG: location of initial sites
 };
 
 struct VoronoiOptions {
   size_t nSites = 1;                     // number of sites to place
   std::vector<SurfacePoint> initialSites; // desired locations for sites. If blank, locations are chosen randomly
-  size_t iterations = 10000;                 // number of iterations to run for
+  size_t iterations = 500;                 // number of iterations to run for
   double stepSize = 1.0;                    // step size for steps towards cell centers
   bool useDelaunay = true;                // solve on an intrinsic Delaunay triangulation of the input
   bool computeDistributions = false;      // return the indicator functions for each cell (`result.siteDistributions`)
