@@ -3667,19 +3667,19 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     double avgTotalMeasure = (totalPosMeasure + totalNegMeasure) / 2;
 
     //debugging on a simple square
-    for (Vertex v : globalMesh.vertices()){
-        //if (globalGeometry.vertexPositions[v].z < 0 && globalGeometry.vertexPositions[v].x < 0) posMeasure[v] = 1.0;
-        // posMeasure[v] = std::fabs(globalGeometry.vertexPositions[v].x);
-        posMeasure[v] = globalTimeFunction[v];
-        // posMeasure[v] = globalGeometry.vertexPositions[v].x * globalGeometry.vertexPositions[v].x;
-        // posMeasure[v] = std::exp(globalGeometry.vertexPositions[v].x);
-    }
+    // for (Vertex v : globalMesh.vertices()){
+    //     //if (globalGeometry.vertexPositions[v].z < 0 && globalGeometry.vertexPositions[v].x < 0) posMeasure[v] = 1.0;
+    //     // posMeasure[v] = std::fabs(globalGeometry.vertexPositions[v].x);
+    //     posMeasure[v] = globalTimeFunction[v];
+    //     // posMeasure[v] = globalGeometry.vertexPositions[v].x * globalGeometry.vertexPositions[v].x;
+    //     // posMeasure[v] = std::exp(globalGeometry.vertexPositions[v].x);
+    // }
 
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 2; //std::round(avgTotalMeasure / period);
+    posOptions.nSites = std::round(avgTotalMeasure / period);
     std::cout << "number of sings = " << posOptions.nSites << std::endl;
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
@@ -3690,19 +3690,14 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
     std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
 
-    for (int i = 0; i < posInitialSites.size(); i++){
-        Vector3 p = posInitialSites[i].interpolate(globalGeometry.vertexPositions);
-        polyscope::registerPointCloud("initial site " + std::to_string(i), std::vector<Vector3>{p});
-    }
-
-    //write a nested callback to debug the evolution of our method
+    //write a nested callback to debug the evolution of our method for the positive sites
     //Register the callback which creates the UI and does the hard work
     int step = 0;
     int iSite = 0;
-    auto focusedPopupUI = [&](){
+    auto positivePopUpUI = [&](){
         static bool showWindow = true;
         ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
-        ImGui::Begin("Debug", &showWindow);
+        ImGui::Begin("Positive sites", &showWindow);
         ImGui::PushItemWidth(400);
         ImGui::Separator();
         ImGui::InputInt("Site", &iSite);
@@ -3717,15 +3712,15 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //should do this outside the ImGUI
         // std::vector<Vector3> currentSites; 
         // for (int i = 0; i < posOptions.nSites; i++){
-        //     currentSites.push_back(steps[i][step].interpolate(globalGeometry.vertexPositions));
+        //     currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
         // }
-        // polyscope::registerPointCloud("all sites", currentSites);
+        // polyscope::registerPointCloud("all pos sites", currentSites);
 
         if (ImGui::Button("Done"))
             polyscope::popContext();
         ImGui::SameLine();
     };
-    polyscope::pushContext(focusedPopupUI);  
+    polyscope::pushContext(positivePopUpUI);  
 
     polyscope::show();
 
@@ -3765,7 +3760,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         polyscope::registerPointCloud("site " + std::to_string(i) + " initialization ", std::vector<Vector3>{p})->setEnabled(false);
     }
 
-    /** 
+    
     VoronoiOptions negOptions = defaultVoronoiOptions;
     negOptions.nSites = posOptions.nSites;
     negOptions.useDelaunay = false;
@@ -3777,6 +3772,43 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
     std::vector<std::vector<VertexData<double>>> negStepSiteDistribution = negVoronoiCenters.stepSiteDistribution;
     std::vector<std::vector<SurfacePoint>> negSteps = negVoronoiCenters.steps;
+    std::vector<SurfacePoint> negInitialSites = negVoronoiCenters.initialSites;
+
+
+    //write a nested callback to debug the evolution of our method for the negative sites
+    //Register the callback which creates the UI and does the hard work
+    step = 0;
+    iSite = 0;
+    auto negativePopUpUI = [&](){
+        static bool showWindow = true;
+        ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
+        ImGui::Begin("Negative sites", &showWindow);
+        ImGui::PushItemWidth(400);
+        ImGui::Separator();
+        ImGui::InputInt("Site", &iSite);
+        ImGui::InputInt("Time Step", &step);
+        // Clamp to bounds after user input
+        iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
+        step = std::clamp(step, 0, static_cast<int>(negStepSiteDistribution[iSite].size() - 1));
+        //need setEnabled(true) otherwise we run into OpenGL errors? weird
+        psMesh.addVertexScalarQuantity("distribution", negStepSiteDistribution[iSite][step])->setEnabled(true);
+        polyscope::registerPointCloud("site ", std::vector<Vector3>{negSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+
+        //should do this outside the ImGUI
+        // std::vector<Vector3> currentSites; 
+        // for (int i = 0; i < posOptions.nSites; i++){
+        //     currentSites.push_back(negSteps[i][step].interpolate(globalGeometry.vertexPositions));
+        // }
+        // polyscope::registerPointCloud("all negative sites", currentSites);
+
+        if (ImGui::Button("Done"))
+            polyscope::popContext();
+        ImGui::SameLine();
+    };
+    polyscope::pushContext(negativePopUpUI);  
+
+    polyscope::show();
+
     std::vector<Vector3> negativeCenters;
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
        negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
@@ -3798,40 +3830,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
     
 
-    //write a nested callback to debug the evolution of our method
-    //Register the callback which creates the UI and does the hard work
-    int step = 0;
-    int iSite = 0;
-    auto focusedPopupUI = [&](){
-        static bool showWindow = true;
-        ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
-        ImGui::Begin("Debug", &showWindow);
-        ImGui::PushItemWidth(400);
-        ImGui::Separator();
-        ImGui::InputInt("Site", &iSite);
-        ImGui::InputInt("Time Step", &step);
-        // Clamp to bounds after user input
-        iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
-        step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution[iSite].size() - 1));
-        //need setEnabled(true) otherwise we run into OpenGL errors? weird
-        psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
-        polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
-
-        //should do this outside the ImGUI
-        // std::vector<Vector3> currentSites; 
-        // for (int i = 0; i < posOptions.nSites; i++){
-        //     currentSites.push_back(steps[i][step].interpolate(globalGeometry.vertexPositions));
-        // }
-        // polyscope::registerPointCloud("all sites", currentSites);
-
-        if (ImGui::Button("Done"))
-            polyscope::popContext();
-        ImGui::SameLine();
-    };
-    polyscope::pushContext(focusedPopupUI);  
-
-    polyscope::show();
-    
     
     //perform optimal matching using all the surface points directly
     // std::vector<std::pair<SurfacePoint, int>> allSites;
@@ -4159,7 +4157,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         if (index == -1) saddleVertexPositions.push_back(globalGeometry.vertexPositions[v]);
     }
     polyscope::registerPointCloud("saddle vertices", saddleVertexPositions);
-    */
+    
 
     //-------------------End of testing-------------------//
 
