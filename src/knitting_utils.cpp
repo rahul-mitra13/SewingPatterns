@@ -3549,16 +3549,21 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     // for(int i = 0; i < allSaddleLoops.size(); i++){
     //     edgePathConstraints.push_back(std::make_pair(allSaddleLoops[i], 0.0));
     // }
-    for (int i = 0; i < allSaddleLoops.size(); i++){
-        std::vector<double> path = allSaddleLoops[i];
-        for (int j = 0; j < path.size(); j++){
-            if (std::fabs(path[j]) > 0){
-                Edge e = gluedGeometry.mesh.edge(j);
-                heatSourceVerts.push_back(e.halfedge().tailVertex());
-                heatSourceVerts.push_back(e.halfedge().tipVertex());
-            }
-        }
-    }
+    // for (int i = 0; i < allSaddleLoops.size(); i++){
+    //     std::vector<double> path = allSaddleLoops[i];
+    //     for (int j = 0; j < path.size(); j++){
+    //         if (std::fabs(path[j]) > 0){
+    //             Edge e = gluedGeometry.mesh.edge(j);
+    //             heatSourceVerts.push_back(e.halfedge().tailVertex());
+    //             heatSourceVerts.push_back(e.halfedge().tipVertex());
+    //         }
+    //     }
+    // }
+
+    // std::vector<Vertex> saddleVertices = getSaddleVertices(gluedGeometry, globalTimeFunction);
+    // for (auto v : saddleVertices){
+    //     heatSourceVerts.push_back(v);
+    // }
     
 
     //solve the model without any singularities 
@@ -3603,10 +3608,33 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     globalTimeFunctionGradientsNormalized, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
 
+    VertexData<double> allDist = heatSolver.computeDistance(heatSourceVerts);
+    VertexData<double> courseWeighting(globalMesh);
+    double maxVal = std::numeric_limits<double>::min();
+    double maxSourceVal = std::numeric_limits<double>::min();
+    //for all the source vertices, find the max value 
+    // for (Vertex v : heatSourceVerts){
+    //     maxSourceVal = std::max(maxSourceVal, allDist[v]);
+    // }
+    // //find the max val over all distances
+    // for (Vertex v : gluedMesh.vertices()){
+    //     maxVal = std::max(maxVal, allDist[v]);
+    // }
+    // //shift down all the source vertex values
+    // for (Vertex v : heatSourceVerts){
+    //     allDist[v] -= maxSourceVal;
+    // }
+    // //clip all values to 0 
+    // for (Vertex v : gluedMesh.vertices()){
+    //     allDist[v] = std::max(allDist[v], 0.0);
+    // }
+    // //have a hard mask in the course direction
+    // for (Vertex v : globalMesh.vertices()){
+    //     courseWeighting[v] = (allDist[v] > 2*period);
+    //     curlMeasure[v] = courseWeighting[v] * curlMeasure[v];
+    // }
+
     psMesh.addVertexScalarQuantity("initial curl measure ", curlMeasure);
-
-
-
     // Cap curl measure to avoid high concentration of singularities
     for (Vertex v : globalMesh.vertices()) {
         curlMeasure[v] = fmin(curlMeasure[v], period / (3*globalGeometry.vertexDualAreas[v]));
