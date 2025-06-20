@@ -296,8 +296,8 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, Vert
         double fj = vertexScalarFunction[f.halfedge().next().vertex()];
         double fk = vertexScalarFunction[f.halfedge().next().next().vertex()];
         double area = geometry.faceAreas[f];
-        BarycentricVector X_ik_perp = (BarycentricVector(f, Vector3{1., 0, -1.})).rotated90(geometry);
-        BarycentricVector X_ji_perp = (BarycentricVector(f, Vector3{-1., 1., 0.})).rotated90(geometry);
+        BarycentricVector X_ik_perp = (BarycentricVector(f, Vector3{1., 0, -1.})).rotate90(geometry);
+        BarycentricVector X_ji_perp = (BarycentricVector(f, Vector3{-1., 1., 0.})).rotate90(geometry);
         BarycentricVector gradF = ((fj - fi) * X_ik_perp + (fk - fi) * X_ji_perp)/ (2. * area); 
         BarycentricVector gradFNormalized = gradF / norm(geometry, gradF);
         gradients[f] = Vector3{gradFNormalized.faceCoords[0], gradFNormalized.faceCoords[1], gradFNormalized.faceCoords[2]};
