@@ -3722,8 +3722,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     };
     polyscope::pushContext(positivePopUpUI);  
 
-    polyscope::show();
-
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
        positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
@@ -3806,8 +3804,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         ImGui::SameLine();
     };
     polyscope::pushContext(negativePopUpUI);  
-
-    polyscope::show();
 
     std::vector<Vector3> negativeCenters;
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
@@ -3921,19 +3917,19 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //map singular edges to their corresponding isovals
     std::map<Edge, double> edgeToIsoVal;
 
+    polyscope::show();
+
     //now appropriatately specify the singular edges
     //this relies on the assumption that 2 singular sites (surface points) don't end up on the same face 
     //Even if they end up on adjacent faces, we shouldn't select the same edges 
     //If the algorithm runs to convergence, we shouldn't be getting singularities so close together
     //But we clearly run into issues where the above happens 
-    for (auto &[posSite,negSite] : alignmentOptions.pairedSites) {
-    // for (int i = 0; i < posAlignedCenters.siteLocations.size(); i++){
-        
+    for (auto &[posSite,negSite] : alignmentOptions.pairedSites) { 
         //handle positive case 
         SurfacePoint posFacePoint = posSite.inSomeFace();
         double posVal = posSite.interpolate(globalTimeFunction);
         Halfedge posHe;
-        Face f = posSite.face;
+        Face f = posFacePoint.face;
         Edge posSingularEdge;
         double maxDotProd = -DBL_MAX;
         for (Halfedge he : f.adjacentHalfedges()){
@@ -3952,7 +3948,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         SurfacePoint negFacePoint = negSite.inSomeFace();
         double negVal = negSite.interpolate(globalTimeFunction);
         Halfedge negHe;
-        f = negSite.face;
+        f = negFacePoint.face;
         Edge negSingularEdge;
         maxDotProd = -DBL_MAX;
         for (Halfedge he : f.adjacentHalfedges()){
@@ -4126,7 +4122,28 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
 
     psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
-    // polyscope::show();
+    
+    //variant 3d experiments 
+    auto [v, e, P] = getVerticesAndEdgesInShortestEdgePath(globalGeometry, globalMesh.vertex(4683), globalMesh.vertex(3523));
+    std::vector<Vector3> curveNetworkPos;
+    std::vector<std::array<int, 2>> curveNetworkEdges;
+    for (int i = 0; i < v.size(); i++){
+        curveNetworkPos.push_back(globalGeometry.vertexPositions[v[i]]);
+    }
+    for (int i = 0; i < (int)v.size() - 1; i++){
+        curveNetworkEdges.push_back(std::array{i, i + 1});
+    }
+    polyscope::registerCurveNetwork("user constraint", curveNetworkPos, curveNetworkEdges)->setRadius(0.00125);
+    std::vector<std::vector<int>> stripeAlignmentConstraints;
+    std::vector<int> currConstraint(globalMesh.nHalfedges());
+    for (int i = 0; i < P.size(); i++){
+        if (P[i] > 0) currConstraint[globalMesh.edge(i).halfedge().getIndex()] = 1;
+        if (P[i] < 0) currConstraint[globalMesh.edge(i).halfedge().twin().getIndex()] = 1.0;
+    }
+    stripeAlignmentConstraints.push_back(currConstraint);
+    model.setStripeAlignmentConstraints(stripeAlignmentConstraints);
+    //end of variant 3d experiments
+
 
     //model.setEdgePathConstraints(edgePathConstraints);
     model.setHalfedgePathConstraints(halfedgePathConstraints);
@@ -4580,6 +4597,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
     std::vector<int> bdyEdges = gbModel.getBdyEdges();
     std::vector<std::pair<std::vector<double>, double>> edgePathConstraints = gbModel.getEdgePathConstraints();
     std::vector<std::pair<std::vector<double>, double>> halfedgePathConstraints = gbModel.getHalfedgePathConstraints();
+    std::vector<std::vector<int>> stripeAlignmentConstraints = gbModel.getStripeAlignmentConstraints();
 
     gluedGeometry.requireDECOperators();
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
@@ -4897,6 +4915,19 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                 model.addConstr(pathIntegral == period * halfedgePathConstraints[i].second);
             else
                 model.addConstr(pathIntegral == 0.0);
+        }
+
+        //add stripe alignment constraints 
+        std::vector<GRBVar> alignmentEqualities;
+        for (int i = 0; i < stripeAlignmentConstraints.size(); i++){
+            GRBVar equalityI = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS);
+            alignmentEqualities.push_back(equalityI);//decision variables
+        }
+        for (int i = 0; i < stripeAlignmentConstraints.size(); i++){
+            std::vector<int> currHes = stripeAlignmentConstraints[i];
+            for (int j = 0; j < gluedMesh.nHalfedges(); j++){
+                if (currHes[j] != 0) model.addConstr(sigma[j] == 0.);//don't have to set it 0, can set it to alignmentEqualities[i] and let gurobi figure it out 
+            }
         }
 
         //compute a piecewise linear function over the vertices of the mesh 

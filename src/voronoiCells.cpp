@@ -150,7 +150,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     // UPDATE WEIGHTS WITH FIXED SITES (using Karcher mean)
 
     //double alpha = 2, beta = 0.2;
-    double alpha = 1.0, beta = 0; // standard gradient descent 
+    double alpha = 1e-2, beta = 0; // standard gradient descent 
 
     // Nesterov acceleration
     vector<double> phiWeightsY(nSites);

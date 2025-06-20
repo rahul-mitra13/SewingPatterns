@@ -65,13 +65,13 @@ void KnitGraph::buildGraph(){
 
 
     // tag the increases and decreases 
-    //tagIncreasesDecreases();
+    tagIncreasesDecreases();
     
     //render the knit graph
     renderGraph();
 
     //trace the short rows 
-    traceShortRows();
+    //traceShortRows();
 
     //sanity check the graph
     sanityCheck();

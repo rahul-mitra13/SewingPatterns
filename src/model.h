@@ -27,6 +27,12 @@ class Model{
         std::vector<std::pair<std::vector<double>, double>> edgePathConstraints;
 
 
+        //list of stripe alignment constraints 
+        //each nested vector is of length mesh.nHalfedges() and stores the indices of the halfedges 
+        //which should have equal 1-form values
+        std::vector<std::vector<int>> stripeAlignmentConstraints;
+
+
         //stores a pair of (edge indices, integral value of the path that those edge indices specify) 
         //the length of the vector is mesh->nHalfedges()
         std::vector<std::pair<std::vector<double>, double>> halfedgePathConstraints;
@@ -96,6 +102,9 @@ class Model{
         //set halfedge path constraints
         void setHalfedgePathConstraints(std::vector<std::pair<std::vector<double>, double>>& edgePathConstraints);
 
+        //set stripe alignment constraint
+        void setStripeAlignmentConstraints(std::vector<std::vector<int>> stripeAlignmentConstraints);
+
         //set singular face indices 
         void setSingularFaceIndices(std::vector<std::pair<int, int>>& singularFaces);
 
@@ -140,6 +149,9 @@ class Model{
 
         //get halfedge path constraints 
         std::vector<std::pair<std::vector<double>, double>> getHalfedgePathConstraints();
+
+        //get stripe alignment constraint
+        std::vector<std::vector<int>> getStripeAlignmentConstraints();
 
         //get period value 
         double getPeriod();
