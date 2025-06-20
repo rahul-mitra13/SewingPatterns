@@ -4124,24 +4124,24 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
     
     //variant 3d experiments 
-    auto [v, e, P] = getVerticesAndEdgesInShortestEdgePath(globalGeometry, globalMesh.vertex(4683), globalMesh.vertex(3523));
-    std::vector<Vector3> curveNetworkPos;
-    std::vector<std::array<int, 2>> curveNetworkEdges;
-    for (int i = 0; i < v.size(); i++){
-        curveNetworkPos.push_back(globalGeometry.vertexPositions[v[i]]);
-    }
-    for (int i = 0; i < (int)v.size() - 1; i++){
-        curveNetworkEdges.push_back(std::array{i, i + 1});
-    }
-    polyscope::registerCurveNetwork("user constraint", curveNetworkPos, curveNetworkEdges)->setRadius(0.00125);
-    std::vector<std::vector<int>> stripeAlignmentConstraints;
-    std::vector<int> currConstraint(globalMesh.nHalfedges());
-    for (int i = 0; i < P.size(); i++){
-        if (P[i] > 0) currConstraint[globalMesh.edge(i).halfedge().getIndex()] = 1;
-        if (P[i] < 0) currConstraint[globalMesh.edge(i).halfedge().twin().getIndex()] = 1.0;
-    }
-    stripeAlignmentConstraints.push_back(currConstraint);
-    model.setStripeAlignmentConstraints(stripeAlignmentConstraints);
+    // auto [v, e, P] = getVerticesAndEdgesInShortestEdgePath(globalGeometry, globalMesh.vertex(4683), globalMesh.vertex(3523));
+    // std::vector<Vector3> curveNetworkPos;
+    // std::vector<std::array<int, 2>> curveNetworkEdges;
+    // for (int i = 0; i < v.size(); i++){
+    //     curveNetworkPos.push_back(globalGeometry.vertexPositions[v[i]]);
+    // }
+    // for (int i = 0; i < (int)v.size() - 1; i++){
+    //     curveNetworkEdges.push_back(std::array{i, i + 1});
+    // }
+    // polyscope::registerCurveNetwork("user constraint", curveNetworkPos, curveNetworkEdges)->setRadius(0.00125);
+    // std::vector<std::vector<int>> stripeAlignmentConstraints;
+    // std::vector<int> currConstraint(globalMesh.nHalfedges());
+    // for (int i = 0; i < P.size(); i++){
+    //     if (P[i] > 0) currConstraint[globalMesh.edge(i).halfedge().getIndex()] = 1;
+    //     if (P[i] < 0) currConstraint[globalMesh.edge(i).halfedge().twin().getIndex()] = 1.0;
+    // }
+    // stripeAlignmentConstraints.push_back(currConstraint);
+    // model.setStripeAlignmentConstraints(stripeAlignmentConstraints);
     //end of variant 3d experiments
 
 
