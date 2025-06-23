@@ -3608,6 +3608,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     globalTimeFunctionGradientsNormalized, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
 
+    psMesh.addVertexScalarQuantity("initial curl measure without masking", curlMeasure);
+
     //mask the saddle 
     //not sure if this is the correct way to go
     // VertexData<double> allDist = heatSolver.computeDistance(heatSourceVerts);
@@ -3636,8 +3638,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //     curlMeasure[v] = courseWeighting[v] * curlMeasure[v];
     // }
 
-    psMesh.addVertexScalarQuantity("initial curl measure ", curlMeasure);
-    //polyscope::show();
+    // psMesh.addVertexScalarQuantity("initial curl measure with masking", curlMeasure);
+
+    // polyscope::show();
 
     // Cap curl measure to avoid high concentration of singularities
     for (Vertex v : globalMesh.vertices()) {
