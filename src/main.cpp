@@ -502,17 +502,6 @@ int main(int argc, char **argv) {
   // Set the callback function
   polyscope::state::userCallback = callBacks;
 
-  auto [v, e, P] = getVerticesAndEdgesInShortestEdgePath(*globalGeometry, globalMesh->vertex(4683), globalMesh->vertex(3523));
-  std::vector<Vector3> curveNetworkPos;
-  std::vector<std::array<int, 2>> curveNetworkEdges;
-  for (int i = 0; i < v.size(); i++){
-    curveNetworkPos.push_back(globalGeometry->vertexPositions[v[i]]);
-  }
-  for (int i = 0; i < (int)v.size() - 1; i++){
-    curveNetworkEdges.push_back(std::array{i, i + 1});
-  }
-  polyscope::registerCurveNetwork("user constraint", curveNetworkPos, curveNetworkEdges)->setRadius(0.00125);
-
   if (argc > 2) // period was provided
     showStripePatterns();
 
