@@ -71,7 +71,7 @@ void KnitGraph::buildGraph(){
     renderGraph();
 
     //trace the short rows 
-    //traceShortRows();
+    traceShortRows();
 
     //sanity check the graph
     sanityCheck();
