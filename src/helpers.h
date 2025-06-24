@@ -305,3 +305,6 @@ class UF {
 
 // Given a set of continuous numbers, round them to the closest integers while maintaining a given sum
 std::vector<int> roundWithSum(std::vector<double> y, int sum);
+
+// Show a set of edges as a curve network
+polyscope::CurveNetwork* showEdges(std::string name, std::vector<Edge> edges, VertexPositionGeometry& geometry);
