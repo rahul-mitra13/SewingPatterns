@@ -1908,7 +1908,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     }
     */
 
-    //-------------------------TESTING----------------------//
+    //-------------------------TESTING (WALE) ----------------------//
     //Attempting to find the center of distributions using Vector Heat Method
     VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     waleCurlFunctionGrad, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
@@ -3891,13 +3891,13 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     alignPointsOnIsolineFast(globalMesh, globalGeometry, alignmentOptions, psMesh);
 
     // Plot aligned singularities
-    // std::vector<Vector3> alignedPosCenters, alignedNegCenters;
-    // for (auto &[s1,s2] : alignmentOptions.pairedSites) {
-    //     alignedPosCenters.push_back(s1.interpolate(globalGeometry.vertexPositions));
-    //     alignedNegCenters.push_back(s2.interpolate(globalGeometry.vertexPositions));
-    // }
-    // polyscope::registerPointCloud("Voronoi sites aligned (+)", alignedPosCenters)->setEnabled(false);
-    // polyscope::registerPointCloud("Voronoi sites aligned (-)", alignedNegCenters)->setEnabled(false);
+    std::vector<Vector3> alignedPosCenters, alignedNegCenters;
+    for (auto &[s1,s2] : alignmentOptions.pairedSites) {
+        alignedPosCenters.push_back(s1.interpolate(globalGeometry.vertexPositions));
+        alignedNegCenters.push_back(s2.interpolate(globalGeometry.vertexPositions));
+    }
+    polyscope::registerPointCloud("Voronoi sites aligned (+)", alignedPosCenters)->setEnabled(false);
+    polyscope::registerPointCloud("Voronoi sites aligned (-)", alignedNegCenters)->setEnabled(false);
 
     // for (int i = 0; i < alignmentOptions.pairedSites.size(); i++){
     //     auto [s1, s2] = alignmentOptions.pairedSites[i];
@@ -3917,7 +3917,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //map singular edges to their corresponding isovals
     std::map<Edge, double> edgeToIsoVal;
 
-    polyscope::show();
+    // polyscope::show();
 
     //now appropriatately specify the singular edges
     //this relies on the assumption that 2 singular sites (surface points) don't end up on the same face 
@@ -3977,6 +3977,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //TO-DO: * ensure edge singularities lie in the same cylindrical compononent
     //       * ensure the average isovalue passes through both faces
     std::vector<int> indicesToUse; 
+    int problemCount = 0;
     for (int i = 0; i < singularEdges.size(); i++){
         auto p = singularEdges[i];
         auto timeFuncPair = pairedTimeFunctions[i];
@@ -3994,6 +3995,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             indicesToUse.push_back(i);
         }
         else{//remove these entry from edgeIndices and edgeSingularities
+
+            showEdges("dropped pair "+std::to_string(problemCount), {posEdge, negEdge}, globalGeometry);
+            problemCount++;
+
             edgeIndices[p.first] = 0.0;
             edgeIndices[p.second] = 0.0;
             edgeSingularities[posEdge] = 0.0;
@@ -4002,6 +4007,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
 
     std::cout << "Number of singularity pairs missing = " << posOptions.nSites - indicesToUse.size() << std::endl;
+    if (problemCount > 0) {
+        P("Stopping because some singularity pairs were dropped");
+        polyscope::show();
+    }
 
     //set the singular edges where path exists
     std::vector<std::pair<int, int>> singularEdgesToUse;
