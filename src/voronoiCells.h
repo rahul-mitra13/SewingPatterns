@@ -21,7 +21,7 @@ struct VoronoiResult {
 struct VoronoiOptions {
   size_t nSites = 1;                     // number of sites to place
   std::vector<SurfacePoint> initialSites; // desired locations for sites. If blank, locations are chosen randomly
-  size_t iterations = 500;                 // number of iterations to run for
+  size_t iterations = 200;                 // number of iterations to run for
   double stepSize = 1.0;                    // step size for steps towards cell centers
   bool useDelaunay = true;                // solve on an intrinsic Delaunay triangulation of the input
   bool computeDistributions = false;      // return the indicator functions for each cell (`result.siteDistributions`)
