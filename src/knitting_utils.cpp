@@ -3649,37 +3649,37 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     psMesh.addVertexScalarQuantity("initial curl measure without masking (course)", curlMeasure);
 
-    //mask the saddle 
+    //mask the saddle (if any)
     //not sure if this is the correct way to go
-    VertexData<double> allDist = heatSolver.computeDistance(heatSourceVerts);
-    VertexData<double> courseWeighting(globalMesh);
-    double maxVal = std::numeric_limits<double>::min();
-    double maxSourceVal = std::numeric_limits<double>::min();
-    //for all the source vertices, find the max value 
-    for (Vertex v : heatSourceVerts){
-        maxSourceVal = std::max(maxSourceVal, allDist[v]);
-    }
-    //find the max val over all distances
-    for (Vertex v : gluedMesh.vertices()){
-        maxVal = std::max(maxVal, allDist[v]);
-    }
-    //shift down all the source vertex values
-    for (Vertex v : heatSourceVerts){
-        allDist[v] -= maxSourceVal;
-    }
-    //clip all values to 0 
-    for (Vertex v : gluedMesh.vertices()){
-        allDist[v] = std::max(allDist[v], 0.0);
-    }
-    //have a hard mask in the course direction
-    for (Vertex v : globalMesh.vertices()){
-        courseWeighting[v] = (allDist[v] > 2*period);
-        curlMeasure[v] = courseWeighting[v] * curlMeasure[v];
+    if (heatSourceVerts.size() > 0) {
+        VertexData<double> allDist = heatSolver.computeDistance(heatSourceVerts);
+        VertexData<double> courseWeighting(globalMesh);
+        double maxVal = std::numeric_limits<double>::min();
+        double maxSourceVal = std::numeric_limits<double>::min();
+        //for all the source vertices, find the max value 
+        for (Vertex v : heatSourceVerts){
+            maxSourceVal = std::max(maxSourceVal, allDist[v]);
+        }
+        //find the max val over all distances
+        for (Vertex v : gluedMesh.vertices()){
+            maxVal = std::max(maxVal, allDist[v]);
+        }
+        //shift down all the source vertex values
+        for (Vertex v : heatSourceVerts){
+            allDist[v] -= maxSourceVal;
+        }
+        //clip all values to 0 
+        for (Vertex v : gluedMesh.vertices()){
+            allDist[v] = std::max(allDist[v], 0.0);
+        }
+        //have a hard mask in the course direction
+        for (Vertex v : globalMesh.vertices()){
+            courseWeighting[v] = (allDist[v] > 2*period);
+            curlMeasure[v] = courseWeighting[v] * curlMeasure[v];
+        }
     }
 
     psMesh.addVertexScalarQuantity("initial curl measure with masking (course)", curlMeasure);
-
-    //polyscope::show();
 
     // Cap curl measure to avoid high concentration of singularities
     for (Vertex v : globalMesh.vertices()) {
