@@ -1939,10 +1939,12 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     }
     //have a hard mask in the course direction
     for (Vertex v : globalMesh.vertices()){
-        courseWeighting[v] = (allDist[v] > 2*period);
+        courseWeighting[v] = (allDist[v] > 3*period);
         curlMeasure[v] = courseWeighting[v] * curlMeasure[v];
     }
     psMesh.addVertexScalarQuantity("initial curl measure with masking (wale)", curlMeasure);
+
+    polyscope::show();
 
 
 
