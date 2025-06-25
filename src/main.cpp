@@ -175,7 +175,7 @@ void showStripePatterns(){
   // polyscope::show();
 
   std::string richDataFile;
-  richDataFile = "split_fine_masking_both_directions.ply";
+  //richDataFile = "split_fine_masking_both_directions.ply";
 
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
@@ -475,6 +475,8 @@ int main(int argc, char **argv) {
   //create the glued edge length geometry
   gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, vertexMap, edgeMap, gluedOneRingMap);
 
+  std::cout << "Number of boundary loops = " << gluedELG -> mesh.nBoundaryLoops() << std::endl;
+
   //visualizing the cotan weights
   // globalGeometry->requireEdgeCotanWeights();
   // for (Edge e : globalMesh -> edges()){
@@ -497,6 +499,7 @@ int main(int argc, char **argv) {
 
   //render the stitched vertices
   renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
+
   // Disable the ground plane
   //polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::None;
   // Set the callback function
