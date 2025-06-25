@@ -417,11 +417,13 @@ void projectOnIsoline(SurfacePoint& point, double target, SurfaceMesh& mesh, Int
   Vector2 v = timeFunctionGrad[initPoint.face]; // search direction
   v = v.normalize();
 
+  geom.requireShapeLengthScale(); // used to scale the search direction
+
   // Binary search in direction v to find the target time value
   double lower = -1, upper = +1.1; // is it enough? For some reason if mid=0, traceGeodesic fails
   while(upper - lower > 1e-6) {
     double mid = (lower+upper) / 2;
-    TraceGeodesicResult traceResult = traceGeodesic(geom, initPoint, mid*v);
+    TraceGeodesicResult traceResult = traceGeodesic(geom, initPoint, mid*v * geom.shapeLengthScale);
     point = traceResult.endPoint;
     double t = point.interpolate(options.timeFunction);
     if (t > target)
@@ -442,6 +444,7 @@ void alignPointsOnIsolineFast(SurfaceMesh& mesh, IntrinsicGeometryInterface& geo
     double t1 = s1.interpolate(options.timeFunction), t2 = s2.interpolate(options.timeFunction);
     projectOnIsoline(s1, (t1+t2)/2, mesh, geom, options, timeFunctionGrad);
     projectOnIsoline(s2, (t1+t2)/2, mesh, geom, options, timeFunctionGrad);
+    ensure(abs(s1.interpolate(options.timeFunction) - s2.interpolate(options.timeFunction)) < 1e-6); // sanity check
   }
 }
 
