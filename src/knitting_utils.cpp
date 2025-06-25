@@ -189,6 +189,43 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, 
     return faceGradients;
 }
 
+FaceData<Vector2> computeTimeFunctionFaceGradIntrinsic(const IntrinsicGeometryInterface& geometry, VertexData<double>& vertexScalarFunction) {
+
+    SurfaceMesh& mesh = geometry.mesh;
+
+    // Setup matrices that IGL needs
+    // Be careful with index convention! Edge i is opposite vertex i
+    Eigen::MatrixXd L(mesh.nFaces(), 3); // edge lengths
+    Eigen::MatrixXi F(mesh.nFaces(), 3); // face vertex indices
+    for (Face face : geometry.mesh.faces()) {
+        Halfedge he = face.halfedge();
+        for (int i = 0; i < 3; i++) {
+            L(face.getIndex(), i) = geometry.edgeLengths[he.edge()];
+            F(face.getIndex(), (i+1)%3) = he.tailVertex().getIndex();
+            he = he.next();
+        }
+    }
+
+    // Compute intrinsic gradient operator
+    SparseMatrix<double> G; // (2*F, V)
+    igl::grad_intrinsic(L, F, G);
+
+    // Set the scalar function in IGL format
+    Eigen::VectorXd u(mesh.nVertices());
+    for (Vertex v : mesh.vertices())
+        u(v.getIndex()) = vertexScalarFunction[v];
+
+    // Compute gradient and convert to GC format
+    Eigen::VectorXd Gu = G*u;
+    FaceData<Vector2> grad(geometry.mesh);
+    for (Face face : geometry.mesh.faces()) {
+        grad[face] = {Gu(face.getIndex()), Gu(face.getIndex()+mesh.nFaces())};
+    }
+
+    return grad;
+
+}
+
 //compute the gradient of the a function defined as a scalar over vertices in the glued mesh setting 
 //don't think the formula I'm using in here is right
 // FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, VertexData<double>& vertexScalarFunction){
@@ -1643,44 +1680,44 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     // }
     // psMesh.addEdgeScalarQuantity("constrained edges", constrainedEdges);
 
-    VertexData<double> waleVertexCurl = computeCourseVertexCurl(globalGeometry, gluedGeometry, waleCurlFunctionGrad, gluedOneRingMap,
-                                                         gluedEdgeSingularities, heatSolver, vertexMap);
-    VertexData<double> allDist(gluedGeometry.mesh, 1.0);
-    VertexData<double> allDistGlobal(globalGeometry.mesh);
-    VertexData<double> waleWeighting(globalGeometry.mesh);
-    if (heatSourceVerts.size()){
-        allDist = heatSolver.computeDistance(heatSourceVerts);
-        double maxVal = std::numeric_limits<double>::min();
-        double maxSourceVal = std::numeric_limits<double>::min();
-        //for all the source vertices, find the max value 
-        for (Vertex v : heatSourceVerts){
-            maxSourceVal = std::max(maxSourceVal, allDist[v]);
-        }
-        //find the maximum value over all the distances
-        for (Vertex v : gluedGeometry.mesh.vertices()){
-            maxVal = std::max(maxVal, allDist[v]);
-        }
-        //shift down all the source vertex values
-        for (Vertex v : heatSourceVerts){
-            allDist[v] -= maxSourceVal;
-        }
-        //clip all values to 0
-        for (Vertex v : gluedGeometry.mesh.vertices()){
-            allDist[v] = std::max(allDist[v], 0.0);
-        }
-        allDistGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, allDist, vertexMap);
-        for (Vertex v : globalGeometry.mesh.vertices()){
-            waleWeighting[v] = (allDistGlobal[v] > 2*period);
-            //waleWeighting[v] = (1 - exp(-pow(allDistGlobal[v], 2.) / (2 * pow(2*period, 2))));
-            waleVertexCurl[v] = waleWeighting[v] * waleVertexCurl[v];
-        }
-    }
+    // VertexData<double> waleVertexCurl = computeCourseVertexCurl(globalGeometry, gluedGeometry, waleCurlFunctionGrad, gluedOneRingMap,
+    //                                                      gluedEdgeSingularities, heatSolver, vertexMap);
+    // VertexData<double> allDist(gluedGeometry.mesh, 1.0);
+    // VertexData<double> allDistGlobal(globalGeometry.mesh);
+    // VertexData<double> waleWeighting(globalGeometry.mesh);
+    // if (heatSourceVerts.size()){
+    //     allDist = heatSolver.computeDistance(heatSourceVerts);
+    //     double maxVal = std::numeric_limits<double>::min();
+    //     double maxSourceVal = std::numeric_limits<double>::min();
+    //     //for all the source vertices, find the max value 
+    //     for (Vertex v : heatSourceVerts){
+    //         maxSourceVal = std::max(maxSourceVal, allDist[v]);
+    //     }
+    //     //find the maximum value over all the distances
+    //     for (Vertex v : gluedGeometry.mesh.vertices()){
+    //         maxVal = std::max(maxVal, allDist[v]);
+    //     }
+    //     //shift down all the source vertex values
+    //     for (Vertex v : heatSourceVerts){
+    //         allDist[v] -= maxSourceVal;
+    //     }
+    //     //clip all values to 0
+    //     for (Vertex v : gluedGeometry.mesh.vertices()){
+    //         allDist[v] = std::max(allDist[v], 0.0);
+    //     }
+    //     allDistGlobal = convertGluedToGlobalVertexFunction(globalGeometry, gluedGeometry, allDist, vertexMap);
+    //     for (Vertex v : globalGeometry.mesh.vertices()){
+    //         waleWeighting[v] = (allDistGlobal[v] > 2*period);
+    //         //waleWeighting[v] = (1 - exp(-pow(allDistGlobal[v], 2.) / (2 * pow(2*period, 2))));
+    //         waleVertexCurl[v] = waleWeighting[v] * waleVertexCurl[v];
+    //     }
+    // }
 
-    psMesh.addVertexScalarQuantity("initial wale weighting", waleWeighting);
-    psMesh.addVertexScalarQuantity("initial all distance wale", allDistGlobal);
-    EdgeData<double> waleEdgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, waleVertexCurl);
-    psMesh.addVertexScalarQuantity("initial wale vertex curl", waleVertexCurl);
-    psMesh.addEdgeScalarQuantity("wale edge curl without any wale singularities", waleEdgeCurl);
+    // psMesh.addVertexScalarQuantity("initial wale weighting", waleWeighting);
+    // psMesh.addVertexScalarQuantity("initial all distance wale", allDistGlobal);
+    // EdgeData<double> waleEdgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, waleVertexCurl);
+    // psMesh.addVertexScalarQuantity("initial wale vertex curl", waleVertexCurl);
+    // psMesh.addEdgeScalarQuantity("wale edge curl without any wale singularities", waleEdgeCurl);
 
 
     double oldL1Distance = 0.;
@@ -1879,12 +1916,43 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     }
     */
 
-    //-------------------------TESTING----------------------//
+    //-------------------------TESTING (WALE) ----------------------//
     //Attempting to find the center of distributions using Vector Heat Method
     VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     waleCurlFunctionGrad, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
 
-    psMesh.addVertexScalarQuantity("initial curl measure ", curlMeasure);
+    psMesh.addVertexScalarQuantity("initial curl measure without masking (wale)", curlMeasure);
+
+    //mask the saddle 
+    //not sure if this is the correct way to go
+    VertexData<double> allDist = heatSolver.computeDistance(heatSourceVerts);
+    VertexData<double> courseWeighting(globalMesh);
+    double maxVal = std::numeric_limits<double>::min();
+    double maxSourceVal = std::numeric_limits<double>::min();
+    //for all the source vertices, find the max value 
+    for (Vertex v : heatSourceVerts){
+        maxSourceVal = std::max(maxSourceVal, allDist[v]);
+    }
+    //find the max val over all distances
+    for (Vertex v : gluedMesh.vertices()){
+        maxVal = std::max(maxVal, allDist[v]);
+    }
+    //shift down all the source vertex values
+    for (Vertex v : heatSourceVerts){
+        allDist[v] -= maxSourceVal;
+    }
+    //clip all values to 0 
+    for (Vertex v : gluedMesh.vertices()){
+        allDist[v] = std::max(allDist[v], 0.0);
+    }
+    //have a hard mask in the course direction
+    for (Vertex v : globalMesh.vertices()){
+        courseWeighting[v] = (allDist[v] > 2*period);
+        curlMeasure[v] = courseWeighting[v] * curlMeasure[v];
+    }
+    psMesh.addVertexScalarQuantity("initial curl measure with masking (wale)", curlMeasure);
+
+
 
     // Cap curl measure to avoid high concentration of singularities
     for (Vertex v : globalMesh.vertices()) {
@@ -1917,7 +1985,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     posOptions.nSites = std::round(totalPosMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
-    posOptions.iterations = 500;
+    //posOptions.iterations = 500;
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
@@ -1943,7 +2011,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     negOptions.nSites = std::round(totalNegMeasure / period); // we don't care if this is different that posOptions.nSites
     negOptions.useDelaunay = false;
     negOptions.computeDistributions = true;
-    negOptions.iterations = 500;
+    // negOptions.iterations = 500;
     std::cout << "# positive sites " << posOptions.nSites << std::endl;
     std::cout << "# negative sites " << negOptions.nSites << std::endl;
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
@@ -1989,14 +2057,14 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         waleSingularEdgesGlobal[singularEdge] = 1.0;
     }
 
-    // for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
-    //     std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
-    //     std::vector<Vector3> stepPos;
-    //     for (int i = 0; i < steps.size(); i++){
-    //         stepPos.push_back(steps[i].interpolate(globalGeometry.vertexPositions));
-    //     }
-    //     polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos);
-    // }
+    for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
+        std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
+        std::vector<Vector3> stepPos;
+        for (int i = 0; i < steps.size(); i++){
+            stepPos.push_back(steps[i].interpolate(globalGeometry.vertexPositions));
+        }
+        polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos)->setEnabled(false);
+    }
 
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
         SurfacePoint facePoint = negVoronoiCenters.siteLocations[i].inSomeFace();
@@ -3349,9 +3417,6 @@ bool isValidEdgePair(VertexPositionGeometry& globalGeometry, EdgeData<double>& e
     return true;
 }
 
-
-
-
 //@clean 
 //the below two functions use the energy min ||\del sigma_i - \nabla \sigma_{i - 1} / ||\nabla \sigma_{i - 1}|| ||^2
 //if i = 1, use \nabla h / ||\nabla h||
@@ -3518,25 +3583,11 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     double maxDotProd = maximumDotProduct(globalGeometry, rotatedFaceGradients);
     HalfedgeData<double> gluedHeWeights = constructGluedHalfedgeWeights(globalGeometry, gluedGeometry, rotatedFaceGradients, maxDotProd);
 
-    //masked vertex for bent cylinder masking experiment/figure
-    // std::vector<int> maskedVerticesIds = {2624, 2620, 624, 2824, 2820, 2816, 2812, 528, 3016, 3012, 3008, 525,
-    //                               526, 527, 52, 620, 621, 622, 623, 64, 716, 717, 2643, 2639, 619, 2843, 2839, 2835, 
-    //                               2831, 523, 3035, 3031, 3027, 3026, 3030, 3034, 522, 2830, 2834, 2838, 2842, 618, 2638, 2642, 
-    //                               2641, 2637, 617, 2841, 2837, 2833, 2820, 521, 3033, 3029, 3024, 3028, 3032, 520, 2828, 2832, 2836, 2840, 616,
-    //                               2636, 2640, 2829, 3025};
-    // VertexData<double> maskedVertices(globalMesh, 0.0);
-    // for (int v : maskedVerticesIds){
-    //     maskedVertices[v] = 1.0;
-    //     //add the masked vertices to the heat sources
-    //     heatSourceVerts.push_back(gluedMesh.vertex(vertexMap[v]));
-    // }
-    // psMesh.addVertexScalarQuantity("masked vertices", maskedVertices)
-
 
     //handle saddle loops in the intrinsic setting
-    // for(int i = 0; i < allSaddleLoops.size(); i++){
-    //     edgePathConstraints.push_back(std::make_pair(allSaddleLoops[i], 0.0));
-    // }
+    for(int i = 0; i < allSaddleLoops.size(); i++){
+        edgePathConstraints.push_back(std::make_pair(allSaddleLoops[i], 0.0));
+    }
     for (int i = 0; i < allSaddleLoops.size(); i++){
         std::vector<double> path = allSaddleLoops[i];
         for (int j = 0; j < path.size(); j++){
@@ -3547,6 +3598,11 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             }
         }
     }
+
+    // std::vector<Vertex> saddleVertices = getSaddleVertices(gluedGeometry, globalTimeFunction);
+    // for (auto v : saddleVertices){
+    //     heatSourceVerts.push_back(v);
+    // }
     
 
     //solve the model without any singularities 
@@ -3591,9 +3647,39 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     globalTimeFunctionGradientsNormalized, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
 
-    psMesh.addVertexScalarQuantity("initial curl measure ", curlMeasure);
+    psMesh.addVertexScalarQuantity("initial curl measure without masking (course)", curlMeasure);
 
+    //mask the saddle 
+    //not sure if this is the correct way to go
+    VertexData<double> allDist = heatSolver.computeDistance(heatSourceVerts);
+    VertexData<double> courseWeighting(globalMesh);
+    double maxVal = std::numeric_limits<double>::min();
+    double maxSourceVal = std::numeric_limits<double>::min();
+    //for all the source vertices, find the max value 
+    for (Vertex v : heatSourceVerts){
+        maxSourceVal = std::max(maxSourceVal, allDist[v]);
+    }
+    //find the max val over all distances
+    for (Vertex v : gluedMesh.vertices()){
+        maxVal = std::max(maxVal, allDist[v]);
+    }
+    //shift down all the source vertex values
+    for (Vertex v : heatSourceVerts){
+        allDist[v] -= maxSourceVal;
+    }
+    //clip all values to 0 
+    for (Vertex v : gluedMesh.vertices()){
+        allDist[v] = std::max(allDist[v], 0.0);
+    }
+    //have a hard mask in the course direction
+    for (Vertex v : globalMesh.vertices()){
+        courseWeighting[v] = (allDist[v] > 2*period);
+        curlMeasure[v] = courseWeighting[v] * curlMeasure[v];
+    }
 
+    psMesh.addVertexScalarQuantity("initial curl measure with masking (course)", curlMeasure);
+
+    //polyscope::show();
 
     // Cap curl measure to avoid high concentration of singularities
     for (Vertex v : globalMesh.vertices()) {
@@ -3635,16 +3721,57 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 40; //std::round(avgTotalMeasure / period);
+    posOptions.nSites = std::round(avgTotalMeasure / period);
+    std::cout << "number of sings = " << posOptions.nSites << std::endl;
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
-    posOptions.iterations = 500;
+    posOptions.seed = 42;
+    // posOptions.iterations = 500; // we have a stopping criterion now
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
+    std::vector<std::vector<VertexData<double>>> posStepSiteDistribution = posVoronoiCenters.stepSiteDistribution;
+    std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
+    std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
+
+    //write a nested callback to debug the evolution of our method for the positive sites
+    //Register the callback which creates the UI and does the hard work
+    int step = 0;
+    int iSite = 0;
+    auto positivePopUpUI = [&](){
+        static bool showWindow = true;
+        ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
+        ImGui::Begin("Positive sites", &showWindow);
+        ImGui::PushItemWidth(400);
+        ImGui::Separator();
+        ImGui::InputInt("Site", &iSite);
+        ImGui::InputInt("Time Step", &step);
+        // Clamp to bounds after user input
+        iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
+        step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution[iSite].size() - 1));
+        //need setEnabled(true) otherwise we run into OpenGL errors? weird
+        psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
+        polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+
+        //should do this outside the ImGUI
+        // std::vector<Vector3> currentSites; 
+        // for (int i = 0; i < posOptions.nSites; i++){
+        //     currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
+        // }
+        // polyscope::registerPointCloud("all pos sites", currentSites);
+
+        if (ImGui::Button("Done"))
+            polyscope::popContext();
+        ImGui::SameLine();
+    };
+    //polyscope::pushContext(positivePopUpUI);  
+
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
        positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+       polyscope::registerPointCloud("unaligned site (+) " + std::to_string(i), std::vector<Vector3>{posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions)})->setEnabled(false);
     }
-    polyscope::registerPointCloud("positive voronoi sites (not aligned)", positiveCenters)->setEnabled(false);
+
+
+    polyscope::registerPointCloud("Voronoi sites unaligned (+)", positiveCenters)->setEnabled(false);
     std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
 
     //print the positive masses
@@ -3656,23 +3783,76 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             }
         }
         std::cout << "positive mass at site " << i << " = " << mass << std::endl;
-        psMesh.addVertexScalarQuantity("positve site distribution " + std::to_string(i), posSiteDistributions[i]);
+        psMesh.addVertexScalarQuantity("unaligned site distribution (+) " + std::to_string(i), posSiteDistributions[i]);
     }
 
-   
+    for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
+        std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
+        std::vector<Vector3> stepPos;
+        for (int i = 0; i < steps.size(); i++){
+            stepPos.push_back(steps[i].interpolate(globalGeometry.vertexPositions));
+        }
+        polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos)->setEnabled(false);
+    }
+
+    for (int i = 0; i < posInitialSites.size(); i++){
+        Vector3 p = posInitialSites[i].interpolate(globalGeometry.vertexPositions);
+        polyscope::registerPointCloud("site " + std::to_string(i) + " initialization ", std::vector<Vector3>{p})->setEnabled(false);
+    }
+
+    
     VoronoiOptions negOptions = defaultVoronoiOptions;
     negOptions.nSites = posOptions.nSites;
     negOptions.useDelaunay = false;
     negOptions.computeDistributions = true;
-    negOptions.iterations = 500;
+    negOptions.seed = 42;
+    // negOptions.iterations = 500; // we have a stopping criterion now
     std::cout << "# positive sites " << posOptions.nSites << std::endl;
     std::cout << "# negative sites " << negOptions.nSites << std::endl;
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
+    std::vector<std::vector<VertexData<double>>> negStepSiteDistribution = negVoronoiCenters.stepSiteDistribution;
+    std::vector<std::vector<SurfacePoint>> negSteps = negVoronoiCenters.steps;
+    std::vector<SurfacePoint> negInitialSites = negVoronoiCenters.initialSites;
+
+
+    //write a nested callback to debug the evolution of our method for the negative sites
+    //Register the callback which creates the UI and does the hard work
+    step = 0;
+    iSite = 0;
+    auto negativePopUpUI = [&](){
+        static bool showWindow = true;
+        ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
+        ImGui::Begin("Negative sites", &showWindow);
+        ImGui::PushItemWidth(400);
+        ImGui::Separator();
+        ImGui::InputInt("Site", &iSite);
+        ImGui::InputInt("Time Step", &step);
+        // Clamp to bounds after user input
+        iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
+        step = std::clamp(step, 0, static_cast<int>(negStepSiteDistribution[iSite].size() - 1));
+        //need setEnabled(true) otherwise we run into OpenGL errors? weird
+        psMesh.addVertexScalarQuantity("distribution", negStepSiteDistribution[iSite][step])->setEnabled(true);
+        polyscope::registerPointCloud("site ", std::vector<Vector3>{negSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+
+        //should do this outside the ImGUI
+        // std::vector<Vector3> currentSites; 
+        // for (int i = 0; i < posOptions.nSites; i++){
+        //     currentSites.push_back(negSteps[i][step].interpolate(globalGeometry.vertexPositions));
+        // }
+        // polyscope::registerPointCloud("all negative sites", currentSites);
+
+        if (ImGui::Button("Done"))
+            polyscope::popContext();
+        ImGui::SameLine();
+    };
+    //polyscope::pushContext(negativePopUpUI);  
+
     std::vector<Vector3> negativeCenters;
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
        negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+       polyscope::registerPointCloud("unaligned site (-) " + std::to_string(i), std::vector<Vector3>{negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions)})->setEnabled(false);
     }
-    polyscope::registerPointCloud("negative voronoi sites ", negativeCenters)->setEnabled(false);
+    polyscope::registerPointCloud("Voronoi sites unaligned (-)", negativeCenters)->setEnabled(false);
     std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
 
     //print the negative masses
@@ -3684,97 +3864,94 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             }
         }
         std::cout << "negative mass at site " << i << " = " << mass << std::endl;
-        psMesh.addVertexScalarQuantity("negative site distribution (course)" + std::to_string(i), negSiteDistributions[i]);
+        psMesh.addVertexScalarQuantity("unaligned site distribution (-) " + std::to_string(i), negSiteDistributions[i]);
     }
+    
 
+    
     //perform optimal matching using all the surface points directly
-    std::vector<std::pair<SurfacePoint, int>> allSites;
+    // std::vector<std::pair<SurfacePoint, int>> allSites;
+    // for (SurfacePoint s : posVoronoiCenters.siteLocations){
+    //     allSites.push_back(std::make_pair(s, 1));
+    // }
+    // for (SurfacePoint s : negVoronoiCenters.siteLocations){
+    //     allSites.push_back(std::make_pair(s, -1));
+    // }
+    // std::vector<std::pair<SurfacePoint, SurfacePoint>> matchedSurfacePoints = performOptimalSurfacePointMatching(globalGeometry, gluedHeWeights,
+    //                                                                             allSites, globalTimeFunction);
+    
+    // for (int i = 0; i < matchedSurfacePoints.size(); i++){
+    //     std::vector<Vector3> matchedSPs;
+    //     matchedSPs.push_back(matchedSurfacePoints[i].first.interpolate(globalGeometry.vertexPositions));
+    //     matchedSPs.push_back(matchedSurfacePoints[i].second.interpolate(globalGeometry.vertexPositions));
+    //     polyscope::registerPointCloud("matched surface point pair " + std::to_string(i), matchedSPs)->setEnabled(false);
+    // }
+
+    //perform optimal matching after projecting surface points to vertices
+    //store a vector of vertex ids and singularity indices (for optimal matching)
+    std::vector<std::pair<Vertex, int>> singularities;
+
+    //map vertices to surface points 
+    std::map<Vertex, SurfacePoint> vertexToSurfacePointMap;
     for (SurfacePoint s : posVoronoiCenters.siteLocations){
-        allSites.push_back(std::make_pair(s, 1));
+        Vertex v = s.nearestVertex();
+        singularities.push_back(std::make_pair(v, 1));
+        vertexToSurfacePointMap[v] = s;
+
+        
     }
     for (SurfacePoint s : negVoronoiCenters.siteLocations){
-        allSites.push_back(std::make_pair(s, -1));
-    }
-    std::vector<std::pair<SurfacePoint, SurfacePoint>> matchedSurfacePoints = performOptimalSurfacePointMatching(globalGeometry, gluedHeWeights,
-                                                                                allSites, globalTimeFunction);
-    
-    for (int i = 0; i < matchedSurfacePoints.size(); i++){
-        std::vector<Vector3> matchedSPs;
-        matchedSPs.push_back(matchedSurfacePoints[i].first.interpolate(globalGeometry.vertexPositions));
-        matchedSPs.push_back(matchedSurfacePoints[i].second.interpolate(globalGeometry.vertexPositions));
-        polyscope::registerPointCloud("matched surface point pair " + std::to_string(i), matchedSPs);
+        Vertex v = s.nearestVertex();
+        singularities.push_back(std::make_pair(v, -1));
+        vertexToSurfacePointMap[v] = s;
     }
 
-    //store a vector of vertex ids and singularity indices (for optimal matching)
-    // std::vector<std::pair<Vertex, int>> singularities;
-
-    // //map vertices to surface points 
-    // std::map<Vertex, SurfacePoint> vertexToSurfacePointMap;
-
-
-    // for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
-    //     SurfacePoint facePoint = posVoronoiCenters.siteLocations[i].inSomeFace();
-    //     Face f = facePoint.face;
-    //     Edge singularEdge;
-    //     double maxDotProd = -DBL_MAX;
-    //     for (Halfedge he : f.adjacentHalfedges()){
-    //         Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
-    //                             globalGeometry.vertexPositions[he.tailVertex()]).normalize();
-    //         if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
-    //             maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
-    //             singularEdge = he.edge();
-    //         }
-    //     }
-    //     //increment the indices really close so indices cancel out
-    //     //edgeIndices[singularEdge.getIndex()] = -1.0;
-    //     //edgeSingularities[singularEdge] = 1.0;
-    //     singularities.push_back(std::make_pair(singularEdge.halfedge().tailVertex(), 1));//used for optimal matching
-    //     vertexToSurfacePointMap[singularEdge.halfedge().tailVertex()] = posVoronoiCenters.siteLocations[i];//save it in the map, useful for aligning later
-    // }
-
-    // for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
-    //     SurfacePoint facePoint = negVoronoiCenters.siteLocations[i].inSomeFace();
-    //     Face f = facePoint.face;
-    //     Edge singularEdge;
-    //     double maxDotProd = -DBL_MAX;
-    //     for (Halfedge he : f.adjacentHalfedges()){
-    //         Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
-    //                             globalGeometry.vertexPositions[he.tailVertex()]).normalize();
-    //         if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
-    //             maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
-    //             singularEdge = he.edge();
-    //         }
-    //     }
-    //     //increment the indices really close so indices cancel out
-    //     //edgeIndices[singularEdge.getIndex()] = 1.0;
-    //     //edgeSingularities[singularEdge] = -1.0;
-    //     singularities.push_back(std::make_pair(singularEdge.halfedge().tailVertex(), -1));//used for optimal matching
-    //     vertexToSurfacePointMap[singularEdge.halfedge().tailVertex()] = negVoronoiCenters.siteLocations[i];//save it in the map, useful for aligning later
-    // }
-    
-    // //perform optimal matching 
-    // HalfedgeData<double> heWeights = gluedHeWeights;
-    // std::vector<std::pair<Vertex, Vertex>> matchedVertices = performOptimalMatching(globalGeometry, heWeights, singularities, globalTimeFunction);
+    HalfedgeData<double> heWeights = gluedHeWeights;
+    std::vector<std::pair<Vertex, Vertex>> matchedVertices = performOptimalMatching(globalGeometry, heWeights, singularities, globalTimeFunction);
 
     //specify options for alignment
     alignOptions alignmentOptions;
     alignmentOptions.timeFunction = globalTimeFunction;
-    // std::vector<std::pair<SurfacePoint, SurfacePoint>> pairedSites;
-    // for (int i = 0; i < matchedVertices.size(); i++){
-    //     auto p = matchedVertices[i];
-    //     pairedSites.push_back(std::make_pair(vertexToSurfacePointMap[p.first], vertexToSurfacePointMap[p.second]));
-    // }
+    std::vector<std::pair<SurfacePoint, SurfacePoint>> matchedSurfacePoints;
+    for (int i = 0; i < matchedVertices.size(); i++){
+        auto p = matchedVertices[i];
+        matchedSurfacePoints.push_back(std::make_pair(vertexToSurfacePointMap[p.first], vertexToSurfacePointMap[p.second]));
+    }
+
+    //render the matched surface points 
+    for (int i = 0; i <  matchedSurfacePoints.size(); i++){
+        auto p = matchedSurfacePoints[i];
+        std::vector<Vector3> matchedSP;
+        matchedSP.push_back(p.first.interpolate(globalGeometry.vertexPositions));
+        matchedSP.push_back(p.second.interpolate(globalGeometry.vertexPositions));
+        polyscope::registerPointCloud("matched SPs " + std::to_string(i), matchedSP)->setEnabled(false);
+    }
     alignmentOptions.pairedSites = matchedSurfacePoints;
     alignmentOptions.usingPosCurl = true;
     alignmentOptions.iterations = 2500;
     alignmentOptions.lambda = 1.0;
-    VoronoiResult posAlignedCenters = alignPointsOnIsoline(globalMesh, globalGeometry, alignmentOptions, posMeasure, psMesh);
-    std::vector<Vector3> alignedPosCenters;
-    for (int i = 0; i < posAlignedCenters.siteLocations.size(); i++){
-       alignedPosCenters.push_back(posAlignedCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+    alignPointsOnIsolineFast(globalMesh, globalGeometry, alignmentOptions, psMesh);
+
+    // Plot aligned singularities
+    std::vector<Vector3> alignedPosCenters, alignedNegCenters;
+    for (auto &[s1,s2] : alignmentOptions.pairedSites) {
+        alignedPosCenters.push_back(s1.interpolate(globalGeometry.vertexPositions));
+        alignedNegCenters.push_back(s2.interpolate(globalGeometry.vertexPositions));
     }
-    polyscope::registerPointCloud("positive voronoi sites (aligned course)", alignedPosCenters)->setEnabled(false);
-    
+    polyscope::registerPointCloud("Voronoi sites aligned (+)", alignedPosCenters)->setEnabled(false);
+    polyscope::registerPointCloud("Voronoi sites aligned (-)", alignedNegCenters)->setEnabled(false);
+
+    // for (int i = 0; i < alignmentOptions.pairedSites.size(); i++){
+    //     auto [s1, s2] = alignmentOptions.pairedSites[i];
+    //     Vector3 p1 = {s1.interpolate(globalGeometry.vertexPositions)};
+    //     Vector3 p2 = {s2.interpolate(globalGeometry.vertexPositions)};
+    //     polyscope::registerPointCloud("site aligned (+) " + std::to_string(i), std::vector<Vector3>{p1});
+    //     polyscope::registerPointCloud("site aligned (-) " + std::to_string(i), std::vector<Vector3>{p2});
+    // }
+
+    // // Old approach using gradient descent to align centers
+    // VoronoiResult posAlignedCenters = alignPointsOnIsoline(globalMesh, globalGeometry, alignmentOptions, posMeasure, psMesh);
+
     //store the paired time functions
     std::vector<std::pair<double, double>> pairedTimeFunctions;
     //paired halfedges
@@ -3782,16 +3959,19 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //map singular edges to their corresponding isovals
     std::map<Edge, double> edgeToIsoVal;
 
+    // polyscope::show();
+
     //now appropriatately specify the singular edges
-    for (int i = 0; i < posAlignedCenters.siteLocations.size(); i++){
-        SurfacePoint posSite = posAlignedCenters.siteLocations[i];
-        SurfacePoint negSite = matchedSurfacePoints[i].second;//find the corresponding paired negative site
-        
+    //this relies on the assumption that 2 singular sites (surface points) don't end up on the same face 
+    //Even if they end up on adjacent faces, we shouldn't select the same edges 
+    //If the algorithm runs to convergence, we shouldn't be getting singularities so close together
+    //But we clearly run into issues where the above happens 
+    for (auto &[posSite,negSite] : alignmentOptions.pairedSites) { 
         //handle positive case 
         SurfacePoint posFacePoint = posSite.inSomeFace();
         double posVal = posSite.interpolate(globalTimeFunction);
         Halfedge posHe;
-        Face f = posSite.face;
+        Face f = posFacePoint.face;
         Edge posSingularEdge;
         double maxDotProd = -DBL_MAX;
         for (Halfedge he : f.adjacentHalfedges()){
@@ -3810,7 +3990,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         SurfacePoint negFacePoint = negSite.inSomeFace();
         double negVal = negSite.interpolate(globalTimeFunction);
         Halfedge negHe;
-        f = negSite.face;
+        f = negFacePoint.face;
         Edge negSingularEdge;
         maxDotProd = -DBL_MAX;
         for (Halfedge he : f.adjacentHalfedges()){
@@ -3839,6 +4019,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //TO-DO: * ensure edge singularities lie in the same cylindrical compononent
     //       * ensure the average isovalue passes through both faces
     std::vector<int> indicesToUse; 
+    int problemCount = 0;
     for (int i = 0; i < singularEdges.size(); i++){
         auto p = singularEdges[i];
         auto timeFuncPair = pairedTimeFunctions[i];
@@ -3850,12 +4031,16 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         std::vector<Face> faces;
         int code; 
         std::tie(faces, code) = traceIsolineFaces(globalGeometry, globalTimeFunction, globalTimeFunctionGradientsNormalized, rotatedFaceGradients, isoVal, 
-                                                    HePair.first, HePair.second);
+                                                 HePair.first, HePair.second);
         //a face path exists and we got to the end face
         if (faces.size() != 0 && code != -1){
             indicesToUse.push_back(i);
         }
         else{//remove these entry from edgeIndices and edgeSingularities
+
+            showEdges("dropped pair "+std::to_string(problemCount), {posEdge, negEdge}, globalGeometry);
+            problemCount++;
+
             edgeIndices[p.first] = 0.0;
             edgeIndices[p.second] = 0.0;
             edgeSingularities[posEdge] = 0.0;
@@ -3863,17 +4048,38 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         }
     }
 
-    for (int i : indicesToUse){
-        std::cout << "index to use = " << i << std::endl;
+    std::cout << "Number of singularity pairs missing = " << posOptions.nSites - indicesToUse.size() << std::endl;
+    if (problemCount > 0) {
+        P("Stopping because some singularity pairs were dropped");
+        polyscope::show();
     }
-    std::cout << "Finished aligning the sites " << std::endl;
-    //set the singular edges
-    model.setSingularEdges(singularEdges);
+
+    //set the singular edges where path exists
+    std::vector<std::pair<int, int>> singularEdgesToUse;
+    for (int i : indicesToUse){
+        singularEdgesToUse.push_back(singularEdges[i]);
+    }
+    model.setSingularEdges(singularEdgesToUse);
+
+    // Set edgeSingularities[e] = ±i, where i is the ordering of the pair in time.
+    // Having the ordering will be useful for constructing the knit graph.
+    std::map<double, std::pair<Edge,Edge>> singularPairsByTime;
+    for (auto &[i1, i2] : singularEdgesToUse) {
+        Edge e1 = globalMesh.edge(i1);
+        Edge e2 = globalMesh.edge(i2);
+        singularPairsByTime[edgeToIsoVal[e1]] = {e1, e2};
+    }
+    int pairIndex = 1;
+    for (auto &[t, p] : singularPairsByTime) {
+        edgeSingularities[p.first] = +pairIndex;
+        edgeSingularities[p.second] = -pairIndex;
+        pairIndex++;
+    }
 
     std::cout << "Set singular edges as constraints " << std::endl;
 
     std::vector<std::pair<std::vector<double>, double>> halfedgePathConstraints;
- 
+    
     //construct edge paths between singular edges
     for (int i : indicesToUse){
         auto p = singularEdges[i];
@@ -3932,7 +4138,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         FaceData<int> facePath(globalGeometry.mesh, 0);
         for (Face f : faces) facePath[f] = 1;
         psMesh.addFaceScalarQuantity("faces for pair " + std::to_string(i), facePath);
-        psMesh.addHalfedgeScalarQuantity("halfedge strip path " + std::to_string(i), stripHalfedgePath);
+        //psMesh.addHalfedgeScalarQuantity("halfedge strip path " + std::to_string(i), stripHalfedgePath);
         std::vector<double> edgePath(globalMesh.nEdges(), 0.0);
         // for (Halfedge he : globalMesh.halfedges()){
         //     if (stripHalfedgePath[he]){
@@ -3967,21 +4173,23 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
 
     psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
-    //polyscope::show();
-
-    //model.setEdgePathConstraints(edgePathConstraints);
+    
     model.setHalfedgePathConstraints(halfedgePathConstraints);
     model.setEdgeIndices(edgeIndices);
     model.setHomologyGenerators(homologyGenerators);
+
+    //polyscope::show();
+
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
     //plot the stripes
     std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
     std::tie(uniquePos, uniqueEdges, components) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, edgeMap);
+    psMesh.addCornerScalarQuantity("our stripe values", prepareCornerData(stripeValuesSigmaCourse));
     courseStripes = polyscope::registerCurveNetwork("our course stripes ", uniquePos, uniqueEdges);
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
 
-    psMesh.addHalfedgeScalarQuantity("Sigma ", gluedSigmaTilde);
+    //psMesh.addHalfedgeScalarQuantity("our Sigma ", gluedSigmaTilde);
 
     //visualize the saddle vertices
     std::vector<Vector3> saddleVertexPositions;
@@ -3994,6 +4202,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         if (index == -1) saddleVertexPositions.push_back(globalGeometry.vertexPositions[v]);
     }
     polyscope::registerPointCloud("saddle vertices", saddleVertexPositions);
+    
 
     //-------------------End of testing-------------------//
 
@@ -4335,39 +4544,29 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 std::vector<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry,  std::vector<Face> faces, 
                                      VertexData<double>& timeFunction, double isoVal, EdgeData<double>& edgeSingularities,
                                      std::map<Edge, double>& edgeToIsoVal, std::pair<int, int>& singEdgePair){
-
+    
+    
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     std::vector<double> result(globalMesh.nHalfedges(), 0.0);
     //path of halfedges
     std::vector<Halfedge> hePath;
+
+    //vector of halfedge weights on the lens complex
+    std::vector<double> lensHePath(globalMesh.nHalfedges(), 0.0);
+
     Edge posEdge = globalMesh.edge(singEdgePair.first);
     Edge negEdge = globalMesh.edge(singEdgePair.second);
 
+    //TO-DO: Going to hit singular edge twice in adjacent faces
     for (Face f : faces){
         for (Halfedge he : f.adjacentHalfedges()) {
             if (edgeSingularities[he.edge()] && he.edge() != posEdge
-                && he.edge() != negEdge){//we have hit a singular edge
+                && he.edge() != negEdge){//we have hit a singular edge and it's not the edge you're currently tracing
                 Edge singularEdge = he.edge();
-                double singIsoVal = edgeToIsoVal[singularEdge];
-                if (singIsoVal < isoVal){//if the singularity isovalue is less than the current isovalue, route "below" the edge
-                    if (timeFunction[singularEdge.halfedge().tailVertex()] < timeFunction[singularEdge.halfedge().tipVertex()]){
-                        hePath.push_back(singularEdge.halfedge().twin());
-                        hePath.push_back(singularEdge.halfedge());
-                    }
-                    else{
-                        hePath.push_back(singularEdge.halfedge());
-                        hePath.push_back(singularEdge.halfedge().twin());
-                    }
-                }
-                else{//singularity isovalue is greater than the current isovalue, route "above" the edge
-                    if (timeFunction[singularEdge.halfedge().tailVertex()] < timeFunction[singularEdge.halfedge().tipVertex()]){
-                        hePath.push_back(singularEdge.halfedge());
-                        hePath.push_back(singularEdge.halfedge().twin());
-                    }
-                    else{
-                        hePath.push_back(singularEdge.halfedge().twin());
-                        hePath.push_back(singularEdge.halfedge());
-                    }
+                double hitIsoVal = edgeToIsoVal[singularEdge];
+                if (hitIsoVal > isoVal){//if the current singularity isovalue is lesser than the hit isovalue, route "below" the edge
+                    lensHePath[he.getIndex()] = -1.0;
+                    lensHePath[he.twin().getIndex()] = -1.0;
                 }
             }
 
@@ -4376,24 +4575,16 @@ std::vector<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry
 
             double f0 = timeFunction[v0];
             double f1 = timeFunction[v1];
-
+            
             if (f0 > isoVal && f1 > isoVal) {
-                hePath.push_back(he);
+                hePath.push_back(he.twin());//add the halfedges in the correct direction (TODO: handle case when singular edge is at the top or bottom of the strip)
+                lensHePath[he.getIndex()] = -1.0;
                 Edge e = he.edge();
-                // Optional: only add canonical reps to avoid duplicates
-                //result[e] = 1.0;
             }
-
 
         }
     }
-    
-    for (Halfedge he : hePath){
-        result[he.getIndex()] = 1.0;
-    }
-
-    return result;
-
+    return lensHePath;
 }
 
 
@@ -4408,6 +4599,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
     std::vector<int> bdyEdges = gbModel.getBdyEdges();
     std::vector<std::pair<std::vector<double>, double>> edgePathConstraints = gbModel.getEdgePathConstraints();
     std::vector<std::pair<std::vector<double>, double>> halfedgePathConstraints = gbModel.getHalfedgePathConstraints();
+    std::vector<std::vector<int>> stripeAlignmentConstraints = gbModel.getStripeAlignmentConstraints();
 
     gluedGeometry.requireDECOperators();
     Eigen::SparseMatrix<double, Eigen::RowMajor> d_one = gluedGeometry.d1;
@@ -4433,6 +4625,10 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
 
         // Create an empty model
         GRBModel model = GRBModel(env);
+
+        //relaxing the model
+        //trying to get Gurobi to remove constraints that cause infeasablity issues
+        //model.feasRelax(GRB_FEASRELAX_LINEAR, true, true, true);
 
         //set the timeout
         //model.getEnv().set(GRB_DoubleParam_TimeLimit, 30);
@@ -4721,6 +4917,19 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                 model.addConstr(pathIntegral == period * halfedgePathConstraints[i].second);
             else
                 model.addConstr(pathIntegral == 0.0);
+        }
+
+        //add stripe alignment constraints 
+        std::vector<GRBVar> alignmentEqualities;
+        for (int i = 0; i < stripeAlignmentConstraints.size(); i++){
+            GRBVar equalityI = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS);
+            alignmentEqualities.push_back(equalityI);//decision variables
+        }
+        for (int i = 0; i < stripeAlignmentConstraints.size(); i++){
+            std::vector<int> currHes = stripeAlignmentConstraints[i];
+            for (int j = 0; j < gluedMesh.nHalfedges(); j++){
+                if (currHes[j] != 0) model.addConstr(sigma[j] == 0.);//don't have to set it 0, can set it to alignmentEqualities[i] and let gurobi figure it out 
+            }
         }
 
         //compute a piecewise linear function over the vertices of the mesh 

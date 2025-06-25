@@ -25,6 +25,11 @@ void Model::setHalfedgePathConstraints(std::vector<std::pair<std::vector<double>
     this->halfedgePathConstraints = halfedgePathConstraints;
 }
 
+void Model::setStripeAlignmentConstraints(std::vector<std::vector<int>> stripeAlignmentConstraints){
+
+    this->stripeAlignmentConstraints = stripeAlignmentConstraints;
+
+}
 
 
 void Model::setSingularFaceIndices(std::vector<std::pair<int, int>>& singularFaces){
@@ -157,6 +162,12 @@ std::vector<std::pair<std::vector<double>, double>> Model::getEdgePathConstraint
 std::vector<std::pair<std::vector<double>, double>> Model::getHalfedgePathConstraints(){
 
     return this->halfedgePathConstraints;
+}
+
+std::vector<std::vector<int>> Model::getStripeAlignmentConstraints(){
+
+    return this->stripeAlignmentConstraints;
+
 }
 
 std::vector<int> Model::getBdyEdges(){

@@ -23,6 +23,7 @@
 #include <igl/slice.h>
 #include <igl/slice_into.h>
 #include <igl/grad.h>
+#include <igl/grad_intrinsic.h>
 #include <igl/average_onto_vertices.h>
 #include <igl/hessian_energy.h>
 #include <igl/curved_hessian_energy.h>
@@ -66,6 +67,8 @@ VertexData<double> computeTimeFunction(EdgeLengthGeometry& gluedGeometry, global
 //
 //@return       faceGradients           FaceData<Vector3>               #F by 3 vector per face
 FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, VertexData<double>& vertexScalarFunction);
+
+FaceData<Vector2> computeTimeFunctionFaceGradIntrinsic(const IntrinsicGeometryInterface& geometry, VertexData<double>& vertexScalarFunction);
 
 //compute the gradient of the a function defined as a scalar over vertices in the glued mesh setting 
 //Don't think the formula I'm using in here is right
@@ -251,6 +254,7 @@ void revealCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& glue
 //find isoval with maximum average edge curl 
 double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& globalTimeFunction, 
                                     EdgeData<double>& curl, std::map<int, int>& hashedUsedIsoVals, double stepSize);
+
 
 //@clean 
 //the below two functions use the energy min ||\del sigma - \nabla \sigma_{i - 1} / ||\nabla \sigma_{i - 1}|| ||^2
