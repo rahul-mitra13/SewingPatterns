@@ -612,14 +612,14 @@ void KnitGraph::intrinsicMerge(){
         bool success = false;
         while (!success) {
 
-            // Pick the first unmatched vertex on he2Vertices
-            knitGraphVertex startVertex;
-            for (knitGraphVertex &v : he2Vertices) {
-                if (!matchings.count(v.id)) {
-                    startVertex = v;
-                    break;
-                }
+            // As a starting vertex, pick the one after the last matched vertex on he2Vertices
+            knitGraphVertex startVertex = he2Vertices[0];
+            for (int i = 0; i < he2Vertices.size()-1; i++) {
+                if (matchings.count(he2Vertices[i].id))
+                    startVertex = he2Vertices[i+1];
             }
+            ensure(!matchings.count(startVertex.id)); // if this fails we're screwed lol
+
             matchings[startVertex.id] = -1;
 
             // Trace short row. Now that we go in the direction of row_in (== right)!
