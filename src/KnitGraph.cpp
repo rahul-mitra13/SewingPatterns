@@ -466,6 +466,12 @@ void KnitGraph::renderGraph(){
 
 }
 
+//find the sign of a value
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
+
 //carry out a merging in the intrinsic setting
 void KnitGraph::intrinsicMerge(){
 
@@ -477,16 +483,16 @@ void KnitGraph::intrinsicMerge(){
 
 
     // Store these vertices in order of the "direction of the halfedge"
-    std::map<Halfedge, std::vector<knitGraphVertex>> halfedgeVertices;
-    EdgeData<int> numVirtualVertices(gluedGeometry->mesh, 0);
+    std::map<Halfedge, std::vector<knitGraphVertex>> halfedgeCourseVertices;
+    std::map<Halfedge, std::vector<knitGraphVertex>> halfedgeWaleVertices;
     for (const knitGraphVertex& v : vertices) if (v.isVirtual) {
 
         // // Prevent merging on singular edges
         // if (v.isAlphaVirtual && std::fabs(courseSingularEdgesGlued[v.edge.value()]) > 0) continue; // end of course stripe: skip
         // if (v.isBetaVirtual  && std::fabs(waleSingularEdgesGlued[v.edge.value()]) > 0)   continue; // end of wale stripe: skip
 
-        numVirtualVertices[v.halfedge.value().edge()]++;
-        halfedgeVertices[v.halfedge.value()].push_back(v);
+        if (v.isAlphaVirtual) halfedgeCourseVertices[v.halfedge.value()].push_back(v);
+        if (v.isBetaVirtual) halfedgeWaleVertices[v.halfedge.value()].push_back(v);
     }
 
     // // Check that each edge has an even number of virtual vertices
@@ -518,30 +524,223 @@ void KnitGraph::intrinsicMerge(){
         return a.baryCoords[0] > b.baryCoords[0];
     };
 
-    //now sort the halfedge vertices based on their barycoords
-    for (auto p : halfedgeVertices){
-        Halfedge he = p.first;
-        std::vector<knitGraphVertex> vec = p.second;
-
-        if (std::fabs(vec[0].baryCoords[0]) < 1e-8){//this is a halfedge on the jk edge
-            std::sort(vec.begin(), vec.end(), compareByJK);
+    //now sort the halfedge vertices based on their barycoords (course + wale)
+    for (auto &[he, verts] : halfedgeCourseVertices) {
+        if (std::fabs(verts[0].baryCoords[0]) < 1e-8){//this is a halfedge on the jk edge
+            std::sort(verts.begin(), verts.end(), compareByJK);
         }
-        else if (std::fabs(vec[0].baryCoords[1]) < 1e-8){//this is a halfedge on the ki edge
-            std::sort(vec.begin(), vec.end(), compareByKI);
+        else if (std::fabs(verts[0].baryCoords[1]) < 1e-8){//this is a halfedge on the ki edge
+            std::sort(verts.begin(), verts.end(), compareByKI);
         }
         else{//this is a halfedge on the ij edge
-            std::sort(vec.begin(), vec.end(), compareByIJ);
+            std::sort(verts.begin(), verts.end(), compareByIJ);
         }
-        //update the value
-        halfedgeVertices[he] = vec;
+    }
+    for (auto &[he, verts] : halfedgeWaleVertices) {
+        if (std::fabs(verts[0].baryCoords[0]) < 1e-8){//this is a halfedge on the jk edge
+            std::sort(verts.begin(), verts.end(), compareByJK);
+        }
+        else if (std::fabs(verts[0].baryCoords[1]) < 1e-8){//this is a halfedge on the ki edge
+            std::sort(verts.begin(), verts.end(), compareByKI);
+        }
+        else{//this is a halfedge on the ij edge
+            std::sort(verts.begin(), verts.end(), compareByIJ);
+        }
     }
 
-    //make the connections 
-    for (Edge e : (gluedGeometry->mesh).edges()){
+    // Make connections across regular course edges
+    for (Edge e : (gluedGeometry->mesh).edges()) if (!e.isBoundary() && courseSingularEdgesGlued[e] == 0) {
+
+        std::vector<knitGraphVertex> he1CourseVertices = halfedgeCourseVertices[e.halfedge()];
+        std::vector<knitGraphVertex> he2CourseVertices = halfedgeCourseVertices[e.halfedge().twin()];
+
+        // Trivial matchings
+        vector<pair<int, int>> matchings;
+        for (int i = 0; i < he1CourseVertices.size(); i++) {
+            matchings.push_back({i, (he1CourseVertices.size() - i) - 1});
+        }
+
+        // Connect all matchings
+        for (auto [i1, i2] : matchings) {
+            knitGraphVertex v1 = he1CourseVertices[i1];
+            knitGraphVertex v2 = he2CourseVertices[i2];
+
+            // if (v1.col_in[0] == -1 && v2.col_in[0] == -1 && v1.col_out[0] == -1 && v2.col_out[0] == -1){//this is a row merge
+            if (v1.row_in == -1 && v2.row_in != -1){
+                vertices[v2.id].row_out = v1.id;
+                vertices[v1.id].row_in  = v2.id;
+            }
+            if (v2.row_in == -1 && v1.row_in != -1){
+                vertices[v1.id].row_out = v2.id;
+                vertices[v2.id].row_in  = v1.id;                    
+            }
+            // }
+        }
+
+    }
+
+    // Now we need to connect across course singular edges.
+    // For each positive sing, we choose an arbitrary stripe to start a short row (TODO: make a better choice here).
+    // We then propagate it until reaching another sing edge. If that sing edge matches the first one, we're done.
+    // If not, we connect it across in a way that respects the ordering.
+
+    map<int, int> matchings; // -1 means short row
+    vector<Edge> processedEdges; // for debugging
+
+    // Order positive edges in decreasing order of time
+    vector<Edge> orderedPosEdges;
+    map<int, Edge, greater<int>> posEdgesByTime;
+    for (Edge edge : (gluedGeometry->mesh).edges()) if (!edge.isBoundary() && courseSingularEdgesGlued[edge] > 0)
+        posEdgesByTime[courseSingularEdgesGlued[edge]] = edge;
+    for (auto &[time,edge] : posEdgesByTime)
+        orderedPosEdges.push_back(edge);
+
+    for (Edge startEdge : orderedPosEdges) {
+        // Loop on positive course sings
+
+        processedEdges.push_back(startEdge);
+
+        int startEdgeOrder = round(courseSingularEdgesGlued[startEdge]);
+
+        std::vector<knitGraphVertex> he1Vertices = halfedgeCourseVertices[startEdge.halfedge()];
+        std::vector<knitGraphVertex> he2Vertices = halfedgeCourseVertices[startEdge.halfedge().twin()];
+        if (he1Vertices.size() > he2Vertices.size())
+            swap(he1Vertices, he2Vertices);
+
+        ensure(he2Vertices.size() - he1Vertices.size() == 1);
+
+        bool success = false;
+        while (!success) {
+
+            // As a starting vertex, pick the one after the last matched vertex on he2Vertices
+            knitGraphVertex startVertex = he2Vertices[0];
+            for (int i = 0; i < he2Vertices.size()-1; i++) {
+                if (matchings.count(he2Vertices[i].id))
+                    startVertex = he2Vertices[i+1];
+            }
+            ensure(!matchings.count(startVertex.id)); // if this fails we're screwed lol
+
+            matchings[startVertex.id] = -1;
+
+            // Trace short row. Now that we go in the direction of row_in (== right)!
+            knitGraphVertex walker = startVertex;
+            ensure(walker.row_in != -1);
+            while (true) {
+
+                if (walker.row_in == -1) {
+                    // We hit a singular edge
+                    ensure(walker.isVirtual); // walker must be virtual
+
+                    // if (matchings.count(walker.id)) {
+                    //     polyscope::registerPointCloud("matched walker", vector<Vector3>{startVertex.position, walker.position});
+                    //     showEdges("processedEdges", processedEdges, *globalGeometry);
+                    //     H(matchings[walker.id]);
+                    //     H(startVertex.id);
+                    //     polyscope::show();
+                    // }
+
+                    ensure(!matchings.count(walker.id)); // walker must be unmatched
+                    ensure(walker.edge.has_value());
+
+                    Edge edge = walker.edge.value();
+                    int edgeOrder = round(courseSingularEdgesGlued[edge]);
+
+                    if (edgeOrder == -startEdgeOrder) {
+                        // It's a match! We're done
+                        matchings[walker.id] = -1;
+                        success = true;
+                        break;
+                    } else {
+                        // We need to cross this edge. Above or below?
+                        std::vector<knitGraphVertex> leftVertices = halfedgeCourseVertices[edge.halfedge()];
+                        std::vector<knitGraphVertex> rightVertices = halfedgeCourseVertices[edge.halfedge().twin()];
+
+                        if (sgn((int)rightVertices.size() - (int)leftVertices.size()) != sgn(edgeOrder))
+                            swap(leftVertices, rightVertices);
+                        ensure(sgn((int)rightVertices.size() - (int)leftVertices.size()) == sgn(edgeOrder)); // make sure the sides are correct!
+
+                        // Find index along half-edge
+                        int indexAlongHalfedge = -1;
+                        for (int i = 0; i < leftVertices.size(); i++) {
+                            if (leftVertices[i].id == walker.id) {
+                                indexAlongHalfedge = i;
+                                break;
+                            }
+                        }
+
+                        knitGraphVertex connectTo;
+                        if (abs(edgeOrder) > startEdgeOrder) {
+                            // Go below
+                            connectTo = rightVertices[rightVertices.size()-1-indexAlongHalfedge];
+                        } else {
+                            // Go above (also happens if we looped to the starting edge)
+                            connectTo = rightVertices[leftVertices.size()-1-indexAlongHalfedge];
+                        }
+                        matchings[walker.id] = connectTo.id;
+                        matchings[connectTo.id] = walker.id;
+                        walker = connectTo;
+                        if (edgeOrder == startEdgeOrder) {
+                            // We looped around! Break and continue onto the next short row candidate
+                            break;
+                        }
+                    }
+                } else {
+                    walker = vertices[walker.row_in];
+                }
+
+            }
+
+        }
+    }
+
+
+
+    // Connect the remaining unmatched virtual vertices across singular edges
+    for (Edge startEdge : (gluedGeometry->mesh).edges()) if (!startEdge.isBoundary() && courseSingularEdgesGlued[startEdge] != 0) {
+        std::vector<knitGraphVertex> he1Vertices = halfedgeCourseVertices[startEdge.halfedge()];
+        std::vector<knitGraphVertex> he2Vertices = halfedgeCourseVertices[startEdge.halfedge().twin()];
+
+        int i2 = he2Vertices.size()-1;
+        for (int i1 = 0; i1 < he1Vertices.size(); i1++) {
+            if (!matchings.count(he1Vertices[i1].id)) {
+                while (matchings.count(he2Vertices[i2].id)) {
+                    i2--;
+                    if (i2 < 0) {
+                        showEdges("i2 < 0", {startEdge}, *globalGeometry);
+                        // polyscope::registerPointCloud("i2 < 0", vector<Vector3> {he2Vertices[i2].position});
+                        polyscope::show();
+                    }
+                    ensure (i2 >= 0);
+                }
+                matchings[he1Vertices[i1].id] = he2Vertices[i2].id;
+                matchings[he2Vertices[i2].id] = he1Vertices[i1].id;
+                i2--;
+            }
+        }
+    }
+
+    // Now actually connect all course matchings
+    for (auto [i1, i2] : matchings) {
+        if (i1 == -1 || i2 == -1) continue;
+        knitGraphVertex v1 = vertices[i1];
+        knitGraphVertex v2 = vertices[i2];
+        if (v1.row_in == -1 && v2.row_in != -1){
+            vertices[v2.id].row_out = v1.id;
+            vertices[v1.id].row_in  = v2.id;
+        }
+        if (v2.row_in == -1 && v1.row_in != -1){
+            vertices[v1.id].row_out = v2.id;
+            vertices[v2.id].row_in  = v1.id;                    
+        }
+    }
+
+
+    // Connect wale vertices 
+    for (Edge e : (gluedGeometry->mesh).edges()) {
         if (e.isBoundary()) continue;//don't need to handle boundary vertices
 
-        std::vector<knitGraphVertex> he1Vertices = halfedgeVertices[e.halfedge()];
-        std::vector<knitGraphVertex> he2Vertices = halfedgeVertices[e.halfedge().twin()];
+        std::vector<knitGraphVertex> he1Vertices = halfedgeWaleVertices[e.halfedge()];
+        std::vector<knitGraphVertex> he2Vertices = halfedgeWaleVertices[e.halfedge().twin()];
 
         // classical singularity with 1 stripe being born/dying: nothing to do
         if (he1Vertices.size() + he2Vertices.size() == 1)
@@ -550,7 +749,7 @@ void KnitGraph::intrinsicMerge(){
         vector<pair<int, int>> matchings;
 
         // more funky singularity: we need to match
-        if (numVirtualVertices[e] % 2 != 0) { 
+        if (he1Vertices.size() != he2Vertices.size()) { 
 
             // Check which side of the triangles he1 and he2 are located
             // TODO: find a way to do this without epsilons
@@ -574,7 +773,7 @@ void KnitGraph::intrinsicMerge(){
                 for (int i1 = 0; i1 < he1Vertices.size(); i1++) {
                     int i2closest = -1;
                     for (int i2 = 0; i2 < he2Vertices.size(); i2++)
-                        if (he1Vertices[i1].isAlphaVirtual == he2Vertices[i2].isAlphaVirtual && (i2closest == -1 || abs(coordsAlongHe1[i1] - coordsAlongHe2[i2]) < abs(coordsAlongHe1[i1] - coordsAlongHe2[i2closest])))
+                        if (i2closest == -1 || abs(coordsAlongHe1[i1] - coordsAlongHe2[i2]) < abs(coordsAlongHe1[i1] - coordsAlongHe2[i2closest]))
                             i2closest = i2;
                     if (i2closest == -1) {
                         cout << "Error: No match found for vertex " << he1Vertices[i1].id << endl;
@@ -587,7 +786,7 @@ void KnitGraph::intrinsicMerge(){
                 for (int i2 = 0; i2 < he2Vertices.size(); i2++) {
                     int i1closest = -1;
                     for (int i1 = 0; i1 < he1Vertices.size(); i1++)
-                        if (he1Vertices[i1].isAlphaVirtual == he2Vertices[i2].isAlphaVirtual && (i1closest == -1 || abs(coordsAlongHe1[i1] - coordsAlongHe2[i2]) < abs(coordsAlongHe1[i1closest] - coordsAlongHe2[i2])))
+                        if (i1closest == -1 || abs(coordsAlongHe1[i1] - coordsAlongHe2[i2]) < abs(coordsAlongHe1[i1closest] - coordsAlongHe2[i2]))
                             i1closest = i1;
                     if (i1closest == -1) {
                         cout << "Error: No match found for vertex " << he2Vertices[i2].id << endl;
@@ -604,33 +803,20 @@ void KnitGraph::intrinsicMerge(){
             }
         }
 
-
-        // Now actually connect all matchings
+        // Connect the wale matchings we found
         for (auto [i1, i2] : matchings) {
-            knitGraphVertex v1 = he1Vertices[i1];
-            knitGraphVertex v2 = he2Vertices[i2];
-            if (v1.row_in == -1 && v2.row_in == -1 && v1.row_out == -1 && v2.row_out == -1){//this is a column merge
-                if (v1.col_in[0] == -1 && v2.col_in[0] != -1){
-                    vertices[v1.id].col_in[0]  = v2.id;
-                    vertices[v2.id].col_out[0] = v1.id;
-                }
-                if (v2.col_in[0] == -1 && v1.col_in[0] != -1){
-                    vertices[v1.id].col_out[0] = v2.id;
-                    vertices[v2.id].col_in[0]  = v1.id;
-                }
+            knitGraphVertex v1 = vertices[he1Vertices[i1].id];
+            knitGraphVertex v2 = vertices[he2Vertices[i2].id];
+            if (v1.col_in[0] == -1 && v2.col_in[0] != -1){
+                vertices[v1.id].col_in[0]  = v2.id;
+                vertices[v2.id].col_out[0] = v1.id;
             }
-
-            if (v1.col_in[0] == -1 && v2.col_in[0] == -1 && v1.col_out[0] == -1 && v2.col_out[0] == -1){//this is a row merge
-                if (v1.row_in == -1 && v2.row_in != -1){
-                    vertices[v2.id].row_out = v1.id;
-                    vertices[v1.id].row_in  = v2.id;
-                }
-                if (v2.row_in == -1 && v1.row_in != -1){
-                    vertices[v1.id].row_out = v2.id;
-                    vertices[v2.id].row_in  = v1.id;                    
-                }
+            if (v2.col_in[0] == -1 && v1.col_in[0] != -1){
+                vertices[v1.id].col_out[0] = v2.id;
+                vertices[v2.id].col_in[0]  = v1.id;
             }
         }
+
     }
 
     // Now connect real vertices to one another
@@ -1241,6 +1427,7 @@ void KnitGraph::writeKnitGraphLineElement(){
     }
 
     outfile.close();
+    std::cout << "wrote knit graph text file " << std::endl;
 }
 
 //trace the short rows in the graph 
@@ -1248,7 +1435,6 @@ void KnitGraph::traceShortRows(){
 
     int ctr = 0;
     for (auto &v : realVertices){
-
         if (v.row_in == -1){
             std::vector<Vector3> pos;
             std::vector<std::array<int, 2>> edges;
@@ -1257,7 +1443,7 @@ void KnitGraph::traceShortRows(){
                 pos.push_back(walker.position);
                 walker = realVertices[walker.row_out];
             }
-            for (int i = 0; i < pos.size() - 1; i++){
+            for (int i = 0; i < (int)pos.size() - 1; i++){
                 edges.push_back(std::array{i, i + 1});
             }
             if (pos.size() > 1000) return;

@@ -941,4 +941,17 @@ std::vector<int> roundWithSum(std::vector<double> y, int sum) {
 
 
     return res;
+
+}
+
+polyscope::CurveNetwork* showEdges(std::string name, std::vector<Edge> edges, VertexPositionGeometry& geometry) {
+    std::vector<Vector3> positions(2*edges.size());
+    std::vector<std::array<size_t, 2>> edgeIndices(edges.size());
+    for (size_t i = 0; i < edges.size(); i++) {
+        Edge e = edges[i];
+        positions[2*i] = geometry.vertexPositions[e.firstVertex()];
+        positions[2*i+1] = geometry.vertexPositions[e.secondVertex()];
+        edgeIndices[i] = {2*i, 2*i+1};
+    }
+    return polyscope::registerCurveNetwork(name, positions, edgeIndices);
 }
