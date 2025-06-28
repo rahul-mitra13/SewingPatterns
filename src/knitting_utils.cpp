@@ -203,8 +203,8 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, Vert
         double fj = vertexScalarFunction[f.halfedge().next().vertex()];
         double fk = vertexScalarFunction[f.halfedge().next().next().vertex()];
         double area = geometry.faceAreas[f];
-        BarycentricVector X_ik_perp = (BarycentricVector(f, Vector3{1., 0, -1.})).rotated90(geometry);
-        BarycentricVector X_ji_perp = (BarycentricVector(f, Vector3{-1., 1., 0.})).rotated90(geometry);
+        BarycentricVector X_ik_perp = (BarycentricVector(f, Vector3{1., 0, -1.})).rotate90(geometry);
+        BarycentricVector X_ji_perp = (BarycentricVector(f, Vector3{-1., 1., 0.})).rotate90(geometry);
         BarycentricVector gradF = ((fj - fi) * X_ik_perp + (fk - fi) * X_ji_perp)/ (2. * area); 
         BarycentricVector gradFNormalized = gradF / norm(geometry, gradF);
         gradients[f] = Vector3{gradFNormalized.faceCoords[0], gradFNormalized.faceCoords[1], gradFNormalized.faceCoords[2]};
@@ -3414,7 +3414,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         psMesh.addVertexScalarQuantity("initial all distance course", allDistGlobal);
         for (Vertex v : globalMesh.vertices()){
             //vertexCurl[v] = (1 - exp(-pow(allDistGlobal[v], 2.) / (2 * pow(period, 2)))) * vertexCurl[v];
-            courseWeighting[v] = (allDistGlobal[v] > 2*period);
+            courseWeighting[v] = (allDistGlobal[v] > 2. * period);
             vertexCurl[v] = courseWeighting[v] * vertexCurl[v];
         }
     }
@@ -3464,6 +3464,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     int numSingularities = 0;
 
     auto start = std::chrono::high_resolution_clock::now();
+
+    polyscope::show();
 
     int numIters = 0;
     while(true){
