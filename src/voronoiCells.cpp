@@ -32,7 +32,6 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     std::vector<VertexData<double>> rhs;
     double maxWeight = *std::max_element(weights.begin(), weights.end());
 
-    //divide by factor of (4 * shortTime)
     for (size_t i = 0; i < points.size(); i++){
       VertexData<double> rhsi(mesh, 0);
       SurfacePoint facePoint = points[i].inSomeFace();
@@ -149,8 +148,8 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     
     // UPDATE WEIGHTS WITH FIXED SITES (using Karcher mean)
 
-    //double alpha = 2, beta = 0.2;
-    double alpha = 1, beta = 0; // standard gradient descent 
+    //double alpha = 2, beta = 0.1;
+    double alpha = 1, beta = 0.; // standard gradient descent 
 
     // Nesterov acceleration
     vector<double> phiWeightsY(nSites);
@@ -172,7 +171,6 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
       }
 
       // Now compute gradient of y_k
-
       rhs = computeRHSWithWeights(siteLocations, phiWeightsY, shortTime);
 
       // Compute the normalizer distribution
@@ -181,14 +179,10 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
         normRHS += rhs[i];
       normD = vSolver.scalarDiffuse(normRHS);
 
-      // double mean = 0;
-
       // We want to do the mesh registration serially
       vector<VertexData<double>> fracDWeights;
       for (int i = 0; i < omp_get_max_threads(); i++)
         fracDWeights.emplace_back(VertexData<double>(mesh, 0));
-
-        
 
       double gradNorm = 0;
 
@@ -198,42 +192,19 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
         int tid = omp_get_thread_num(); // thread ID
 
         SurfacePoint site = siteLocations[j];
+        //scalarDiffuse takes something that's a mass and returns a density
         fracDWeights[tid] = vSolvers[tid].scalarDiffuse(rhs[j]);
-        // cout << fracDWeights[tid] << endl;
-        // fracDWeights[tid] = vSolvers[tid].scalarDiffuse(rhs[j]);//scalarDiffuse takes something that's a mass and returns a density
-
-        // Disabled because data race
-        // for (Vertex v : mesh.vertices()) {
-        //   rho[v] += thisFracDWeights[v] / normD[v];
-        // }
-
+        
         //normalize and weigh the distibution by the curl measure 
         double updateWSum = 0.0;
         for (Vertex v : mesh.vertices()) {
           fracDWeights[tid][v] *= (geom.vertexDualAreas[v] * measure[v]) / normD[v];//multiplying by area (density -> mass)
-          //thisFracDWeights[v] *= measure[v]/normD[v];
           updateWSum += fracDWeights[tid][v];
         }
 
         gradNorm += (desiredMass-updateWSum) * (desiredMass-updateWSum);
 
-        // std::cout << "updateWSum = " << updateWSum << std::endl;
-        //newWeight = phiWeights[j] + (((1/iIter) * shortTime) * (desiredMass - updateWSum));//do a time-decaying step size here
-
         phiWeights[j] = phiWeightsY[j] + alpha * (desiredMass - updateWSum);
-
-        // phiWeights[j] += 1e-0 * (desiredMass - updateWSum);//don't do a time-decaying step size
-
-        // // Nesterov (need to fix)
-        // double y = phiWeights[j] + beta * (phiWeights[j] - oldPhiWeights[j]);
-        // oldPhiWeights[j] = phiWeights[j]; // update old
-        // phiWeights[j] += 
-
-        // double z = beta * phiWeights[j] + 1e-0 * (desiredMass - updateWSum);
-        // phiWeights[j] = phiWeights[j] + alpha * z;
-
-        // newWeight = phiWeights[j] + ((shortTime) * (desiredMass - updateWSum));//don't do a time-decaying step size
-        // mean += newWeight; 
 
         cellMasses[j] = updateWSum;
       }
@@ -248,22 +219,9 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
         cout << endl << "Performed " << i+1 << " iterations for weights update.";
         break;
       }
-
-      //ensure that the average of all the weights is 0
-      // mean /= nSites;
-      // for (size_t k = 0; k < nSites; k++){
-      //   newPhiWeights[k] -= mean;
-      // }
-      // phiWeights = newPhiWeights;
     }//end of gradient descent
 
     cout << endl;
-
-
-    // std::cout << "weights after gradient descent: " << std::endl;
-    // for (int i = 0; i < phiWeights.size(); i++){
-    //   std::cout << "weight at site " << i << ": " << phiWeights[i] << std::endl;
-    // }
 
     double minCellMass = *min_element(cellMasses.begin(), cellMasses.end());
     double maxCellMass = *max_element(cellMasses.begin(), cellMasses.end());
@@ -271,7 +229,6 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
 
     // UPDATE SITES WITH FIXED WEIGHTS (using Karcher mean)
     double energy = 0;
-    // std::vector<SurfacePoint> newSiteLocations;
 
     options.nSubIterations = 1;
     for (size_t iSubIter = 0; iSubIter < options.nSubIterations; iSubIter++) {
@@ -338,7 +295,6 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
           energy += dist * dist * weight; // TODO: use a per-site array to avoid data race
         }
 
-        //updateSum /= updateWSum;
         Vector2 update = updateSum / updateWSum;
         updateNorm[iSite] = update.norm();
 
@@ -365,12 +321,9 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
         stop = true;
         break;
       }
-
-      // newSiteLocations.push_back(site);
-    }
+    }//end of Karcher mean step to find mean of distribution
     cout << endl;
 
-    // siteLocations = newSiteLocations;
     if (VORONOI_PRINT) std::cout << "Finished iteration " << iIter << "  energy " << energy << std::endl;
     std::cout << "-------------------------" << std::endl;
   }
