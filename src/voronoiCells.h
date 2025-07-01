@@ -57,11 +57,5 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
 // Based on geodesic tracing so not exact, but fast.
 void alignPointsOnIsolineFast(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom, alignOptions& options, polyscope::SurfaceMesh &psMesh);
 
-
-//TO-DO: jointly optmize the positions of both the positive sites and the negtive site 
-VoronoiResult alignPointsOnIsoline(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
-                                  alignOptions options, VertexData<double>& posMeasure, VertexData<double>& negMeasure, polyscope::SurfaceMesh &psMesh);
-
-
 } // namespace surface
 } // namespace geometrycentral

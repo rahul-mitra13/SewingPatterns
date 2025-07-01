@@ -149,7 +149,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     // UPDATE WEIGHTS WITH FIXED SITES (using Karcher mean)
 
     //double alpha = 2, beta = 0.1;
-    double alpha = 1.0, beta = 0.; // standard gradient descent 
+    double alpha = 2, beta = 0.; // standard gradient descent 
 
     // Nesterov acceleration
     vector<double> phiWeightsY(nSites);
@@ -370,11 +370,13 @@ void projectOnIsoline(SurfacePoint& point, double target, SurfaceMesh& mesh, Int
   Vector2 v = timeFunctionGrad[initPoint.face]; // search direction
   v = v.normalize();
 
+  geom.requireShapeLengthScale(); // used to scale the search direction
+
   // Binary search in direction v to find the target time value
   double lower = -1, upper = +1.1; // is it enough? For some reason if mid=0, traceGeodesic fails
   while(upper - lower > 1e-6) {
     double mid = (lower+upper) / 2;
-    TraceGeodesicResult traceResult = traceGeodesic(geom, initPoint, mid*v);
+    TraceGeodesicResult traceResult = traceGeodesic(geom, initPoint, mid*v*geom.shapeLengthScale);
     point = traceResult.endPoint;
     double t = point.interpolate(options.timeFunction);
     if (t > target)
