@@ -1919,7 +1919,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         //mask the saddle 
         //not sure if this is the correct way to go
         VertexData<double> allDist = heatSolver.computeDistance(heatSourceVerts);
-        VertexData<double> courseWeighting(globalMesh);
+        VertexData<double> waleWeighting(globalMesh);
         double maxVal = std::numeric_limits<double>::min();
         double maxSourceVal = std::numeric_limits<double>::min();
         //for all the source vertices, find the max value 
@@ -1940,8 +1940,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         }
         //have a hard mask in the course direction
         for (Vertex v : globalMesh.vertices()){
-            courseWeighting[v] = (allDist[v] > 3*period);
-            curlMeasure[v] = courseWeighting[v] * curlMeasure[v];
+            waleWeighting[v] = (allDist[v] > 1.5 * period);
+            curlMeasure[v] = waleWeighting[v] * curlMeasure[v];
         }
     }
     psMesh.addVertexScalarQuantity("initial curl measure with masking (wale)", curlMeasure);
@@ -3670,7 +3670,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         }
         //have a hard mask in the course direction
         for (Vertex v : globalMesh.vertices()){
-            courseWeighting[v] = (allDist[v] > 2*period);
+            courseWeighting[v] = (allDist[v] > 1.5 * period);
             curlMeasure[v] = courseWeighting[v] * curlMeasure[v];
         }
     }
@@ -3930,6 +3930,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     alignmentOptions.iterations = 2500;
     alignmentOptions.lambda = 1.0;
     alignPointsOnIsolineFast(globalMesh, globalGeometry, alignmentOptions, psMesh);
+    //alignPointsOnIsolineEdges(globalMesh, globalGeometry, alignmentOptions);
 
     // Plot aligned singularities
     std::vector<Vector3> alignedPosCenters, alignedNegCenters;
@@ -4038,8 +4039,16 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         else{//remove these entry from edgeIndices and edgeSingularities
 
             showEdges("dropped pair "+std::to_string(problemCount), {posEdge, negEdge}, globalGeometry);
+            std::vector<Vector3> problemSPs;
+            Eigen::MatrixXd iV;
+            Eigen::MatrixXd iE;
+            std::vector<int> f;
+            std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, isoVal);
+            polyscope::registerCurveNetwork("problem isoline " + std::to_string(problemCount), iV, iE)->setRadius(0.001)->setEnabled(false);
+            problemSPs.push_back(alignmentOptions.pairedSites[i].first.interpolate(globalGeometry.vertexPositions));
+            problemSPs.push_back(alignmentOptions.pairedSites[i].second.interpolate(globalGeometry.vertexPositions));
+            polyscope::registerPointCloud("problem sites " + std::to_string(problemCount), problemSPs);
             problemCount++;
-
             edgeIndices[p.first] = 0.0;
             edgeIndices[p.second] = 0.0;
             edgeSingularities[posEdge] = 0.0;
