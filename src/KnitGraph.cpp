@@ -1219,21 +1219,31 @@ void KnitGraph::makeRealVertices(){
 
 
 void KnitGraph::tagIncreasesDecreases(){
+
+    std::vector<Vector3> problemIncreases;
+    std::vector<Vector3> problemDecreases;
                
     //handle increases
     for (auto &v : realVertices){
         if (v.col_in[0] == -1  && v.col_in[1] == -1){
             if ((realVertices[v.row_out].col_in[0]) != -1 && (realVertices[v.row_in].col_in[0]) != -1){//we're not at the bottom-most course row (assuming can't have short-rows on the bottom row)
-                std::cout << "In increase case for vertex " << v.id << std::endl;
-                auto &candidate1 = realVertices[realVertices[v.row_out].col_in[0]];
-                auto &candidate2 = realVertices[realVertices[v.row_in].col_in[0]];
-                if (norm(v.position - candidate1.position) < norm(v.position - candidate2.position)){
-                    candidate1.col_out[1] = v.id;
-                    v.col_in[0] = candidate1.id;
+                if (realVertices[v.row_out].col_in[0] < realVertices.size() && realVertices[v.row_in].col_in[0] < realVertices.size()){
+                    std::cout << "In stable increase case for vertex " << v.id << std::endl;
+                    auto &candidate1 = realVertices[realVertices[v.row_out].col_in[0]];
+                    auto &candidate2 = realVertices[realVertices[v.row_in].col_in[0]];
+                    if (norm(v.position - candidate1.position) < norm(v.position - candidate2.position)){
+                        candidate1.col_out[1] = v.id;
+                        v.col_in[0] = candidate1.id;
+                    }
+                    else{
+                        candidate2.col_out[1] = v.id;
+                        v.col_in[0] = candidate2.id;
+                    }
                 }
                 else{
-                    candidate2.col_out[1] = v.id;
-                    v.col_in[0] = candidate2.id;
+                    problemIncreases.push_back(v.position);
+                    std::cout << "Something went wrong for increase at vertex " << v.id << std::endl;
+                    std::cout << "skipping..." << std::endl;
                 }
             }
         }
@@ -1243,20 +1253,30 @@ void KnitGraph::tagIncreasesDecreases(){
     for (auto &v : realVertices){
         if (v.col_out[0] == -1 && v.col_out[1] == -1){
             if ((realVertices[v.row_out].col_out[0]) != -1 && (realVertices[v.row_in].col_out[0]) != -1){//we're not at the top-most course row (assuming can't have short-rows on the top row)
-            std::cout << "In decrease case for vertex " << v.id << std::endl;
-            auto &candidate1 = realVertices[realVertices[v.row_out].col_out[0]];
-            auto &candidate2 = realVertices[realVertices[v.row_in].col_out[0]];
-            if (norm(v.position - candidate1.position) < norm(v.position - candidate2.position)){
-                candidate1.col_in[1] = v.id;
-                v.col_out[0] = candidate1.id;
-            }
-            else{
-                candidate2.col_in[1] = v.id;
-                v.col_out[0] = candidate2.id;
+                if (realVertices[v.row_out].col_out[0] < realVertices.size() && realVertices[v.row_in].col_out[0] < realVertices.size()){
+                    std::cout << "In stable decrease case for vertex " << v.id << std::endl;
+                    auto &candidate1 = realVertices[realVertices[v.row_out].col_out[0]];
+                    auto &candidate2 = realVertices[realVertices[v.row_in].col_out[0]];
+                    if (norm(v.position - candidate1.position) < norm(v.position - candidate2.position)){
+                        candidate1.col_in[1] = v.id;
+                        v.col_out[0] = candidate1.id;
+                    }
+                    else{
+                        candidate2.col_in[1] = v.id;
+                        v.col_out[0] = candidate2.id;
+                    }
+                }
+                else{
+                    problemDecreases.push_back(v.position);
+                    std::cout << "Something went wrong for decrease at vertex " << v.id << std::endl;
+                    std::cout << "skipping..." << std::endl;
                 }
             }
         }
     }
+
+    polyscope::registerPointCloud("problem increase ", problemIncreases);
+    polyscope::registerPointCloud("problem decreases ", problemDecreases);
 
     //check if col_out[0] and col_out[1] need flipping for increases i.e., col_out[0] should always have a row_out that points to col_out[1]
     for (auto &v : realVertices){
