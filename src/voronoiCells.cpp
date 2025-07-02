@@ -44,6 +44,15 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
 
     return rhs;
   };
+
+  //This computes the objective of the proxy function we're trying to use for line search 
+  auto proxyEnergy = [&](const std::vector<double>& cellMasses, int LloydIter) -> double {
+
+    if (LloydIter == 0) return DBL_MAX;
+    double minCellMass = *min_element(cellMasses.begin(), cellMasses.end());
+    double maxCellMass = *max_element(cellMasses.begin(), cellMasses.end());
+    return std::fabs(maxCellMass - minCellMass);
+  };
   
 
   // Set points to start
@@ -113,9 +122,10 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
   geom.requireVertexDualAreas();
 
   //trying to find equal mass power cells 
-  size_t descIter = 1000;
+  size_t descIter = 10;
   // double stepSize = 1e-6;
   std::vector<double> phiWeights(nSites, 0.), oldPhiWeights(nSites);
+  std::vector<double> cellMasses(nSites); //masses on each cell
   double shortTime;
   geom.requireEdgeLengths();
   //compute the diffusion time 
@@ -148,7 +158,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     
     // UPDATE WEIGHTS WITH FIXED SITES (using Karcher mean)
 
-    //double alpha = 2, beta = 0.1;
+    //double alpha = 1.0, beta = 0.9;
     double alpha = 1e-3, beta = 0.; // standard gradient descent 
 
     // Nesterov acceleration
@@ -158,59 +168,113 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     VertexData<double> normD;
     VertexData<double> rho(mesh, 0.0); // just for sanity check
     VertexData<double> normRHS(mesh, 0); // sum on all sites
-    
-    std::vector<double> cellMasses(nSites);
+    double gradNorm = 0;
 
     //gradient descent to find the weights 
     for (size_t i = 0; i < descIter; i++){
 
-      // Compute the y_k of Nesterov's AGD
-      for (int j = 0; j < nSites; j++) {
-        phiWeightsY[j] = phiWeights[j] + beta * (phiWeights[j] - oldPhiWeights[j]);
-        oldPhiWeights[j] = phiWeights[j]; // don't need old anymore, we can update
-      }
+      if (options.useLineSearch){
+        //Line Search
+        double oldEnergy;
+        oldEnergy = proxyEnergy(cellMasses, iIter);
+        double stepSize = alpha;
+        for (int lineSearchIter = 0; lineSearchIter < 8; lineSearchIter++){
+          //try taking a step
+          // Compute the y_k of Nesterov's AGD
+          for (int j = 0; j < nSites; j++) {
+            phiWeightsY[j] = phiWeights[j] + beta * (phiWeights[j] - oldPhiWeights[j]);
+            oldPhiWeights[j] = phiWeights[j]; // don't need old anymore, we can update
+          }
 
-      // Now compute gradient of y_k
-      rhs = computeRHSWithWeights(siteLocations, phiWeightsY, shortTime);
+          // Now compute gradient of y_k
+          rhs = computeRHSWithWeights(siteLocations, phiWeightsY, shortTime);
 
-      // Compute the normalizer distribution
-      normRHS.fill(0);
-      for (int i = 0; i < siteLocations.size(); i++)
-        normRHS += rhs[i];
-      normD = vSolver.scalarDiffuse(normRHS);
+          // Compute the normalizer distribution
+          normRHS.fill(0);
+          for (int i = 0; i < siteLocations.size(); i++)
+            normRHS += rhs[i];
+          normD = vSolver.scalarDiffuse(normRHS);
 
-      // We want to do the mesh registration serially
-      vector<VertexData<double>> fracDWeights;
-      for (int i = 0; i < omp_get_max_threads(); i++)
-        fracDWeights.emplace_back(VertexData<double>(mesh, 0));
+          // We want to do the mesh registration serially
+          vector<VertexData<double>> fracDWeights;
+          for (int i = 0; i < omp_get_max_threads(); i++)
+            fracDWeights.emplace_back(VertexData<double>(mesh, 0));
 
-      double gradNorm = 0;
+          #pragma omp parallel for reduction(+:gradNorm)
+          for (size_t j = 0; j < nSites; j++){
 
-      #pragma omp parallel for reduction(+:gradNorm)
-      for (size_t j = 0; j < nSites; j++){
+            int tid = omp_get_thread_num(); // thread ID
 
-        int tid = omp_get_thread_num(); // thread ID
-
-        SurfacePoint site = siteLocations[j];
-        //scalarDiffuse takes something that's a mass and returns a density
-        fracDWeights[tid] = vSolvers[tid].scalarDiffuse(rhs[j]);
+            SurfacePoint site = siteLocations[j];
+            //scalarDiffuse takes something that's a mass and returns a density
+            fracDWeights[tid] = vSolvers[tid].scalarDiffuse(rhs[j]);
         
-        //normalize and weigh the distibution by the curl measure 
-        double updateWSum = 0.0;
-        for (Vertex v : mesh.vertices()) {
-          fracDWeights[tid][v] *= (geom.vertexDualAreas[v] * measure[v]) / normD[v];//multiplying by area (density -> mass)
-          updateWSum += fracDWeights[tid][v];
+            //normalize and weigh the distibution by the curl measure 
+            double updateWSum = 0.0;
+            for (Vertex v : mesh.vertices()) {
+              fracDWeights[tid][v] *= (geom.vertexDualAreas[v] * measure[v]) / normD[v];//multiplying by area (density -> mass)
+              updateWSum += fracDWeights[tid][v];
+            }
+
+            gradNorm += (desiredMass-updateWSum) * (desiredMass-updateWSum);
+            phiWeights[j] = phiWeightsY[j] + stepSize * (desiredMass - updateWSum);
+            cellMasses[j] = updateWSum;
+          }
+          double newEnergy = proxyEnergy(cellMasses, false);
+          // Accept step if good
+          if (newEnergy < oldEnergy) {
+            break;
+          }
+          // Otherwise decrease step size and repeat
+          stepSize *= 0.5;
+
+        }//end of line search 
+      }
+      else{
+        // Compute the y_k of Nesterov's AGD
+        for (int j = 0; j < nSites; j++) {
+          phiWeightsY[j] = phiWeights[j] + beta * (phiWeights[j] - oldPhiWeights[j]);
+          oldPhiWeights[j] = phiWeights[j]; // don't need old anymore, we can update
         }
 
-        gradNorm += (desiredMass-updateWSum) * (desiredMass-updateWSum);
+        // Now compute gradient of y_k
+        rhs = computeRHSWithWeights(siteLocations, phiWeightsY, shortTime);
 
-        phiWeights[j] = phiWeightsY[j] + alpha * (desiredMass - updateWSum);
+        // Compute the normalizer distribution
+        normRHS.fill(0);
+        for (int i = 0; i < siteLocations.size(); i++)
+          normRHS += rhs[i];
+        normD = vSolver.scalarDiffuse(normRHS);
 
-        cellMasses[j] = updateWSum;
+        // We want to do the mesh registration serially
+        vector<VertexData<double>> fracDWeights;
+        for (int i = 0; i < omp_get_max_threads(); i++)
+          fracDWeights.emplace_back(VertexData<double>(mesh, 0));
+
+        #pragma omp parallel for reduction(+:gradNorm)
+        for (size_t j = 0; j < nSites; j++){
+
+          int tid = omp_get_thread_num(); // thread ID
+
+          SurfacePoint site = siteLocations[j];
+          //scalarDiffuse takes something that's a mass and returns a density
+          fracDWeights[tid] = vSolvers[tid].scalarDiffuse(rhs[j]);
+        
+          //normalize and weigh the distibution by the curl measure 
+          double updateWSum = 0.0;
+          for (Vertex v : mesh.vertices()) {
+            fracDWeights[tid][v] *= (geom.vertexDualAreas[v] * measure[v]) / normD[v];//multiplying by area (density -> mass)
+            updateWSum += fracDWeights[tid][v];
+          }
+
+          gradNorm += (desiredMass-updateWSum) * (desiredMass-updateWSum);
+          phiWeights[j] = phiWeightsY[j] + alpha * (desiredMass - updateWSum);
+          cellMasses[j] = updateWSum;
+        }
       }
 
+      
       gradNorm = sqrt(gradNorm);
-      // H(gradNorm);
       std::cout << "gradNorm: " << gradNorm << "\t\r" << std::flush;
 
       psMesh.addVertexScalarQuantity("rho", rho);
