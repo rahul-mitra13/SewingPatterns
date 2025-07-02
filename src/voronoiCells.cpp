@@ -122,7 +122,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
   geom.requireVertexDualAreas();
 
   //trying to find equal mass power cells 
-  size_t descIter = 10;
+  size_t descIter = 500;
   // double stepSize = 1e-6;
   std::vector<double> phiWeights(nSites, 0.), oldPhiWeights(nSites);
   std::vector<double> cellMasses(nSites); //masses on each cell
