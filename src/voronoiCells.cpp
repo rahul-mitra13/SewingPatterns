@@ -113,7 +113,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
   // fixes thread issues lol. Many thanks to
   // https://github.com/nmwsharp/geometry-central/issues/108
   VertexData<double> dummyRHS(mesh, 42.0);
-  SurfacePoint dummySite = siteLocations[0];
+  SurfacePoint dummySite = mesh.vertex(0);
   for (int i = 0; i < omp_get_max_threads(); i++) {
     vSolvers[i].scalarDiffuse(dummyRHS);
     vSolvers[i].computeLogMap(dummySite);
