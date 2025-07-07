@@ -121,8 +121,6 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
 
   geom.requireVertexDualAreas();
 
-  //trying to find equal mass power cells 
-  size_t descIter = 500;
   // double stepSize = 1e-6;
   std::vector<double> phiWeights(nSites, 0.), oldPhiWeights(nSites);
   std::vector<double> cellMasses(nSites); //masses on each cell
@@ -159,7 +157,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     // UPDATE WEIGHTS WITH FIXED SITES (using Karcher mean)
 
     //double alpha = 1.0, beta = 0.9;
-    double alpha = 1e-3, beta = 0.; // standard gradient descent 
+    double alpha = 1.0, beta = 0.; // standard gradient descent 
 
     // Nesterov acceleration
     vector<double> phiWeightsY(nSites);
@@ -171,7 +169,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     double gradNorm = 0;
 
     //gradient descent to find the weights 
-    for (size_t i = 0; i < descIter; i++){
+    for (size_t i = 0; i < options.descIter; i++){
 
       if (options.useLineSearch){
         //Line Search
@@ -273,7 +271,6 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
         }
       }
 
-      
       gradNorm = sqrt(gradNorm);
       std::cout << "gradNorm: " << gradNorm << "\t\r" << std::flush;
 
