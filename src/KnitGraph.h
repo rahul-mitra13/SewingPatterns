@@ -171,6 +171,9 @@ class KnitGraph{
             //sanity check the graph 
             void sanityCheck();
 
+            //find duplicate edges in the graph 
+            void findDuplicateEdges();
+
             //write knit graph to txt file
             void writeKnitGraphToTxtFile(const std::string& file_name);
 

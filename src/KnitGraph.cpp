@@ -70,6 +70,9 @@ void KnitGraph::buildGraph(){
     //render the knit graph
     renderGraph();
 
+    //find duplicate edges in the graph
+    findDuplicateEdges();
+
     //trace the short rows 
     traceShortRows();
 
@@ -1306,7 +1309,39 @@ void KnitGraph::tagIncreasesDecreases(){
 
 }
 
+void KnitGraph::findDuplicateEdges(){
 
+    std::vector<std::array<int, 2>> edges;
+    //visualize the knit graph vertices with the virtual connections
+    for (auto &v : realVertices){
+        if (v.row_out != -1){
+            edges.push_back({v.id, v.row_out});
+        }
+        if (v.col_out[0] != -1){
+            edges.push_back({v.id, v.col_out[0]});
+        }
+        if (v.col_out[1] != -1){
+            edges.push_back({v.id, v.col_out[1]});
+        }
+    }
+
+    std::vector<Vector3> dups;
+    int numDuplicate = 0;
+    for (int i = 0; i < edges.size(); i++){
+        for (int j = 0; j < edges.size(); j++){
+            if (i == j) continue;
+            if (edges[i][0] == edges[j][0] && edges[i][1] == edges[j][1]){
+                dups.push_back(realVertices[edges[i][0]].position);
+                dups.push_back(realVertices[edges[i][1]].position);
+                std::cout << "duplicate edges " << std::endl;
+                std::cout << "duplicate edge between " << edges[i][0] << " and " << edges[i][1] << std::endl;
+                numDuplicate++;
+            }
+        }
+    }
+    polyscope::registerPointCloud("duplicates", dups);
+
+}
 //----------------------helper functions----------------------//
 //hash function for a floating point number
 int KnitGraph::hashFloat(double value) {
