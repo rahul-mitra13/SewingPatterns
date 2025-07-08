@@ -54,11 +54,11 @@ void KnitGraph::buildGraph(){
 
     //find duplicate edges in the graph
     //fix them in this function as well
-    findDuplicateEdges();
+    fixDuplicateEdges();
 
     //reorder vertex indices
     //after fixing duplicates, we need to re-order the vertices
-    makeRealVertices();
+    //makeRealVertices();
 
     // Plot real vertices
     std::vector<Vector3> realVertexPositions;
@@ -1314,7 +1314,7 @@ void KnitGraph::tagIncreasesDecreases(){
 
 }
 
-void KnitGraph::findDuplicateEdges(){
+void KnitGraph::fixDuplicateEdges(){
 
     std::vector<std::array<int, 2>> edges;
     //visualize the knit graph vertices with the virtual connections
@@ -1401,9 +1401,16 @@ void KnitGraph::findDuplicateEdges(){
 
         //update connections for preserved vertex 
         realVertices[v1].row_in = globalRowIn;
+        realVertices[globalRowIn].row_out = v1;
+
         realVertices[v1].row_out = globalRowOut;
+        realVertices[globalRowOut].row_in = v1;
+
         realVertices[v1].col_in[0] = globalColIn;
+        realVertices[globalColIn].col_out[0] = v1;
+
         realVertices[v1].col_out[0] = globalColOut;
+        realVertices[globalColOut].col_in[0] = v1;
 
         std::cout << "global row in = " << globalRowIn << std::endl;
         std::cout << "global row out = " << globalRowOut << std::endl;
@@ -1414,6 +1421,80 @@ void KnitGraph::findDuplicateEdges(){
         realVertices[v1].printVertexInfo();
         realVertices[v2].printVertexInfo();
     }
+    
+    //finally, fix the realVertices
+    //first re-order indices in the graph
+    //convert graph indices to autoknit txt format 
+    std::map<int, int> mp;
+    int i = 0;
+    std::vector<knitGraphVertex> finalVertices;
+    for (knitGraphVertex& v: realVertices){
+        if (v.isVirtual) continue;//only handle real vertices (this condition migh be hit since we've merged real vertices above)
+        mp.insert({v.id, i++});
+    }
+    int id = -1;
+    int row_in = -1;
+    int row_out = -1;
+    int col_in_1 = -1;
+    int col_in_2 = -1;
+    int col_out_1 = -1;
+    int col_out_2 = -1;
+    //resize the real vertices
+    finalVertices.resize(mp.size());
+    //update the ids in the knit graph
+    for (knitGraphVertex& v : realVertices){
+        if (v.isVirtual) continue;//only handle real vertices
+        int id = mp[v.id];
+        if (v.row_in == -1){//row_in is unset
+            row_in = -1;
+        }
+        else{
+            row_in = mp[v.row_in];
+        }
+        if (v.row_out == -1){//row_out is unset
+            row_out = -1;
+        }
+        else{
+            row_out = mp[v.row_out];
+        }
+        if (v.col_in[0] == -1){//col_in_1 is unset
+            col_in_1 = -1;
+        }
+        else{
+            col_in_1 = mp[v.col_in[0]];
+        }
+        if (v.col_in[1] == -1){//col_in_2 is unset
+            col_in_2 = -1;
+        }
+        else{
+            col_in_2 = mp[v.col_in[1]];
+        }
+        if (v.col_out[0] == -1){//col_out_1 is unset
+            col_out_1 = -1;
+        }
+        else{
+            col_out_1 = mp[v.col_out[0]]; 
+        }
+
+        if (v.col_out[1] == -1){//col_out_2 is unset
+            col_out_2 = -1;
+        }
+        else{
+            col_out_2 = mp[v.col_out[1]];
+        }
+
+        //update the info
+        v.id = id;
+        v.row_in = row_in;
+        v.row_out = row_out;
+        v.col_in[0] = col_in_1;
+        v.col_in[1] = col_in_2;
+        v.col_out[0] = col_out_1;
+        v.col_out[1] = col_out_2;
+        //add the updated id vertex to the vector of real vertices
+        finalVertices[v.id] = v;
+    }
+    realVertices = finalVertices;
 
 }
 //----------------------helper functions----------------------//
