@@ -39,6 +39,18 @@ struct knitGraphVertex{
     bool isVirtual = false;//if this is a virtual vertex
     bool isAlphaVirtual = false;//is a virtual vertex in the course direction
     bool isBetaVirtual = false;//is a virtual vertex in the wale direction 
+
+    void printVertexInfo(){
+          
+        std::cout << "vertex id = " << id << std::endl;
+        std::cout << "row in = " << row_in << std::endl;
+        std::cout << "row out = " << row_out << std::endl;
+        std::cout << "col_in[0] = " << col_in[0] << std::endl;
+        std::cout << "col_in[1] = " << col_in[1] << std::endl;
+        std::cout << "col_out[0] = " << col_out[0] << std::endl;
+        std::cout << "col_out[1] = " << col_out[1] << std::endl;
+        std::cout << "isVirtual = " << isVirtual << std::endl;
+    }
 };
 
 
