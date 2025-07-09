@@ -1358,8 +1358,6 @@ void KnitGraph::fixDuplicateEdges(){
             if (edges[i][0] == edges[j][0] && edges[i][1] == edges[j][1]){
                 dups.push_back(realVertices[edges[i][0]].position);
                 dups.push_back(realVertices[edges[i][1]].position);
-                std::cout << "duplicate edges " << std::endl;
-                std::cout << "duplicate edge between " << edges[i][0] << " and " << edges[i][1] << std::endl;
                 int v1 = edges[i][0];
                 int v2 = edges[i][1];
                 realVertices[v1].printVertexInfo();
@@ -1376,9 +1374,7 @@ void KnitGraph::fixDuplicateEdges(){
     for (auto p : dupIndices){
         int v1 = p.first;
         int v2 = p.second;
-        std::cout << "before real merge: " << std::endl;
-        realVertices[v1].printVertexInfo();
-        realVertices[v2].printVertexInfo();
+    
         //preserve v1, set v2 to virtual 
         realVertices[v2].isVirtual = true;
 
@@ -1412,14 +1408,6 @@ void KnitGraph::fixDuplicateEdges(){
         realVertices[v1].col_out[0] = globalColOut;
         realVertices[globalColOut].col_in[0] = v1;
 
-        std::cout << "global row in = " << globalRowIn << std::endl;
-        std::cout << "global row out = " << globalRowOut << std::endl;
-        std::cout << "global col in = " << globalColIn << std::endl;
-        std::cout << "global col out = " << globalColOut << std::endl;
-
-        std::cout << "after real merge: " << std::endl;
-        realVertices[v1].printVertexInfo();
-        realVertices[v2].printVertexInfo();
     }
     
     //finally, fix the realVertices
