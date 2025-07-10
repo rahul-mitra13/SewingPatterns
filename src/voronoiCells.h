@@ -131,7 +131,7 @@ class F_OT{
       geom.requireVertexDualAreas();
       VertexData<double> normD(mesh, 0); // denominator for the rho's
       for (size_t iSite = 0; iSite < options.nSites; iSite++) {
-        normD += exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * heatKernel[iSite];
+        normD += exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite];
       }
 
       VertexData<double> integrand;
@@ -143,7 +143,7 @@ class F_OT{
           d2minusPhi[v] = (logMapPerSite[iSite][v].norm2() - phiWeights[iSite]);
         }
         
-        VertexData<double> rho = exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * heatKernel[iSite];
+        VertexData<double> rho = exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite];
 
         integrand = d2minusPhi * rho * options.measure * geom.vertexDualAreas;
 
