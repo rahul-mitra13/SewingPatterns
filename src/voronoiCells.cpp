@@ -336,6 +336,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
 
         // === Compute the log map
         // auto t1 = chrono::high_resolution_clock::now();
+        //VertexData<Vector2> logmap = vSolvers[tid].computeLogMap(site, LogMapStrategy::AffineAdaptive);
         VertexData<Vector2> logmap = vSolvers[tid].computeLogMap(site);
         // auto t2 = chrono::high_resolution_clock::now();
         // totalTime += chrono::duration_cast<chrono::microseconds>(t2 - t1).count();
