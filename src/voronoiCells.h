@@ -6,6 +6,8 @@
 
 #include "polyscope/surface_mesh.h"
 
+#include <LBFGS.h>
+
 namespace geometrycentral {
 namespace surface {
 
