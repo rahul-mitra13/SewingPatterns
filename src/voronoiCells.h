@@ -118,8 +118,8 @@ class F_OT{
 
     double operator()(const Eigen::VectorXd& phiWeights, Eigen::VectorXd& grad){ 
       
+      //we use this for numerical stability
       double maxWeight = *std::max_element(phiWeights.begin(), phiWeights.end());
-      std::vector<VertexData<double>> rho(options.nSites);
 
       //find the desired mass 
       double desiredMass = 0;
@@ -144,7 +144,7 @@ class F_OT{
           d2minusPhi[v] = (logMapPerSite[iSite][v].norm2() - phiWeights[iSite]);
         }
         
-        VertexData<double> rho = exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite];
+        VertexData<double> rho = (exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite]) / normD;
 
         integrand = d2minusPhi * rho * options.measure * geom.vertexDualAreas;
 
@@ -157,12 +157,12 @@ class F_OT{
         grad(iSite) = desiredMass - sumTerm;
       }
 
-      //compute the first term 
+      //compute the first objective term  
       double weightSum = 0; 
       for (int i = 0; i < phiWeights.size(); i++) weightSum += phiWeights(i);
       double firstTerm = weightSum * desiredMass;
 
-      //compute the second term
+      //compute the second objective term
       double secondTerm = 0;
       for (Vertex v : mesh.vertices()) secondTerm += integrand[v];
 
