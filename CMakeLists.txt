@@ -158,6 +158,8 @@ add_executable(
 
 # Include settings
 target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/libigl/include")
+#add LBFGS
+target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/LBFGSpp/include")
 #add args
 target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/polyscope/deps/args")
 #add json
