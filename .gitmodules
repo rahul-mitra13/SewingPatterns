@@ -9,3 +9,6 @@
 	path = deps/geometry-central
 	url = https://github.com/mcouplet/geometry-central.git
 
+[submodule "deps/LBFGSpp"]
+	path = deps/LBFGSpp
+	url = https://github.com/yixuan/LBFGSpp.git
