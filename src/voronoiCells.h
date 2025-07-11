@@ -67,6 +67,10 @@ void alignPointsOnIsolineFast(SurfaceMesh& mesh, IntrinsicGeometryInterface& geo
 VoronoiResult computeSitesWithFunction(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
                                       VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
 
+//computing equal weights using LBFGS
+Eigen::VectorXd computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
+                                        VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
+
 
 //defining a class to do LBFGS with F_OT as defined by the seminal work, "Stochastic Wassertein Barycenters"
 class F_OT{
@@ -83,6 +87,10 @@ class F_OT{
       geom(myGeom), mesh(myMesh), options(myOptions), sites(mySites){}
     
     void requireLogMap(std::vector<VectorHeatMethodSolver>& vSolvers){
+
+      for (int i = 0; i < options.nSites; i++){
+        this->logMapPerSite.emplace_back(VertexData<Vector2>(this->mesh, Vector2{0., 0.}));
+      }
       
       #pragma omp parallel for 
       for (size_t iSite = 0; iSite < options.nSites; iSite++){
@@ -107,6 +115,10 @@ class F_OT{
         return rhs;
       };
 
+      for (int i = 0; i < options.nSites; i++){
+        this->heatKernel.emplace_back(VertexData<double>(this->mesh, 0.0));
+      }
+
       #pragma omp parallel for 
       for (size_t iSite = 0; iSite < options.nSites; iSite++) {
         int tid = omp_get_thread_num(); // thread ID
@@ -117,9 +129,11 @@ class F_OT{
     }
 
     double operator()(const Eigen::VectorXd& phiWeights, Eigen::VectorXd& grad){ 
+
       
       //we use this for numerical stability
       double maxWeight = *std::max_element(phiWeights.begin(), phiWeights.end());
+      std::cout << "maxWeight = " << maxWeight << std::endl;
 
       //find the desired mass 
       double desiredMass = 0;
@@ -128,14 +142,17 @@ class F_OT{
       }
       desiredMass /= options.nSites;
 
+      std::cout << "desiredMass = " << desiredMass << std::endl;
 
       geom.requireVertexDualAreas();
       VertexData<double> normD(mesh, 0); // denominator for the rho's
       for (size_t iSite = 0; iSite < options.nSites; iSite++) {
         normD += exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite];
       }
+      
+      //The second objective term
+      double secondTerm = 0;
 
-      VertexData<double> integrand;
       #pragma omp parallel for 
       for (size_t iSite = 0; iSite < options.nSites; iSite++){
 
@@ -146,7 +163,7 @@ class F_OT{
         
         VertexData<double> rho = (exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite]) / normD;
 
-        integrand = d2minusPhi * rho * options.measure * geom.vertexDualAreas;
+        VertexData<double> integrand = d2minusPhi * rho * options.measure * geom.vertexDualAreas;
 
         double sumTerm = 0;
         for (Vertex v : mesh.vertices()){
@@ -155,16 +172,15 @@ class F_OT{
 
         //add the gradient component 
         grad(iSite) = desiredMass - sumTerm;
+        
+        for (Vertex v : mesh.vertices()) secondTerm += integrand[v];
+      
       }
 
-      //compute the first objective term  
+      //The first objective term  
       double weightSum = 0; 
       for (int i = 0; i < phiWeights.size(); i++) weightSum += phiWeights(i);
       double firstTerm = weightSum * desiredMass;
-
-      //compute the second objective term
-      double secondTerm = 0;
-      for (Vertex v : mesh.vertices()) secondTerm += integrand[v];
 
       double obj = firstTerm + secondTerm;
 

@@ -462,5 +462,89 @@ void alignPointsOnIsolineFast(SurfaceMesh& mesh, IntrinsicGeometryInterface& geo
   }
 }
 
+//computing equal weights using LBFGS
+Eigen::VectorXd computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
+                                        VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh){
+  
+  //set the measure in Voronoi options (TO DO: specify this elsewhere) 
+  options.measure = measure;
+
+  // Define one vector heat method solver per thread
+  vector<VectorHeatMethodSolver> vSolvers;
+  for (int i = 0; i < omp_get_max_threads(); i++)
+    vSolvers.emplace_back(geom, options.tCoef);
+
+  // For some reason, running a dummy scalarDiffuse / computeLogMap first
+  // fixes thread issues lol. Many thanks to
+  // https://github.com/nmwsharp/geometry-central/issues/108
+  VertexData<double> dummyRHS(mesh, 42.0);
+  SurfacePoint dummySite = mesh.vertex(0);
+  for (int i = 0; i < omp_get_max_threads(); i++) {
+    vSolvers[i].scalarDiffuse(dummyRHS);
+    vSolvers[i].computeLogMap(dummySite);
+  }  
+  
+  // Set points to start
+  std::vector<SurfacePoint> siteLocations = options.initialSites;
+  //use a random seed 
+  std::mt19937 rng(options.seed);
+  std::uniform_real_distribution<double> uniform01(0.0, 1.0);
+  std::uniform_int_distribution<int> pointTypeDist(0, 2); // 0: vertex, 1: edge, 2: face
+  for (size_t i = 0; i < options.nSites; ++i) {
+      int type = pointTypeDist(rng);
+
+      if (type == 0) {
+        // Random vertex
+        Vertex v = mesh.vertex(rng() % mesh.nVertices());
+        siteLocations.emplace_back(v);
+      } else if (type == 1) {
+        // Random edge interior
+        Edge e = mesh.edge(rng() % mesh.nEdges());
+        double t = uniform01(rng); // interpolation along the edge
+        siteLocations.emplace_back(e, t);
+      } else if (type == 2) {
+        // Random face interior
+        Face f = mesh.face(rng() % mesh.nFaces());
+
+        // Random barycentric coordinates
+        double u = uniform01(rng);
+        double v = uniform01(rng);
+        if (u + v > 1.0) {
+          u = 1.0 - u;
+          v = 1.0 - v;
+        }
+        double w = 1.0 - u - v;
+        Halfedge he = f.halfedge();
+        SurfacePoint pt(f, Vector3{u, v, w}); // SurfacePoint using barycentric coords in a triangle
+        siteLocations.push_back(pt);
+      }
+  }
+
+  int n = siteLocations.size();
+
+  // Set up parameters
+  LBFGSpp::LBFGSParam<double> param;
+  param.epsilon = 1e-6;
+  param.max_iterations = 1;
+ 
+  // Create solver and function object
+  LBFGSpp::LBFGSSolver<double> solver(param);
+  F_OT fun(geom, mesh, options, siteLocations);
+  fun.requireHeatKernel(vSolvers);
+  fun.requireLogMap(vSolvers);
+
+  // Initial guess
+  Eigen::VectorXd x = Eigen::VectorXd::Ones(n);
+  // x will be overwritten to be the best point found
+  double fx;
+  int niter = solver.minimize(fun, x, fx);
+ 
+  std::cout << niter << " iterations" << std::endl;
+  std::cout << "x = \n" << x.transpose() << std::endl;
+  std::cout << "f(x) = " << fx << std::endl;
+  
+  return x;
+}
+
 } // namespace surface
 } // namespace geometrycentral

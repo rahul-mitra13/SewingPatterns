@@ -3632,12 +3632,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     //ONLY IMPLEMENTED IN THE GLOBAL SETTING FOR NOW
 
-    //rotate the gradients so that we measure curl in the wale direction
-    // globalGeometry.requireFaceNormals();
-    // //rotate the gradients to measure the wale curl 
-    // for (Face f : globalMesh.faces()){
-    //     globalTimeFunctionGradientsNormalized[f] = globalTimeFunctionGradientsNormalized[f].rotateAround(globalGeometry.faceNormals[f], M_PI/2.);
-    // }
 
     //Attempting to find the center of distributions using Vector Heat Method
     VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
@@ -3677,8 +3671,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     psMesh.addVertexScalarQuantity("initial curl measure with masking (course)", curlMeasure);
 
-    //polyscope::show();
-
     // Cap curl measure to avoid high concentration of singularities
     for (Vertex v : globalMesh.vertices()) {
         curlMeasure[v] = fmin(curlMeasure[v], period / (3*globalGeometry.vertexDualAreas[v]));
@@ -3715,9 +3707,19 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //     // posMeasure[v] = std::exp(globalGeometry.vertexPositions[v].x);
     // }
 
+    //test LBFGS implementation
+    VoronoiOptions posLBFGSOptions = defaultVoronoiOptions;
+    posLBFGSOptions.nSites = std::round(avgTotalMeasure / period);
+    posLBFGSOptions.useDelaunay = false;
+    posLBFGSOptions.seed = 42;
+    std::cout << "Testing LBFGS..." << std::endl;
+    Eigen::VectorXd weights = computePhiWeights(globalMesh, globalGeometry, posLBFGSOptions, posMeasure, psMesh);
+    std::cout << "Finished testing LBFGS..." << std::endl;
+    polyscope::show();
+    //----------------------------//
+
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
-    polyscope::show();
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
     posOptions.nSites = std::round(avgTotalMeasure / period);
