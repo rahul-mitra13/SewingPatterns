@@ -148,7 +148,8 @@ class F_OT{
       VertexData<double> normD(mesh, 0); // denominator for the rho's
       for (size_t iSite = 0; iSite < options.nSites; iSite++) {
         normD += exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite];
-      }
+        std::cout << "exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) " << exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) << std::endl;
+      } 
       
       //The second objective term
       double secondTerm = 0;
@@ -172,7 +173,7 @@ class F_OT{
 
         //add the gradient component 
         grad(iSite) = desiredMass - sumTerm;
-        
+
         for (Vertex v : mesh.vertices()) secondTerm += integrand[v];
       
       }
