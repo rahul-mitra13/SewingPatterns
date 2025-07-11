@@ -133,8 +133,7 @@ class F_OT{
       
       //we use this for numerical stability
       double maxWeight = *std::max_element(phiWeights.begin(), phiWeights.end());
-      std::cout << "maxWeight = " << maxWeight << std::endl;
-
+      
       //find the desired mass 
       double desiredMass = 0;
       for (Vertex v : mesh.vertices()){
@@ -142,13 +141,10 @@ class F_OT{
       }
       desiredMass /= options.nSites;
 
-      std::cout << "desiredMass = " << desiredMass << std::endl;
-
       geom.requireVertexDualAreas();
       VertexData<double> normD(mesh, 0); // denominator for the rho's
       for (size_t iSite = 0; iSite < options.nSites; iSite++) {
         normD += exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite];
-        std::cout << "exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) " << exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) << std::endl;
       } 
       
       //The second objective term

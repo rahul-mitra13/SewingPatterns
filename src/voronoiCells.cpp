@@ -469,6 +469,16 @@ Eigen::VectorXd computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface&
   //set the measure in Voronoi options (TO DO: specify this elsewhere) 
   options.measure = measure;
 
+  //compute shortTime parameter (TO DO: specify this elsewhere)
+  geom.requireEdgeLengths();
+  //compute the diffusion time 
+  double meanEdgeLength = 0.;
+  for (Edge e : mesh.edges()) {
+    meanEdgeLength += geom.edgeLengths[e];
+  }
+  meanEdgeLength /= mesh.nEdges();
+  options.shortTime = options.tCoef * meanEdgeLength * meanEdgeLength;
+
   // Define one vector heat method solver per thread
   vector<VectorHeatMethodSolver> vSolvers;
   for (int i = 0; i < omp_get_max_threads(); i++)
@@ -482,7 +492,8 @@ Eigen::VectorXd computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface&
   for (int i = 0; i < omp_get_max_threads(); i++) {
     vSolvers[i].scalarDiffuse(dummyRHS);
     vSolvers[i].computeLogMap(dummySite);
-  }  
+  }
+  
   
   // Set points to start
   std::vector<SurfacePoint> siteLocations = options.initialSites;
@@ -524,17 +535,23 @@ Eigen::VectorXd computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface&
 
   // Set up parameters
   LBFGSpp::LBFGSParam<double> param;
-  param.epsilon = 1e-6;
+  param.epsilon = 1e-5;
   param.max_iterations = 1;
+  param.max_linesearch = 10000;
  
   // Create solver and function object
-  LBFGSpp::LBFGSSolver<double> solver(param);
+  LBFGSpp::LBFGSSolver<double, LBFGSpp::LineSearchMoreThuente> solver(param);
   F_OT fun(geom, mesh, options, siteLocations);
   fun.requireHeatKernel(vSolvers);
   fun.requireLogMap(vSolvers);
 
   // Initial guess
-  Eigen::VectorXd x = Eigen::VectorXd::Ones(n);
+  // Eigen::VectorXd x(options.nSites);
+  // for (int i = 0; i < options.nSites; i++){
+  //   x(i) = uniform01(rng);
+  // }
+  Eigen::VectorXd x = Eigen::VectorXd::Ones(options.nSites);
+
   // x will be overwritten to be the best point found
   double fx;
   int niter = solver.minimize(fun, x, fx);
