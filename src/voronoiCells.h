@@ -5,7 +5,6 @@
 #include "geometrycentral/surface/vector_heat_method.h"
 
 #include "polyscope/surface_mesh.h"
-
 #include <LBFGS.h>
 
 namespace geometrycentral {
