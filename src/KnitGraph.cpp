@@ -1330,7 +1330,7 @@ void KnitGraph::fixDuplicateEdges(){
         }
     }
 
-    std::vector<Vector3> dups;
+    //std::vector<Vector3> dups;
     // Declare an unordered_set of pairs, with inline hash & equality lambdas:
     std::unordered_set<
       std::pair<int,int>,
@@ -1356,18 +1356,18 @@ void KnitGraph::fixDuplicateEdges(){
         for (int j = 0; j < edges.size(); j++){
             if (i == j) continue;
             if (edges[i][0] == edges[j][0] && edges[i][1] == edges[j][1]){
-                dups.push_back(realVertices[edges[i][0]].position);
-                dups.push_back(realVertices[edges[i][1]].position);
+                //dups.push_back(realVertices[edges[i][0]].position);
+                //dups.push_back(realVertices[edges[i][1]].position);
                 int v1 = edges[i][0];
                 int v2 = edges[i][1];
-                realVertices[v1].printVertexInfo();
-                std::cout << std::endl;
-                realVertices[v2].printVertexInfo();
+                //realVertices[v1].printVertexInfo();
+                //std::cout << std::endl;
+                //realVertices[v2].printVertexInfo();
                 dupIndices.emplace(std::make_pair(v1, v2));
             }
         }
     }
-    polyscope::registerPointCloud("duplicates", dups);
+    //polyscope::registerPointCloud("duplicates", dups);
     
 
     //now merge 2 real vertices v1 and v2 into one real vertex 
@@ -1484,6 +1484,28 @@ void KnitGraph::fixDuplicateEdges(){
     }
     realVertices = finalVertices;
 
+    //now fix the issues when rows become columns and vice versa
+    std::vector<Vector3> badVertices;
+    for (auto &v : realVertices){
+        if ((v.row_in == v.id) || (v.row_in == v.row_out) || (v.row_in == v.col_in[0]) || (v.row_in == v.col_out[0])){
+            badVertices.emplace_back(v.position);
+            std::cout << "row in problem at vertex " << v.id << std::endl;
+        }
+        if ((v.row_out == v.id) || (v.row_out == v.row_in) || (v.row_out == v.col_in[0]) || (v.row_out == v.col_out[0])){
+            badVertices.emplace_back(v.position);
+            std::cout << "row out problem at vertex " << v.id << std::endl;
+        }
+        if ((v.col_in[0] == v.id) || (v.col_in[0] == v.row_in) || (v.col_in[0] == v.row_out) || (v.col_in[0] == v.col_out[0])){
+            badVertices.emplace_back(v.position);
+            std::cout << "col_in[0] out problem at vertex " << v.id << std::endl;
+        }
+        if ((v.col_out[0] == v.id) || (v.col_out[0] == v.row_in) || (v.col_out[0] == v.row_out) || (v.col_out[0] == v.col_in[0])){
+            badVertices.emplace_back(v.position);
+            std::cout << "col_out[0] out problem at vertex " << v.id << std::endl;
+        }
+    }
+
+    polyscope::registerPointCloud("bad duplicate edges", badVertices);
 }
 //----------------------helper functions----------------------//
 //hash function for a floating point number
