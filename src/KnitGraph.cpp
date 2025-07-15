@@ -1487,21 +1487,29 @@ void KnitGraph::fixDuplicateEdges(){
     //now fix the issues when rows become columns and vice versa
     std::vector<Vector3> badVertices;
     for (auto &v : realVertices){
-        if ((v.row_in == v.id) || (v.row_in == v.row_out) || (v.row_in == v.col_in[0]) || (v.row_in == v.col_out[0])){
-            badVertices.emplace_back(v.position);
-            std::cout << "row in problem at vertex " << v.id << std::endl;
+        if (v.row_in != -1){
+            if ((v.row_in == v.id) || (v.row_in == v.row_out) || (v.row_in == v.col_in[0]) || (v.row_in == v.col_out[0])){
+                badVertices.emplace_back(v.position);
+                std::cout << "row in problem at vertex " << v.id << std::endl;
+            }
         }
-        if ((v.row_out == v.id) || (v.row_out == v.row_in) || (v.row_out == v.col_in[0]) || (v.row_out == v.col_out[0])){
-            badVertices.emplace_back(v.position);
-            std::cout << "row out problem at vertex " << v.id << std::endl;
+        if (v.row_out != -1){
+            if ((v.row_out == v.id) || (v.row_out == v.row_in) || (v.row_out == v.col_in[0]) || (v.row_out == v.col_out[0])){
+                badVertices.emplace_back(v.position);
+                std::cout << "row out problem at vertex " << v.id << std::endl;
+            }
         }
-        if ((v.col_in[0] == v.id) || (v.col_in[0] == v.row_in) || (v.col_in[0] == v.row_out) || (v.col_in[0] == v.col_out[0])){
-            badVertices.emplace_back(v.position);
-            std::cout << "col_in[0] out problem at vertex " << v.id << std::endl;
+        if (v.col_in[0] != -1){
+            if ((v.col_in[0] == v.id) || (v.col_in[0] == v.row_in) || (v.col_in[0] == v.row_out) || (v.col_in[0] == v.col_out[0])){
+                badVertices.emplace_back(v.position);
+                std::cout << "col_in[0] out problem at vertex " << v.id << std::endl;
+            }
         }
-        if ((v.col_out[0] == v.id) || (v.col_out[0] == v.row_in) || (v.col_out[0] == v.row_out) || (v.col_out[0] == v.col_in[0])){
-            badVertices.emplace_back(v.position);
-            std::cout << "col_out[0] out problem at vertex " << v.id << std::endl;
+        if (v.col_in[1] != -1){
+            if ((v.col_out[0] == v.id) || (v.col_out[0] == v.row_in) || (v.col_out[0] == v.row_out) || (v.col_out[0] == v.col_in[0])){
+                badVertices.emplace_back(v.position);
+                std::cout << "col_out[0] out problem at vertex " << v.id << std::endl;
+            }
         }
     }
 
