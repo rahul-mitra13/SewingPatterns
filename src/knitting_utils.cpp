@@ -3707,6 +3707,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //     // posMeasure[v] = std::exp(globalGeometry.vertexPositions[v].x);
     // }
 
+    //------------------------------//
     //test LBFGS implementation
     VoronoiOptions posLBFGSOptions = defaultVoronoiOptions;
     posLBFGSOptions.nSites = std::round(avgTotalMeasure / period);

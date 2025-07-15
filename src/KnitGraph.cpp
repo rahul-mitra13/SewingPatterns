@@ -1234,6 +1234,14 @@ void KnitGraph::tagIncreasesDecreases(){
     //handle increases
     for (auto &v : realVertices){
         if (v.col_in[0] == -1  && v.col_in[1] == -1){
+            if (v.row_in == -1){//handle increases at short-row
+                v.col_in[0] = realVertices[v.row_out].col_in[0];
+                realVertices[realVertices[v.row_out].col_in[0]].col_out[1] = v.id; 
+            }
+            if (v.row_out == -1){//handle increases at short-row
+                v.col_in[0] = realVertices[v.row_in].col_in[0];
+                realVertices[realVertices[v.row_in].col_in[0]].col_out[1] = v.id;
+            }
             if ((realVertices[v.row_out].col_in[0]) != -1 && (realVertices[v.row_in].col_in[0]) != -1){//we're not at the bottom-most course row (assuming can't have short-rows on the bottom row)
                 if (realVertices[v.row_out].col_in[0] < realVertices.size() && realVertices[v.row_in].col_in[0] < realVertices.size()){
                     std::cout << "In stable increase case for vertex " << v.id << std::endl;
@@ -1260,6 +1268,14 @@ void KnitGraph::tagIncreasesDecreases(){
     //handle decrease
     for (auto &v : realVertices){
         if (v.col_out[0] == -1 && v.col_out[1] == -1){
+            if (v.row_in == -1){//handle decrease at short-row
+                v.col_out[0] = realVertices[v.row_out].col_out[0];
+                realVertices[realVertices[v.row_out].col_out[0]].col_in[1] = v.id;
+            }
+            if (v.row_out == -1){//handle decrease at short-row
+                v.col_out[0] = realVertices[v.row_in].col_out[0];
+                realVertices[realVertices[v.row_in].col_out[0]].col_in[1] = v.id;
+            }
             if ((realVertices[v.row_out].col_out[0]) != -1 && (realVertices[v.row_in].col_out[0]) != -1){//we're not at the top-most course row (assuming can't have short-rows on the top row)
                 if (realVertices[v.row_out].col_out[0] < realVertices.size() && realVertices[v.row_in].col_out[0] < realVertices.size()){
                     std::cout << "In stable decrease case for vertex " << v.id << std::endl;
@@ -1484,36 +1500,41 @@ void KnitGraph::fixDuplicateEdges(){
     }
     realVertices = finalVertices;
 
+    //clear the previously assigned duplicated indices
+    dupIndices.clear();
     //now fix the issues when rows become columns and vice versa
-    std::vector<Vector3> badVertices;
+    std::vector<Vector3> toMerge;
     for (auto &v : realVertices){
         if (v.row_in != -1){
             if ((v.row_in == v.id) || (v.row_in == v.row_out) || (v.row_in == v.col_in[0]) || (v.row_in == v.col_out[0])){
-                badVertices.emplace_back(v.position);
                 std::cout << "row in problem at vertex " << v.id << std::endl;
+                dupIndices.emplace(std::make_pair(v.id, v.row_in));
             }
         }
         if (v.row_out != -1){
             if ((v.row_out == v.id) || (v.row_out == v.row_in) || (v.row_out == v.col_in[0]) || (v.row_out == v.col_out[0])){
-                badVertices.emplace_back(v.position);
                 std::cout << "row out problem at vertex " << v.id << std::endl;
+                dupIndices.emplace(std::make_pair(v.id, v.row_out));
             }
         }
         if (v.col_in[0] != -1){
             if ((v.col_in[0] == v.id) || (v.col_in[0] == v.row_in) || (v.col_in[0] == v.row_out) || (v.col_in[0] == v.col_out[0])){
-                badVertices.emplace_back(v.position);
                 std::cout << "col_in[0] out problem at vertex " << v.id << std::endl;
+                dupIndices.emplace(std::make_pair(v.id, v.col_in[0]));
             }
         }
         if (v.col_in[1] != -1){
             if ((v.col_out[0] == v.id) || (v.col_out[0] == v.row_in) || (v.col_out[0] == v.row_out) || (v.col_out[0] == v.col_in[0])){
-                badVertices.emplace_back(v.position);
                 std::cout << "col_out[0] out problem at vertex " << v.id << std::endl;
+                dupIndices.emplace(std::make_pair(v.id, v.col_out[0]));
             }
         }
     }
-
-    polyscope::registerPointCloud("bad duplicate edges", badVertices);
+    for (auto p : dupIndices){
+        toMerge.push_back(realVertices[p.first].position);
+        toMerge.push_back(realVertices[p.second].position);
+    }
+    polyscope::registerPointCloud("needs real merge", toMerge);
 }
 //----------------------helper functions----------------------//
 //hash function for a floating point number
