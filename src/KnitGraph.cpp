@@ -442,6 +442,7 @@ void KnitGraph::renderGraph(){
     auto graphReal = polyscope::registerCurveNetwork("knit graph with real connections", vertexPositions, edges);
     graphReal -> setRadius(0.001);
     graphReal -> setEnabled(true);
+    graphReal -> setColor({0,0,0}); // black knit graph
 
     //visualize the knit graph with virtual connections
     // for (auto &v : vertices){ 

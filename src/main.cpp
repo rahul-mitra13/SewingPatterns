@@ -475,6 +475,7 @@ int main(int argc, char **argv) {
 
   globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(modelPath), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
 
+  globalPSMesh->setSurfaceColor({1,1,1}); // white mesh
   
   // Internally, Polyscope numbers the edges by looping over faces.
   // Since our numbering is different than that after fixDelaunay, we need to specify the new numbering by providing a permutation.
