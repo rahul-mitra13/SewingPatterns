@@ -115,16 +115,18 @@ class F_OT{
         return rhs;
       };
 
-      for (int i = 0; i < options.nSites; i++){
+      std::vector<VertexData<double>> rhs;
+      for (int i = 0; i < options.nSites; i++) {
         this->heatKernel.emplace_back(VertexData<double>(this->mesh, 0.0));
+        rhs.push_back(computeRHS(std::vector<SurfacePoint>{sites[i]}));
       }
+
 
       #pragma omp parallel for 
       for (size_t iSite = 0; iSite < options.nSites; iSite++) {
         int tid = omp_get_thread_num(); // thread ID
-        SurfacePoint site = sites[iSite];
-        //Just do a scalar diffues
-        this->heatKernel[tid] = vSolvers[tid].scalarDiffuse(computeRHS(std::vector<SurfacePoint>{site}));
+        //Just do a scalar diffuse
+        this->heatKernel[iSite] = vSolvers[tid].scalarDiffuse(rhs[iSite]);
       }
     }
 
@@ -144,44 +146,71 @@ class F_OT{
       geom.requireVertexDualAreas();
       VertexData<double> normD(mesh, 0); // denominator for the rho's
       for (size_t iSite = 0; iSite < options.nSites; iSite++) {
-        normD += exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite];
+        for (Vertex v : mesh.vertices()) {
+          normD[v] += exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite][v];
+        }
       } 
       
       //The second objective term
-      double secondTerm = 0;
+      std::vector<double> secondTermPerSite(options.nSites, 0.0);
 
-      #pragma omp parallel for 
+      #pragma omp parallel for
       for (size_t iSite = 0; iSite < options.nSites; iSite++){
 
         VertexData<double> d2minusPhi(mesh, 0); 
-        for (Vertex v :  mesh.vertices()){
-          d2minusPhi[v] = (logMapPerSite[iSite][v].norm2() - phiWeights[iSite]);
-        }
-        
-        VertexData<double> rho = (exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite]) / normD;
-
-        VertexData<double> integrand = d2minusPhi * rho * options.measure * geom.vertexDualAreas;
-
+        VertexData<double> rho(mesh, 0);
         double sumTerm = 0;
         for (Vertex v : mesh.vertices()){
+          d2minusPhi[v] = (logMapPerSite[iSite][v].norm2() - phiWeights[iSite]);
+          // d2minusPhi[v] = - phiWeights[iSite];
+          rho[v] = (exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite][v]) / normD[v];
           sumTerm += rho[v] * options.measure[v] * geom.vertexDualAreas[v];
+          secondTermPerSite[iSite] += d2minusPhi[v] * rho[v] * options.measure[v] * geom.vertexDualAreas[v];
         }
 
         //add the gradient component 
         grad(iSite) = desiredMass - sumTerm;
 
-        for (Vertex v : mesh.vertices()) secondTerm += integrand[v];
+        // VertexData<double> rho = (exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite]) / normD;
+        // for (Vertex v : mesh.vertices())
+        //   std::cout << rho[v] << " ";
+        // std::cout << std::endl;
+
+        // double sumTerm = 0;
+        // for (Vertex v : mesh.vertices()){
+        //   sumTerm += rho[v] * options.measure[v] * geom.vertexDualAreas[v];
+        // }
+
+
+        // VertexData<double> integrand = d2minusPhi * rho * options.measure * geom.vertexDualAreas;
+        // for (Vertex v : mesh.vertices()) secondTerm += integrand[v];
       
       }
 
-      //The first objective term  
-      double weightSum = 0; 
-      for (int i = 0; i < phiWeights.size(); i++) weightSum += phiWeights(i);
-      double firstTerm = weightSum * desiredMass;
-
-      double obj = firstTerm + secondTerm;
+      // Assemble objective term
+      double obj = 0;
+      for (int i = 0; i < phiWeights.size(); i++) {
+        obj += phiWeights(i) * desiredMass + secondTermPerSite[i];
+      }
 
       return obj;
+  }
+
+  double checkGrad(Eigen::VectorXd& phi, double h) {
+    int n = phi.size();
+    Eigen::VectorXd grad(n), dummy(n), grad_FD(n);
+    double f = (*this)(phi, grad); // analytical gradient
+    double error = 0;
+    for (int i = 0; i < n; i++) {
+      phi(i) += h;
+      double fr = (*this)(phi, dummy); // f(x+h)
+      phi(i) -= 2*h;
+      double fl = (*this)(phi, dummy); // f(x-h)
+      phi(i) += h; // reset to initial value
+      grad_FD(i) = (fr - fl) / (2*h);
+    }
+    std::cout << grad - grad_FD << std::endl;
+    return (grad - grad_FD).norm() / grad.norm();
   }
 };
 

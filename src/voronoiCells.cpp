@@ -552,6 +552,12 @@ Eigen::VectorXd computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface&
   // }
   Eigen::VectorXd x = Eigen::VectorXd::Ones(options.nSites);
 
+  // Check gradient
+  std::vector<double> eps {1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9};
+  for (auto h : eps)
+    H(fun.checkGrad(x, h));
+  polyscope::show();
+
   // x will be overwritten to be the best point found
   double fx;
   int niter = solver.minimize(fun, x, fx);
