@@ -183,8 +183,8 @@ class KnitGraph{
             //sanity check the graph 
             void sanityCheck();
 
-            //find duplicate edges in the graph 
-            void fixDuplicateEdges();
+            //perform real merges on misaligned edges in the knit graph 
+            void realMerge();
 
             //write knit graph to txt file
             void writeKnitGraphToTxtFile(const std::string& file_name);

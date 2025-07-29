@@ -52,9 +52,8 @@ void KnitGraph::buildGraph(){
     //reorder vertex indices
     makeRealVertices();
 
-    //find duplicate edges in the graph
-    //fix them in this function as well
-    fixDuplicateEdges();
+    //perform real merges on misaligned edges in the graph
+    realMerge();
 
     //reorder vertex indices
     //after fixing duplicates, we need to re-order the vertices
@@ -1325,23 +1324,9 @@ void KnitGraph::tagIncreasesDecreases(){
 
 }
 
-void KnitGraph::fixDuplicateEdges(){
+//perform real merges on misaligned edges in the knit graph
+void KnitGraph::realMerge(){
 
-    // std::vector<std::array<int, 2>> edges;
-    // //visualize the knit graph vertices with the virtual connections
-    // for (auto &v : realVertices){
-    //     if (v.row_out != -1){
-    //         edges.push_back({v.id, v.row_out});
-    //     }
-    //     if (v.col_out[0] != -1){
-    //         edges.push_back({v.id, v.col_out[0]});
-    //     }
-    //     if (v.col_out[1] != -1){
-    //         edges.push_back({v.id, v.col_out[1]});
-    //     }
-    // }
-
-    //std::vector<Vector3> dups;
     // Declare an unordered_set of pairs, with inline hash & equality lambdas:
     std::unordered_set<
       std::pair<int,int>,
@@ -1362,141 +1347,6 @@ void KnitGraph::fixDuplicateEdges(){
             || (p1.first == p2.second && p1.second == p2.first);
       }
     );
-
-    // for (int i = 0; i < edges.size(); i++){
-    //     for (int j = 0; j < edges.size(); j++){
-    //         if (i == j) continue;
-    //         if (edges[i][0] == edges[j][0] && edges[i][1] == edges[j][1]){
-    //             dups.push_back(realVertices[edges[i][0]].position);
-    //             dups.push_back(realVertices[edges[i][1]].position);
-    //             int v1 = edges[i][0];
-    //             int v2 = edges[i][1];
-    //             //realVertices[v1].printVertexInfo();
-    //             //std::cout << std::endl;
-    //             //realVertices[v2].printVertexInfo();
-    //             dupIndices.emplace(std::make_pair(v1, v2));
-    //         }
-    //     }
-    // }
-    // polyscope::registerPointCloud("duplicates", dups);
-    
-
-    //now merge 2 real vertices v1 and v2 into one real vertex 
-    // for (auto p : dupIndices){
-    //     int v1 = p.first;
-    //     int v2 = p.second;
-    
-    //     //preserve v1, set v2 to virtual 
-    //     realVertices[v2].isVirtual = true;
-
-    //     //find a valid row_in 
-    //     int globalRowIn = -1;
-    //     if (realVertices[v1].row_in != v2) globalRowIn = realVertices[v1].row_in;
-    //     if (realVertices[v2].row_in != v1) globalRowIn = realVertices[v2].row_in;
-    //     //find a valid row_out 
-    //     int globalRowOut = -1;
-    //     if (realVertices[v1].row_out != v2) globalRowOut = realVertices[v1].row_out;
-    //     if (realVertices[v2].row_out != v1) globalRowOut = realVertices[v2].row_out;
-    //     //find a valid col_in
-    //     int globalColIn = -1;
-    //     if (realVertices[v1].col_in[0] != v2) globalColIn = realVertices[v1].col_in[0];
-    //     if (realVertices[v2].col_in[0] != v1) globalColIn = realVertices[v2].col_in[0];
-    //     //find a valid col_out
-    //     int globalColOut = -1;
-    //     if (realVertices[v1].col_out[0] != v2) globalColOut = realVertices[v1].col_out[0];
-    //     if (realVertices[v2].col_out[0] != v1) globalColOut = realVertices[v2].col_out[0];
-
-    //     //update connections for preserved vertex 
-    //     realVertices[v1].row_in = globalRowIn;
-    //     realVertices[globalRowIn].row_out = v1;
-
-    //     realVertices[v1].row_out = globalRowOut;
-    //     realVertices[globalRowOut].row_in = v1;
-
-    //     realVertices[v1].col_in[0] = globalColIn;
-    //     realVertices[globalColIn].col_out[0] = v1;
-
-    //     realVertices[v1].col_out[0] = globalColOut;
-    //     realVertices[globalColOut].col_in[0] = v1;
-
-    // }
-    
-    //finally, fix the realVertices
-    //first re-order indices in the graph
-    //convert graph indices to autoknit txt format 
-    // std::map<int, int> mp;
-    // int i = 0;
-    // std::vector<knitGraphVertex> finalVertices;
-    // for (knitGraphVertex& v: realVertices){
-    //     if (v.isVirtual) continue;//only handle real vertices (this condition migh be hit since we've merged real vertices above)
-    //     mp.insert({v.id, i++});
-    // }
-    // int id = -1;
-    // int row_in = -1;
-    // int row_out = -1;
-    // int col_in_1 = -1;
-    // int col_in_2 = -1;
-    // int col_out_1 = -1;
-    // int col_out_2 = -1;
-    // //resize the real vertices
-    // finalVertices.resize(mp.size());
-    // //update the ids in the knit graph
-    // for (knitGraphVertex& v : realVertices){
-    //     if (v.isVirtual) continue;//only handle real vertices
-    //     int id = mp[v.id];
-    //     if (v.row_in == -1){//row_in is unset
-    //         row_in = -1;
-    //     }
-    //     else{
-    //         row_in = mp[v.row_in];
-    //     }
-    //     if (v.row_out == -1){//row_out is unset
-    //         row_out = -1;
-    //     }
-    //     else{
-    //         row_out = mp[v.row_out];
-    //     }
-    //     if (v.col_in[0] == -1){//col_in_1 is unset
-    //         col_in_1 = -1;
-    //     }
-    //     else{
-    //         col_in_1 = mp[v.col_in[0]];
-    //     }
-    //     if (v.col_in[1] == -1){//col_in_2 is unset
-    //         col_in_2 = -1;
-    //     }
-    //     else{
-    //         col_in_2 = mp[v.col_in[1]];
-    //     }
-    //     if (v.col_out[0] == -1){//col_out_1 is unset
-    //         col_out_1 = -1;
-    //     }
-    //     else{
-    //         col_out_1 = mp[v.col_out[0]]; 
-    //     }
-
-    //     if (v.col_out[1] == -1){//col_out_2 is unset
-    //         col_out_2 = -1;
-    //     }
-    //     else{
-    //         col_out_2 = mp[v.col_out[1]];
-    //     }
-
-    //     //update the info
-    //     v.id = id;
-    //     v.row_in = row_in;
-    //     v.row_out = row_out;
-    //     v.col_in[0] = col_in_1;
-    //     v.col_in[1] = col_in_2;
-    //     v.col_out[0] = col_out_1;
-    //     v.col_out[1] = col_out_2;
-    //     //add the updated id vertex to the vector of real vertices
-    //     finalVertices[v.id] = v;
-    // }
-    // realVertices = finalVertices;
-
-    //-------------------------------------------------------//
-    //just copying code from above, need to put it all in a function eventually
 
     //clear the previously assigned duplicated indices
     dupIndices.clear();
@@ -1541,19 +1391,19 @@ void KnitGraph::fixDuplicateEdges(){
         //find a valid row_in 
         int globalRowIn = -1;
         if (realVertices[v1].row_in != v2) globalRowIn = realVertices[v1].row_in;
-        if (realVertices[v2].row_in != v1) globalRowIn = realVertices[v2].row_in;
+        else if (realVertices[v2].row_in != v1) globalRowIn = realVertices[v2].row_in;
         //find a valid row_out 
         int globalRowOut = -1;
         if (realVertices[v1].row_out != v2) globalRowOut = realVertices[v1].row_out;
-        if (realVertices[v2].row_out != v1) globalRowOut = realVertices[v2].row_out;
+        else if (realVertices[v2].row_out != v1) globalRowOut = realVertices[v2].row_out;
         //find a valid col_in
         int globalColIn = -1;
         if (realVertices[v1].col_in[0] != v2) globalColIn = realVertices[v1].col_in[0];
-        if (realVertices[v2].col_in[0] != v1) globalColIn = realVertices[v2].col_in[0];
+        else if (realVertices[v2].col_in[0] != v1) globalColIn = realVertices[v2].col_in[0];
         //find a valid col_out
         int globalColOut = -1;
         if (realVertices[v1].col_out[0] != v2) globalColOut = realVertices[v1].col_out[0];
-        if (realVertices[v2].col_out[0] != v1) globalColOut = realVertices[v2].col_out[0];
+        else if (realVertices[v2].col_out[0] != v1) globalColOut = realVertices[v2].col_out[0];
 
         //update connections for preserved vertex 
         realVertices[v1].row_in = globalRowIn;
@@ -1569,8 +1419,36 @@ void KnitGraph::fixDuplicateEdges(){
         realVertices[globalColOut].col_in[0] = v1;
     }
     polyscope::registerPointCloud("needs real merge", toMerge);
-    std::cout << "size of dupIndices = " << dupIndices.size() << std::endl;
-    std::cout << "size of toMerge = " << toMerge.size() << std::endl;
+
+
+    //remove short-rows on boundary 
+    // for (auto &v : realVertices){
+    //     if ((v.col_in[0] == -1 && realVertices[v.row_out].col_in[0] == -1 && realVertices[v.row_in].col_in[0] == -1) 
+    //         || (v.col_out[0] == -1 && realVertices[v.row_out].col_out[0] == -1 && realVertices[v.row_in].col_out[0] == -1)){//short-row on boundary
+    //         auto walker = v;
+    //         while (walker.row_out != -1){
+    //             realVertices[walker.id].isVirtual = true;
+    //             if (walker.col_in[0] != -1){
+    //                 realVertices[walker.col_in[0]].col_out[0] = -1;
+    //                 realVertices[walker.col_in[0]].col_out[1] = -1;
+    //             }
+    //             else if (walker.col_out[0] != -1){
+    //                 realVertices[walker.col_out[0]].col_in[0] = -1;
+    //                 realVertices[walker.col_out[0]].col_in[1] = -1;
+    //             }
+    //             walker = realVertices[walker.row_out];
+    //         }
+    //         realVertices[walker.id].isVirtual = true;
+    //         if (walker.col_in[0] != -1){
+    //             realVertices[walker.col_in[0]].col_out[0] = -1;
+    //             realVertices[walker.col_in[0]].col_out[1] = -1;
+    //         }
+    //         else if (walker.col_out[0] != -1){
+    //             realVertices[walker.col_out[0]].col_in[0] = -1;
+    //             realVertices[walker.col_out[0]].col_in[1] = -1;
+    //         }
+    //     }
+    // }
     
     //just copying code from above, will put into functions soon 
     std::map<int, int> mp;
