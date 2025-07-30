@@ -1381,7 +1381,7 @@ void KnitGraph::realMerge(){
                 dupIndices.emplace(std::make_pair(v.id, v.col_in[0]));
             }
         }
-        if (v.col_in[1] != -1){
+        if (v.col_out[0] != -1){
             if ((v.col_out[0] == v.id) || (v.col_out[0] == v.row_in) || (v.col_out[0] == v.row_out) || (v.col_out[0] == v.col_in[0])){
                 std::cout << "col_out[0] out problem at vertex " << v.id << std::endl;
                 dupIndices.emplace(std::make_pair(v.id, v.col_out[0]));
@@ -1395,7 +1395,8 @@ void KnitGraph::realMerge(){
         int v1 = p.first;
         int v2 = p.second;
     
-        //preserve v1, set v2 to virtual 
+        //preserve v1
+        //make v2 virtual
         realVertices[v2].isVirtual = true;
 
         //find a valid row_in 
@@ -1406,12 +1407,10 @@ void KnitGraph::realMerge(){
         int globalRowOut = -1;
         if (realVertices[v1].row_out != v2 && realVertices[v1].row_out != -1) globalRowOut = realVertices[v1].row_out;
         else if (realVertices[v2].row_out != v1 && realVertices[v2].row_out != -1) globalRowOut = realVertices[v2].row_out;
-
         //find a valid col_in
         int globalColIn = -1;
         if (realVertices[v1].col_in[0] != v2 && realVertices[v1].col_in[0] != -1) globalColIn = realVertices[v1].col_in[0];
         else if (realVertices[v2].col_in[0] != v1 && realVertices[v2].col_in[0] != -1) globalColIn = realVertices[v2].col_in[0];
-
         //find a valid col_out
         int globalColOut = -1;
         if (realVertices[v1].col_out[0] != v2 && realVertices[v1].col_out[0] != -1) globalColOut = realVertices[v1].col_out[0];
@@ -1443,6 +1442,7 @@ void KnitGraph::realMerge(){
         
         realVertices[v2].col_out[0] = -1;
         realVertices[realVertices[v2].col_out[0]].col_in[0] = -1;
+
     }
     polyscope::registerPointCloud("before real merge ", toMerge);
 
@@ -1485,33 +1485,36 @@ void KnitGraph::realMerge(){
 
 
     //TO-DO: remove short-rows on boundary 
-    // for (auto &v : realVertices){
-    //     if ((v.col_in[0] == -1 && realVertices[v.row_out].col_in[0] == -1 && realVertices[v.row_in].col_in[0] == -1) 
-    //         || (v.col_out[0] == -1 && realVertices[v.row_out].col_out[0] == -1 && realVertices[v.row_in].col_out[0] == -1)){//short-row on boundary
-    //         auto walker = v;
-    //         while (walker.row_out != -1){
-    //             realVertices[walker.id].isVirtual = true;
-    //             if (walker.col_in[0] != -1){
-    //                 realVertices[walker.col_in[0]].col_out[0] = -1;
-    //                 realVertices[walker.col_in[0]].col_out[1] = -1;
-    //             }
-    //             else if (walker.col_out[0] != -1){
-    //                 realVertices[walker.col_out[0]].col_in[0] = -1;
-    //                 realVertices[walker.col_out[0]].col_in[1] = -1;
-    //             }
-    //             walker = realVertices[walker.row_out];
-    //         }
-    //         realVertices[walker.id].isVirtual = true;
-    //         if (walker.col_in[0] != -1){
-    //             realVertices[walker.col_in[0]].col_out[0] = -1;
-    //             realVertices[walker.col_in[0]].col_out[1] = -1;
-    //         }
-    //         else if (walker.col_out[0] != -1){
-    //             realVertices[walker.col_out[0]].col_in[0] = -1;
-    //             realVertices[walker.col_out[0]].col_in[1] = -1;
-    //         }
-    //     }
-    // }
+    for (auto &v : realVertices){
+        if (v.isVirtual) continue;
+        if (((v.col_in[0] == -1 && realVertices[v.row_out].col_in[0] == -1 && realVertices[v.row_in].col_in[0] == -1) 
+            || (v.col_out[0] == -1 && realVertices[v.row_out].col_out[0] == -1 && realVertices[v.row_in].col_out[0] == -1))
+           && (v.row_in == -1)){//short-row on boundary
+            auto walker = v;
+            while (walker.row_out != -1){
+                std::cout << "In here " << std::endl;
+                realVertices[walker.id].isVirtual = true;
+                if (walker.col_in[0] != -1){
+                    realVertices[walker.col_in[0]].col_out[0] = -1;
+                    realVertices[walker.col_in[0]].col_out[1] = -1;
+                }
+                else if (walker.col_out[0] != -1){
+                    realVertices[walker.col_out[0]].col_in[0] = -1;
+                    realVertices[walker.col_out[0]].col_in[1] = -1;
+                }
+                walker = realVertices[walker.row_out];
+            }
+            realVertices[walker.id].isVirtual = true;
+            if (walker.col_in[0] != -1){
+                realVertices[walker.col_in[0]].col_out[0] = -1;
+                realVertices[walker.col_in[0]].col_out[1] = -1;
+            }
+            else if (walker.col_out[0] != -1){
+                realVertices[walker.col_out[0]].col_in[0] = -1;
+                realVertices[walker.col_out[0]].col_in[1] = -1;
+            }
+        }
+    }
     
 
     std::map<int, int> mp;
@@ -1528,9 +1531,7 @@ void KnitGraph::realMerge(){
     int row_in = -1;
     int row_out = -1;
     int col_in_1 = -1;
-    int col_in_2 = -1;
     int col_out_1 = -1;
-    int col_out_2 = -1;
     //resize the real vertices
     finalVertices.resize(mp.size());
     //update the ids in the knit graph
@@ -1555,34 +1556,18 @@ void KnitGraph::realMerge(){
         else{
             col_in_1 = mp[v.col_in[0]];
         }
-        if (v.col_in[1] == -1){//col_in_2 is unset
-            col_in_2 = -1;
-        }
-        else{
-            col_in_2 = mp[v.col_in[1]];
-        }
         if (v.col_out[0] == -1){//col_out_1 is unset
             col_out_1 = -1;
         }
         else{
             col_out_1 = mp[v.col_out[0]]; 
         }
-
-        if (v.col_out[1] == -1){//col_out_2 is unset
-            col_out_2 = -1;
-        }
-        else{
-            col_out_2 = mp[v.col_out[1]];
-        }
-
         //update the info
         v.id = id;
         v.row_in = row_in;
         v.row_out = row_out;
         v.col_in[0] = col_in_1;
-        v.col_in[1] = col_in_2;
         v.col_out[0] = col_out_1;
-        v.col_out[1] = col_out_2;
         //add the updated id vertex to the vector of real vertices
         finalVertices[v.id] = v;
     }
