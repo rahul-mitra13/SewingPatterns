@@ -2,6 +2,40 @@
 
 using namespace std;
 
+//check if 2 edges intersect in 3D
+bool edgesIntersect3D(const Vector3 &p1, const Vector3 &p2,
+                      const Vector3 &q1, const Vector3 &q2,
+                      double threshold = 1e-8) {
+    const double EPS = 1e-12;
+    Vector3 u = p2 - p1;
+    Vector3 v = q2 - q1;
+    Vector3 w = p1 - q1;
+    double a = dot(u,u);
+    double b = dot(u,v);
+    double c = dot(v,v);
+    double d = dot(u,w);
+    double e = dot(v,w);
+    double D = a*c - b*b;
+    double sc, sN, sD = D;
+    double tc, tN, tD = D;
+
+    if (D < EPS) { // parallel segments
+        sN = 0.0;
+        sD = 1.0;
+        tN = e;
+        tD = c;
+    } else {
+        sN = (b*e - c*d);
+        tN = (a*e - b*d);
+    }
+
+    sN = std::clamp(sN / sD, 0.0, 1.0);
+    tN = std::clamp(tN / tD, 0.0, 1.0);
+
+    Vector3 dP = w + u*sN - v*tN;
+    return norm2(dP) < threshold*threshold;
+}
+
 KnitGraph::KnitGraph(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, double coursePeriod, double walePeriod,
                       CornerData<double>& courseOneForm, EdgeData<double>& courseSingularEdges, CornerData<double>& waleOneForm, EdgeData<double>& waleSingularEdges,
                       std::map<int, int>& globalToGluedEdgeMap){
@@ -491,6 +525,36 @@ void KnitGraph::renderGraph(){
     // auto graph = polyscope::registerCurveNetwork("knit graph with virtual connections", vertexPositions, edges);
     // graph -> setRadius(0.001);
     // graph -> setEnabled(false);
+
+    //visualize intersecting edges in 3D 
+    // for (auto e : edges){
+    //     Vector3 aPos = realVertices[e[0]];
+    //     Vector3 bPos = realVertices[e[1]];
+
+    // }
+
+    //find intersecting edges
+    // std::vector<Vector3> intersectingEdges;
+    // for (int i = 0; i < edges.size(); i++){
+    //     auto e1 = edges[i];
+    //     for (int j = i+1; j < edges.size(); j++){ // start from i+1 to avoid duplicates
+    //         auto e2 = edges[j];
+    //         // Skip edges that share a vertex
+    //         if (e1[0] == e2[0] || e1[0] == e2[1] ||
+    //             e1[1] == e2[0] || e1[1] == e2[1]) continue;
+    //         Vector3 p1 = realVertices[e1[0]].position;
+    //         Vector3 p2 = realVertices[e1[1]].position;
+    //         Vector3 q1 = realVertices[e2[0]].position;
+    //         Vector3 q2 = realVertices[e2[1]].position;
+    //         if (edgesIntersect3D(p1, p2, q1, q2)){
+    //             intersectingEdges.push_back(p1);
+    //             intersectingEdges.push_back(p2);
+    //             intersectingEdges.push_back(q1);
+    //             intersectingEdges.push_back(q2);
+    //         }
+    //     }
+    // }
+    // polyscope::registerPointCloud("intersecting edges", intersectingEdges);
 
 }
 
@@ -1485,36 +1549,36 @@ void KnitGraph::realMerge(){
 
 
     //TO-DO: remove short-rows on boundary 
-    for (auto &v : realVertices){
-        if (v.isVirtual) continue;
-        if (((v.col_in[0] == -1 && realVertices[v.row_out].col_in[0] == -1 && realVertices[v.row_in].col_in[0] == -1) 
-            || (v.col_out[0] == -1 && realVertices[v.row_out].col_out[0] == -1 && realVertices[v.row_in].col_out[0] == -1))
-           && (v.row_in == -1)){//short-row on boundary
-            auto walker = v;
-            while (walker.row_out != -1){
-                std::cout << "In here " << std::endl;
-                realVertices[walker.id].isVirtual = true;
-                if (walker.col_in[0] != -1){
-                    realVertices[walker.col_in[0]].col_out[0] = -1;
-                    realVertices[walker.col_in[0]].col_out[1] = -1;
-                }
-                else if (walker.col_out[0] != -1){
-                    realVertices[walker.col_out[0]].col_in[0] = -1;
-                    realVertices[walker.col_out[0]].col_in[1] = -1;
-                }
-                walker = realVertices[walker.row_out];
-            }
-            realVertices[walker.id].isVirtual = true;
-            if (walker.col_in[0] != -1){
-                realVertices[walker.col_in[0]].col_out[0] = -1;
-                realVertices[walker.col_in[0]].col_out[1] = -1;
-            }
-            else if (walker.col_out[0] != -1){
-                realVertices[walker.col_out[0]].col_in[0] = -1;
-                realVertices[walker.col_out[0]].col_in[1] = -1;
-            }
-        }
-    }
+    // for (auto &v : realVertices){
+    //     if (v.isVirtual) continue;
+    //     if (((v.col_in[0] == -1 && realVertices[v.row_out].col_in[0] == -1 && realVertices[v.row_in].col_in[0] == -1) 
+    //         || (v.col_out[0] == -1 && realVertices[v.row_out].col_out[0] == -1 && realVertices[v.row_in].col_out[0] == -1))
+    //        && (v.row_in == -1)){//short-row on boundary
+    //         auto walker = v;
+    //         while (walker.row_out != -1){
+    //             std::cout << "In here " << std::endl;
+    //             realVertices[walker.id].isVirtual = true;
+    //             if (walker.col_in[0] != -1){
+    //                 realVertices[walker.col_in[0]].col_out[0] = -1;
+    //                 realVertices[walker.col_in[0]].col_out[1] = -1;
+    //             }
+    //             else if (walker.col_out[0] != -1){
+    //                 realVertices[walker.col_out[0]].col_in[0] = -1;
+    //                 realVertices[walker.col_out[0]].col_in[1] = -1;
+    //             }
+    //             walker = realVertices[walker.row_out];
+    //         }
+    //         realVertices[walker.id].isVirtual = true;
+    //         if (walker.col_in[0] != -1){
+    //             realVertices[walker.col_in[0]].col_out[0] = -1;
+    //             realVertices[walker.col_in[0]].col_out[1] = -1;
+    //         }
+    //         else if (walker.col_out[0] != -1){
+    //             realVertices[walker.col_out[0]].col_in[0] = -1;
+    //             realVertices[walker.col_out[0]].col_in[1] = -1;
+    //         }
+    //     }
+    // }
     
 
     std::map<int, int> mp;
