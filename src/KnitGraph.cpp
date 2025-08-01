@@ -579,24 +579,9 @@ void KnitGraph::intrinsicMerge(){
     std::map<Halfedge, std::vector<knitGraphVertex>> halfedgeWaleVertices;
     for (const knitGraphVertex& v : vertices) if (v.isVirtual) {
 
-        // // Prevent merging on singular edges
-        // if (v.isAlphaVirtual && std::fabs(courseSingularEdgesGlued[v.edge.value()]) > 0) continue; // end of course stripe: skip
-        // if (v.isBetaVirtual  && std::fabs(waleSingularEdgesGlued[v.edge.value()]) > 0)   continue; // end of wale stripe: skip
-
         if (v.isAlphaVirtual) halfedgeCourseVertices[v.halfedge.value()].push_back(v);
         if (v.isBetaVirtual) halfedgeWaleVertices[v.halfedge.value()].push_back(v);
     }
-
-    // // Check that each edge has an even number of virtual vertices
-    // for (Edge e : (gluedGeometry->mesh).edges()){
-    //     if (e.isBoundary()) continue;
-    //     if (numVirtualVertices[e] % 2 != 0){
-    //         std::cout << "something wrong on edge " << e << std::endl;
-    //         std::cout << "non singular edge has an uneven number of virtual vertices " << std::endl;
-    //         polyscope::show();
-    //         exit(1);    
-    //     }
-    // }
 
     // Custom comparator function
     auto compareByJK = [](const knitGraphVertex &a, const knitGraphVertex &b) -> bool {
@@ -657,7 +642,6 @@ void KnitGraph::intrinsicMerge(){
             knitGraphVertex v1 = he1CourseVertices[i1];
             knitGraphVertex v2 = he2CourseVertices[i2];
 
-            // if (v1.col_in[0] == -1 && v2.col_in[0] == -1 && v1.col_out[0] == -1 && v2.col_out[0] == -1){//this is a row merge
             if (v1.row_in == -1 && v2.row_in != -1){
                 vertices[v2.id].row_out = v1.id;
                 vertices[v1.id].row_in  = v2.id;
@@ -666,7 +650,6 @@ void KnitGraph::intrinsicMerge(){
                 vertices[v1.id].row_out = v2.id;
                 vertices[v2.id].row_in  = v1.id;                    
             }
-            // }
         }
 
     }
