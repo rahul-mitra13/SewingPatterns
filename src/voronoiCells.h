@@ -132,68 +132,108 @@ class F_OT{
 
     double operator()(const Eigen::VectorXd& phiWeights, Eigen::VectorXd& grad){ 
 
+      geom.requireVertexDualAreas();
       
       //we use this for numerical stability
       double maxWeight = *std::max_element(phiWeights.begin(), phiWeights.end());
       
-      //find the desired mass 
+      //find the desired mass (per site)
       double desiredMass = 0;
       for (Vertex v : mesh.vertices()){
         desiredMass +=  geom.vertexDualAreas[v] * options.measure[v];
       }
       desiredMass /= options.nSites;
 
-      geom.requireVertexDualAreas();
-      VertexData<double> normD(mesh, 0); // denominator for the rho's
-      for (size_t iSite = 0; iSite < options.nSites; iSite++) {
-        for (Vertex v : mesh.vertices()) {
-          normD[v] += exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite][v];
-        }
-      } 
-      
-      //The second objective term
-      std::vector<double> secondTermPerSite(options.nSites, 0.0);
+      // VertexData<double> normD(mesh, 0); // denominator for the rho's
+      // for (size_t iSite = 0; iSite < options.nSites; iSite++) {
+      //   for (Vertex v : mesh.vertices()) {
+      //     normD[v] += exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite][v];
+      //   }
+      // } 
 
-      #pragma omp parallel for
-      for (size_t iSite = 0; iSite < options.nSites; iSite++){
-
-        VertexData<double> d2minusPhi(mesh, 0); 
-        VertexData<double> rho(mesh, 0);
-        double sumTerm = 0;
-        for (Vertex v : mesh.vertices()){
-          d2minusPhi[v] = (logMapPerSite[iSite][v].norm2() - phiWeights[iSite]);
-          // d2minusPhi[v] = - phiWeights[iSite];
-          rho[v] = (exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite][v]) / normD[v];
-          sumTerm += rho[v] * options.measure[v] * geom.vertexDualAreas[v];
-          secondTermPerSite[iSite] += d2minusPhi[v] * rho[v] * options.measure[v] * geom.vertexDualAreas[v];
-        }
-
-        //add the gradient component 
-        grad(iSite) = desiredMass - sumTerm;
-
-        // VertexData<double> rho = (exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite]) / normD;
-        // for (Vertex v : mesh.vertices())
-        //   std::cout << rho[v] << " ";
-        // std::cout << std::endl;
-
-        // double sumTerm = 0;
-        // for (Vertex v : mesh.vertices()){
-        //   sumTerm += rho[v] * options.measure[v] * geom.vertexDualAreas[v];
-        // }
-
-
-        // VertexData<double> integrand = d2minusPhi * rho * options.measure * geom.vertexDualAreas;
-        // for (Vertex v : mesh.vertices()) secondTerm += integrand[v];
-      
-      }
-
-      // Assemble objective term
+      // NEW OBJECTIVE (ENTROPIC OT)
       double obj = 0;
-      for (int i = 0; i < phiWeights.size(); i++) {
-        obj += phiWeights(i) * desiredMass + secondTermPerSite[i];
+      double eps = 4*options.shortTime;
+      grad.setZero();
+      for (Vertex v : mesh.vertices()) {
+        std::vector<double> argExp(options.nSites);
+        for (int iSite = 0; iSite < options.nSites; iSite++) {
+          // argExp[iSite] = (phiWeights[iSite] - logMapPerSite[iSite][v].norm2()) / eps;
+          // argExp[iSite] = this->heatKernel[iSite][v] * exp(phiWeights[iSite] / eps);
+          argExp[iSite] = phiWeights[iSite] / eps;
+          // std::cout << "argexp: " << phiWeights[iSite] / eps << std::endl;
+          // sumExp += exp((phiWeights[iSite] - logMapPerSite[iSite][v].norm2()) / eps) * desiredMass;
+        }
+        double maxArgExp = *std::max_element(argExp.begin(), argExp.end());
+        // std::cout << phiWeights << std::endl;
+        // std::cout << eps << std::endl;
+        // std::cout << "maxArgExp = " << maxArgExp << std::endl;
+        // double maxArgExp = 0; // todo later
+        double sumExp = 0;
+        for (int iSite = 0; iSite < options.nSites; iSite++) {
+          sumExp += this->heatKernel[iSite][v] * exp(argExp[iSite]);
+        }
+        for (int iSite = 0; iSite < options.nSites; iSite++) {
+          grad(iSite) += - (this->heatKernel[iSite][v] * exp(argExp[iSite]) / sumExp) * options.measure[v] * geom.vertexDualAreas[v];
+        }
+        
+        obj += -eps * log(sumExp * desiredMass) * options.measure[v] * geom.vertexDualAreas[v];
+          
+        // obj += -eps * log(sumExp) * options.measure[v] * geom.vertexDualAreas[v];
       }
 
-      return obj;
+      for (int iSite = 0; iSite < options.nSites; iSite++) {
+        obj += phiWeights[iSite] * desiredMass;
+        grad(iSite) += desiredMass;
+      }
+
+      // std::cout << "grad " << grad << std::endl;
+      
+      // //The second objective term
+      // std::vector<double> secondTermPerSite(options.nSites, 0.0);
+
+      // #pragma omp parallel for
+      // for (size_t iSite = 0; iSite < options.nSites; iSite++){
+
+      //   VertexData<double> d2minusPhi(mesh, 0); 
+      //   VertexData<double> rho(mesh, 0);
+      //   double sumTerm = 0;
+      //   for (Vertex v : mesh.vertices()) {
+      //     d2minusPhi[v] = (logMapPerSite[iSite][v].norm2() - phiWeights[iSite]);
+      //     // d2minusPhi[v] = - phiWeights[iSite];
+      //     rho[v] = (exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite][v]) / normD[v];
+      //     sumTerm += rho[v] * options.measure[v] * geom.vertexDualAreas[v];
+      //     secondTermPerSite[iSite] += d2minusPhi[v] * rho[v] * options.measure[v] * geom.vertexDualAreas[v];
+      //   }
+
+      //   //add the gradient component 
+      //   grad(iSite) = desiredMass - sumTerm;
+
+      //   // VertexData<double> rho = (exp((phiWeights[iSite] - maxWeight)/(4 * options.shortTime)) * this->heatKernel[iSite]) / normD;
+      //   // for (Vertex v : mesh.vertices())
+      //   //   std::cout << rho[v] << " ";
+      //   // std::cout << std::endl;
+
+      //   // double sumTerm = 0;
+      //   // for (Vertex v : mesh.vertices()){
+      //   //   sumTerm += rho[v] * options.measure[v] * geom.vertexDualAreas[v];
+      //   // }
+
+
+      //   // VertexData<double> integrand = d2minusPhi * rho * options.measure * geom.vertexDualAreas;
+      //   // for (Vertex v : mesh.vertices()) secondTerm += integrand[v];
+      
+      // }
+
+      // // Assemble objective term
+      // double obj = 0;
+      // for (int i = 0; i < phiWeights.size(); i++) {
+      //   obj += phiWeights(i) * desiredMass + secondTermPerSite[i];
+      // }
+
+      // Negate everything to make it a mimization problem
+      grad = -grad;
+      return -obj;
   }
 
   double checkGrad(Eigen::VectorXd& phi, double h) {
@@ -209,7 +249,8 @@ class F_OT{
       phi(i) += h; // reset to initial value
       grad_FD(i) = (fr - fl) / (2*h);
     }
-    std::cout << grad - grad_FD << std::endl;
+    // std::cout << grad << std::endl;
+    // std::cout << grad_FD << std::endl;
     return (grad - grad_FD).norm() / grad.norm();
   }
 };

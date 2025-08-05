@@ -1,4 +1,7 @@
 #include "knitting_utils.h"
+#include "geometrycentral/utilities/utilities.h"
+#include <algorithm>
+// #include "igl/hsv_to_rgb.h"
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -3707,17 +3710,17 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //     // posMeasure[v] = std::exp(globalGeometry.vertexPositions[v].x);
     // }
 
-    //------------------------------//
-    //test LBFGS implementation
-    VoronoiOptions posLBFGSOptions = defaultVoronoiOptions;
-    posLBFGSOptions.nSites = std::round(avgTotalMeasure / period);
-    posLBFGSOptions.useDelaunay = false;
-    posLBFGSOptions.seed = 42;
-    std::cout << "Testing LBFGS..." << std::endl;
-    Eigen::VectorXd weights = computePhiWeights(globalMesh, globalGeometry, posLBFGSOptions, posMeasure, psMesh);
-    std::cout << "Finished testing LBFGS..." << std::endl;
-    polyscope::show();
-    //----------------------------//
+    // //------------------------------//
+    // //test LBFGS implementation
+    // VoronoiOptions posLBFGSOptions = defaultVoronoiOptions;
+    // posLBFGSOptions.nSites = std::round(avgTotalMeasure / period);
+    // posLBFGSOptions.useDelaunay = false;
+    // posLBFGSOptions.seed = 42;
+    // std::cout << "Testing LBFGS..." << std::endl;
+    // Eigen::VectorXd weights = computePhiWeights(globalMesh, globalGeometry, posLBFGSOptions, posMeasure, psMesh);
+    // std::cout << "Finished testing LBFGS..." << std::endl;
+    // polyscope::show();
+    // //----------------------------//
 
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
@@ -3728,7 +3731,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     posOptions.seed = 42;
-    // posOptions.iterations = 500; // we have a stopping criterion now
+    // posOptions.iterations = 50; // for debugging
+    // posOptions.tCoef = 0.05;
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
     std::vector<std::vector<VertexData<double>>> posStepSiteDistribution = posVoronoiCenters.stepSiteDistribution;
     std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
@@ -3764,7 +3768,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             polyscope::popContext();
         ImGui::SameLine();
     };
-    //polyscope::pushContext(positivePopUpUI);  
+    // polyscope::pushContext(positivePopUpUI);  
 
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
@@ -3776,17 +3780,47 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     polyscope::registerPointCloud("Voronoi sites unaligned (+)", positiveCenters)->setEnabled(false);
     std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
 
+    // Compute max curl for normalization
+    double maxPosCurl = 0;
+    for (Vertex v : globalMesh.vertices())
+        maxPosCurl = std::max(maxPosCurl, posMeasure[v]);
+
     //print the positive masses
+    std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
+    std::vector<Vector3> posSiteColors(posSiteDistributions.size());
+    for (size_t i = 0; i < posSiteDistributions.size(); i++){
+        double r,g,b;
+        hsv_to_rgb((double)i/posSiteDistributions.size() * 360, 0.75, 1., r, g, b);
+        posSiteColors[i] = {r,g,b};
+    }
+    std::random_device rd;              // non-deterministic seed
+    std::mt19937 g(rd());               // Mersenne Twister engine
+    std::shuffle(posSiteColors.begin(), posSiteColors.end(), g);
+
     for (size_t i = 0; i < posSiteDistributions.size(); i++){
         double mass = 0;
-        for (Vertex v : globalMesh.vertices()){
+        for (Vertex v : globalMesh.vertices()){ 
             if (std::fabs(posSiteDistributions[i][v]) > 1e-8){
                 mass += posSiteDistributions[i][v];
             }
         }
         std::cout << "positive mass at site " << i << " = " << mass << std::endl;
         psMesh.addVertexScalarQuantity("unaligned site distribution (+) " + std::to_string(i), posSiteDistributions[i]);
+
+        // Vector3 siteColor {geometrycentral::unitRand(), geometrycentral::unitRand(), geometrycentral::unitRand()};
+
+        // // Define blended color map
+        // double r,g,b;
+        // hsv_to_rgb(unitRand() * 360, 0.75, 1., r, g, b);
+        // Vector3 siteColor {r,g,b};
+
+        for (Vertex v : globalMesh.vertices()) {
+            // H(posSiteDistributions[i][v] / maxPosCurl);
+            // posSiteDistributionColor[v.getIndex()] -= siteColor * posSiteDistributions[i][v] / maxPosCurl;
+            posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
+        }
     }
+    psMesh.addVertexColorQuantity("pos site dist blend", posSiteDistributionColor)->setEnabled(true);
 
     for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
         std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
@@ -3801,6 +3835,11 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         Vector3 p = posInitialSites[i].interpolate(globalGeometry.vertexPositions);
         polyscope::registerPointCloud("site " + std::to_string(i) + " initialization ", std::vector<Vector3>{p})->setEnabled(false);
     }
+    
+
+    polyscope::show();
+
+    // NEGATIVE COURSE
 
     
     VoronoiOptions negOptions = defaultVoronoiOptions;
@@ -3808,7 +3847,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     negOptions.useDelaunay = false;
     negOptions.computeDistributions = true;
     negOptions.seed = 42;
-    // negOptions.iterations = 500; // we have a stopping criterion now
+    // negOptions.iterations = 50; // we have a stopping criterion now
     std::cout << "# positive sites " << posOptions.nSites << std::endl;
     std::cout << "# negative sites " << negOptions.nSites << std::endl;
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
