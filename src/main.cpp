@@ -177,6 +177,7 @@ void showStripePatterns(){
   std::string richDataFile;
   // richDataFile = "info.ply";
   // richDataFile = "sock_info_0.0035.ply";
+  // richDataFile = "split_fine_55_sings.ply";
 
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);

@@ -3708,8 +3708,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //     // posMeasure[v] = std::exp(globalGeometry.vertexPositions[v].x);
     // }
 
-    //------------------------------//
-    //LBFGS implementation.....
+    // //------------------------------//
+    // //test LBFGS implementation
     // VoronoiOptions posLBFGSOptions = defaultVoronoiOptions;
     // posLBFGSOptions.nSites = std::round(avgTotalMeasure / period);
     // posLBFGSOptions.useDelaunay = false;
@@ -3718,7 +3718,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     // Eigen::VectorXd weights = computePhiWeights(globalMesh, globalGeometry, posLBFGSOptions, posMeasure, psMesh);
     // std::cout << "Finished testing LBFGS..." << std::endl;
     // polyscope::show();
-    //----------------------------//
+    // //----------------------------//
 
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
@@ -3729,8 +3729,11 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     posOptions.seed = 42;
-    // posOptions.iterations = 50; // for debugging
-    // posOptions.tCoef = 0.05;
+    // posOptions.iterations = 500; // we have a stopping criterion now
+
+    // polyscope::show();
+
+
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
     std::vector<std::vector<VertexData<double>>> posStepSiteDistribution = posVoronoiCenters.stepSiteDistribution;
     std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;

@@ -63,6 +63,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
   std::uniform_int_distribution<int> pointTypeDist(0, 2); // 0: vertex, 1: edge, 2: face
   for (size_t i = 0; i < options.nSites; ++i) {
       int type = pointTypeDist(rng);
+      type = 2;
 
       if (type == 0) {
         // Random vertex
@@ -89,6 +90,9 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
         SurfacePoint pt(f, Vector3{u, v, w}); // SurfacePoint using barycentric coords in a triangle
         siteLocations.push_back(pt);
       }
+
+      // H(type);
+      // H(siteLocations.back().face);
   }
 
   //debug on the square 
@@ -320,6 +324,12 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
       for (int i = 0; i < omp_get_max_threads(); i++)
         fracDKarcher.emplace_back(VertexData<double>(mesh, 0));
 
+      // // This doesn't fucking work because it's an intrisic geometry fml
+      // vector<Vector3> sites;
+      // for (auto &site: siteLocations) {
+      //   sites.push_back(site.interpolate(geom.vertexPositions));
+      // }
+      // polyscope::registerPointCloud("sites", sites);
 
       #pragma omp parallel for reduction(+:energy)
       for (size_t iSite = 0; iSite < nSites; iSite++) {
@@ -327,13 +337,22 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
         int tid = omp_get_thread_num(); // thread ID
 
         SurfacePoint site = siteLocations[iSite];
+        // H(site.face);
 
         // === Compute the nearest distribution
         fracDKarcher[tid] = vSolvers[tid].scalarDiffuse(rhs[iSite]);
 
+
+        // // polyscope::registerPointCloud("sites", siteLocations);
+        // psMesh.addVertexScalarQuantity("rhs", rhs[iSite]);
+        // psMesh.addVertexScalarQuantity("fracDKarcher", fracDKarcher[tid]);
+        // psMesh.addVertexScalarQuantity("normD", normD);
+        // polyscope::show();
+
         for (Vertex v : mesh.vertices()) {
           fracDKarcher[tid][v] /= normD[v];
         }
+
 
         //WEIGHT THE DISTRIBUTION BY THE CURL MEASURE (vertex dual areas below when finding weight)
         for (Vertex v : mesh.vertices()){ 
@@ -359,6 +378,9 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
           double weight = fracDKarcher[tid][v] * geom.vertexDualAreas[v];
           Vector2 logVal = logmap[v];
           double dist = logVal.norm();
+
+          // H(fracDKarcher[tid][v]);
+          // H(geom.vertexDualAreas[v]);
 
           updateSum += weight * logVal;
           updateWSum += weight;
