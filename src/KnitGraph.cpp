@@ -2,6 +2,40 @@
 
 using namespace std;
 
+//check if 2 edges intersect in 3D
+bool edgesIntersect3D(const Vector3 &p1, const Vector3 &p2,
+                      const Vector3 &q1, const Vector3 &q2,
+                      double threshold = 1e-8) {
+    const double EPS = 1e-12;
+    Vector3 u = p2 - p1;
+    Vector3 v = q2 - q1;
+    Vector3 w = p1 - q1;
+    double a = dot(u,u);
+    double b = dot(u,v);
+    double c = dot(v,v);
+    double d = dot(u,w);
+    double e = dot(v,w);
+    double D = a*c - b*b;
+    double sc, sN, sD = D;
+    double tc, tN, tD = D;
+
+    if (D < EPS) { // parallel segments
+        sN = 0.0;
+        sD = 1.0;
+        tN = e;
+        tD = c;
+    } else {
+        sN = (b*e - c*d);
+        tN = (a*e - b*d);
+    }
+
+    sN = std::clamp(sN / sD, 0.0, 1.0);
+    tN = std::clamp(tN / tD, 0.0, 1.0);
+
+    Vector3 dP = w + u*sN - v*tN;
+    return norm2(dP) < threshold*threshold;
+}
+
 KnitGraph::KnitGraph(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, polyscope::SurfaceMesh& psMesh, double coursePeriod, double walePeriod,
                       CornerData<double>& courseOneForm, EdgeData<double>& courseSingularEdges, CornerData<double>& waleOneForm, EdgeData<double>& waleSingularEdges,
                       std::map<int, int>& globalToGluedEdgeMap){
@@ -52,13 +86,8 @@ void KnitGraph::buildGraph(){
     //reorder vertex indices
     makeRealVertices();
 
-    //find duplicate edges in the graph
-    //fix them in this function as well
-    fixDuplicateEdges();
-
-    //reorder vertex indices
-    //after fixing duplicates, we need to re-order the vertices
-    //makeRealVertices();
+    //perform real merges on misaligned edges in the graph
+    realMerge();
 
     // Plot real vertices
     std::vector<Vector3> realVertexPositions;
@@ -430,11 +459,17 @@ void KnitGraph::connectOnSmoothFace(std::vector<knitGraphVertex>& faceVertices){
 
 void KnitGraph::renderGraph(){
     
+    std::cout << "Rendering graph...." << std::endl;
+    std::cout << "size of realVertices = " << realVertices.size() << std::endl;
+    int i = 0;
+
+    // std::vector<Vector3> rowInUnset;
+    // std::vector<Vector3> rowOutUnset;
+    // std::vector<Vector3> colInUnset;
+    // std::vector<Vector3> colOutUnset;
+
     //visualize the knit graph vertices with the real connections
     for (auto &v : realVertices){
-        //if (v.isVirtual) continue;
-        // if (vertices[v.row_out].isVirtual) continue;
-        // if (vertices[v.col_out[0]].isVirtual) continue;
         vertexPositions.push_back(v.position);
         if (v.row_out != -1)
             edges.push_back({v.id, v.row_out});
@@ -446,7 +481,26 @@ void KnitGraph::renderGraph(){
             edges.push_back({v.id, v.col_in[0]});
         if (v.col_in[1] != -1)
             edges.push_back({v.id, v.col_in[1]});
+
+        // if (v.row_in == -1){
+        //     rowInUnset.push_back(v.position);
+        // }
+        // if (v.row_out == -1){
+        //     rowOutUnset.push_back(v.position);
+        // }
+        // if (v.col_in[0] == -1){
+        //     colInUnset.push_back(v.position);
+        // }
+        // if (v.col_out[0] == -1){
+        //     colOutUnset.push_back(v.position);
+        // }
     }
+
+    // polyscope::registerPointCloud("No row in", rowInUnset);
+    // polyscope::registerPointCloud("No row out", rowOutUnset);
+    // polyscope::registerPointCloud("No col in", colInUnset);
+    // polyscope::registerPointCloud("No col out", colOutUnset);
+
     auto graphReal = polyscope::registerCurveNetwork("knit graph with real connections", vertexPositions, edges);
     graphReal -> setRadius(0.001);
     graphReal -> setEnabled(true);
@@ -472,6 +526,36 @@ void KnitGraph::renderGraph(){
     // graph -> setRadius(0.001);
     // graph -> setEnabled(false);
 
+    //visualize intersecting edges in 3D 
+    // for (auto e : edges){
+    //     Vector3 aPos = realVertices[e[0]];
+    //     Vector3 bPos = realVertices[e[1]];
+
+    // }
+
+    //find intersecting edges
+    // std::vector<Vector3> intersectingEdges;
+    // for (int i = 0; i < edges.size(); i++){
+    //     auto e1 = edges[i];
+    //     for (int j = i+1; j < edges.size(); j++){ // start from i+1 to avoid duplicates
+    //         auto e2 = edges[j];
+    //         // Skip edges that share a vertex
+    //         if (e1[0] == e2[0] || e1[0] == e2[1] ||
+    //             e1[1] == e2[0] || e1[1] == e2[1]) continue;
+    //         Vector3 p1 = realVertices[e1[0]].position;
+    //         Vector3 p2 = realVertices[e1[1]].position;
+    //         Vector3 q1 = realVertices[e2[0]].position;
+    //         Vector3 q2 = realVertices[e2[1]].position;
+    //         if (edgesIntersect3D(p1, p2, q1, q2)){
+    //             intersectingEdges.push_back(p1);
+    //             intersectingEdges.push_back(p2);
+    //             intersectingEdges.push_back(q1);
+    //             intersectingEdges.push_back(q2);
+    //         }
+    //     }
+    // }
+    // polyscope::registerPointCloud("intersecting edges", intersectingEdges);
+
 }
 
 //find the sign of a value
@@ -495,24 +579,9 @@ void KnitGraph::intrinsicMerge(){
     std::map<Halfedge, std::vector<knitGraphVertex>> halfedgeWaleVertices;
     for (const knitGraphVertex& v : vertices) if (v.isVirtual) {
 
-        // // Prevent merging on singular edges
-        // if (v.isAlphaVirtual && std::fabs(courseSingularEdgesGlued[v.edge.value()]) > 0) continue; // end of course stripe: skip
-        // if (v.isBetaVirtual  && std::fabs(waleSingularEdgesGlued[v.edge.value()]) > 0)   continue; // end of wale stripe: skip
-
         if (v.isAlphaVirtual) halfedgeCourseVertices[v.halfedge.value()].push_back(v);
         if (v.isBetaVirtual) halfedgeWaleVertices[v.halfedge.value()].push_back(v);
     }
-
-    // // Check that each edge has an even number of virtual vertices
-    // for (Edge e : (gluedGeometry->mesh).edges()){
-    //     if (e.isBoundary()) continue;
-    //     if (numVirtualVertices[e] % 2 != 0){
-    //         std::cout << "something wrong on edge " << e << std::endl;
-    //         std::cout << "non singular edge has an uneven number of virtual vertices " << std::endl;
-    //         polyscope::show();
-    //         exit(1);    
-    //     }
-    // }
 
     // Custom comparator function
     auto compareByJK = [](const knitGraphVertex &a, const knitGraphVertex &b) -> bool {
@@ -573,7 +642,6 @@ void KnitGraph::intrinsicMerge(){
             knitGraphVertex v1 = he1CourseVertices[i1];
             knitGraphVertex v2 = he2CourseVertices[i2];
 
-            // if (v1.col_in[0] == -1 && v2.col_in[0] == -1 && v1.col_out[0] == -1 && v2.col_out[0] == -1){//this is a row merge
             if (v1.row_in == -1 && v2.row_in != -1){
                 vertices[v2.id].row_out = v1.id;
                 vertices[v1.id].row_in  = v2.id;
@@ -582,7 +650,6 @@ void KnitGraph::intrinsicMerge(){
                 vertices[v1.id].row_out = v2.id;
                 vertices[v2.id].row_in  = v1.id;                    
             }
-            // }
         }
 
     }
@@ -1134,8 +1201,6 @@ void KnitGraph::makeRealVertices(){
     //resize the real vertices
     realVertices.resize(mp.size());
 
-    std::cout << "size of real vertices = " << realVertices.size() << std::endl;
-
     //update the ids in the knit graph
     for (knitGraphVertex& v : vertices){
 
@@ -1147,8 +1212,6 @@ void KnitGraph::makeRealVertices(){
             row_in = -1;
         }
         else{
-            // it = mp.find(v.row_in);//find the row_in from the original graph
-            // row_in = it -> second;
             row_in = mp[v.row_in];
         }
 
@@ -1156,8 +1219,6 @@ void KnitGraph::makeRealVertices(){
             row_out = -1;
         }
         else{
-            // it = mp.find(v.row_out);//find the row out from the original graph
-            // row_out = it -> second;
             row_out = mp[v.row_out];
         }
 
@@ -1165,8 +1226,6 @@ void KnitGraph::makeRealVertices(){
             col_in_1 = -1;
         }
         else{
-            // it = mp.find(v.col_in[0]);//find the col_in_1 from the orginal graph
-            // col_in_1 = it -> second;
             col_in_1 = mp[v.col_in[0]];
         }
 
@@ -1174,8 +1233,6 @@ void KnitGraph::makeRealVertices(){
             col_in_2 = -1;
         }
         else{
-            // it = mp.find(v.col_in[1]);//find the col_in_1 from the orginal graph
-            // col_in_2 = it -> second;
             col_in_2 = mp[v.col_in[1]];
         }
 
@@ -1183,8 +1240,6 @@ void KnitGraph::makeRealVertices(){
             col_out_1 = -1;
         }
         else{
-            // it = mp.find(v.col_out[0]);//find the col_out_1 from the orginal graph
-            // col_out_1 = it -> second;
             col_out_1 = mp[v.col_out[0]]; 
         }
 
@@ -1192,8 +1247,6 @@ void KnitGraph::makeRealVertices(){
             col_out_2 = -1;
         }
         else{
-            // it = mp.find(v.col_out[1]);//find the col_out_1 from the orginal graph
-            // col_out_2 = it -> second;
             col_out_2 = mp[v.col_out[1]];
         }
 
@@ -1228,8 +1281,8 @@ void KnitGraph::makeRealVertices(){
 
 void KnitGraph::tagIncreasesDecreases(){
 
-    std::vector<Vector3> problemIncreases;
-    std::vector<Vector3> problemDecreases;
+    // std::vector<Vector3> problemIncreases;
+    // std::vector<Vector3> problemDecreases;
                
     //handle increases
     for (auto &v : realVertices){
@@ -1238,11 +1291,11 @@ void KnitGraph::tagIncreasesDecreases(){
                 v.col_in[0] = realVertices[v.row_out].col_in[0];
                 realVertices[realVertices[v.row_out].col_in[0]].col_out[1] = v.id; 
             }
-            if (v.row_out == -1){//handle increases at short-row
+            else if (v.row_out == -1){//handle increases at short-row
                 v.col_in[0] = realVertices[v.row_in].col_in[0];
                 realVertices[realVertices[v.row_in].col_in[0]].col_out[1] = v.id;
             }
-            if ((realVertices[v.row_out].col_in[0]) != -1 && (realVertices[v.row_in].col_in[0]) != -1){//we're not at the bottom-most course row (assuming can't have short-rows on the bottom row)
+            else if ((realVertices[v.row_out].col_in[0]) != -1 && (realVertices[v.row_in].col_in[0]) != -1){//we're not at the bottom-most course row (assuming can't have short-rows on the bottom row)
                 if (realVertices[v.row_out].col_in[0] < realVertices.size() && realVertices[v.row_in].col_in[0] < realVertices.size()){
                     std::cout << "In stable increase case for vertex " << v.id << std::endl;
                     auto &candidate1 = realVertices[realVertices[v.row_out].col_in[0]];
@@ -1256,14 +1309,10 @@ void KnitGraph::tagIncreasesDecreases(){
                         v.col_in[0] = candidate2.id;
                     }
                 }
-                else{
-                    problemIncreases.push_back(v.position);
-                    std::cout << "Something went wrong for increase at vertex " << v.id << std::endl;
-                    std::cout << "skipping..." << std::endl;
-                }
             }
         }
     }
+    
 
     //handle decrease
     for (auto &v : realVertices){
@@ -1272,11 +1321,11 @@ void KnitGraph::tagIncreasesDecreases(){
                 v.col_out[0] = realVertices[v.row_out].col_out[0];
                 realVertices[realVertices[v.row_out].col_out[0]].col_in[1] = v.id;
             }
-            if (v.row_out == -1){//handle decrease at short-row
+            else if (v.row_out == -1){//handle decrease at short-row
                 v.col_out[0] = realVertices[v.row_in].col_out[0];
                 realVertices[realVertices[v.row_in].col_out[0]].col_in[1] = v.id;
             }
-            if ((realVertices[v.row_out].col_out[0]) != -1 && (realVertices[v.row_in].col_out[0]) != -1){//we're not at the top-most course row (assuming can't have short-rows on the top row)
+            else if ((realVertices[v.row_out].col_out[0]) != -1 && (realVertices[v.row_in].col_out[0]) != -1){//we're not at the top-most course row (assuming can't have short-rows on the top row)
                 if (realVertices[v.row_out].col_out[0] < realVertices.size() && realVertices[v.row_in].col_out[0] < realVertices.size()){
                     std::cout << "In stable decrease case for vertex " << v.id << std::endl;
                     auto &candidate1 = realVertices[realVertices[v.row_out].col_out[0]];
@@ -1290,17 +1339,13 @@ void KnitGraph::tagIncreasesDecreases(){
                         v.col_out[0] = candidate2.id;
                     }
                 }
-                else{
-                    problemDecreases.push_back(v.position);
-                    std::cout << "Something went wrong for decrease at vertex " << v.id << std::endl;
-                    std::cout << "skipping..." << std::endl;
-                }
             }
         }
     }
+    
 
-    polyscope::registerPointCloud("problem increase ", problemIncreases);
-    polyscope::registerPointCloud("problem decreases ", problemDecreases);
+    // polyscope::registerPointCloud("problem increase ", problemIncreases);
+    // polyscope::registerPointCloud("problem decreases ", problemDecreases);
 
     //check if col_out[0] and col_out[1] need flipping for increases i.e., col_out[0] should always have a row_out that points to col_out[1]
     for (auto &v : realVertices){
@@ -1330,23 +1375,10 @@ void KnitGraph::tagIncreasesDecreases(){
 
 }
 
-void KnitGraph::fixDuplicateEdges(){
+//perform real merges on misaligned edges in the knit graph
+void KnitGraph::realMerge(){
 
-    std::vector<std::array<int, 2>> edges;
-    //visualize the knit graph vertices with the virtual connections
-    for (auto &v : realVertices){
-        if (v.row_out != -1){
-            edges.push_back({v.id, v.row_out});
-        }
-        if (v.col_out[0] != -1){
-            edges.push_back({v.id, v.col_out[0]});
-        }
-        if (v.col_out[1] != -1){
-            edges.push_back({v.id, v.col_out[1]});
-        }
-    }
-
-    //std::vector<Vector3> dups;
+    //something is going very wrong in this function
     // Declare an unordered_set of pairs, with inline hash & equality lambdas:
     std::unordered_set<
       std::pair<int,int>,
@@ -1368,48 +1400,68 @@ void KnitGraph::fixDuplicateEdges(){
       }
     );
 
-    for (int i = 0; i < edges.size(); i++){
-        for (int j = 0; j < edges.size(); j++){
-            if (i == j) continue;
-            if (edges[i][0] == edges[j][0] && edges[i][1] == edges[j][1]){
-                //dups.push_back(realVertices[edges[i][0]].position);
-                //dups.push_back(realVertices[edges[i][1]].position);
-                int v1 = edges[i][0];
-                int v2 = edges[i][1];
-                //realVertices[v1].printVertexInfo();
-                //std::cout << std::endl;
-                //realVertices[v2].printVertexInfo();
-                dupIndices.emplace(std::make_pair(v1, v2));
+    int numReal = 0;
+    for (knitGraphVertex& v: realVertices){
+        if (v.isVirtual) continue;
+        numReal++;
+    }
+    std::cout << "number of real vertices before real merger " << numReal << std::endl;
+
+    //now fix the issues when rows become columns and vice versa
+    std::vector<Vector3> toMerge;
+    for (knitGraphVertex &v : realVertices){
+        if (v.row_in != -1){
+            if ((v.row_in == v.id) || (v.row_in == v.row_out) || (v.row_in == v.col_in[0]) || (v.row_in == v.col_out[0])){
+                std::cout << "row in problem at vertex " << v.id << std::endl;
+                dupIndices.emplace(std::make_pair(v.id, v.row_in));
+            }
+        }
+        if (v.row_out != -1){
+            if ((v.row_out == v.id) || (v.row_out == v.row_in) || (v.row_out == v.col_in[0]) || (v.row_out == v.col_out[0])){
+                std::cout << "row out problem at vertex " << v.id << std::endl;
+                dupIndices.emplace(std::make_pair(v.id, v.row_out));
+            }
+        }
+        if (v.col_in[0] != -1){
+            if ((v.col_in[0] == v.id) || (v.col_in[0] == v.row_in) || (v.col_in[0] == v.row_out) || (v.col_in[0] == v.col_out[0])){
+                std::cout << "col_in[0] out problem at vertex " << v.id << std::endl;
+                dupIndices.emplace(std::make_pair(v.id, v.col_in[0]));
+            }
+        }
+        if (v.col_out[0] != -1){
+            if ((v.col_out[0] == v.id) || (v.col_out[0] == v.row_in) || (v.col_out[0] == v.row_out) || (v.col_out[0] == v.col_in[0])){
+                std::cout << "col_out[0] out problem at vertex " << v.id << std::endl;
+                dupIndices.emplace(std::make_pair(v.id, v.col_out[0]));
             }
         }
     }
-    //polyscope::registerPointCloud("duplicates", dups);
-    
-
-    //now merge 2 real vertices v1 and v2 into one real vertex 
     for (auto p : dupIndices){
+        toMerge.push_back(realVertices[p.first].position);
+        toMerge.push_back(realVertices[p.second].position);
+
         int v1 = p.first;
         int v2 = p.second;
     
-        //preserve v1, set v2 to virtual 
+        //preserve v1
+        //make v2 virtual
         realVertices[v2].isVirtual = true;
 
         //find a valid row_in 
         int globalRowIn = -1;
-        if (realVertices[v1].row_in != v2) globalRowIn = realVertices[v1].row_in;
-        if (realVertices[v2].row_in != v1) globalRowIn = realVertices[v2].row_in;
+        if (realVertices[v1].row_in != v2 && realVertices[v1].row_in != -1) globalRowIn = realVertices[v1].row_in;
+        else if (realVertices[v2].row_in != v1 && realVertices[v2].row_in != -1) globalRowIn = realVertices[v2].row_in;
         //find a valid row_out 
         int globalRowOut = -1;
-        if (realVertices[v1].row_out != v2) globalRowOut = realVertices[v1].row_out;
-        if (realVertices[v2].row_out != v1) globalRowOut = realVertices[v2].row_out;
+        if (realVertices[v1].row_out != v2 && realVertices[v1].row_out != -1) globalRowOut = realVertices[v1].row_out;
+        else if (realVertices[v2].row_out != v1 && realVertices[v2].row_out != -1) globalRowOut = realVertices[v2].row_out;
         //find a valid col_in
         int globalColIn = -1;
-        if (realVertices[v1].col_in[0] != v2) globalColIn = realVertices[v1].col_in[0];
-        if (realVertices[v2].col_in[0] != v1) globalColIn = realVertices[v2].col_in[0];
+        if (realVertices[v1].col_in[0] != v2 && realVertices[v1].col_in[0] != -1) globalColIn = realVertices[v1].col_in[0];
+        else if (realVertices[v2].col_in[0] != v1 && realVertices[v2].col_in[0] != -1) globalColIn = realVertices[v2].col_in[0];
         //find a valid col_out
         int globalColOut = -1;
-        if (realVertices[v1].col_out[0] != v2) globalColOut = realVertices[v1].col_out[0];
-        if (realVertices[v2].col_out[0] != v1) globalColOut = realVertices[v2].col_out[0];
+        if (realVertices[v1].col_out[0] != v2 && realVertices[v1].col_out[0] != -1) globalColOut = realVertices[v1].col_out[0];
+        else if (realVertices[v2].col_out[0] != v1 && realVertices[v2].col_out[0] != -1) globalColOut = realVertices[v2].col_out[0];
 
         //update connections for preserved vertex 
         realVertices[v1].row_in = globalRowIn;
@@ -1424,86 +1476,27 @@ void KnitGraph::fixDuplicateEdges(){
         realVertices[v1].col_out[0] = globalColOut;
         realVertices[globalColOut].col_in[0] = v1;
 
-    }
-    
-    //finally, fix the realVertices
-    //first re-order indices in the graph
-    //convert graph indices to autoknit txt format 
-    std::map<int, int> mp;
-    int i = 0;
-    std::vector<knitGraphVertex> finalVertices;
-    for (knitGraphVertex& v: realVertices){
-        if (v.isVirtual) continue;//only handle real vertices (this condition migh be hit since we've merged real vertices above)
-        mp.insert({v.id, i++});
-    }
-    int id = -1;
-    int row_in = -1;
-    int row_out = -1;
-    int col_in_1 = -1;
-    int col_in_2 = -1;
-    int col_out_1 = -1;
-    int col_out_2 = -1;
-    //resize the real vertices
-    finalVertices.resize(mp.size());
-    //update the ids in the knit graph
-    for (knitGraphVertex& v : realVertices){
-        if (v.isVirtual) continue;//only handle real vertices
-        int id = mp[v.id];
-        if (v.row_in == -1){//row_in is unset
-            row_in = -1;
-        }
-        else{
-            row_in = mp[v.row_in];
-        }
-        if (v.row_out == -1){//row_out is unset
-            row_out = -1;
-        }
-        else{
-            row_out = mp[v.row_out];
-        }
-        if (v.col_in[0] == -1){//col_in_1 is unset
-            col_in_1 = -1;
-        }
-        else{
-            col_in_1 = mp[v.col_in[0]];
-        }
-        if (v.col_in[1] == -1){//col_in_2 is unset
-            col_in_2 = -1;
-        }
-        else{
-            col_in_2 = mp[v.col_in[1]];
-        }
-        if (v.col_out[0] == -1){//col_out_1 is unset
-            col_out_1 = -1;
-        }
-        else{
-            col_out_1 = mp[v.col_out[0]]; 
-        }
+        //unset connections for v2 
+        realVertices[v2].row_in = -1;
+        realVertices[realVertices[v2].row_in].row_out = -1;
 
-        if (v.col_out[1] == -1){//col_out_2 is unset
-            col_out_2 = -1;
-        }
-        else{
-            col_out_2 = mp[v.col_out[1]];
-        }
+        realVertices[v2].row_out = -1;
+        realVertices[realVertices[v2].row_out].row_in = -1;
 
-        //update the info
-        v.id = id;
-        v.row_in = row_in;
-        v.row_out = row_out;
-        v.col_in[0] = col_in_1;
-        v.col_in[1] = col_in_2;
-        v.col_out[0] = col_out_1;
-        v.col_out[1] = col_out_2;
-        //add the updated id vertex to the vector of real vertices
-        finalVertices[v.id] = v;
+        realVertices[v2].col_in[0] = -1;
+        realVertices[realVertices[v2].col_in[0]].col_out[0] = -1;
+
+        
+        realVertices[v2].col_out[0] = -1;
+        realVertices[realVertices[v2].col_out[0]].col_in[0] = -1;
+
     }
-    realVertices = finalVertices;
+    polyscope::registerPointCloud("before real merge ", toMerge);
 
-    //clear the previously assigned duplicated indices
+    //sanity checking the merge above
+    toMerge.clear();
     dupIndices.clear();
-    //now fix the issues when rows become columns and vice versa
-    std::vector<Vector3> toMerge;
+
     for (auto &v : realVertices){
         if (v.row_in != -1){
             if ((v.row_in == v.id) || (v.row_in == v.row_out) || (v.row_in == v.col_in[0]) || (v.row_in == v.col_out[0])){
@@ -1534,7 +1527,98 @@ void KnitGraph::fixDuplicateEdges(){
         toMerge.push_back(realVertices[p.first].position);
         toMerge.push_back(realVertices[p.second].position);
     }
-    polyscope::registerPointCloud("needs real merge", toMerge);
+
+    polyscope::registerPointCloud("after real merge", toMerge);
+
+
+    //TO-DO: remove short-rows on boundary 
+    // for (auto &v : realVertices){
+    //     if (v.isVirtual) continue;
+    //     if (((v.col_in[0] == -1 && realVertices[v.row_out].col_in[0] == -1 && realVertices[v.row_in].col_in[0] == -1) 
+    //         || (v.col_out[0] == -1 && realVertices[v.row_out].col_out[0] == -1 && realVertices[v.row_in].col_out[0] == -1))
+    //        && (v.row_in == -1)){//short-row on boundary
+    //         auto walker = v;
+    //         while (walker.row_out != -1){
+    //             std::cout << "In here " << std::endl;
+    //             realVertices[walker.id].isVirtual = true;
+    //             if (walker.col_in[0] != -1){
+    //                 realVertices[walker.col_in[0]].col_out[0] = -1;
+    //                 realVertices[walker.col_in[0]].col_out[1] = -1;
+    //             }
+    //             else if (walker.col_out[0] != -1){
+    //                 realVertices[walker.col_out[0]].col_in[0] = -1;
+    //                 realVertices[walker.col_out[0]].col_in[1] = -1;
+    //             }
+    //             walker = realVertices[walker.row_out];
+    //         }
+    //         realVertices[walker.id].isVirtual = true;
+    //         if (walker.col_in[0] != -1){
+    //             realVertices[walker.col_in[0]].col_out[0] = -1;
+    //             realVertices[walker.col_in[0]].col_out[1] = -1;
+    //         }
+    //         else if (walker.col_out[0] != -1){
+    //             realVertices[walker.col_out[0]].col_in[0] = -1;
+    //             realVertices[walker.col_out[0]].col_in[1] = -1;
+    //         }
+    //     }
+    // }
+    
+
+    std::map<int, int> mp;
+    int i = 0;
+    std::vector<knitGraphVertex> finalVertices;
+    for (knitGraphVertex& v: realVertices){
+        if (v.isVirtual) continue;//only handle real vertices (this condition migh be hit since we've merged real vertices above)
+        mp.insert({v.id, i++});
+    }
+
+    std::cout << "number of real vertices after merger = " << mp.size() << std::endl;
+
+    int id = -1;
+    int row_in = -1;
+    int row_out = -1;
+    int col_in_1 = -1;
+    int col_out_1 = -1;
+    //resize the real vertices
+    finalVertices.resize(mp.size());
+    //update the ids in the knit graph
+    for (knitGraphVertex& v : realVertices){
+        if (v.isVirtual) continue;//only handle real vertices
+        int id = mp[v.id];
+        if (v.row_in == -1){//row_in is unset
+            row_in = -1;
+        }
+        else{
+            row_in = mp[v.row_in];
+        }
+        if (v.row_out == -1){//row_out is unset
+            row_out = -1;
+        }
+        else{
+            row_out = mp[v.row_out];
+        }
+        if (v.col_in[0] == -1){//col_in_1 is unset
+            col_in_1 = -1;
+        }
+        else{
+            col_in_1 = mp[v.col_in[0]];
+        }
+        if (v.col_out[0] == -1){//col_out_1 is unset
+            col_out_1 = -1;
+        }
+        else{
+            col_out_1 = mp[v.col_out[0]]; 
+        }
+        //update the info
+        v.id = id;
+        v.row_in = row_in;
+        v.row_out = row_out;
+        v.col_in[0] = col_in_1;
+        v.col_out[0] = col_out_1;
+        //add the updated id vertex to the vector of real vertices
+        finalVertices[v.id] = v;
+    }
+    realVertices = finalVertices;
 }
 //----------------------helper functions----------------------//
 //hash function for a floating point number

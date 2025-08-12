@@ -2040,9 +2040,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         Face f = facePoint.face;
         Edge singularEdge;
         double maxDotProd = -DBL_MAX;
-        // if (facePoint.faceCoords.x == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().vertex(), 1));
-        // else if (facePoint.faceCoords.y == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().vertex(), 1));
-        // else if (facePoint.faceCoords.z == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().next().vertex() , 1));
         for (Halfedge he : f.adjacentHalfedges()){
             Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
                                 globalGeometry.vertexPositions[he.tailVertex()]).normalize();
@@ -2051,9 +2048,11 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 singularEdge = he.edge();
             }
         }
+        
         //increment the indices really close so indices cancel out
         edgeIndices[singularEdge.getIndex()] = -1.0;
         waleSingularEdgesGlobal[singularEdge] = 1.0;
+        
     }
 
     for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
@@ -2070,9 +2069,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         Face f = facePoint.face;
         Edge singularEdge;
         double maxDotProd = -DBL_MAX;
-        // if (facePoint.faceCoords.x == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().vertex(), -1));
-        // else if (facePoint.faceCoords.y == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().vertex(), -1));
-        // else if (facePoint.faceCoords.z == std::max({facePoint.faceCoords.x, facePoint.faceCoords.y, facePoint.faceCoords.z})) singularities.push_back(std::make_pair(f.halfedge().next().next().vertex() , -1));
         for (Halfedge he : f.adjacentHalfedges()){
             Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
                                 globalGeometry.vertexPositions[he.tailVertex()]).normalize();
@@ -2081,9 +2077,11 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 singularEdge = he.edge();
             }
         }
+        
         //increment the indices really close so indices cancel out
         edgeIndices[singularEdge.getIndex()] = 1.0;
         waleSingularEdgesGlobal[singularEdge] = -1.0;
+        
     }
 
     //set the edge indices from the singularities found using the OT method 
@@ -3710,8 +3708,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //     // posMeasure[v] = std::exp(globalGeometry.vertexPositions[v].x);
     // }
 
-    // //------------------------------//
-    // //test LBFGS implementation
+    //------------------------------//
+    //LBFGS implementation.....
     // VoronoiOptions posLBFGSOptions = defaultVoronoiOptions;
     // posLBFGSOptions.nSites = std::round(avgTotalMeasure / period);
     // posLBFGSOptions.useDelaunay = false;
@@ -3720,7 +3718,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     // Eigen::VectorXd weights = computePhiWeights(globalMesh, globalGeometry, posLBFGSOptions, posMeasure, psMesh);
     // std::cout << "Finished testing LBFGS..." << std::endl;
     // polyscope::show();
-    // //----------------------------//
+    //----------------------------//
 
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
@@ -4020,13 +4018,15 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
              Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
                                  globalGeometry.vertexPositions[he.tailVertex()]).normalize();
             if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
-                    maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
-                    posSingularEdge = he.edge();
-                    posHe = he;
+                maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
+                posSingularEdge = he.edge();
+                posHe = he;
             }
         }
+        
         edgeIndices[posSingularEdge.getIndex()] = -1.0;
         edgeSingularities[posSingularEdge] = 1.0;
+        
 
         //handle negative case
         SurfacePoint negFacePoint = negSite.inSomeFace();
@@ -4044,9 +4044,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                     negHe = he;
             }
         }
+        
         edgeIndices[negSingularEdge.getIndex()] = 1.0;
         edgeSingularities[negSingularEdge] = -1.0;
-
+        
         singularEdges.push_back(std::make_pair(posSingularEdge.getIndex(), negSingularEdge.getIndex()));
         pairedTimeFunctions.push_back(std::make_pair(posVal, negVal));
         pairedHalfedges.push_back(std::make_pair(posHe, negHe));
