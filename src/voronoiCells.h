@@ -157,14 +157,24 @@ class F_OT{
       grad.setZero();
       for (Vertex v : mesh.vertices()) {
         std::vector<double> argExp(options.nSites);
+        double innerProduct; 
         for (int iSite = 0; iSite < options.nSites; iSite++) {
           // argExp[iSite] = (phiWeights[iSite] - logMapPerSite[iSite][v].norm2()) / eps;
           // argExp[iSite] = this->heatKernel[iSite][v] * exp(phiWeights[iSite] / eps);
           argExp[iSite] = phiWeights[iSite] / eps;
           // std::cout << "argexp: " << phiWeights[iSite] / eps << std::endl;
           // sumExp += exp((phiWeights[iSite] - logMapPerSite[iSite][v].norm2()) / eps) * desiredMass;
+
+          //computing the inner product 
+          innerProduct += phiWeights[iSite] * desiredMass;
         }
         double maxArgExp = *std::max_element(argExp.begin(), argExp.end());
+        //adjust the argExp for numerical stability
+        for (int iSite = 0; iSite < options.nSites; iSite++) {
+          argExp[iSite] = argExp[iSite] - maxArgExp;
+        }
+
+
         // std::cout << phiWeights << std::endl;
         // std::cout << eps << std::endl;
         // std::cout << "maxArgExp = " << maxArgExp << std::endl;
@@ -177,7 +187,7 @@ class F_OT{
           grad(iSite) += - (this->heatKernel[iSite][v] * exp(argExp[iSite]) / sumExp) * options.measure[v] * geom.vertexDualAreas[v];
         }
         
-        obj += -eps * log(sumExp * desiredMass) * options.measure[v] * geom.vertexDualAreas[v];
+        obj += -eps * log(sumExp * desiredMass) * options.measure[v] * geom.vertexDualAreas[v] + innerProduct;
           
         // obj += -eps * log(sumExp) * options.measure[v] * geom.vertexDualAreas[v];
       }

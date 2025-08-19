@@ -3709,16 +3709,16 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     // }
 
     // //------------------------------//
-    // //test LBFGS implementation
-    // VoronoiOptions posLBFGSOptions = defaultVoronoiOptions;
-    // posLBFGSOptions.nSites = std::round(avgTotalMeasure / period);
-    // posLBFGSOptions.useDelaunay = false;
-    // posLBFGSOptions.seed = 42;
-    // std::cout << "Testing LBFGS..." << std::endl;
-    // Eigen::VectorXd weights = computePhiWeights(globalMesh, globalGeometry, posLBFGSOptions, posMeasure, psMesh);
-    // std::cout << "Finished testing LBFGS..." << std::endl;
-    // polyscope::show();
-    // //----------------------------//
+    //test LBFGS implementation
+    VoronoiOptions posLBFGSOptions = defaultVoronoiOptions;
+    posLBFGSOptions.nSites = std::round(avgTotalMeasure / period);
+    posLBFGSOptions.useDelaunay = false;
+    posLBFGSOptions.seed = 42;
+    std::cout << "Testing LBFGS..." << std::endl;
+    Eigen::VectorXd weights = computePhiWeights(globalMesh, globalGeometry, posLBFGSOptions, posMeasure, psMesh);
+    std::cout << "Finished testing LBFGS..." << std::endl;
+    polyscope::show();
+    //----------------------------//
 
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
