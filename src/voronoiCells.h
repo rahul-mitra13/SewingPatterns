@@ -192,10 +192,10 @@ class F_OT{
         // obj += -eps * log(sumExp) * options.measure[v] * geom.vertexDualAreas[v];
       }
 
-      for (int iSite = 0; iSite < options.nSites; iSite++) {
-        obj += phiWeights[iSite] * desiredMass;
-        grad(iSite) += desiredMass;
-      }
+      // for (int iSite = 0; iSite < options.nSites; iSite++) {
+      //   obj += phiWeights[iSite] * desiredMass;
+      //   grad(iSite) += desiredMass;
+      // }
 
       // std::cout << "grad " << grad << std::endl;
       
