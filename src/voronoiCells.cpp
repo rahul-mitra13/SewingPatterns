@@ -13,6 +13,14 @@ namespace {
 const bool VORONOI_PRINT = false;
 }
 
+// To print vectors easily
+template<class T> std::ostream &operator<<(std::ostream &os, std::vector<T> v) {
+  os << "["; if (v.size() > 0) os << v[0];
+  for(int i = 1; i < v.size(); i++) os << ", " << v[i];
+  os << "]";
+  return os;
+}
+
 // The default trace options
 const VoronoiOptions defaultVoronoiOptions{};
 
@@ -172,10 +180,11 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     VertexData<double> normRHS(mesh, 0); // sum on all sites
     double gradNorm = 0;
 
-    // // New L-BFGS stuff
-    // Eigen::VectorXd phi = computePhiWeights(mesh, geom, options, measure, psMesh);
-    // for (int iSite = 0; iSite < options.nSites; iSite++)
-    //   phiWeights[iSite] = phi[iSite];
+    // New L-BFGS stuff
+    Eigen::VectorXd phi = computePhiWeights(mesh, geom, options, measure, psMesh);
+    for (int iSite = 0; iSite < options.nSites; iSite++)
+      phiWeights[iSite] = phi[iSite];
+    break; // for debug
 
     //gradient descent to find the weights 
     for (size_t i = 0; i < options.descIter; i++){
@@ -423,15 +432,17 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     std::cout << "-------------------------" << std::endl;
   }
 
-  geom.unrequireVertexDualAreas();
+  // geom.unrequireVertexDualAreas();
 
   result.siteLocations = siteLocations;
 
   if (options.computeDistributions) {
     result.hasDistributions = true;
 
+    H(phiWeights);
+
     // Compute the normalizer distribution
-    std::vector<VertexData<double>> rhs = computeRHSWithWeights(siteLocations, phiWeights, shortTime); // make it sharp just for visu
+    std::vector<VertexData<double>> rhs = computeRHSWithWeights(siteLocations, phiWeights, 4*shortTime); // make it sharp just for visu
     VertexData<double> normRHS(mesh, 0); // sum on all sites
     for (int i = 0; i < siteLocations.size(); i++)
       normRHS += rhs[i];
@@ -446,6 +457,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
 
       //WEIGHT THE DISTRIBUTION BY THE CURL MEASURE
       for (Vertex v : mesh.vertices()){ 
+        // H(thisFracD[v]);
         // thisFracD[v] *= measure[v]; // density (this is what we want, i think)
         // thisFracD[v] *= measure[v] * geom.vertexDualAreas[v]; // mass
       }
@@ -569,12 +581,13 @@ Eigen::VectorXd computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface&
 
   // Set up parameters
   LBFGSpp::LBFGSParam<double> param;
-  param.epsilon = 1e-5;
+  param.epsilon = 1e-8;
+  param.epsilon_rel = 1e-8;
   param.max_iterations = 1000;
   param.max_linesearch = 10000;
  
   // Create solver and function object
-  LBFGSpp::LBFGSSolver<double, LBFGSpp::LineSearchMoreThuente> solver(param);
+  LBFGSpp::LBFGSSolver<double> solver(param);
   F_OT fun(geom, mesh, options, siteLocations);
   fun.requireHeatKernel(vSolvers);
   fun.requireLogMap(vSolvers);
@@ -585,22 +598,35 @@ Eigen::VectorXd computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface&
   //   x(i) = uniform01(rng);
   // }
   Eigen::VectorXd x = Eigen::VectorXd::Ones(options.nSites);
+  Eigen::VectorXd grad(n);
+  double fx = fun(x, grad); // analytical gradient
+  H(fx);
+  H(grad);
 
-  // Check gradient
-  std::vector<double> eps {1e0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9};
-  for (auto h : eps)
-    H(fun.checkGrad(x, h));
-  polyscope::show();
+  // // Check gradient
+  // std::vector<double> eps {1e0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9};
+  // for (auto h : eps)
+  //   H(fun.checkGrad(x, h));
+  // polyscope::show();
 
   // x will be overwritten to be the best point found
-  double fx;
+  fx = 0;
   int niter = solver.minimize(fun, x, fx);
-  x = -x; // max -> min
  
+
   std::cout << niter << " iterations" << std::endl;
+ 
+
   // std::cout << "x = \n" << x.transpose() << std::endl;
   // std::cout << "f(x) = " << fx << std::endl;
   
+  fx = fun(x, grad); // analytical gradient
+  H(fx);
+  H(grad);
+  H(grad.norm());
+
+  H(x);
+
   return x;
 }
 

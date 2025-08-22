@@ -143,6 +143,7 @@ class F_OT{
         desiredMass +=  geom.vertexDualAreas[v] * options.measure[v];
       }
       desiredMass /= options.nSites;
+      std::cout << "Desired mass: " << desiredMass << std::endl;
 
       // VertexData<double> normD(mesh, 0); // denominator for the rho's
       // for (size_t iSite = 0; iSite < options.nSites; iSite++) {
