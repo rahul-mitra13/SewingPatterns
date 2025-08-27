@@ -154,7 +154,7 @@ add_executable(
         #src/experiments.cpp
         src/KnitGraph.cpp
         src/voronoiCells.cpp
-        src/KG.h
+        src/KG.cpp
 )
 
 # Include settings
