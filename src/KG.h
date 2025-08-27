@@ -16,6 +16,7 @@
 #include <optional>
 #include <iostream>
 #include <fstream>
+#include <memory>
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -31,8 +32,6 @@ struct KGVertex{
     int col_out[2] = {-1, -1};
     double alpha_tag = -1;
     double beta_tag = -1;
-    Face face;//associated face of a vertex (on the underlying mesh)
-    std::optional<Edge> edge;//associated edge of a vertex (for virtual vertices)
     std::optional<Halfedge> halfedge;//associated halfedge of a vertex (for virtual vertices)
     SurfacePoint surfacePoint;//surfacePoint representation of this knit graph vertex
     bool isAlphaVirtual = false;//is a virtual vertex in the course direction
@@ -59,12 +58,6 @@ class KG{
         //id counter of vertices 
         int vertexID = 0;
 
-        //period for sampling the course stripes 
-        double coursePeriod; 
-
-        //period for sampling the wale stripes 
-        double walePeriod;
-
         //geometry on which this graph lives 
         VertexPositionGeometry *globalGeometry;
 
@@ -74,22 +67,35 @@ class KG{
         //polyscope object for this geometry 
         polyscope::SurfaceMesh *psMesh; 
 
-        //edge map from global mesh to glued mesh 
-        std::map<int, int> *globalToGluedEdgeMap;
+        //period for sampling the course stripes 
+        double coursePeriod; 
+
+        //period for sampling the wale stripes 
+        double walePeriod;
 
         // Flag of edges that were glued together
         EdgeData<bool> isGlued;
 
         //course stripe 1-form 
         CornerData<double> courseOneForm; 
+
+        //edge indices in the course direction in the global setting
+        EdgeData<double> courseSingularEdges; 
+
+        //edge indices in the course direction in the glued setting
+        EdgeData<double> courseSingularEdgesGlued;
+
         //wale stripe 1-form
         CornerData<double> waleOneForm;
 
-        //edge indices in the course direction
-        EdgeData<double> courseSingularEdges; 
-
-        //edge indices in the wale direction
+        //edge indices in the wale direction in the global setting
         EdgeData<double> waleSingularEdges;
+
+        //edge indices in the wale direction in the glued setting
+        EdgeData<double> waleSingularEdgesGlued;
+
+        //edge map from global mesh to glued mesh 
+        std::map<int, int> *globalToGluedEdgeMap;
 
         //vertices in the graph (including virtuals)
         std::vector<std::unique_ptr<KGVertex>> allVertices;
@@ -104,9 +110,8 @@ class KG{
             //hashing floating point numbers 
             int hashFloat(double val);
 
-
-            //get a knit graph vertex by id
-            knitGraphVertex& get(int id);
+            //make virtual vertices on singular edges 
+            void makeSingularEdgeVertices(std::vector<std::unique_ptr<KGVertex>>& allVertices, Face& f, double period, bool isCourseDirection);
 
         public: 
 
