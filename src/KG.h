@@ -32,12 +32,9 @@ struct KGVertex{
     double alpha_tag = -1;
     double beta_tag = -1;
     Face face;//associated face of a vertex (on the underlying mesh)
-    std::optional<Edge> edge;//associated edge of a vertex
-    std::optional<Halfedge> halfedge;//associated halfedge of a vertex
-    SurfacePoint surfacePoint;//used for intersections on singular faces
-    bool isBaryCenter = false;//if this is a vertex at the barycenter
-    bool hasBeenHandled = false;//if this vertex has been handled by a merge
-    bool isVirtual = false;//if this is a virtual vertex
+    std::optional<Edge> edge;//associated edge of a vertex (for virtual vertices)
+    std::optional<Halfedge> halfedge;//associated halfedge of a vertex (for virtual vertices)
+    SurfacePoint surfacePoint;//surfacePoint representation of this knit graph vertex
     bool isAlphaVirtual = false;//is a virtual vertex in the course direction
     bool isBetaVirtual = false;//is a virtual vertex in the wale direction 
 
@@ -50,6 +47,99 @@ struct KGVertex{
         std::cout << "col_in[1] = " << col_in[1] << std::endl;
         std::cout << "col_out[0] = " << col_out[0] << std::endl;
         std::cout << "col_out[1] = " << col_out[1] << std::endl;
-        std::cout << "isVirtual = " << isVirtual << std::endl;
+        std::cout << "isAlphaVirtual = " << isAlphaVirtual << std::endl;
+        std::cout << "isBetaVirtual = " << isBetaVirtual << std::endl;
     }
+};
+
+class KG{
+
+    private:
+        
+        //id counter of vertices 
+        int vertexID = 0;
+
+        //period for sampling the course stripes 
+        double coursePeriod; 
+
+        //period for sampling the wale stripes 
+        double walePeriod;
+
+        //geometry on which this graph lives 
+        VertexPositionGeometry *globalGeometry;
+
+        //edge length geometry if we want to do this in the embedded setting 
+        EdgeLengthGeometry *gluedGeometry;
+
+        //polyscope object for this geometry 
+        polyscope::SurfaceMesh *psMesh; 
+
+        //edge map from global mesh to glued mesh 
+        std::map<int, int> *globalToGluedEdgeMap;
+
+        // Flag of edges that were glued together
+        EdgeData<bool> isGlued;
+
+        //course stripe 1-form 
+        CornerData<double> courseOneForm; 
+        //wale stripe 1-form
+        CornerData<double> waleOneForm;
+
+        //edge indices in the course direction
+        EdgeData<double> courseSingularEdges; 
+
+        //edge indices in the wale direction
+        EdgeData<double> waleSingularEdges;
+
+        //vertices in the graph (including virtuals)
+        std::vector<std::unique_ptr<KGVertex>> allVertices;
+
+        std::vector<std::unique_ptr<KGVertex>> finalVertices;
+
+        // Pairs of stitched (real) vertices
+        std::vector<std::pair<int, int>> stitchedVertices;
+
+        private: 
+
+            //hashing floating point numbers 
+            int hashFloat(double val);
+
+
+            //get a knit graph vertex by id
+            knitGraphVertex& get(int id);
+
+        public: 
+
+            //Default Constructor 
+            KG(){};
+
+            //Constructor
+            KG(VertexPositionGeometry& globalGeometry,
+               EdgeLengthGeometry& gluedGeometry,
+               polyscope::SurfaceMesh& psMesh,
+               double coursePeriod, double walePeriod,
+               CornerData<double>& courseOneForm,
+               EdgeData<double>& courseSingularEdges,
+               CornerData<double>& waleOneForm,
+               EdgeData<double>& waleSingularEdges,
+               std::map<int, int>& globalToGluedEdgeMap);
+
+            //get the vertices in this knit graph 
+            std::vector<std::unique_ptr<KGVertex>>&  getAllVertices(){
+                return this->allVertices;
+            }
+
+            //get the real vertices in this knit graph 
+            std::vector<std::unique_ptr<KGVertex>>& getFinalVertices(){
+                return this->finalVertices;
+            }
+
+            //build the knit graph 
+            void buildGraph();
+
+            //handle course singular edges  
+            void handleCourseSingularEdges();
+
+            //handle wale singular edges 
+            void handleWaleSingularEdges();
 };
