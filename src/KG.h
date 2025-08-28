@@ -110,8 +110,8 @@ class KG{
             //hashing floating point numbers 
             int hashFloat(double val);
 
-            //make virtual vertices on singular edges 
-            void makeSingularEdgeVertices(std::vector<std::unique_ptr<KGVertex>>& allVertices, Face& f, double period, bool isCourseDirection);
+            //make virtual vertices on the border of a singular face
+            void makeSingularFaceVirtualVertices(std::vector<std::unique_ptr<KGVertex>>& allVertices, Face& f, double period, bool isCourseDirection);
 
         public: 
 
@@ -142,9 +142,9 @@ class KG{
             //build the knit graph 
             void buildGraph();
 
-            //handle course singular edges  
-            void handleCourseSingularEdges();
+            //make virtual vertices in the course direction
+            void makeCourseVirtualVertices();
 
-            //handle wale singular edges 
-            void handleWaleSingularEdges();
+            //make virtual vertices in the wale direction 
+            void makeWaleVirtualVertices();
 };
