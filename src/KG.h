@@ -17,6 +17,8 @@
 #include <iostream>
 #include <fstream>
 #include <memory>
+#include <map>
+#include <cmath>
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -30,6 +32,15 @@ struct KGVertex{
     int row_out = -1;
     int col_in[2] = {-1, -1};
     int col_out[2] = {-1, -1};
+
+    // Row neighbors
+    KGVertex* row_in_vertex  = nullptr;  
+    KGVertex* row_out_vertex = nullptr; 
+
+    // Column neighbors 
+    std::array<KGVertex*, 2> col_in_vertex  { nullptr, nullptr };
+    std::array<KGVertex*, 2> col_out_vertex { nullptr, nullptr };
+
     double alpha_tag = -1;
     double beta_tag = -1;
     std::optional<Halfedge> halfedge;//associated halfedge of a vertex (for virtual vertices)
@@ -105,14 +116,40 @@ class KG{
         // Pairs of stitched (real) vertices
         std::vector<std::pair<int, int>> stitchedVertices;
 
+        //course level sets per face (will become useful when we update the vertex positions of virtual vertices)
+        FaceData<std::vector<double>> faceCourseLevelSets; 
+
+        //wale level sets per face (will become useful when we update the vertex positions of virtual vertices)
+        FaceData<std::vector<double>> faceWaleLevelSets; 
+
+        //graph vertices per face
+        FaceData<std::vector<KGVertex*>> faceKGVertices;
+
+
         private: 
 
             //hashing floating point numbers 
             int hashFloat(double val);
 
-            //make virtual vertices on the border of a singular face
-            void makeSingularFaceVirtualVertices(std::vector<std::unique_ptr<KGVertex>>& allVertices, Face& f, double period, bool isCourseDirection);
+            //make virtual vertices in the course direction
+            void makeCourseVirtualVertices();
 
+            //make virtual vertices in the wale direction 
+            void makeWaleVirtualVertices();
+
+            //make virtual vertices on the border of all faces
+            void makeVirtualVerticesOnBorder(Face& f, bool isCourseDirection);
+
+            //make the real vertices 
+            void makeRealVertices();
+
+            //compute real vertices
+            void makeRealVerticesOnInterior(Face& f);
+
+            //make connections over a face 
+            void makeFaceConnections();
+
+            
         public: 
 
             //Default Constructor 
@@ -142,9 +179,4 @@ class KG{
             //build the knit graph 
             void buildGraph();
 
-            //make virtual vertices in the course direction
-            void makeCourseVirtualVertices();
-
-            //make virtual vertices in the wale direction 
-            void makeWaleVirtualVertices();
 };
