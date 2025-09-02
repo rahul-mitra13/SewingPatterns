@@ -50,6 +50,36 @@ void KG::buildGraph(){
     makeWaleVirtualVertices();
     makeRealVertices();
     makeFaceConnections();
+
+    //render the graph with all the vertices 
+    std::vector<Vector3> allVs;
+    std::vector<std::array<int, 2>> edges;
+    for (auto &v : allVertices){
+        //now compute the position of v in R^3 
+        int fIndex = v->halfedge->face().getIndex();
+        //grab the global face 
+        Face f = globalGeometry->mesh.face(fIndex);
+        //grab the vertices on the face
+        Vertex vI = f.halfedge().vertex();
+        Vertex vJ = f.halfedge().next().vertex();
+        Vertex vK = f.halfedge().next().next().vertex();
+        //grab the positions
+        Vector3 pI = globalGeometry->vertexPositions[vI];
+        Vector3 pJ = globalGeometry->vertexPositions[vJ];
+        Vector3 pK = globalGeometry->vertexPositions[vK];
+        v->position = v->baryCoords[0] * pI + v->baryCoords[1] * pJ + v->baryCoords[2] * pK;
+        allVs.emplace_back(v->position);
+        //seg faulting
+        // if (v->row_in_vertex != nullptr){
+        //     edges.push_back({v->id, v->row_out_vertex->id});
+        // }
+        // if (v->col_out_vertex[0] != nullptr){
+        //     edges.push_back({v->id, v->col_out_vertex[0]->id});
+        // }
+    }
+    //polyscope::registerCurveNetwork("All vertices knit graph", allVs, edges);
+    polyscope::registerPointCloud("All vertices knit graph", allVs);
+
 }
 
 //Makes virtual vertices in the course direction
@@ -79,7 +109,7 @@ void KG::makeCourseVirtualVertices(){
         virtualCourseSingularVertices.emplace_back(v->position);
     }
 
-    polyscope::registerPointCloud("Course Singular Vertices", virtualCourseSingularVertices);
+    //polyscope::registerPointCloud("Course Singular Vertices", virtualCourseSingularVertices);
 }
 
 //Makes virtual vertices in the wale direction
@@ -109,7 +139,7 @@ void KG::makeWaleVirtualVertices(){
         virtualWaleSingularVertices.emplace_back(v->position);
     }
 
-    polyscope::registerPointCloud("Wale Singular Vertices", virtualWaleSingularVertices);
+    //polyscope::registerPointCloud("Wale Singular Vertices", virtualWaleSingularVertices);
 }
 
 //make virtual vertices on the border of all faces

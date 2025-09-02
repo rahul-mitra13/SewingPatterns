@@ -149,6 +149,12 @@ class KG{
             //make connections over a face 
             void makeFaceConnections();
 
+            //render a set of knit graph nodes as a point cloud 
+            void renderKnitGraphPoints();
+
+            //render a set of knit graph nodes a curve network 
+            void renderKnitGraphCurveNetwork();
+
             
         public: 
 
