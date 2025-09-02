@@ -70,15 +70,15 @@ void KG::buildGraph(){
         v->position = v->baryCoords[0] * pI + v->baryCoords[1] * pJ + v->baryCoords[2] * pK;
         allVs.emplace_back(v->position);
         //seg faulting
-        // if (v->row_in_vertex != nullptr){
-        //     edges.push_back({v->id, v->row_out_vertex->id});
-        // }
-        // if (v->col_out_vertex[0] != nullptr){
-        //     edges.push_back({v->id, v->col_out_vertex[0]->id});
-        // }
+        if (v->row_out_vertex != nullptr){
+            edges.push_back({v->id, v->row_out_vertex->id});
+        }
+        if (v->col_out_vertex[0] != nullptr){
+            edges.push_back({v->id, v->col_out_vertex[0]->id});
+        }
     }
-    //polyscope::registerCurveNetwork("All vertices knit graph", allVs, edges);
-    polyscope::registerPointCloud("All vertices knit graph", allVs);
+    polyscope::registerCurveNetwork("All vertices knit graph", allVs, edges);
+    //polyscope::registerPointCloud("All vertices knit graph", allVs);
 
 }
 
