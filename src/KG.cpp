@@ -526,4 +526,19 @@ void KG::intrinsicMerge(){
             }
         }
     }
+
+    // Now we need to connect across course singular edges.
+    // For each positive sing, we choose an arbitrary stripe to start a short row (TODO: make a better choice here).
+    // We then propagate it until reaching another sing edge. If that sing edge matches the first one, we're done.
+    // If not, we connect it across in a way that respects the ordering.
+    std::map<int, int> matchings; // -1 means short row
+
+    // Order positive edges in decreasing order of time
+    std::vector<Edge> orderedPosEdges;
+    std::map<int, Edge, std::greater<int>> posEdgesByTime;
+    for (Edge edge : (gluedGeometry->mesh).edges()) if (!edge.isBoundary() && courseSingularEdgesGlued[edge] > 0)
+        posEdgesByTime[courseSingularEdgesGlued[edge]] = edge;
+    for (auto &[time,edge] : posEdgesByTime)
+        orderedPosEdges.push_back(edge);
+
 }
