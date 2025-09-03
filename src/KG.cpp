@@ -463,10 +463,8 @@ void KG::intrinsicMerge(){
     std::map<Halfedge, std::vector<KGVertex*>> halfedgeCourseVertices;
     std::map<Halfedge, std::vector<KGVertex*>> halfedgeWaleVertices;
     for (const auto& v : allVertices){
-        if (v->isAlphaVirtual || v->isBetaVirtual){
-            if (v->isAlphaVirtual) halfedgeCourseVertices[v->halfedge.value()].push_back(v.get());
-            if (v->isBetaVirtual) halfedgeWaleVertices[v->halfedge.value()].push_back(v.get());
-        }
+        if (v->isAlphaVirtual) halfedgeCourseVertices[v->halfedge.value()].push_back(v.get());
+        if (v->isBetaVirtual) halfedgeWaleVertices[v->halfedge.value()].push_back(v.get());
     }
 
     // Compute a consistent 1D parameter t in [0,1] along the oriented halfedge
@@ -512,7 +510,7 @@ void KG::intrinsicMerge(){
                 matchings.push_back({i, (he1CourseVertices.size() - i) - 1});
             }
 
-            // Connect all matchings
+            // Connect the virtual matchings first
             for (auto [i1, i2] : matchings) {
                 KGVertex* v1 = he1CourseVertices[i1];
                 KGVertex* v2 = he2CourseVertices[i2];
@@ -528,38 +526,4 @@ void KG::intrinsicMerge(){
             }
         }
     }
-
-    std::vector<Vector3> courseVs;
-    std::vector<std::array<int, 2>> edges;
-    std::unordered_map<int, int> idx;
-    for (auto &v : allVertices){
-        if (v->isAlphaVirtual || v->isBetaVirtual) continue;
-        //now compute the position of v in R^3 
-        int fIndex = v->halfedge->face().getIndex();
-        //grab the global face 
-        Face f = globalGeometry->mesh.face(fIndex);
-        //grab the vertices on the face
-        Vertex vI = f.halfedge().vertex();
-        Vertex vJ = f.halfedge().next().vertex();
-        Vertex vK = f.halfedge().next().next().vertex();
-        //grab the positions
-        Vector3 pI = globalGeometry->vertexPositions[vI];
-        Vector3 pJ = globalGeometry->vertexPositions[vJ];
-        Vector3 pK = globalGeometry->vertexPositions[vK];
-        v->position = v->baryCoords[0] * pI + v->baryCoords[1] * pJ + v->baryCoords[2] * pK;
-        int i = static_cast<int>(courseVs.size());
-        courseVs.emplace_back(v->position);
-        idx[v->id] = i;
-    }
-    for (auto &v : allVertices){
-        if (v->isAlphaVirtual || v->isBetaVirtual) continue;
-        edges.push_back({idx[v->id], idx[v->row_out_vertex->id]});
-        std::cout << "edge[0] = " << idx[v->id] << std::endl;
-        std::cout << "edge[1] = " << idx[v->row_out_vertex->id] << std::endl;
-        std::cout << std::endl;
-        
-    }
-
-
-    polyscope::registerCurveNetwork("Row connections", courseVs, edges);
 }

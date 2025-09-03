@@ -46,17 +46,17 @@ struct KGVertex{
           
         std::cout << "vertex id = " << id << std::endl;
         if (row_in_vertex != nullptr) std::cout << "row in = " << row_in_vertex->id << std::endl;
-        else std::cout << "-1" << std::endl;
+        else std::cout << "row_in = -1" << std::endl;
         if (row_out_vertex != nullptr) std::cout << "row out = " << row_out_vertex->id << std::endl;
-        else std::cout << "-1" << std::endl;
+        else std::cout << "row_out = -1" << std::endl;
         if (col_in_vertex[0] != nullptr) std::cout << "col_in[0] = " << col_in_vertex[0]->id << std::endl;
-        else std::cout << "-1" << std::endl;
+        else std::cout << "col_in[0] = -1" << std::endl;
         if (col_in_vertex[1] != nullptr) std::cout << "col_in[1] = " << col_in_vertex[1]->id << std::endl;
-        else std::cout << "-1" << std::endl;
+        else std::cout << "col_in[1] = -1" << std::endl;
         if (col_out_vertex[0] != nullptr) std::cout << "col_out[0] = " << col_out_vertex[0]->id << std::endl;
-        else std::cout << "-1" << std::endl;
+        else std::cout << "col_out[0] = -1" << std::endl;
         if (col_out_vertex[1] != nullptr) std::cout << "col_out[1] = " << col_out_vertex[1]->id << std::endl;
-        else std::cout << "-1" << std::endl;
+        else std::cout << "col_out[1] = -1" << std::endl;
         std::cout << "isAlphaVirtual = " << isAlphaVirtual << std::endl;
         std::cout << "isBetaVirtual = " << isBetaVirtual << std::endl;
     }
