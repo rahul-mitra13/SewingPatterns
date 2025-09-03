@@ -31,7 +31,7 @@ KG::KG(VertexPositionGeometry& globalGeometry,
     , faceWaleLevelSets(gluedGeometry.mesh)   
     , faceKGVertices(gluedGeometry.mesh){           
 
-        //bring everything into the glued setting first
+        // Bring everything into the glued setting first
         courseSingularEdgesGlued = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, courseSingularEdges, globalToGluedEdgeMap);
         waleSingularEdgesGlued = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, waleSingularEdges, globalToGluedEdgeMap);
 
@@ -50,6 +50,7 @@ void KG::buildGraph(){
     makeWaleVirtualVertices();
     makeRealVertices();
     makeFaceConnections();
+    intrinsicMerge();
 
     //render the graph with all the vertices 
     std::vector<Vector3> allVs;
@@ -69,7 +70,6 @@ void KG::buildGraph(){
         Vector3 pK = globalGeometry->vertexPositions[vK];
         v->position = v->baryCoords[0] * pI + v->baryCoords[1] * pJ + v->baryCoords[2] * pK;
         allVs.emplace_back(v->position);
-        //seg faulting
         if (v->row_out_vertex != nullptr){
             edges.push_back({v->id, v->row_out_vertex->id});
         }
@@ -77,8 +77,7 @@ void KG::buildGraph(){
             edges.push_back({v->id, v->col_out_vertex[0]->id});
         }
     }
-    polyscope::registerCurveNetwork("All vertices knit graph", allVs, edges);
-    //polyscope::registerPointCloud("All vertices knit graph", allVs);
+    //polyscope::registerCurveNetwork("All vertices knit graph", allVs, edges);
 
 }
 
@@ -90,26 +89,6 @@ void KG::makeCourseVirtualVertices(){
     }
 
     std::vector<Vector3> virtualCourseSingularVertices;
-
-    for (auto &v : allVertices){
-        if (!v->isAlphaVirtual) continue;
-        //now compute the position of v in R^3 
-        int fIndex = v->halfedge->face().getIndex();
-        //grab the global face 
-        Face f = globalGeometry->mesh.face(fIndex);
-        //grab the vertices on the face
-        Vertex vI = f.halfedge().vertex();
-        Vertex vJ = f.halfedge().next().vertex();
-        Vertex vK = f.halfedge().next().next().vertex();
-        //grab the positions
-        Vector3 pI = globalGeometry->vertexPositions[vI];
-        Vector3 pJ = globalGeometry->vertexPositions[vJ];
-        Vector3 pK = globalGeometry->vertexPositions[vK];
-        v->position = v->baryCoords[0] * pI + v->baryCoords[1] * pJ + v->baryCoords[2] * pK;
-        virtualCourseSingularVertices.emplace_back(v->position);
-    }
-
-    //polyscope::registerPointCloud("Course Singular Vertices", virtualCourseSingularVertices);
 }
 
 //Makes virtual vertices in the wale direction
@@ -118,31 +97,9 @@ void KG::makeWaleVirtualVertices(){
     for (Face f : gluedGeometry->mesh.faces()){
         makeVirtualVerticesOnBorder(f, false);
     }
-
-    std::vector<Vector3> virtualWaleSingularVertices;
-
-    for (auto &v : allVertices){
-        if (!v->isBetaVirtual) continue;
-        //now compute the position of v in R^3 
-        int fIndex = v->halfedge->face().getIndex();
-        //grab the global face 
-        Face f = globalGeometry->mesh.face(fIndex);
-        //grab the vertices on the face
-        Vertex vI = f.halfedge().vertex();
-        Vertex vJ = f.halfedge().next().vertex();
-        Vertex vK = f.halfedge().next().next().vertex();
-        //grab the positions
-        Vector3 pI = globalGeometry->vertexPositions[vI];
-        Vector3 pJ = globalGeometry->vertexPositions[vJ];
-        Vector3 pK = globalGeometry->vertexPositions[vK];
-        v->position = v->baryCoords[0] * pI + v->baryCoords[1] * pJ + v->baryCoords[2] * pK;
-        virtualWaleSingularVertices.emplace_back(v->position);
-    }
-
-    //polyscope::registerPointCloud("Wale Singular Vertices", virtualWaleSingularVertices);
 }
 
-//make virtual vertices on the border of all faces
+//Make virtual vertices on the border of all faces
 void KG::makeVirtualVerticesOnBorder(Face& f, bool isCourseDirection){
         
     //grab the alpha values
@@ -312,7 +269,7 @@ void KG::makeVirtualVerticesOnBorder(Face& f, bool isCourseDirection){
     }
 
     if (dot(cross(gradAlpha, gradBeta), n) < 0) {
-        for (auto &v : allVertices) {
+        for (auto &v : faceKGVertices[f]) {
             v->alpha_tag = -v->alpha_tag;
             v->beta_tag = -v->beta_tag;
         }
@@ -355,7 +312,15 @@ void KG::makeRealVerticesOnInterior(Face& f){
     double beta_end = (std::floor((beta_max - walePeriod/4.)/walePeriod) * walePeriod) + walePeriod/4.;
 
     //looping variables and linear system variables
-    double RHS_alpha, RHS_beta, detA, a1, b1, c1, a2, b2, c2, j, k, bi, bj, bk;
+    double RHS_alpha, RHS_beta, detA, a1, b1, c1, a2, b2, c2, j, k, bi, bj, bk = 0;
+
+    //solving the linear system below
+    a1 = alphaI - alphaK;
+    b1 = alphaJ - alphaK;
+    c1 = alphaK;
+    a2 = betaI - betaK;
+    b2 = betaJ - betaK;
+    c2 = betaK;
     
     //query position information to fix alpha_beta tags 
     int fIndex = f.getIndex();
@@ -413,13 +378,20 @@ void KG::makeRealVerticesOnInterior(Face& f){
             }
         }
     }
+
+    if (dot(cross(gradAlpha, gradBeta), n) < 0) {
+        for (auto &v : faceKGVertices[f]) {
+            v->alpha_tag = -v->alpha_tag;
+            v->beta_tag = -v->beta_tag;
+        }
+    }
 }
 
 void KG::makeFaceConnections(){
 
     constexpr double eps = 1e-8;
 
-    auto approx_contains = [eps](const std::vector<double>& xs, double x) {
+    auto approx_contains = [](const std::vector<double>& xs, double x) {
         for (double v : xs) if (std::fabs(v - x) <= eps) return true;
         return false;
     };
@@ -456,8 +428,6 @@ void KG::makeFaceConnections(){
             for (auto it = currAlphaRow.begin(); std::next(it) != currAlphaRow.end(); ++it) {
                 KGVertex* currVertex = it->second;                // already KGVertex*
                 KGVertex* nextVertex = std::next(it)->second;     // KGVertex*
-                currVertex->row_out = nextVertex->id;
-                nextVertex->row_in  = currVertex->id;
                 //update the pointers
                 currVertex->row_out_vertex = nextVertex;
                 nextVertex->row_in_vertex = currVertex;
@@ -475,8 +445,6 @@ void KG::makeFaceConnections(){
             for (auto it = currBetaCol.begin(); std::next(it) != currBetaCol.end(); ++it) {
                 KGVertex* currVertex = it->second;
                 KGVertex* nextVertex = std::next(it)->second;
-                currVertex->col_out[0] = nextVertex->id;
-                nextVertex->col_in[0]  = currVertex->id;
                 //update the pointers 
                 currVertex->col_out_vertex[0] = nextVertex;
                 nextVertex->col_in_vertex[0] = currVertex;
@@ -484,5 +452,114 @@ void KG::makeFaceConnections(){
             }
         }
     }
+}
 
+
+//intrinsic merge of the virtual vertices
+//this will give us the matchings across singular edges
+void KG::intrinsicMerge(){
+
+    // Store these vertices in order of the "direction of the halfedge"
+    std::map<Halfedge, std::vector<KGVertex*>> halfedgeCourseVertices;
+    std::map<Halfedge, std::vector<KGVertex*>> halfedgeWaleVertices;
+    for (const auto& v : allVertices){
+        if (v->isAlphaVirtual || v->isBetaVirtual){
+            if (v->isAlphaVirtual) halfedgeCourseVertices[v->halfedge.value()].push_back(v.get());
+            if (v->isBetaVirtual) halfedgeWaleVertices[v->halfedge.value()].push_back(v.get());
+        }
+    }
+
+    // Compute a consistent 1D parameter t in [0,1] along the oriented halfedge
+    // Face’s three halfedges correspond to edges: ij (h0), jk (h1), ki (h2).
+    // Parameter choice consistent with your construction:
+    //   ij : t = b_j
+    //   jk : t = b_k
+    //   ki : t = b_i   (note: uses the face's orientation)
+    auto edgeParam = [](KGVertex* v) -> double {
+        Halfedge he = v->halfedge.value(); // safe: we guarded above
+        Face f = he.face();
+        Halfedge h0 = f.halfedge();
+        Halfedge h1 = h0.next();
+        Halfedge h2 = h1.next();
+
+        if (he == h0)      return v->baryCoords[1]; // ij
+        else if (he == h1) return v->baryCoords[2]; // jk
+        else               return v->baryCoords[0]; // ki
+    };
+
+    auto sortByParam = [&](std::vector<KGVertex*>& vec) {
+        std::sort(vec.begin(), vec.end(),
+                  [&](KGVertex* a, KGVertex* b) {
+                      return edgeParam(a) < edgeParam(b); // ascending along edge
+                  });
+    };
+
+    // Sort each bucket along the halfedge
+    for (auto& [hid, vec] : halfedgeCourseVertices) sortByParam(vec);
+    for (auto& [hid, vec] : halfedgeWaleVertices)   sortByParam(vec);
+
+    // Make connections across regular course edges
+    for (Edge e : (gluedGeometry->mesh).edges()){ 
+    
+        if (!e.isBoundary() && courseSingularEdgesGlued[e] == 0) {
+
+            std::vector<KGVertex*> he1CourseVertices = halfedgeCourseVertices[e.halfedge()];
+            std::vector<KGVertex*> he2CourseVertices = halfedgeCourseVertices[e.halfedge().twin()];
+
+            // Trivial matchings
+            std::vector<std::pair<int, int>> matchings;
+            for (int i = 0; i < he1CourseVertices.size(); i++) {
+                matchings.push_back({i, (he1CourseVertices.size() - i) - 1});
+            }
+
+            // Connect all matchings
+            for (auto [i1, i2] : matchings) {
+                KGVertex* v1 = he1CourseVertices[i1];
+                KGVertex* v2 = he2CourseVertices[i2];
+
+                if (v1->row_in_vertex == nullptr && v2->row_in_vertex != nullptr){
+                    v2->row_out_vertex = v1;
+                    v1->row_in_vertex = v2;
+                }
+                if (v2->row_in_vertex == nullptr && v1->row_in_vertex != nullptr){
+                    v1->row_out_vertex = v2;
+                    v2->row_in_vertex = v1;                   
+                }
+            }
+        }
+    }
+
+    std::vector<Vector3> courseVs;
+    std::vector<std::array<int, 2>> edges;
+    std::unordered_map<int, int> idx;
+    for (auto &v : allVertices){
+        if (v->isAlphaVirtual || v->isBetaVirtual) continue;
+        //now compute the position of v in R^3 
+        int fIndex = v->halfedge->face().getIndex();
+        //grab the global face 
+        Face f = globalGeometry->mesh.face(fIndex);
+        //grab the vertices on the face
+        Vertex vI = f.halfedge().vertex();
+        Vertex vJ = f.halfedge().next().vertex();
+        Vertex vK = f.halfedge().next().next().vertex();
+        //grab the positions
+        Vector3 pI = globalGeometry->vertexPositions[vI];
+        Vector3 pJ = globalGeometry->vertexPositions[vJ];
+        Vector3 pK = globalGeometry->vertexPositions[vK];
+        v->position = v->baryCoords[0] * pI + v->baryCoords[1] * pJ + v->baryCoords[2] * pK;
+        int i = static_cast<int>(courseVs.size());
+        courseVs.emplace_back(v->position);
+        idx[v->id] = i;
+    }
+    for (auto &v : allVertices){
+        if (v->isAlphaVirtual || v->isBetaVirtual) continue;
+        edges.push_back({idx[v->id], idx[v->row_out_vertex->id]});
+        std::cout << "edge[0] = " << idx[v->id] << std::endl;
+        std::cout << "edge[1] = " << idx[v->row_out_vertex->id] << std::endl;
+        std::cout << std::endl;
+        
+    }
+
+
+    polyscope::registerCurveNetwork("Row connections", courseVs, edges);
 }

@@ -28,15 +28,9 @@ struct KGVertex{
     int id = -1;
     Vector3 position;//position embedded in R^3 (if position information is available)
     Vector3 baryCoords;//barycentric coordinates of the vertex if position information is not available
-    int row_in = -1;
-    int row_out = -1;
-    int col_in[2] = {-1, -1};
-    int col_out[2] = {-1, -1};
-
     // Row neighbors
     KGVertex* row_in_vertex  = nullptr;  
     KGVertex* row_out_vertex = nullptr; 
-
     // Column neighbors 
     std::array<KGVertex*, 2> col_in_vertex  { nullptr, nullptr };
     std::array<KGVertex*, 2> col_out_vertex { nullptr, nullptr };
@@ -51,12 +45,18 @@ struct KGVertex{
     void printVertexInfo(){
           
         std::cout << "vertex id = " << id << std::endl;
-        std::cout << "row in = " << row_in << std::endl;
-        std::cout << "row out = " << row_out << std::endl;
-        std::cout << "col_in[0] = " << col_in[0] << std::endl;
-        std::cout << "col_in[1] = " << col_in[1] << std::endl;
-        std::cout << "col_out[0] = " << col_out[0] << std::endl;
-        std::cout << "col_out[1] = " << col_out[1] << std::endl;
+        if (row_in_vertex != nullptr) std::cout << "row in = " << row_in_vertex->id << std::endl;
+        else std::cout << "-1" << std::endl;
+        if (row_out_vertex != nullptr) std::cout << "row out = " << row_out_vertex->id << std::endl;
+        else std::cout << "-1" << std::endl;
+        if (col_in_vertex[0] != nullptr) std::cout << "col_in[0] = " << col_in_vertex[0]->id << std::endl;
+        else std::cout << "-1" << std::endl;
+        if (col_in_vertex[1] != nullptr) std::cout << "col_in[1] = " << col_in_vertex[1]->id << std::endl;
+        else std::cout << "-1" << std::endl;
+        if (col_out_vertex[0] != nullptr) std::cout << "col_out[0] = " << col_out_vertex[0]->id << std::endl;
+        else std::cout << "-1" << std::endl;
+        if (col_out_vertex[1] != nullptr) std::cout << "col_out[1] = " << col_out_vertex[1]->id << std::endl;
+        else std::cout << "-1" << std::endl;
         std::cout << "isAlphaVirtual = " << isAlphaVirtual << std::endl;
         std::cout << "isBetaVirtual = " << isBetaVirtual << std::endl;
     }
@@ -155,6 +155,9 @@ class KG{
             //render a set of knit graph nodes a curve network 
             void renderKnitGraphCurveNetwork();
 
+            //intrinsic merging of virtual vertices on the triangle borders 
+            void intrinsicMerge();
+
             
         public: 
 
@@ -172,12 +175,12 @@ class KG{
                EdgeData<double>& waleSingularEdges,
                std::map<int, int>& globalToGluedEdgeMap);
 
-            //get the vertices in this knit graph 
+            //get the vertices in this knit graph (including all virtual vertices)
             std::vector<std::unique_ptr<KGVertex>>&  getAllVertices(){
                 return this->allVertices;
             }
 
-            //get the real vertices in this knit graph 
+            //get the vertices in this knit graph (after merging, fixing, etc.)
             std::vector<std::unique_ptr<KGVertex>>& getFinalVertices(){
                 return this->finalVertices;
             }

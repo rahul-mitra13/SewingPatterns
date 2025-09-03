@@ -651,7 +651,6 @@ void KnitGraph::intrinsicMerge(){
                 vertices[v2.id].row_in  = v1.id;                    
             }
         }
-
     }
 
     // Now we need to connect across course singular edges.
