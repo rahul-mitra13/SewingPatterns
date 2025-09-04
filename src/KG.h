@@ -18,6 +18,7 @@
 #include <fstream>
 #include <memory>
 #include <map>
+#include <unordered_map>
 #include <cmath>
 
 using namespace geometrycentral;
@@ -157,6 +158,20 @@ class KG{
 
             //intrinsic merging of virtual vertices on the triangle borders 
             void intrinsicMerge();
+
+            //get the position of a KG vertex embedded in R^3
+            Vector3 getKGPosition(const KGVertex *v){
+                int fIndex = v->halfedge->face().getIndex();
+                Face f = globalGeometry->mesh.face(fIndex);
+                Vertex vI = f.halfedge().vertex();
+                Vertex vJ = f.halfedge().next().vertex();
+                Vertex vK = f.halfedge().next().next().vertex();
+                Vector3 pI = globalGeometry->vertexPositions[vI];
+                Vector3 pJ = globalGeometry->vertexPositions[vJ];
+                Vector3 pK = globalGeometry->vertexPositions[vK];
+                Vector3 pos = v->baryCoords[0] * pI + v->baryCoords[1] * pJ + v->baryCoords[2] * pK;
+                return pos;
+            }
 
             
         public: 

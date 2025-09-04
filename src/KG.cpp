@@ -1,6 +1,11 @@
 #include "KG.h"
 
 
+//find the sign of a value
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
 KG::KG(VertexPositionGeometry& globalGeometry,
        EdgeLengthGeometry& gluedGeometry,
        polyscope::SurfaceMesh& psMesh,
@@ -52,32 +57,55 @@ void KG::buildGraph(){
     makeFaceConnections();
     intrinsicMerge();
 
-    //render the graph with all the vertices 
-    std::vector<Vector3> allVs;
-    std::vector<std::array<int, 2>> edges;
-    for (auto &v : allVertices){
-        //now compute the position of v in R^3 
+    // 1) Collect real vertices and build a pointer->index map
+    std::vector<Vector3> realVs;
+    std::vector<std::array<int, 2>> realEdges;
+    realVs.reserve(allVertices.size());
+
+    std::map<KGVertex*, int> idxOf;  // which index in realVs each real vertex has
+
+    for (auto& up : allVertices) {
+        KGVertex* v = up.get();
+        if (v->isAlphaVirtual || v->isBetaVirtual) continue; // render only real vertices
+        // compute 3D position from barycentrics on the corresponding global face
         int fIndex = v->halfedge->face().getIndex();
-        //grab the global face 
         Face f = globalGeometry->mesh.face(fIndex);
-        //grab the vertices on the face
         Vertex vI = f.halfedge().vertex();
         Vertex vJ = f.halfedge().next().vertex();
         Vertex vK = f.halfedge().next().next().vertex();
-        //grab the positions
         Vector3 pI = globalGeometry->vertexPositions[vI];
         Vector3 pJ = globalGeometry->vertexPositions[vJ];
         Vector3 pK = globalGeometry->vertexPositions[vK];
         v->position = v->baryCoords[0] * pI + v->baryCoords[1] * pJ + v->baryCoords[2] * pK;
-        allVs.emplace_back(v->position);
-        if (v->row_out_vertex != nullptr){
-            edges.push_back({v->id, v->row_out_vertex->id});
-        }
-        if (v->col_out_vertex[0] != nullptr){
-            edges.push_back({v->id, v->col_out_vertex[0]->id});
-        }
+
+        int i = static_cast<int>(realVs.size());
+        idxOf[v] = i;                    // pointer -> node index
+        realVs.emplace_back(v->position);
     }
-    //polyscope::registerCurveNetwork("All vertices knit graph", allVs, edges);
+
+    // helper to add an edge only if both endpoints are in the node set
+    auto addEdge = [&](KGVertex* a, KGVertex* b) {
+        auto ia = idxOf.find(a);
+        auto ib = idxOf.find(b);
+        if (ia == idxOf.end() || ib == idxOf.end()) return; // skip if an endpoint wasn't rendered
+        if (ia->second == ib->second) return;               // skip self-loop
+        realEdges.push_back({ ia->second, ib->second });
+    };
+
+    // 2) Add edges using the pointer->index map (NOT vertex ids)
+    for (auto& up : allVertices) {
+        KGVertex* v = up.get();
+        if (!v) continue;
+        if (v->isAlphaVirtual || v->isBetaVirtual) continue;
+
+        addEdge(v, v->row_out_vertex);
+        addEdge(v, v->col_out_vertex[0]);
+        // for increases
+        // addEdge(v, v->col_out_vertex[1]);
+    }
+
+    // 3) Register the network
+    polyscope::registerCurveNetwork("Real vertices knit graph", realVs, realEdges);
 
 }
 
@@ -504,14 +532,14 @@ void KG::intrinsicMerge(){
             std::vector<KGVertex*> he1CourseVertices = halfedgeCourseVertices[e.halfedge()];
             std::vector<KGVertex*> he2CourseVertices = halfedgeCourseVertices[e.halfedge().twin()];
 
-            // Trivial matchings
-            std::vector<std::pair<int, int>> matchings;
+            //Matchings across regular edges
+            std::vector<std::pair<int, int>> regularMatchings;
             for (int i = 0; i < he1CourseVertices.size(); i++) {
-                matchings.push_back({i, (he1CourseVertices.size() - i) - 1});
+                regularMatchings.push_back({i, (he1CourseVertices.size() - i) - 1});
             }
 
             // Connect the virtual matchings first
-            for (auto [i1, i2] : matchings) {
+            for (auto [i1, i2] : regularMatchings) {
                 KGVertex* v1 = he1CourseVertices[i1];
                 KGVertex* v2 = he2CourseVertices[i2];
 
@@ -531,7 +559,7 @@ void KG::intrinsicMerge(){
     // For each positive sing, we choose an arbitrary stripe to start a short row (TODO: make a better choice here).
     // We then propagate it until reaching another sing edge. If that sing edge matches the first one, we're done.
     // If not, we connect it across in a way that respects the ordering.
-    std::map<int, int> matchings; // -1 means short row
+    std::map<KGVertex*, KGVertex*> matchings; // nullptr means short row
 
     // Order positive edges in decreasing order of time
     std::vector<Edge> orderedPosEdges;
@@ -541,4 +569,632 @@ void KG::intrinsicMerge(){
     for (auto &[time,edge] : posEdgesByTime)
         orderedPosEdges.push_back(edge);
 
+    //loop over positive course edges
+    for (Edge startEdge : orderedPosEdges){
+
+        int startEdgeOrder = round(courseSingularEdgesGlued[startEdge]);
+        assert(!startEdge.isBoundary() && "Start edge is a boundary edge");
+        
+        std::vector<KGVertex*> he1Vertices = halfedgeCourseVertices[startEdge.halfedge()];
+        std::vector<KGVertex*> he2Vertices = halfedgeCourseVertices[startEdge.halfedge().twin()];
+
+        if (he1Vertices.size() > he2Vertices.size())
+            swap(he1Vertices, he2Vertices);
+
+        assert(he2Vertices.size() - he1Vertices.size() == 1 && "More than one stripe born/dying at singular edge");
+
+        bool success = false;
+        while(!success){
+
+            // Pick the first unmatched vertex on he2Vertices
+            KGVertex* startVertex = nullptr;
+            for (KGVertex* v : he2Vertices) {
+                if (!matchings.count(v)) {
+                    startVertex = v;
+                    break;
+                }
+            }
+
+            matchings[startVertex] = nullptr;
+            // Trace short row. Now that we go in the direction of row_in (== right)!
+            KGVertex* walker = startVertex;
+            assert(walker->row_in_vertex != nullptr && "startVertex picked doesn't have a row_in_vertex");
+
+            while (true){
+
+                if (walker->row_in_vertex == nullptr){
+                    
+                    //we've hit a singular edge
+                    assert(walker->isAlphaVirtual && "walker hit a vertex that is not virtual");//walker must be virtual 
+                    assert(!matchings.count(walker) && "walker is already matched");//walker must be unmatched
+                    assert(walker->halfedge.has_value() && "walker's halfedge option has no value");//walker must be on a halfedge
+
+                    Edge edge = walker->halfedge->edge();
+                    int edgeOrder = round(courseSingularEdgesGlued[edge]);
+
+                    if (edgeOrder == -startEdgeOrder){
+                        //It's a match! We're done 
+                        matchings[walker] = nullptr;
+                        success = true;
+                        break;
+                    }else{
+                        // We need to cross this edge. Above or below?
+                        std::vector<KGVertex*> leftVertices = halfedgeCourseVertices[edge.halfedge()];
+                        std::vector<KGVertex*> rightVertices = halfedgeCourseVertices[edge.halfedge().twin()];
+
+                        if (sgn((int)rightVertices.size() - (int)leftVertices.size()) != sgn(edgeOrder))
+                            swap(leftVertices, rightVertices);
+                        //not sure what this assertion is doing
+                        assert(sgn((int)rightVertices.size() - (int)leftVertices.size()) == sgn(edgeOrder)); // make sure the sides are correct!
+
+                        // Find index along half-edge
+                        int indexAlongHalfedge = -1;
+                        for (int i = 0; i < leftVertices.size(); i++) {
+                            if (leftVertices[i] == walker) {
+                                indexAlongHalfedge = i;
+                                break;
+                            }
+                        }
+
+                        KGVertex* connectTo;
+                        if (abs(edgeOrder) > startEdgeOrder) {
+                            // Go below
+                            connectTo = rightVertices[rightVertices.size()-1-indexAlongHalfedge];
+                        } else {
+                            // Go above (also happens if we looped to the starting edge)
+                            connectTo = rightVertices[leftVertices.size()-1-indexAlongHalfedge];
+                        }
+                        matchings[walker] = connectTo;
+                        matchings[connectTo] = walker;
+                        walker = connectTo;
+                        if (edgeOrder == startEdgeOrder) {
+                            // We looped around! Break and continue onto the next short row candidate
+                            break;
+                        }
+                    }
+                }else{
+                    walker = walker->row_in_vertex;
+                }
+            }
+        }
+    }
+
+    std::cout << "Got here 4" << std::endl;
+
+    // Connect the remaining unmatched virtual vertices across singular edges
+    for (Edge startEdge : (gluedGeometry->mesh).edges()){ 
+        if (!startEdge.isBoundary() && courseSingularEdgesGlued[startEdge] != 0) {
+            std::vector<KGVertex*> he1Vertices = halfedgeCourseVertices[startEdge.halfedge()];
+            std::vector<KGVertex*> he2Vertices = halfedgeCourseVertices[startEdge.halfedge().twin()];
+
+            int i2 = he2Vertices.size()-1;
+            for (int i1 = 0; i1 < he1Vertices.size(); i1++) {
+                if (!matchings.count(he1Vertices[i1])) {
+                    while (matchings.count(he2Vertices[i2])) {
+                        i2--;
+                        if (i2 < 0) {
+                            showEdges("i2 < 0", {startEdge}, *globalGeometry);
+                            polyscope::show();
+                        }
+                        assert(i2 >= 0);
+                    }
+                    matchings[he1Vertices[i1]] = he2Vertices[i2];
+                    matchings[he2Vertices[i2]] = he1Vertices[i1];
+                    i2--;
+                }
+            }
+        }
+    }
+
+    //render the matched vertices in the course direction 
+    std::vector<Vector3> courseMatchings;
+    for (auto [v1, v2] : matchings){
+        if (v1 != nullptr && v2 != nullptr){
+            v1->position = getKGPosition(v1);
+            v2->position = getKGPosition(v2);
+            courseMatchings.emplace_back(v1->position);
+            courseMatchings.emplace_back(v2->position); 
+        }
+    }
+    polyscope::registerPointCloud("course matchings", courseMatchings);
+    
+    
+    // Now actually connect all course matchings
+    for (auto [i1, i2] : matchings) {
+        if (i1 == nullptr || i2 == nullptr) continue;
+        KGVertex* v1 = i1;
+        KGVertex* v2 = i2;
+        if (v1->row_in_vertex == nullptr && v2->row_in_vertex != nullptr){
+            v2->row_out_vertex = v1;
+            v1->row_in_vertex = v2;
+        }
+        if (v2->row_in_vertex == nullptr && v1->row_in_vertex != nullptr){
+            v1->row_out_vertex = v2;
+            v2->row_in_vertex = v1;
+        }
+    }
+
+    std::vector<Vector3> waleMatchings;
+    // Connect wale vertices 
+    for (Edge e : (gluedGeometry->mesh).edges()) {
+        if (e.isBoundary()) continue;//don't need to handle boundary vertices
+
+        std::vector<KGVertex*> he1Vertices = halfedgeWaleVertices[e.halfedge()];
+        std::vector<KGVertex*> he2Vertices = halfedgeWaleVertices[e.halfedge().twin()];
+
+        // classical singularity with 1 stripe being born/dying: nothing to do
+        if (he1Vertices.size() + he2Vertices.size() == 1)
+            continue;
+
+        std::vector<std::pair<int, int>> matchings;
+
+        // more funky singularity: we need to match
+        if (he1Vertices.size() != he2Vertices.size()) { 
+
+            // Check which side of the triangles he1 and he2 are located
+            // TODO: find a way to do this without epsilons
+            int side1, side2;
+            for (int i = 0; i < 3; i++) {
+                if (abs(he1Vertices[0]->baryCoords[i]) < 1e-8)
+                    side1 = (i+1)%3;
+                if (abs(he2Vertices[0]->baryCoords[i]) < 1e-8)
+                    side2 = (i+1)%3;
+            }
+
+            // Fetch coordinate along edge
+            std::vector<double> coordsAlongHe1, coordsAlongHe2;
+            for (KGVertex *v : he1Vertices)
+                coordsAlongHe1.push_back(v->baryCoords[side1]);
+            for (KGVertex *v : he2Vertices)
+                coordsAlongHe2.push_back(1 - v->baryCoords[side2]); // need to invert to be in the same basis
+
+            // Find out best matchings (greedy approach)
+            if (he1Vertices.size() < he2Vertices.size()) { // match every vertex of he1 to closest vertex of he2
+                for (int i1 = 0; i1 < he1Vertices.size(); i1++) {
+                    int i2closest = -1;
+                    for (int i2 = 0; i2 < he2Vertices.size(); i2++)
+                        if (i2closest == -1 || abs(coordsAlongHe1[i1] - coordsAlongHe2[i2]) < abs(coordsAlongHe1[i1] - coordsAlongHe2[i2closest]))
+                            i2closest = i2;
+                    if (i2closest == -1) {
+                        std::cout << "Error: No match found for vertex " << he1Vertices[i1]->id << std::endl;
+                        polyscope::show();
+                    } else {
+                        matchings.push_back({i1, i2closest});
+                        KGVertex *v1 = he1Vertices[i1];
+                        KGVertex *v2 = he2Vertices[i2closest];
+                        waleMatchings.emplace_back(getKGPosition(v1));
+                        waleMatchings.emplace_back(getKGPosition(v2));
+                    }
+                }
+            } else { // match every vertex of he2 to closest vertex of he1
+                for (int i2 = 0; i2 < he2Vertices.size(); i2++) {
+                    int i1closest = -1;
+                    for (int i1 = 0; i1 < he1Vertices.size(); i1++)
+                        if (i1closest == -1 || abs(coordsAlongHe1[i1] - coordsAlongHe2[i2]) < abs(coordsAlongHe1[i1closest] - coordsAlongHe2[i2]))
+                            i1closest = i1;
+                    if (i1closest == -1) {
+                        std::cout << "Error: No match found for vertex " << he2Vertices[i2]->id << std::endl;
+                        polyscope::show();
+                    } else {
+                        matchings.push_back({i1closest, i2});
+                        KGVertex *v1 = he1Vertices[i1closest];
+                        KGVertex *v2 = he2Vertices[i2];
+                        waleMatchings.emplace_back(getKGPosition(v1));
+                        waleMatchings.emplace_back(getKGPosition(v2));
+                    }
+                }
+            }
+        } else {
+            // Edge is regular: matching is trivial
+            for (int i = 0; i < he1Vertices.size(); i++) {
+                matchings.push_back({i, (he1Vertices.size() - i) - 1});
+            }
+        }
+        // Connect the wale matchings we found
+        for (auto [i1, i2] : matchings) {
+            KGVertex *v1 = he1Vertices[i1];
+            KGVertex *v2 = he2Vertices[i2];
+            if (v1->col_in_vertex[0] == nullptr && v2->col_in_vertex[0] != nullptr){
+                v1->col_in_vertex[0] = v2;
+                v2->col_out_vertex[0] = v1;
+            }
+            if (v2->col_in_vertex[0] == nullptr && v1->col_in_vertex[0] != nullptr){
+                v1->col_out_vertex[0] = v2;
+                v2->col_in_vertex[0] = v1;
+            }
+        }
+    }
+    polyscope::registerPointCloud("wale matchings", waleMatchings);
+
+    // Now connect real vertices to one another
+    for (auto& up : allVertices) {
+        KGVertex* v0 = up.get();
+        if (v0->isAlphaVirtual || v0->isBetaVirtual) continue; // only real vertices
+
+        // --------Course--------
+        {
+            KGVertex* v = v0->row_out_vertex;     // start from immediate neighbor
+            bool isGluedPath = false;
+
+            while (v && v->isAlphaVirtual) {
+                if (v->halfedge && isGlued[v->halfedge->edge()]) isGluedPath = true;
+                v = v->row_out_vertex;            // step
+            }
+
+            if (!v || v->isAlphaVirtual) {
+                v0->row_out_vertex = nullptr;     // no real neighbor reachable
+            } else {
+                v0->row_out_vertex = v;           // connect reciprocally
+                v->row_in_vertex   = v0;
+                if (isGluedPath) stitchedVertices.emplace_back(v0->id, v->id);
+            }
+        }
+
+        // --------Wale--------
+        {
+            KGVertex* v = v0->col_out_vertex[0];
+            bool isGluedPath = false;
+
+            while (v && v->isBetaVirtual) {
+                if (v->halfedge && isGlued[v->halfedge->edge()]) isGluedPath = true;
+                v = v->col_out_vertex[0];
+            }
+
+            if (!v || v->isBetaVirtual) {
+                v0->col_out_vertex[0] = nullptr;
+            } else {
+                v0->col_out_vertex[0] = v;
+                v->col_in_vertex[0]   = v0;
+                if (isGluedPath) stitchedVertices.emplace_back(v0->id, v->id);
+            }
+        }
+    }
+
 }
+
+// void KG::intrinsicMerge() {
+
+//   // ---- Bucket virtuals by halfedge (skip vertices without a halfedge) ----
+//   std::map<Halfedge, std::vector<KGVertex*>> halfedgeCourseVertices;
+//   std::map<Halfedge, std::vector<KGVertex*>> halfedgeWaleVertices;
+//   for (const auto& up : allVertices) {
+//     KGVertex* v = up.get();
+//     if (!v) continue;
+//     if (!v->halfedge.has_value()) continue;
+
+//     if (v->isAlphaVirtual) halfedgeCourseVertices[v->halfedge.value()].push_back(v);
+//     if (v->isBetaVirtual)  halfedgeWaleVertices[v->halfedge.value()].push_back(v);
+//   }
+
+//   // ---- Parameter along a halfedge, robust to null/empty halfedges ----
+//   auto edgeParam = [](KGVertex* v) -> double {
+//     if (!v || !v->halfedge.has_value()) return 0.0;
+//     Halfedge he = v->halfedge.value();
+//     if (he.isDead()) return 0.0;
+//     Face f = he.face();
+//     if (f.isDead()) return 0.0;
+
+//     Halfedge h0 = f.halfedge();
+//     Halfedge h1 = h0.next();
+//     Halfedge h2 = h1.next();
+
+//     // ij / jk / ki
+//     if (he == h0)      return v->baryCoords[1];
+//     else if (he == h1) return v->baryCoords[2];
+//     else               return v->baryCoords[0];
+//   };
+
+//   auto sortByParam = [&](std::vector<KGVertex*>& vec) {
+//     if (vec.size() < 2) return;
+//     std::sort(vec.begin(), vec.end(),
+//               [&](KGVertex* a, KGVertex* b) { return edgeParam(a) < edgeParam(b); });
+//   };
+
+//   // ---- Sort each bucket along its halfedge ----
+//   for (auto& [_, vec] : halfedgeCourseVertices) sortByParam(vec);
+//   for (auto& [_, vec] : halfedgeWaleVertices)   sortByParam(vec);
+
+//   // ---- Connect across regular course edges (singular index == 0) ----
+//   for (Edge e : gluedGeometry->mesh.edges()) {
+//     if (e.isBoundary()) continue;
+//     if (courseSingularEdgesGlued[e] != 0) continue;
+
+//     auto itL = halfedgeCourseVertices.find(e.halfedge());
+//     auto itR = halfedgeCourseVertices.find(e.halfedge().twin());
+
+//     if (itL == halfedgeCourseVertices.end() || itR == halfedgeCourseVertices.end())
+//       continue; // no virtuals on this edge
+
+//     const std::vector<KGVertex*>& he1CourseVertices = itL->second;
+//     const std::vector<KGVertex*>& he2CourseVertices = itR->second;
+
+//     if (he1CourseVertices.empty() || he2CourseVertices.empty()) continue;
+
+//     // Match i with mirrored index on the other side
+//     const int n = static_cast<int>(he1CourseVertices.size());
+//     const int m = static_cast<int>(he2CourseVertices.size());
+//     const int k = std::min(n, m);
+
+//     for (int i = 0; i < k; ++i) {
+//       KGVertex* v1 = he1CourseVertices[i];
+//       KGVertex* v2 = he2CourseVertices[(m - 1) - i];
+//       if (!v1 || !v2) continue;
+
+//       // Connect only if one side lacks row_in and the other has it
+//       if (!v1->row_in_vertex &&  v2->row_in_vertex) { v2->row_out_vertex = v1; v1->row_in_vertex = v2; }
+//       if (!v2->row_in_vertex &&  v1->row_in_vertex) { v1->row_out_vertex = v2; v2->row_in_vertex = v1; }
+//     }
+//   }
+
+//   // ---- Short-row matching across course singular edges (positive first) ----
+//   std::map<KGVertex*, KGVertex*> matchings; // nullptr => short row end
+
+//   // Order positive edges by descending "time"
+//   std::vector<Edge> orderedPosEdges;
+//   {
+//     std::map<int, Edge, std::greater<int>> posEdgesByTime;
+//     for (Edge edge : gluedGeometry->mesh.edges()) {
+//       if (!edge.isBoundary() && courseSingularEdgesGlued[edge] > 0) {
+//         posEdgesByTime[static_cast<int>(std::round(courseSingularEdgesGlued[edge]))] = edge;
+//       }
+//     }
+//     for (auto& [_, e] : posEdgesByTime) orderedPosEdges.push_back(e);
+//   }
+
+//   auto getBucket = [](auto& dict, Halfedge he) -> const std::vector<KGVertex*>& {
+//     static const std::vector<KGVertex*> empty;
+//     auto it = dict.find(he);
+//     return (it == dict.end()) ? empty : it->second;
+//   };
+
+//   for (Edge startEdge : orderedPosEdges) {
+//     int startEdgeOrder = static_cast<int>(std::round(courseSingularEdgesGlued[startEdge]));
+//     const std::vector<KGVertex*>* A = &getBucket(halfedgeCourseVertices, startEdge.halfedge());
+//     const std::vector<KGVertex*>* B = &getBucket(halfedgeCourseVertices, startEdge.halfedge().twin());
+//     if (!A || !B) continue;
+
+//     // Put the shorter side in A
+//     std::vector<KGVertex*> he1Vertices = *A;
+//     std::vector<KGVertex*> he2Vertices = *B;
+//     if (he1Vertices.size() > he2Vertices.size()) std::swap(he1Vertices, he2Vertices);
+
+//     // Expect |he2| - |he1| == 1; if not, skip robustly
+//     if (he2Vertices.size() == 0 || he2Vertices.size() - he1Vertices.size() != 1) continue;
+
+//     bool success = false;
+//     while (!success) {
+//       // pick first unmatched on he2
+//       KGVertex* startVertex = nullptr;
+//       for (KGVertex* v : he2Vertices) { if (v && !matchings.count(v)) { startVertex = v; break; } }
+//       if (!startVertex) break; // nothing to do on this edge
+
+//       matchings[startVertex] = nullptr;
+
+//       // Trace to the right (row_in)
+//       KGVertex* walker = startVertex;
+//       while (true) {
+//         if (!walker) { success = true; break; } // defensive
+
+//         if (!walker->row_in_vertex) {
+//           // hit singular/boundary
+//           if (!walker->isAlphaVirtual || !walker->halfedge.has_value()) { success = true; break; }
+
+//           Edge edge = walker->halfedge->edge();
+//           int edgeOrder = static_cast<int>(std::round(courseSingularEdgesGlued[edge]));
+
+//           if (edgeOrder == -startEdgeOrder) {
+//             // found its mate (short row closes)
+//             matchings[walker] = nullptr;
+//             success = true;
+//             break;
+//           } else {
+//             // need to cross the singular edge: decide left/right buckets
+//             std::vector<KGVertex*> leftVertices  = getBucket(halfedgeCourseVertices, edge.halfedge());
+//             std::vector<KGVertex*> rightVertices = getBucket(halfedgeCourseVertices, edge.halfedge().twin());
+
+//             if ( ( (int)rightVertices.size() - (int)leftVertices.size() > 0 ? 1 : ( (int)rightVertices.size() - (int)leftVertices.size() < 0 ? -1 : 0 ) )
+//                 != ( edgeOrder > 0 ? 1 : (edgeOrder < 0 ? -1 : 0) ) ) {
+//               std::swap(leftVertices, rightVertices);
+//             }
+
+//             // locate walker on left side
+//             int idx = -1;
+//             for (int i = 0; i < (int)leftVertices.size(); ++i) if (leftVertices[i] == walker) { idx = i; break; }
+//             if (idx < 0) { success = true; break; } // can't find; bail safely
+
+//             KGVertex* connectTo = nullptr;
+//             if (std::abs(edgeOrder) > std::abs(startEdgeOrder)) {
+//               // go below
+//               int j = (int)rightVertices.size() - 1 - idx;
+//               if (0 <= j && j < (int)rightVertices.size()) connectTo = rightVertices[j];
+//             } else {
+//               // go above (or loop)
+//               int j = (int)leftVertices.size() - 1 - idx;
+//               if (0 <= j && j < (int)rightVertices.size()) connectTo = rightVertices[j];
+//             }
+
+//             if (!connectTo) { success = true; break; }
+
+//             matchings[walker]   = connectTo;
+//             matchings[connectTo]= walker;
+//             walker = connectTo;
+
+//             if (edgeOrder == startEdgeOrder) {
+//               // looped back; move on to next short row candidate
+//               break;
+//             }
+//           }
+//         } else {
+//           // step right along the row
+//           walker = walker->row_in_vertex;
+//         }
+//       } // while true
+//     }   // while !success
+//   }     // for startEdge
+
+//   // ---- Connect remaining unmatched virtuals across course singular edges ----
+//   for (Edge e : gluedGeometry->mesh.edges()) {
+//     if (e.isBoundary()) continue;
+//     int order = static_cast<int>(std::round(courseSingularEdgesGlued[e]));
+//     if (order == 0) continue;
+
+//     const std::vector<KGVertex*>& he1 = getBucket(halfedgeCourseVertices, e.halfedge());
+//     const std::vector<KGVertex*>& he2 = getBucket(halfedgeCourseVertices, e.halfedge().twin());
+//     if (he1.empty() || he2.empty()) continue;
+
+//     int i2 = (int)he2.size() - 1;
+//     for (int i1 = 0; i1 < (int)he1.size(); ++i1) {
+//       KGVertex* a = he1[i1];
+//       if (!a || matchings.count(a)) continue;
+//       while (i2 >= 0 && matchings.count(he2[i2])) --i2;
+//       if (i2 < 0) break;
+//       KGVertex* b = he2[i2];
+//       if (!b) { --i2; continue; }
+//       matchings[a] = b;
+//       matchings[b] = a;
+//       --i2;
+//     }
+//   }
+
+//   // ---- Visualize course matchings (defensive) ----
+//   std::vector<Vector3> courseMatchings;
+//   for (auto& kv : matchings) {
+//     KGVertex* v1 = kv.first;
+//     KGVertex* v2 = kv.second;
+//     if (!v1 || !v2) continue;
+//     v1->position = getKGPosition(v1);
+//     v2->position = getKGPosition(v2);
+//     courseMatchings.emplace_back(v1->position);
+//     courseMatchings.emplace_back(v2->position);
+//   }
+//   if (!courseMatchings.empty())
+//     polyscope::registerPointCloud("course matchings", courseMatchings);
+
+//   // ---- Commit course matchings to row_in/out pointers ----
+//   for (auto& kv : matchings) {
+//     KGVertex* v1 = kv.first;
+//     KGVertex* v2 = kv.second;
+//     if (!v1 || !v2) continue;
+
+//     if (!v1->row_in_vertex &&  v2->row_in_vertex) { v2->row_out_vertex = v1; v1->row_in_vertex = v2; }
+//     if (!v2->row_in_vertex &&  v1->row_in_vertex) { v1->row_out_vertex = v2; v2->row_in_vertex = v1; }
+//   }
+
+//   // ---- Wale matchings (robust version) ----
+//   std::vector<Vector3> waleMatchings;
+//   for (Edge e : gluedGeometry->mesh.edges()) {
+//     if (e.isBoundary()) continue;
+
+//     const std::vector<KGVertex*>& he1 = getBucket(halfedgeWaleVertices, e.halfedge());
+//     const std::vector<KGVertex*>& he2 = getBucket(halfedgeWaleVertices, e.halfedge().twin());
+//     if (he1.empty() && he2.empty()) continue;
+
+//     // classical singularity with exactly one total => skip
+//     if (he1.size() + he2.size() == 1) continue;
+
+//     std::vector<std::pair<int,int>> pairs;
+
+//     if (he1.size() != he2.size()) {
+//       if (he1.empty() || he2.empty()) continue;
+
+//       // pick side indices (fallbacks to 0 if epsilon test fails)
+//       int side1 = 0, side2 = 0;
+//       if (!he1.empty()) {
+//         for (int i = 0; i < 3; ++i) if (std::abs(he1[0]->baryCoords[i]) < 1e-8) { side1 = (i+1)%3; break; }
+//       }
+//       if (!he2.empty()) {
+//         for (int i = 0; i < 3; ++i) if (std::abs(he2[0]->baryCoords[i]) < 1e-8) { side2 = (i+1)%3; break; }
+//       }
+
+//       std::vector<double> c1, c2;
+//       c1.reserve(he1.size()); c2.reserve(he2.size());
+//       for (KGVertex* v : he1) c1.push_back(v ? v->baryCoords[side1] : 0.0);
+//       for (KGVertex* v : he2) c2.push_back(v ? (1.0 - v->baryCoords[side2]) : 0.0);
+
+//       if (he1.size() < he2.size()) {
+//         for (int i1 = 0; i1 < (int)he1.size(); ++i1) {
+//           int best = -1;
+//           for (int i2 = 0; i2 < (int)he2.size(); ++i2)
+//             if (best < 0 || std::abs(c1[i1] - c2[i2]) < std::abs(c1[i1] - c2[best])) best = i2;
+//           if (best >= 0) {
+//             pairs.emplace_back(i1, best);
+//             if (he1[i1] && he2[best]) {
+//               waleMatchings.emplace_back(getKGPosition(he1[i1]));
+//               waleMatchings.emplace_back(getKGPosition(he2[best]));
+//             }
+//           }
+//         }
+//       } else {
+//         for (int i2 = 0; i2 < (int)he2.size(); ++i2) {
+//           int best = -1;
+//           for (int i1 = 0; i1 < (int)he1.size(); ++i1)
+//             if (best < 0 || std::abs(c1[i1] - c2[i2]) < std::abs(c1[best] - c2[i2])) best = i1;
+//           if (best >= 0) {
+//             pairs.emplace_back(best, i2);
+//             if (he1[best] && he2[i2]) {
+//               waleMatchings.emplace_back(getKGPosition(he1[best]));
+//               waleMatchings.emplace_back(getKGPosition(he2[i2]));
+//             }
+//           }
+//         }
+//       }
+//     } else {
+//       // trivial mirror matching
+//       int n = (int)he1.size();
+//       for (int i = 0; i < n; ++i) pairs.emplace_back(i, (n - 1) - i);
+//     }
+
+//     // apply wale pairs
+//     for (auto [i1, i2] : pairs) {
+//       if (i1 < 0 || i2 < 0 || i1 >= (int)he1.size() || i2 >= (int)he2.size()) continue;
+//       KGVertex* v1 = he1[i1];
+//       KGVertex* v2 = he2[i2];
+//       if (!v1 || !v2) continue;
+
+//       if (!v1->col_in_vertex[0] &&  v2->col_in_vertex[0]) { v1->col_in_vertex[0] = v2; v2->col_out_vertex[0] = v1; }
+//       if (!v2->col_in_vertex[0] &&  v1->col_in_vertex[0]) { v1->col_out_vertex[0] = v2; v2->col_in_vertex[0]  = v1; }
+//     }
+//   }
+//   if (!waleMatchings.empty())
+//     polyscope::registerPointCloud("wale matchings", waleMatchings);
+
+//   // ---- Connect real vertices by skipping virtual chains (course & wale) ----
+//   for (auto& up : allVertices) {
+//     KGVertex* v0 = up.get();
+//     if (!v0 || v0->isAlphaVirtual || v0->isBetaVirtual) continue;
+
+//     // course
+//     {
+//       KGVertex* v = v0->row_out_vertex;
+//       bool glued = false;
+//       while (v && v->isAlphaVirtual) {
+//         if (v->halfedge && isGlued[v->halfedge->edge()]) glued = true;
+//         v = v->row_out_vertex;
+//       }
+//       if (!v || v->isAlphaVirtual) {
+//         v0->row_out_vertex = nullptr;
+//       } else {
+//         v0->row_out_vertex = v;
+//         v->row_in_vertex   = v0;
+//         if (glued) stitchedVertices.emplace_back(v0->id, v->id);
+//       }
+//     }
+
+//     // wale (slot 0)
+//     {
+//       KGVertex* v = v0->col_out_vertex[0];
+//       bool glued = false;
+//       while (v && v->isBetaVirtual) {
+//         if (v->halfedge && isGlued[v->halfedge->edge()]) glued = true;
+//         v = v->col_out_vertex[0];
+//       }
+//       if (!v || v->isBetaVirtual) {
+//         v0->col_out_vertex[0] = nullptr;
+//       } else {
+//         v0->col_out_vertex[0] = v;
+//         v->col_in_vertex[0]   = v0;
+//         if (glued) stitchedVertices.emplace_back(v0->id, v->id);
+//       }
+//     }
+//   }
+// }
