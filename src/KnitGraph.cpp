@@ -890,7 +890,6 @@ void KnitGraph::intrinsicMerge(){
                 vertices[v2.id].col_in[0]  = v1.id;
             }
         }
-
     }
 
     // Now connect real vertices to one another
