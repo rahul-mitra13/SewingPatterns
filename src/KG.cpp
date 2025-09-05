@@ -55,7 +55,7 @@ void KG::buildGraph(){
     makeWaleVirtualVertices();
     makeRealVertices();
     makeFaceConnections();
-    //intrinsicMerge();
+    intrinsicMerge();
 
     //render the graph
     // 1) Collect real vertices and build a pointer->index map
