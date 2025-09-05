@@ -109,10 +109,8 @@ class KG{
         //edge map from global mesh to glued mesh 
         std::map<int, int> *globalToGluedEdgeMap;
 
-        //vertices in the graph (including virtuals)
+        //vertices in the graph
         std::vector<std::unique_ptr<KGVertex>> allVertices;
-
-        std::vector<std::unique_ptr<KGVertex>> finalVertices;
 
         // Pairs of stitched (real) vertices
         std::vector<std::pair<int, int>> stitchedVertices;
@@ -125,6 +123,12 @@ class KG{
 
         //graph vertices per face
         FaceData<std::vector<KGVertex*>> faceKGVertices;
+
+        //vertices matched on singular edges in the course direction 
+        std::vector<std::pair<KGVertex*, KGVertex*>> courseMatchings;
+
+        //vertices matched on singular edges in the wale direction 
+        std::vector<std::pair<KGVertex*, KGVertex*>> waleMatchings;
 
 
         private: 
@@ -172,6 +176,13 @@ class KG{
                 Vector3 pos = v->baryCoords[0] * pI + v->baryCoords[1] * pJ + v->baryCoords[2] * pK;
                 return pos;
             }
+            
+
+            //now that we have the matchings, we update their barycoords and alpha/beta tags
+            void updateSingularMatchings();
+
+            //after updating the barycoords for matched vertices, update the stripe level sets over the faces 
+            void adjustFaceLevelSets();
 
             
         public: 
