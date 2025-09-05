@@ -55,8 +55,9 @@ void KG::buildGraph(){
     makeWaleVirtualVertices();
     makeRealVertices();
     makeFaceConnections();
-    intrinsicMerge();
+    //intrinsicMerge();
 
+    //render the graph
     // 1) Collect real vertices and build a pointer->index map
     std::vector<Vector3> realVs;
     std::vector<std::array<int, 2>> realEdges;
@@ -121,7 +122,7 @@ void KG::makeCourseVirtualVertices(){
 
 //Makes virtual vertices in the wale direction
 void KG::makeWaleVirtualVertices(){
-
+ 
     for (Face f : gluedGeometry->mesh.faces()){
         makeVirtualVerticesOnBorder(f, false);
     }
@@ -542,7 +543,6 @@ void KG::intrinsicMerge(){
             for (auto [i1, i2] : regularMatchings) {
                 KGVertex* v1 = he1CourseVertices[i1];
                 KGVertex* v2 = he2CourseVertices[i2];
-
                 if (v1->row_in_vertex == nullptr && v2->row_in_vertex != nullptr){
                     v2->row_out_vertex = v1;
                     v1->row_in_vertex = v2;
@@ -658,8 +658,6 @@ void KG::intrinsicMerge(){
             }
         }
     }
-
-    std::cout << "Got here 4" << std::endl;
 
     // Connect the remaining unmatched virtual vertices across singular edges
     for (Edge startEdge : (gluedGeometry->mesh).edges()){ 
@@ -849,7 +847,6 @@ void KG::intrinsicMerge(){
             }
         }
     }
-
 }
 
 // void KG::intrinsicMerge() {

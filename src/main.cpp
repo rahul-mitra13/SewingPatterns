@@ -187,7 +187,6 @@ void showStripePatterns(){
   CornerData<double> waleStripeValues;
   EdgeData<double> waleSingularEdgesGlobal;
   FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
-
   if (richDataFile.size() > 0) { // if a file is specified, load it
     std::cout << "Reading a file..." << std::endl;
     RichSurfaceMeshData richData(globalGeometry->mesh, richDataFile);
@@ -302,9 +301,20 @@ void showStripePatterns(){
   // graph.writeKnitGraphLineElement();
   // graph.writeKnitGraphToTxtFile("model.obj");
 
+  //transfer the stripe texturing coordinates to the glued setting 
+  CornerData<double> courseStripeValuesGlued(gluedELG->mesh);
+  CornerData<double> waleStripeValuesGlued(gluedELG->mesh);
+  for (Corner c : gluedELG->mesh.corners()){
+    courseStripeValuesGlued[c] = courseStripeValues[c.getIndex()];
+  }
+  for (Corner c : gluedELG->mesh.corners()){
+    waleStripeValuesGlued[c] = waleStripeValues[c.getIndex()];
+  }
+
+
   // generate the new knit graph
   KG graph = KG(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
-                      courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
+                      courseStripeValuesGlued, courseSingularEdgesGlobal, waleStripeValuesGlued, waleSingularEdgesGlobal,
                       edgeMap);
   graph.buildGraph();
 
