@@ -298,7 +298,7 @@ void KG::makeVirtualVerticesOnBorder(Face& f, bool isCourseDirection){
     }
 
     if (dot(cross(gradAlpha, gradBeta), n) < 0) {
-        for (auto &v : faceKGVertices[f]) {
+        for (KGVertex *v : faceKGVertices[f]) {
             v->alpha_tag = -v->alpha_tag;
             v->beta_tag = -v->beta_tag;
         }
@@ -396,12 +396,11 @@ void KG::makeRealVerticesOnInterior(Face& f){
                 auto v = std::make_unique<KGVertex>();	
                 KGVertex* raw = v.get(); 					
    			    raw->baryCoords = Vector3{bi, bj, bk};
-                j = bi * alphaI + bj * alphaJ + bk * alphaK;
+                //assign any halfedge on that face
+                v->halfedge = f.halfedge();
                 raw->id = vertexID++;
                 raw->alpha_tag = j;
                 raw->beta_tag = k;
-                //edges and halfedges are in the glued mesh setting 
-                raw->halfedge = gluedGeometry->mesh.face(f.getIndex()).halfedge().next().next();
                 allVertices.emplace_back(std::move(v));
                 faceKGVertices[f].emplace_back(raw);
             }
@@ -409,7 +408,7 @@ void KG::makeRealVerticesOnInterior(Face& f){
     }
 
     if (dot(cross(gradAlpha, gradBeta), n) < 0) {
-        for (auto &v : faceKGVertices[f]) {
+        for (KGVertex *v : faceKGVertices[f]) {
             v->alpha_tag = -v->alpha_tag;
             v->beta_tag = -v->beta_tag;
         }
@@ -418,9 +417,9 @@ void KG::makeRealVerticesOnInterior(Face& f){
 
 void KG::makeFaceConnections(){
 
-    constexpr double eps = 1e-8;
+    double eps = 1e-8;
 
-    auto approx_contains = [](const std::vector<double>& xs, double x) {
+    auto approx_contains = [eps](const std::vector<double>& xs, double x) {
         for (double v : xs) if (std::fabs(v - x) <= eps) return true;
         return false;
     };
@@ -428,14 +427,12 @@ void KG::makeFaceConnections(){
     for (Face f : gluedGeometry->mesh.faces()) {
 
         // Non-owning reference to this face's vertices
-        auto& faceVertices = faceKGVertices[f]; // std::vector<KGVertex*>
+        std::vector<KGVertex*> faceVertices = faceKGVertices[f];
     
 
         std::vector<double> uniqueAlphas;
         std::vector<double> uniqueBetas;
-        uniqueAlphas.reserve(faceVertices.size());
-        uniqueBetas.reserve(faceVertices.size());
-
+    
         // Collect unique alpha/beta tags using epsilon equality
         for (KGVertex* v : faceVertices) {
             if (!v->isBetaVirtual && !approx_contains(uniqueAlphas, v->alpha_tag)) {
@@ -450,13 +447,13 @@ void KG::makeFaceConnections(){
         for (double currAlphaVal : uniqueAlphas) {
             std::map<double, KGVertex*> currAlphaRow; // key: beta, val: vertex*
             for (KGVertex* v : faceVertices) {
-                if (!v->isBetaVirtual && std::fabs(v->alpha_tag - currAlphaVal) <= eps) {
+                if (std::fabs(v->alpha_tag - currAlphaVal) <= eps) {
                     currAlphaRow[v->beta_tag] = v;
                 }
             }
-            for (auto it = currAlphaRow.begin(); std::next(it) != currAlphaRow.end(); ++it) {
-                KGVertex* currVertex = it->second;                // already KGVertex*
-                KGVertex* nextVertex = std::next(it)->second;     // KGVertex*
+            for (auto it = currAlphaRow.begin(); it != std::prev(currAlphaRow.end()); it++) {
+                KGVertex* currVertex = it->second;    
+                KGVertex* nextVertex = std::next(it)->second; 
                 //update the pointers
                 currVertex->row_out_vertex = nextVertex;
                 nextVertex->row_in_vertex = currVertex;
@@ -467,11 +464,11 @@ void KG::makeFaceConnections(){
         for (double currBetaVal : uniqueBetas) {
             std::map<double, KGVertex*> currBetaCol; // key: alpha, val: vertex*
             for (KGVertex* v : faceVertices) {
-                if (!v->isAlphaVirtual && std::fabs(v->beta_tag - currBetaVal) <= eps) {
+                if (std::fabs(v->beta_tag - currBetaVal) <= eps) {
                     currBetaCol[v->alpha_tag] = v;
                 }
             }
-            for (auto it = currBetaCol.begin(); std::next(it) != currBetaCol.end(); ++it) {
+            for (auto it = currBetaCol.begin(); it != std::prev(currBetaCol.end()); it++) {
                 KGVertex* currVertex = it->second;
                 KGVertex* nextVertex = std::next(it)->second;
                 //update the pointers 
@@ -487,6 +484,17 @@ void KG::makeFaceConnections(){
 //intrinsic merge of the virtual vertices
 //this will give us the matchings across singular edges
 void KG::intrinsicMerge(){
+
+    //before we do anything else 
+    //ensure that all real vertices have connections 
+    for (auto& up : allVertices) {
+        KGVertex* v = up.get();
+        if (v->isAlphaVirtual || v->isBetaVirtual) continue;
+        ensure(v->row_in_vertex != nullptr && "real vertex doesn't have row_in set");
+        ensure(v->row_out_vertex != nullptr && "real vertex doesn't have row_out set");
+        ensure(v->col_in_vertex[0] != nullptr && "real vertex doesn't have col_in[0] set");
+        ensure(v->col_out_vertex[0] != nullptr && "real vertex doesn't have col_out[0] set");
+    }
 
     // Store these vertices in order of the "direction of the halfedge"
     std::map<Halfedge, std::vector<KGVertex*>> halfedgeCourseVertices;
@@ -525,7 +533,7 @@ void KG::intrinsicMerge(){
     for (auto& [hid, vec] : halfedgeCourseVertices) sortByParam(vec);
     for (auto& [hid, vec] : halfedgeWaleVertices)   sortByParam(vec);
 
-    // Make connections across regular course edges
+    // Make virtual connections across regular course edges
     for (Edge e : (gluedGeometry->mesh).edges()){ 
     
         if (!e.isBoundary() && courseSingularEdgesGlued[e] == 0) {
@@ -543,6 +551,8 @@ void KG::intrinsicMerge(){
             for (auto [i1, i2] : regularMatchings) {
                 KGVertex* v1 = he1CourseVertices[i1];
                 KGVertex* v2 = he2CourseVertices[i2];
+                ensure(v1->isAlphaVirtual && "vertex on halfedge is not virtual");
+                ensure(v2->isAlphaVirtual && "vertex on halfege is not virtual");
                 if (v1->row_in_vertex == nullptr && v2->row_in_vertex != nullptr){
                     v2->row_out_vertex = v1;
                     v1->row_in_vertex = v2;
@@ -573,7 +583,7 @@ void KG::intrinsicMerge(){
     for (Edge startEdge : orderedPosEdges){
 
         int startEdgeOrder = round(courseSingularEdgesGlued[startEdge]);
-        assert(!startEdge.isBoundary() && "Start edge is a boundary edge");
+        ensure(!startEdge.isBoundary() && "Start edge is not a boundary edge");
         
         std::vector<KGVertex*> he1Vertices = halfedgeCourseVertices[startEdge.halfedge()];
         std::vector<KGVertex*> he2Vertices = halfedgeCourseVertices[startEdge.halfedge().twin()];
@@ -581,7 +591,7 @@ void KG::intrinsicMerge(){
         if (he1Vertices.size() > he2Vertices.size())
             swap(he1Vertices, he2Vertices);
 
-        assert(he2Vertices.size() - he1Vertices.size() == 1 && "More than one stripe born/dying at singular edge");
+        ensure(he2Vertices.size() - he1Vertices.size() == 1 && "More than one stripe born/dying at singular edge");
 
         bool success = false;
         while(!success){
@@ -598,16 +608,16 @@ void KG::intrinsicMerge(){
             matchings[startVertex] = nullptr;
             // Trace short row. Now that we go in the direction of row_in (== right)!
             KGVertex* walker = startVertex;
-            assert(walker->row_in_vertex != nullptr && "startVertex picked doesn't have a row_in_vertex");
+            ensure(walker->row_in_vertex != nullptr && "startVertex picked doesn't have a row_in_vertex");
 
             while (true){
 
                 if (walker->row_in_vertex == nullptr){
                     
                     //we've hit a singular edge
-                    assert(walker->isAlphaVirtual && "walker hit a vertex that is not virtual");//walker must be virtual 
-                    assert(!matchings.count(walker) && "walker is already matched");//walker must be unmatched
-                    assert(walker->halfedge.has_value() && "walker's halfedge option has no value");//walker must be on a halfedge
+                    ensure(walker->isAlphaVirtual && "walker hit a vertex that is not virtual");//walker must be virtual 
+                    ensure(!matchings.count(walker) && "walker is already matched");//walker must be unmatched
+                    ensure(walker->halfedge.has_value() && "walker's halfedge option has no value");//walker must be on a halfedge
 
                     Edge edge = walker->halfedge->edge();
                     int edgeOrder = round(courseSingularEdgesGlued[edge]);
@@ -625,7 +635,7 @@ void KG::intrinsicMerge(){
                         if (sgn((int)rightVertices.size() - (int)leftVertices.size()) != sgn(edgeOrder))
                             swap(leftVertices, rightVertices);
                         //not sure what this assertion is doing
-                        assert(sgn((int)rightVertices.size() - (int)leftVertices.size()) == sgn(edgeOrder)); // make sure the sides are correct!
+                        ensure(sgn((int)rightVertices.size() - (int)leftVertices.size()) == sgn(edgeOrder)); // make sure the sides are correct!
 
                         // Find index along half-edge
                         int indexAlongHalfedge = -1;
@@ -644,6 +654,7 @@ void KG::intrinsicMerge(){
                             // Go above (also happens if we looped to the starting edge)
                             connectTo = rightVertices[leftVertices.size()-1-indexAlongHalfedge];
                         }
+                        ensure(connectTo->isAlphaVirtual && "connectTo vertex is not alpha virtual");
                         matchings[walker] = connectTo;
                         matchings[connectTo] = walker;
                         walker = connectTo;
