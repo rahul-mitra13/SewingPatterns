@@ -59,6 +59,8 @@ void KG::buildGraph(){
     updateSingularMatchings();
     adjustFaceLevelSets();
 
+    makeAdjustedCourseVirtualVertices();
+
     //render the graph
     // 1) Collect real vertices and build a pointer->index map
     // std::vector<Vector3> realVs;
@@ -118,8 +120,6 @@ void KG::makeCourseVirtualVertices(){
     for (Face f : gluedGeometry->mesh.faces()){
         makeVirtualVerticesOnBorder(f, true);
     }
-
-    std::vector<Vector3> virtualCourseSingularVertices;
 }
 
 //Makes virtual vertices in the wale direction
@@ -983,3 +983,23 @@ void KG::adjustFaceLevelSets(){
         }
     }
 }
+
+void KG::makeAdjustedCourseVirtualVertices(){
+
+    for (Face f : gluedGeometry->mesh.faces()){
+        makeAdjustedVirtualVerticesOnBorder(f, true);
+    }
+}
+
+void KG::makeAdjustedWaleVirtualVertices(){
+
+    for (Face f : gluedGeometry->mesh.faces()){
+        makeAdjustedVirtualVerticesOnBorder(f, false);
+    }
+}
+
+void KG::makeAdjustedVirtualVerticesOnBorder(Face& f, bool isCourseDirection){
+
+    std::cout << "In here " << std::endl;
+}
+

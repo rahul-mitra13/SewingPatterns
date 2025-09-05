@@ -109,8 +109,13 @@ class KG{
         //edge map from global mesh to glued mesh 
         std::map<int, int> *globalToGluedEdgeMap;
 
-        //vertices in the graph
+        //vertices in the graph (including virtuals)
         std::vector<std::unique_ptr<KGVertex>> allVertices;
+
+        //vertices in the graph after adjusting the level sets
+        std::vector<std::unique_ptr<KGVertex>> adjustedVertices;
+
+        std::vector<std::unique_ptr<KGVertex>> finalVertices;
 
         // Pairs of stitched (real) vertices
         std::vector<std::pair<int, int>> stitchedVertices;
@@ -183,6 +188,16 @@ class KG{
 
             //after updating the barycoords for matched vertices, update the stripe level sets over the faces 
             void adjustFaceLevelSets();
+
+            //make virtual vertices on the triangle border in the course direction with the adjusted level sets 
+            void makeAdjustedCourseVirtualVertices();
+
+            //make virtual vertices on the triangle border in the wale direction with the adjusted level sets 
+            void makeAdjustedWaleVirtualVertices();
+            
+            //make virtual vertices on the border of all faces with the adjusted level sets
+            void makeAdjustedVirtualVerticesOnBorder(Face& f, bool isCourseDirection);
+
 
             
         public: 
