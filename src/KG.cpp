@@ -35,7 +35,10 @@ KG::KG(VertexPositionGeometry& globalGeometry,
     , faceWaleLevelSets(gluedGeometry.mesh)
     , faceKGVertices(gluedGeometry.mesh)
     , adjustedVertices()
-    , adjustedFaceKGVertices(gluedGeometry.mesh){        
+    , adjustedFaceKGVertices(gluedGeometry.mesh)
+    , courseLineSegPairs(gluedGeometry.mesh)
+    , waleLineSegPairs(gluedGeometry.mesh)
+      {        
 
         // Bring everything into the glued setting first
         courseSingularEdgesGlued = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, courseSingularEdges, globalToGluedEdgeMap);
@@ -61,6 +64,7 @@ void KG::buildGraph(){
     intrinsicMerge();
 
     //store matching information 
+    findLineSegmentPairs();
     updateSingularMatchings();
     adjustFaceLevelSets();
 
@@ -876,6 +880,45 @@ void KG::intrinsicMerge(){
     }
 }
 
+
+void KG::findLineSegmentPairs(){
+
+    double eps = 1e-12;
+    for (Face f : gluedGeometry->mesh.faces()){
+        std::vector<KGVertex*> faceVertices = faceKGVertices[f];
+        //course 
+        int numSameCourse = 0;
+        for (KGVertex* v1 : faceVertices){
+            if (!v1->isAlphaVirtual) continue;
+            double v1AlphaVal = v1 -> alpha_tag;
+            for (KGVertex* v2 : faceVertices){
+                if (!v2->isAlphaVirtual) continue;
+                double v2AlphaVal = v2 -> alpha_tag;
+                if (std::fabs(v1AlphaVal - v2AlphaVal) < eps){
+                    courseLineSegPairs[f].emplace_back(std::make_pair(v1, v2));
+                    numSameCourse++;
+                }
+            }
+            assert(numSameCourse == 1 && "more than 2 virtual vertices with the same alpha tag");
+        }
+        //wale 
+        int numSameWale = 0;
+        for (KGVertex* v1 : faceVertices){
+            if (!v1->isBetaVirtual) continue;
+            double v1BetaVal = v1 -> beta_tag;
+            for (KGVertex* v2 : faceVertices){
+                if (!v2->isBetaVirtual) continue;
+                double v2BetaVal = v2 -> beta_tag;
+                if (std::fabs(v1BetaVal - v2BetaVal) < eps){
+                    waleLineSegPairs[f].emplace_back(std::make_pair(v1, v2));
+                    numSameWale++;
+                }
+            }
+            assert(numSameWale == 1 && "more than 2 virtual vertices with the same beta tag");
+        }
+    }
+}
+
 void KG::updateSingularMatchings(){
 
     auto edgeParam = [&](KGVertex* v) -> double {
@@ -978,10 +1021,34 @@ void KG::updateSingularMatchings(){
         newWalePos.emplace_back(getKGPosition(v2));
     }
     polyscope::registerPointCloud("new wale positions", newWalePos);
+
+    //view the pairs 
+    std::vector<Vector3> coursePPos;
+    std::vector<Vector3> walePPos;
+    for (Face f : gluedGeometry->mesh.faces()){
+        std::vector<std::pair<KGVertex*, KGVertex*>> coursePs = courseLineSegPairs[f];
+        std::vector<std::pair<KGVertex*, KGVertex*>> walePs = waleLineSegPairs[f];
+
+        for (auto &[v1, v2] : coursePs){
+            coursePPos.emplace_back(getKGPosition(v1));
+            coursePPos.emplace_back(getKGPosition(v2));
+        }
+
+        for (auto &[v1, v2] : walePs){
+            walePPos.emplace_back(getKGPosition(v1));
+            walePPos.emplace_back(getKGPosition(v2));
+        }
+    }
+
+    polyscope::registerPointCloud("course line seg pairs", coursePPos);
+    polyscope::registerPointCloud("wale line seg pairs", walePPos);
+
+
 }
 
 void KG::adjustFaceLevelSets(){
 
+    
     for (Face f : gluedGeometry->mesh.faces()){
 
         std::vector<KGVertex*> faceVertices = faceKGVertices[f];

@@ -136,6 +136,13 @@ class KG{
         //vertices matched on singular edges in the wale direction 
         std::vector<std::pair<KGVertex*, KGVertex*>> waleMatchings;
 
+        //course line segment pairs on a face (this is after the adjustment)
+        FaceData<std::vector<std::pair<KGVertex*, KGVertex*>>> courseLineSegPairs;
+
+        //wale line segment pairs on a face (this is after the adjustment)
+        FaceData<std::vector<std::pair<KGVertex*, KGVertex*>>> waleLineSegPairs;
+
+
 
         private: 
 
@@ -183,6 +190,8 @@ class KG{
                 return pos;
             }
             
+            //find virtual vertex pairs that define stripe segments over a face
+            void findLineSegmentPairs();
 
             //now that we have the matchings, we update their barycoords and alpha/beta tags
             void updateSingularMatchings();
