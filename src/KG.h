@@ -115,8 +115,6 @@ class KG{
         //vertices in the graph after adjusting the level sets
         std::vector<std::unique_ptr<KGVertex>> adjustedVertices;
 
-        std::vector<std::unique_ptr<KGVertex>> finalVertices;
-
         // Pairs of stitched (real) vertices
         std::vector<std::pair<int, int>> stitchedVertices;
 
@@ -126,8 +124,11 @@ class KG{
         //wale level sets per face (will become useful when we update the vertex positions of virtual vertices)
         FaceData<std::vector<double>> faceWaleLevelSets; 
 
-        //graph vertices per face
+        //graph vertices per face before adjustment
         FaceData<std::vector<KGVertex*>> faceKGVertices;
+
+        //graph vertices per face after adjustment
+        FaceData<std::vector<KGVertex*>> adjustedFaceKGVertices;
 
         //vertices matched on singular edges in the course direction 
         std::vector<std::pair<KGVertex*, KGVertex*>> courseMatchings;
@@ -198,6 +199,11 @@ class KG{
             //make virtual vertices on the border of all faces with the adjusted level sets
             void makeAdjustedVirtualVerticesOnBorder(Face& f, bool isCourseDirection);
 
+            //make adjusted real vertices
+            void makeAdjustedRealVertices();
+
+            //compute real vertices on the triangle interior with adjusted level sets
+            void makeAdjustedRealVerticesOnInterior(Face& f);
 
             
         public: 
@@ -221,10 +227,12 @@ class KG{
                 return this->allVertices;
             }
 
-            //get the vertices in this knit graph (after merging, fixing, etc.)
-            std::vector<std::unique_ptr<KGVertex>>& getFinalVertices(){
-                return this->finalVertices;
+            //get the adjusted vertices in this knit graph (including all virtual vertices)
+            std::vector<std::unique_ptr<KGVertex>>&  getAdjustedVertices(){
+                return this->adjustedVertices;
             }
+
+            
 
             //build the knit graph 
             void buildGraph();

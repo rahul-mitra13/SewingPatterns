@@ -21,20 +21,21 @@ KG::KG(VertexPositionGeometry& globalGeometry,
     , psMesh(&psMesh)
     , coursePeriod(coursePeriod)
     , walePeriod(walePeriod)
-    , isGlued(gluedGeometry.mesh, false)      
+    , isGlued(gluedGeometry.mesh, false)
     , courseOneForm(courseOneForm)
     , courseSingularEdges(courseSingularEdges)
     , courseSingularEdgesGlued(gluedGeometry.mesh)
     , waleOneForm(waleOneForm)
     , waleSingularEdges(waleSingularEdges)
-    , waleSingularEdgesGlued(gluedGeometry.mesh) 
+    , waleSingularEdgesGlued(gluedGeometry.mesh)
     , globalToGluedEdgeMap(&globalToGluedEdgeMap)
     , allVertices()
-    , finalVertices()
     , stitchedVertices()
-    , faceCourseLevelSets(gluedGeometry.mesh)     
-    , faceWaleLevelSets(gluedGeometry.mesh)   
-    , faceKGVertices(gluedGeometry.mesh){           
+    , faceCourseLevelSets(gluedGeometry.mesh)
+    , faceWaleLevelSets(gluedGeometry.mesh)
+    , faceKGVertices(gluedGeometry.mesh)
+    , adjustedVertices()
+    , adjustedFaceKGVertices(gluedGeometry.mesh){        
 
         // Bring everything into the glued setting first
         courseSingularEdgesGlued = convertGlobalToGluedEdgeFunction(globalGeometry, gluedGeometry, courseSingularEdges, globalToGluedEdgeMap);
@@ -51,25 +52,32 @@ KG::KG(VertexPositionGeometry& globalGeometry,
 }
 
 void KG::buildGraph(){
+
+    //initial knit graph construction
     makeCourseVirtualVertices();
     makeWaleVirtualVertices();
     makeRealVertices();
     makeFaceConnections();
     intrinsicMerge();
+
+    //store matching information 
     updateSingularMatchings();
     adjustFaceLevelSets();
 
+    //new knit graph construction
     makeAdjustedCourseVirtualVertices();
+    makeAdjustedWaleVirtualVertices();
+    makeAdjustedRealVertices();
 
     //render the graph
-    // 1) Collect real vertices and build a pointer->index map
+    //1) Collect real vertices and build a pointer->index map
     // std::vector<Vector3> realVs;
     // std::vector<std::array<int, 2>> realEdges;
     // realVs.reserve(allVertices.size());
 
     // std::map<KGVertex*, int> idxOf;  // which index in realVs each real vertex has
 
-    // for (auto& up : allVertices) {
+    // for (auto& up : adjustedVertices) {
     //     KGVertex* v = up.get();
     //     if (v->isAlphaVirtual || v->isBetaVirtual) continue; // render only real vertices
     //     // compute 3D position from barycentrics on the corresponding global face
@@ -98,7 +106,7 @@ void KG::buildGraph(){
     // };
 
     // // 2) Add edges using the pointer->index map (NOT vertex ids)
-    // for (auto& up : allVertices) {
+    // for (auto& up : adjustedVertices) {
     //     KGVertex* v = up.get();
     //     if (!v) continue;
     //     if (v->isAlphaVirtual || v->isBetaVirtual) continue;
@@ -110,7 +118,7 @@ void KG::buildGraph(){
     // }
 
     // // 3) Register the network
-    // polyscope::registerCurveNetwork("Real vertices knit graph", realVs, realEdges);
+    // polyscope::registerCurveNetwork("Adjusted vertices knit graph", realVs, realEdges);
 
 }
 
@@ -345,7 +353,7 @@ void KG::makeRealVerticesOnInterior(Face& f){
     //looping variables and linear system variables
     double RHS_alpha, RHS_beta, detA, a1, b1, c1, a2, b2, c2, j, k, bi, bj, bk = 0;
 
-    //solving the linear system below
+    //for solving the linear system below
     a1 = alphaI - alphaK;
     b1 = alphaJ - alphaK;
     c1 = alphaK;
@@ -708,7 +716,7 @@ void KG::intrinsicMerge(){
             courseMatchings.emplace_back(std::make_pair(v1, v2)); 
         }
     }
-    polyscope::registerPointCloud("course matchings", courseMatchingsLocations);
+    //polyscope::registerPointCloud("course matchings", courseMatchingsLocations);
     
     
     // Now actually connect all course matchings
@@ -820,7 +828,7 @@ void KG::intrinsicMerge(){
             }
         }
     }
-    polyscope::registerPointCloud("wale matchings", waleMatchingLocations);
+    //polyscope::registerPointCloud("wale matchings", waleMatchingLocations);
 
     // Now connect real vertices to one another
     for (auto& up : allVertices) {
@@ -1000,6 +1008,277 @@ void KG::makeAdjustedWaleVirtualVertices(){
 
 void KG::makeAdjustedVirtualVerticesOnBorder(Face& f, bool isCourseDirection){
 
-    std::cout << "In here " << std::endl;
+    double bi, bj, bk, j, k;
+    //for floating point tolerance 
+    double eps = 1e-12;
+
+    //grab the alpha values
+    double alphaI = courseOneForm[f.halfedge().corner()];
+    double alphaJ = courseOneForm[f.halfedge().next().corner()];
+    double alphaK = courseOneForm[f.halfedge().next().next().corner()];
+    double alpha_min = std::min({alphaI, alphaJ, alphaK});
+    double alpha_max = std::max({alphaI, alphaJ, alphaK});
+
+    //grab the beta values
+    double betaI = waleOneForm[f.halfedge().corner()];
+    double betaJ = waleOneForm[f.halfedge().next().corner()];
+    double betaK = waleOneForm[f.halfedge().next().next().corner()];
+    double beta_min = std::min({betaI, betaJ, betaK});
+    double beta_max = std::max({betaI, betaJ, betaK});
+    //query position information to fix alpha_beta tags 
+    int fIndex = f.getIndex();
+    //grab the global face 
+    Face fGlobal = globalGeometry->mesh.face(fIndex);
+    //grab the vertices on the face
+    Vertex vI = fGlobal.halfedge().vertex();
+    Vertex vJ = fGlobal.halfedge().next().vertex();
+    Vertex vK = fGlobal.halfedge().next().next().vertex();
+    //grab the positions
+    Vector3 pI = globalGeometry->vertexPositions[vI];
+    Vector3 pJ = globalGeometry->vertexPositions[vJ];
+    Vector3 pK = globalGeometry->vertexPositions[vK];
+    Vector3 e1 = pJ - pI; // edge (i,j)
+    Vector3 e2 = pK - pI; // edge (i,k)
+    Vector3 n = cross(e1, e2) / 2; // triangle normal (weighted by its area)
+    double area = n.norm(); // triangle area
+    Vector3 gradAlpha = ((alphaJ - alphaI) * e2 - (alphaK - alphaI) * e1) / (2.0 * area);
+    Vector3 gradBeta = ((betaJ - betaI) * e2 - (betaK - betaI) * e1) / (2.0 * area);
+
+    std::vector<double> courseLevelSets = faceCourseLevelSets[f];
+    std::vector<double> waleLevelSets = faceWaleLevelSets[f];
+
+    if (isCourseDirection){//course direction
+        //shift by small epsilon to account for floating point error
+        for (double j : courseLevelSets){//fix alpha
+            //ij edge
+            bi = (j - alphaJ) / (alphaI - alphaJ);
+            bj = 1.0 - bi;
+            bk = 0.0;
+            if ((bi >= 0.0 - eps && bi <= 1.0 + eps) && (bj >= 0.0 - eps && bj <= 1.0 + eps) && (bk >= 0.0 - eps && bk <= 1.0 + eps)){//only store points in the triangle
+                auto v = std::make_unique<KGVertex>();		
+                KGVertex* raw = v.get();				
+   			    raw->baryCoords = Vector3{bi, bj, bk};
+                k = bi * betaI + bj * betaJ + bk * betaK;
+                raw->id = vertexID++;
+                raw->alpha_tag = j;
+                raw->beta_tag = k;
+                //edges and halfedges are in the glued mesh setting 
+                raw->halfedge = gluedGeometry->mesh.face(f.getIndex()).halfedge();
+                raw->isAlphaVirtual = true;
+                adjustedVertices.emplace_back(std::move(v));
+                adjustedFaceKGVertices[f].emplace_back(raw);
+            }
+
+            //jk edge
+            bj = (j - alphaK) / (alphaJ - alphaK);
+            bk = 1.0 - bj;
+            bi = 0.0;
+            if ((bi >= 0.0 - eps && bi <= 1.0 + eps) && (bj >= 0.0 - eps && bj <= 1.0 + eps) && (bk >= 0.0 - eps && bk <= 1.0 + eps)){//only store points in the triangle
+                auto v = std::make_unique<KGVertex>();	
+                KGVertex* raw = v.get();		
+   			    raw->baryCoords = Vector3{bi, bj, bk};
+                k = bi * betaI + bj * betaJ + bk * betaK;
+                raw->id = vertexID++;
+                raw->alpha_tag = j;
+                raw->beta_tag = k;
+                raw->halfedge = gluedGeometry->mesh.face(f.getIndex()).halfedge().next();
+                raw->isAlphaVirtual = true;
+                adjustedVertices.emplace_back(std::move(v));
+                adjustedFaceKGVertices[f].emplace_back(raw);
+            }
+
+            //ki edge
+            bi = (j - alphaK) / (alphaI - alphaK);
+            bk = 1.0 - bi;
+            bj = 0.0;
+            if ((bi >= 0.0 - eps && bi <= 1.0 + eps) && (bj >= 0.0 - eps && bj <= 1.0 + eps) && (bk >= 0.0 - eps && bk <= 1.0 + eps)){//only store points in the triangle
+                auto v = std::make_unique<KGVertex>();
+                KGVertex* raw = v.get();							
+   			    raw->baryCoords = Vector3{bi, bj, bk};
+                k = bi * betaI + bj * betaJ + bk * betaK;
+                raw->id = vertexID++;
+                raw->alpha_tag = j;
+                raw->beta_tag = k;
+                //edges and halfedges are in the glued mesh setting 
+                raw->halfedge = gluedGeometry->mesh.face(f.getIndex()).halfedge().next().next();
+                raw->isAlphaVirtual = true;
+                adjustedVertices.emplace_back(std::move(v));
+                adjustedFaceKGVertices[f].emplace_back(raw);
+            }
+        }
+    }else{//wale direction
+
+        //shift by small epsilon to account for floating point error
+   	    for (double k : waleLevelSets){        
+            //ij edge
+            bi = (k - betaJ) / (betaI - betaJ);
+            bj = 1.0 - bi;
+            bk = 0.0;
+            if ((bi >= 0.0 - eps && bi <= 1.0 + eps) && (bj >= 0.0 - eps && bj <= 1.0 + eps) && (bk >= 0.0 - eps && bk <= 1.0 + eps)){//only store points in the triangle
+                auto v = std::make_unique<KGVertex>();	
+                KGVertex* raw = v.get();					
+   			    raw->baryCoords = Vector3{bi, bj, bk};
+                j = bi * alphaI + bj * alphaJ + bk * alphaK;
+                raw->id = vertexID++;
+                raw->alpha_tag = j;
+                raw->beta_tag = k;
+                //edges and halfedges are in the glued mesh setting 
+                raw->halfedge = gluedGeometry->mesh.face(f.getIndex()).halfedge();
+                raw->isBetaVirtual = true;
+                adjustedVertices.emplace_back(std::move(v));
+                adjustedFaceKGVertices[f].emplace_back(raw);
+            }
+
+            //jk edge
+            bj = (k - betaK) / (betaJ - betaK);
+            bk = 1.0 - bj;
+            bi = 0.0;
+            if ((bi >= 0.0 - eps && bi <= 1.0 + eps) && (bj >= 0.0 - eps && bj <= 1.0 + eps) && (bk >= 0.0 - eps && bk <= 1.0 + eps)){//only store points in the triangle
+                auto v = std::make_unique<KGVertex>();
+                KGVertex* raw = v.get();						
+   			    raw->baryCoords = Vector3{bi, bj, bk};
+                j = bi * alphaI + bj * alphaJ + bk * alphaK;
+                raw->id = vertexID++;
+                raw->alpha_tag = j;
+                raw->beta_tag = k;
+                //edges and halfedges are in the glued mesh setting 
+                raw->halfedge = gluedGeometry->mesh.face(f.getIndex()).halfedge().next();
+                raw->isBetaVirtual = true;
+                adjustedVertices.emplace_back(std::move(v));
+                adjustedFaceKGVertices[f].emplace_back(raw);
+            }
+
+            //ki edge
+            bi = (k - betaK) / (betaI - betaK);
+            bk = 1.0 - bi;
+            bj = 0.0;
+            if ((bi >= 0.0 - eps && bi <= 1.0 + eps) && (bj >= 0.0 - eps && bj <= 1.0 + eps) && (bk >= 0.0 - eps && bk <= 1.0 + eps)){//only store points in the triangle
+                auto v = std::make_unique<KGVertex>();	
+                KGVertex* raw = v.get();					
+   			    raw->baryCoords = Vector3{bi, bj, bk};
+                j = bi * alphaI + bj * alphaJ + bk * alphaK;
+                raw->id = vertexID++;
+                raw->alpha_tag = j;
+                raw->beta_tag = k;
+                //edges and halfedges are in the glued mesh setting 
+                raw->halfedge = gluedGeometry->mesh.face(f.getIndex()).halfedge().next().next();
+                raw->isBetaVirtual = true;
+                adjustedVertices.emplace_back(std::move(v));
+                adjustedFaceKGVertices[f].emplace_back(raw);
+            }
+        }
+    }
+
+    if (dot(cross(gradAlpha, gradBeta), n) < 0) {
+        for (KGVertex *v : adjustedFaceKGVertices[f]) {
+            v->alpha_tag = -v->alpha_tag;
+            v->beta_tag = -v->beta_tag;
+        }
+    }
 }
 
+void KG::makeAdjustedRealVertices(){
+
+    for (Face f : gluedGeometry->mesh.faces()){
+        makeAdjustedRealVerticesOnInterior(f);
+    }
+}
+
+
+void KG::makeAdjustedRealVerticesOnInterior(Face& f){
+
+
+    //grab the alpha values
+    double alphaI = courseOneForm[f.halfedge().corner()];
+    double alphaJ = courseOneForm[f.halfedge().next().corner()];
+    double alphaK = courseOneForm[f.halfedge().next().next().corner()];
+    double alpha_min = std::min({alphaI, alphaJ, alphaK});
+    double alpha_max = std::max({alphaI, alphaJ, alphaK});
+
+    //grab the beta values
+    double betaI = waleOneForm[f.halfedge().corner()];
+    double betaJ = waleOneForm[f.halfedge().next().corner()];
+    double betaK = waleOneForm[f.halfedge().next().next().corner()];
+    double beta_min = std::min({betaI, betaJ, betaK});
+    double beta_max = std::max({betaI, betaJ, betaK});
+
+    //for floating point tolerance 
+    double eps = 1e-12;
+
+    //looping variables and linear system variables
+    double RHS_alpha, RHS_beta, detA, a1, b1, c1, a2, b2, c2, bi, bj, bk;
+
+    //for solving the linear system below
+    a1 = alphaI - alphaK;
+    b1 = alphaJ - alphaK;
+    c1 = alphaK;
+    a2 = betaI - betaK;
+    b2 = betaJ - betaK;
+    c2 = betaK;
+
+    std::vector<double> courseLevelSets = faceCourseLevelSets[f];
+    std::vector<double> waleLevelSets = faceWaleLevelSets[f];
+    
+    //query position information to fix alpha_beta tags 
+    int fIndex = f.getIndex();
+    //grab the global face 
+    Face fGlobal = globalGeometry->mesh.face(fIndex);
+    //grab the vertices on the face
+    Vertex vI = fGlobal.halfedge().vertex();
+    Vertex vJ = fGlobal.halfedge().next().vertex();
+    Vertex vK = fGlobal.halfedge().next().next().vertex();
+    //grab the positions
+    Vector3 pI = globalGeometry->vertexPositions[vI];
+    Vector3 pJ = globalGeometry->vertexPositions[vJ];
+    Vector3 pK = globalGeometry->vertexPositions[vK];
+    Vector3 e1 = pJ - pI; // edge (i,j)
+    Vector3 e2 = pK - pI; // edge (i,k)
+    Vector3 n = cross(e1, e2) / 2; // triangle normal (weighted by its area)
+    double area = n.norm(); // triangle area
+    Vector3 gradAlpha = ((alphaJ - alphaI) * e2 - (alphaK - alphaI) * e1) / (2.0 * area);
+    Vector3 gradBeta = ((betaJ - betaI) * e2 - (betaK - betaI) * e1) / (2.0 * area);
+
+    //for the linear system 
+    Eigen::Matrix2f A, A_inv;
+    Eigen::Vector2f x, b;
+
+    //basically solving a 2 by 2 linear system over every face
+   	//shift by small epsilon to account for floating point error
+   	for (double j : courseLevelSets){//step alpha
+   	    for (double k : waleLevelSets){//step beta
+   			//set up the linear system as Ax = b
+   			//set RHS to constant
+   			RHS_alpha = j - c1;
+   			RHS_beta = k - c2;
+   			A << a1, b1, a2, b2;
+   			//finding the determinant of A
+   			detA = (a1 * b2) - (b1 * a2);
+   			//find the inverse of a
+   			A_inv << (b2 / detA), (-b1/detA), (-a2/detA), (a1/detA);
+   			b << RHS_alpha, RHS_beta;
+   			x = A_inv * b;
+   			bi = x(0);
+   			bj = x(1);
+   			bk = 1.0 - bi - bj;
+   			if ((bi >= 0.0 - eps && bi <= 1.0 + eps) && (bj >= 0.0 - eps && bj <= 1.0 + eps) && (bk >= 0.0 - eps && bk <= 1.0 + eps)){//only store points in the triangle
+                auto v = std::make_unique<KGVertex>();	
+                KGVertex* raw = v.get(); 					
+   			    raw->baryCoords = Vector3{bi, bj, bk};
+                //assign any halfedge on that face
+                v->halfedge = f.halfedge();
+                raw->id = vertexID++;
+                raw->alpha_tag = j;
+                raw->beta_tag = k;
+                adjustedVertices.emplace_back(std::move(v));
+                adjustedFaceKGVertices[f].emplace_back(raw);
+            }
+        }
+    }
+
+    if (dot(cross(gradAlpha, gradBeta), n) < 0) {
+        for (KGVertex *v : adjustedFaceKGVertices[f]) {
+            v->alpha_tag = -v->alpha_tag;
+            v->beta_tag = -v->beta_tag;
+        }
+    }
+}
