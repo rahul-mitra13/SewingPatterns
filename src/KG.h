@@ -196,9 +196,6 @@ class KG{
             //now that we have the matchings, we update their barycoords and alpha/beta tags
             void updateSingularMatchings();
 
-            //after updating the barycoords for matched vertices, update the stripe level sets over the faces 
-            void adjustFaceLevelSets();
-
             //make virtual vertices on the triangle border in the course direction with the adjusted level sets 
             void makeAdjustedCourseVirtualVertices();
 
@@ -215,6 +212,7 @@ class KG{
             void makeAdjustedRealVerticesOnInterior(Face& f);
 
             //make adjusted connections over a face 
+            //here we shouldn't really do it with alpha/beta tags because we've changed alpha/beta tags now
             void makeAdjustedFaceConnections();
 
             
