@@ -205,6 +205,9 @@ class KG{
             //compute real vertices on the triangle interior with adjusted level sets
             void makeAdjustedRealVerticesOnInterior(Face& f);
 
+            //make adjusted connections over a face 
+            void makeAdjustedFaceConnections();
+
             
         public: 
 
