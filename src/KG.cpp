@@ -1678,3 +1678,13 @@ void KG::adjustedIntrinsicMerge(){
     }
 
 }
+
+void KG::tagIncreasesAndDecreases(){
+
+    for (auto& up : adjustedVertices) {
+        KGVertex* v = up.get();
+        if (v -> isAlphaVirtual || v -> isBetaVirtual) continue;
+
+    }
+
+}

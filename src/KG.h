@@ -142,8 +142,6 @@ class KG{
         //wale line segment pairs on a face (this is after the adjustment)
         FaceData<std::vector<std::pair<KGVertex*, KGVertex*>>> waleLineSegPairs;
 
-
-
         private: 
 
             //hashing floating point numbers 
@@ -217,6 +215,10 @@ class KG{
 
             //intrinsic merge for adjusted vertices
             void adjustedIntrinsicMerge();
+
+            //tag increases and decreases()
+            void tagIncreasesAndDecreases();
+            
 
             
         public: 
