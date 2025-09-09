@@ -215,6 +215,9 @@ class KG{
             //here we shouldn't really do it with alpha/beta tags because we've changed alpha/beta tags now
             void makeAdjustedFaceConnections();
 
+            //intrinsic merge for adjusted vertices
+            void adjustedIntrinsicMerge();
+
             
         public: 
 

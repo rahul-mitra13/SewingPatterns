@@ -68,80 +68,81 @@ void KG::buildGraph(){
     //new knit graph construction
     makeAdjustedCourseVirtualVertices();
     makeAdjustedWaleVirtualVertices();
-    //makeAdjustedFaceConnections();
+    makeAdjustedRealVertices();
+    makeAdjustedFaceConnections();
 
     //visualize the new (after adjustment) virtual connections to make sure we're correct 
     //debugging
-    std::vector<Vector3> Vs;
-    std::vector<std::array<int, 2>> Es;
-    for (Face f : gluedGeometry->mesh.faces()){
-        std::vector<std::pair<KGVertex*, KGVertex*>> coursePs = courseLineSegPairs[f];
-        for (auto &[v1, v2] : coursePs){
-            int i0 = static_cast<int>(Vs.size());
-            Vs.emplace_back(getKGPosition(v1));
-            Vs.emplace_back(getKGPosition(v2));
-            Es.push_back({i0, i0 + 1});
-        }
-        std::vector<std::pair<KGVertex*, KGVertex*>> walePs = waleLineSegPairs[f];
-        for (auto &[v1, v2] : walePs){
-            int i0 = static_cast<int>(Vs.size());
-            Vs.emplace_back(getKGPosition(v1));
-            Vs.emplace_back(getKGPosition(v2));
-            Es.push_back({i0, i0 + 1});
-        }
-    }
-    polyscope::registerCurveNetwork("New virtual connections", Vs, Es);
+    // std::vector<Vector3> Vs;
+    // std::vector<std::array<int, 2>> Es;
+    // for (Face f : gluedGeometry->mesh.faces()){
+    //     std::vector<std::pair<KGVertex*, KGVertex*>> coursePs = courseLineSegPairs[f];
+    //     for (auto &[v1, v2] : coursePs){
+    //         int i0 = static_cast<int>(Vs.size());
+    //         Vs.emplace_back(getKGPosition(v1));
+    //         Vs.emplace_back(getKGPosition(v2));
+    //         Es.push_back({i0, i0 + 1});
+    //     }
+    //     std::vector<std::pair<KGVertex*, KGVertex*>> walePs = waleLineSegPairs[f];
+    //     for (auto &[v1, v2] : walePs){
+    //         int i0 = static_cast<int>(Vs.size());
+    //         Vs.emplace_back(getKGPosition(v1));
+    //         Vs.emplace_back(getKGPosition(v2));
+    //         Es.push_back({i0, i0 + 1});
+    //     }
+    // }
+    // polyscope::registerCurveNetwork("New virtual connections", Vs, Es);
 
     //render the graph
     //1) Collect real vertices and build a pointer->index map
-    // std::vector<Vector3> realVs;
-    // std::vector<std::array<int, 2>> realEdges;
-    // realVs.reserve(allVertices.size());
+    std::vector<Vector3> realVs;
+    std::vector<std::array<int, 2>> realEdges;
+    realVs.reserve(allVertices.size());
 
-    // std::map<KGVertex*, int> idxOf;  // which index in realVs each real vertex has
+    std::map<KGVertex*, int> idxOf;  // which index in realVs each real vertex has
 
-    // for (auto& up : adjustedVertices) {
-    //     KGVertex* v = up.get();
-    //     //if (v->isAlphaVirtual || v->isBetaVirtual) continue; // render only real vertices
-    //     // compute 3D position from barycentrics on the corresponding global face
-    //     int fIndex = v->halfedge->face().getIndex();
-    //     Face f = globalGeometry->mesh.face(fIndex);
-    //     Vertex vI = f.halfedge().vertex();
-    //     Vertex vJ = f.halfedge().next().vertex();
-    //     Vertex vK = f.halfedge().next().next().vertex();
-    //     Vector3 pI = globalGeometry->vertexPositions[vI];
-    //     Vector3 pJ = globalGeometry->vertexPositions[vJ];
-    //     Vector3 pK = globalGeometry->vertexPositions[vK];
-    //     v->position = v->baryCoords[0] * pI + v->baryCoords[1] * pJ + v->baryCoords[2] * pK;
+    for (auto& up : adjustedVertices) {
+        KGVertex* v = up.get();
+        //if (v->isAlphaVirtual || v->isBetaVirtual) continue; // render only real vertices
+        // compute 3D position from barycentrics on the corresponding global face
+        int fIndex = v->halfedge->face().getIndex();
+        Face f = globalGeometry->mesh.face(fIndex);
+        Vertex vI = f.halfedge().vertex();
+        Vertex vJ = f.halfedge().next().vertex();
+        Vertex vK = f.halfedge().next().next().vertex();
+        Vector3 pI = globalGeometry->vertexPositions[vI];
+        Vector3 pJ = globalGeometry->vertexPositions[vJ];
+        Vector3 pK = globalGeometry->vertexPositions[vK];
+        v->position = v->baryCoords[0] * pI + v->baryCoords[1] * pJ + v->baryCoords[2] * pK;
 
-    //     int i = static_cast<int>(realVs.size());
-    //     idxOf[v] = i;                    // pointer -> node index
-    //     realVs.emplace_back(v->position);
-    // }
+        int i = static_cast<int>(realVs.size());
+        idxOf[v] = i;                    // pointer -> node index
+        realVs.emplace_back(v->position);
+    }
 
-    // // helper to add an edge only if both endpoints are in the node set
-    // auto addEdge = [&](KGVertex* a, KGVertex* b) {
-    //     auto ia = idxOf.find(a);
-    //     auto ib = idxOf.find(b);
-    //     if (ia == idxOf.end() || ib == idxOf.end()) return; // skip if an endpoint wasn't rendered
-    //     if (ia->second == ib->second) return;               // skip self-loop
-    //     realEdges.push_back({ ia->second, ib->second });
-    // };
+    // helper to add an edge only if both endpoints are in the node set
+    auto addEdge = [&](KGVertex* a, KGVertex* b) {
+        auto ia = idxOf.find(a);
+        auto ib = idxOf.find(b);
+        if (ia == idxOf.end() || ib == idxOf.end()) return; // skip if an endpoint wasn't rendered
+        if (ia->second == ib->second) return;               // skip self-loop
+        realEdges.push_back({ ia->second, ib->second });
+    };
 
-    // // 2) Add edges using the pointer->index map (NOT vertex ids)
-    // for (auto& up : adjustedVertices) {
-    //     KGVertex* v = up.get();
-    //     if (!v) continue;
-    //     //if (v->isAlphaVirtual || v->isBetaVirtual) continue;
+    // 2) Add edges using the pointer->index map (NOT vertex ids)
+    for (auto& up : adjustedVertices) {
+        KGVertex* v = up.get();
+        if (!v) continue;
+        //if (v->isAlphaVirtual || v->isBetaVirtual) continue;
 
-    //     addEdge(v, v->row_out_vertex);
-    //     addEdge(v, v->col_out_vertex[0]);
-    //     // for increases
-    //     // addEdge(v, v->col_out_vertex[1]);
-    // }
+        addEdge(v, v->row_out_vertex);
+        addEdge(v, v->col_out_vertex[0]);
+        // for increases
+        // addEdge(v, v->col_out_vertex[1]);
+    }
 
-    // // 3) Register the network
-    // polyscope::registerCurveNetwork("Adjusted vertices knit graph", realVs, realEdges);
+    // 3) Register the network
+    polyscope::registerCurveNetwork("Adjusted vertices knit graph", realVs, realEdges);
 
 }
 
@@ -1194,6 +1195,179 @@ void KG::makeAdjustedVirtualVerticesOnBorder(Face& f, bool isCourseDirection){
         for (KGVertex *v : adjustedFaceKGVertices[f]) {
             v->alpha_tag = -v->alpha_tag;
             v->beta_tag = -v->beta_tag;
+        }
+    }
+}
+
+void KG::makeAdjustedRealVertices(){
+
+    for (Face f : gluedGeometry->mesh.faces()){
+        makeAdjustedRealVerticesOnInterior(f);
+    }
+
+}
+
+void KG::makeAdjustedRealVerticesOnInterior(Face& f){
+
+    const double eps = 1e-12;
+
+    // Orienters: course by beta, wale by alpha (no tie-breaks)
+    auto orientCourse = [&](KGVertex*& p0, KGVertex*& p1) {
+        if (p1->beta_tag < p0->beta_tag) std::swap(p0, p1);
+    };
+    auto orientWale = [&](KGVertex*& p0, KGVertex*& p1) {
+        if (p1->alpha_tag < p0->alpha_tag) std::swap(p0, p1);
+    };
+
+    // Solve (a0 + u*(a1-a0)) = (b0 + v*(b1-b0)) in barycentrics via 2x2 systems
+    auto solveUV = [&](const Vector3& a0, const Vector3& a1,
+                       const Vector3& b0, const Vector3& b1,
+                       double& u, double& v) -> bool {
+        Vector3 A = a1 - a0, B = b1 - b0;
+        auto try2 = [&](int i, int j) -> bool {
+            double m00 = A[i], m01 = -B[i];
+            double m10 = A[j], m11 = -B[j];
+            double r0  = b0[i] - a0[i], r1 = b0[j] - a0[j];
+            double det = m00 * m11 - m01 * m10;
+            if (std::abs(det) < 1e-14) return false;
+            u = ( r0 * m11 - m01 * r1) / det;
+            v = ( m00 * r1 - r0  * m10) / det;
+            return true;
+        };
+        return try2(0,1) || try2(1,2) || try2(0,2);
+    };
+
+    auto strictlyInside = [&](const Vector3& b) -> bool {
+        return (b[0] > eps && b[1] > eps && b[2] > eps);
+    };
+
+    auto setTagsOnFace = [&](KGVertex* v, Face f) {
+        Halfedge h0 = f.halfedge();
+        Halfedge h1 = h0.next();
+        Halfedge h2 = h1.next();
+        double aI = courseOneForm[h0.corner()];
+        double aJ = courseOneForm[h1.corner()];
+        double aK = courseOneForm[h2.corner()];
+        double bI = waleOneForm[h0.corner()];
+        double bJ = waleOneForm[h1.corner()];
+        double bK = waleOneForm[h2.corner()];
+        v->alpha_tag = v->baryCoords[0] * aI + v->baryCoords[1] * aJ + v->baryCoords[2] * aK;
+        v->beta_tag  = v->baryCoords[0] * bI + v->baryCoords[1] * bJ + v->baryCoords[2] * bK;
+    };
+
+    
+    const auto& coursePairs = courseLineSegPairs[f];
+    const auto& walePairs   = waleLineSegPairs[f];
+
+    for (auto cp : coursePairs) {
+        KGVertex *c0 = cp.first, *c1 = cp.second;
+        orientCourse(c0, c1); // beta increases
+        const Vector3 a0 = c0->baryCoords, a1 = c1->baryCoords;
+
+        for (auto wp : walePairs) {
+            KGVertex *w0 = wp.first, *w1 = wp.second;
+            orientWale(w0, w1); // alpha increases
+            const Vector3 b0 = w0->baryCoords, b1 = w1->baryCoords;
+
+            double u, v;
+            if (!solveUV(a0, a1, b0, b1, u, v)) continue;
+            if (u < -eps || u > 1 + eps || v < -eps || v > 1 + eps) continue;
+
+            Vector3 bary = (1.0 - u) * a0 + u * a1;
+            double s = bary[0] + bary[1] + bary[2];
+            if (std::abs(s - 1.0) > 1e-9) bary = (1.0 / s) * bary;
+
+            if (!strictlyInside(bary)) continue;
+
+            auto nv = std::make_unique<KGVertex>();
+            KGVertex* raw = nv.get();
+            raw->baryCoords = bary;
+            raw->id         = vertexID++;
+            raw->halfedge   = f.halfedge(); // any halfedge on this face
+            setTagsOnFace(raw, f);
+
+            adjustedFaceKGVertices[f].push_back(raw);
+            adjustedVertices.emplace_back(std::move(nv));
+        }
+    }
+}
+
+
+//there has to be a better way of writing this
+void KG::makeAdjustedFaceConnections(){
+
+    const double tol_col = 1e-10;   // colinearity/point-on-line tolerance in barycentric space
+    const double tol_t   = 1e-10;   // param range tolerance
+
+    // Return true and t if x lies on segment p0->p1 in barycentric space.
+    auto onSegmentParam = [&](const Vector3& x, const Vector3& p0, const Vector3& p1, double& t) -> bool {
+        Vector3 A = p1 - p0;
+        double AA = dot(A, A);
+        if (AA < 1e-18) return false;                  // degenerate segment
+        Vector3 r = x - p0;
+        t = dot(r, A) / AA;                            // least-squares param along A
+        if (t < -tol_t || t > 1.0 + tol_t) return false;
+        Vector3 proj = p0 + t * A;                     // closest point on the line
+        return (proj - x).norm() <= tol_col;           // near the segment line
+    };
+
+    for (Face f : gluedGeometry->mesh.faces()) {
+        auto& F = adjustedFaceKGVertices[f];           // all adjusted verts (endpoints + intersections) on this face
+
+        // reset connections on this face
+        for (KGVertex* v : F) {
+            v->row_in_vertex = v->row_out_vertex = nullptr;
+            v->col_in_vertex[0] = v->col_out_vertex[0] = nullptr;
+        }
+
+        // ----------------- Course: connect along each course segment by increasing beta -----------------
+        const auto& coursePairs = courseLineSegPairs[f];
+        for (const auto& cp : coursePairs) {
+            const Vector3 p0 = cp.first->baryCoords;
+            const Vector3 p1 = cp.second->baryCoords;
+            if ((p1 - p0).norm() < 1e-18) continue;    // skip degenerate
+
+            std::vector<KGVertex*> stripe;
+            stripe.reserve(F.size());
+            for (KGVertex* v : F) {
+                double t;
+                if (onSegmentParam(v->baryCoords, p0, p1, t)) stripe.push_back(v);
+            }
+
+            std::sort(stripe.begin(), stripe.end(),
+                      [](KGVertex* a, KGVertex* b) { return a->beta_tag < b->beta_tag; });
+
+            for (size_t i = 0; i + 1 < stripe.size(); ++i) {
+                KGVertex* a = stripe[i];
+                KGVertex* b = stripe[i + 1];
+                a->row_out_vertex = b;
+                b->row_in_vertex  = a;
+            }
+        }
+
+        // ----------------- Wale: connect along each wale segment by increasing alpha -------------------
+        const auto& walePairs = waleLineSegPairs[f];
+        for (const auto& wp : walePairs) {
+            const Vector3 q0 = wp.first->baryCoords;
+            const Vector3 q1 = wp.second->baryCoords;
+            if ((q1 - q0).norm() < 1e-18) continue;
+
+            std::vector<KGVertex*> stripe;
+            stripe.reserve(F.size());
+            for (KGVertex* v : F) {
+                double t;
+                if (onSegmentParam(v->baryCoords, q0, q1, t)) stripe.push_back(v);
+            }
+
+            std::sort(stripe.begin(), stripe.end(),
+                      [](KGVertex* a, KGVertex* b) { return a->alpha_tag < b->alpha_tag; });
+
+            for (size_t i = 0; i + 1 < stripe.size(); ++i) {
+                KGVertex* a = stripe[i];
+                KGVertex* b = stripe[i + 1];
+                a->col_out_vertex[0] = b;
+                b->col_in_vertex[0]  = a;
+            }
         }
     }
 }
