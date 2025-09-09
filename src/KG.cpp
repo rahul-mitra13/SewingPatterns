@@ -70,7 +70,7 @@ void KG::buildGraph(){
     makeAdjustedWaleVirtualVertices();
     //makeAdjustedFaceConnections();
 
-    //visualize the new virtual connections to make sure we're correct 
+    //visualize the new (after adjustment) virtual connections to make sure we're correct 
     //debugging
     std::vector<Vector3> Vs;
     std::vector<std::array<int, 2>> Es;
