@@ -70,6 +70,7 @@ void KG::buildGraph(){
     makeAdjustedWaleVirtualVertices();
     makeAdjustedRealVertices();
     makeAdjustedFaceConnections();
+    adjustedIntrinsicMerge();
 
     //visualize the new (after adjustment) virtual connections to make sure we're correct 
     //debugging
@@ -134,9 +135,8 @@ void KG::buildGraph(){
         KGVertex* v = up.get();
         if (!v) continue;
         //if (v->isAlphaVirtual || v->isBetaVirtual) continue;
-
         addEdge(v, v->row_out_vertex);
-        addEdge(v, v->col_out_vertex[0]);
+        addEdge(v, v -> col_out_vertex[0]);
         // for increases
         // addEdge(v, v->col_out_vertex[1]);
     }
@@ -897,6 +897,19 @@ void KG::intrinsicMerge(){
             }
         }
     }
+
+    double eps = 1e-12;
+    // for (Face f : gluedGeometry->mesh.faces()) {
+    //     auto& F = faceKGVertices[f];
+    //     for (KGVertex* v : F) {
+    //         if (v->row_out_vertex) {
+    //             ensure(v->beta_tag + eps <= v->row_out_vertex->beta_tag);
+    //         }
+    //         if (v->col_out_vertex[0]) {
+    //             ensure(v->alpha_tag + eps <= v->col_out_vertex[0]->alpha_tag);
+    //         }
+    //     }
+    // }
 }
 
 
@@ -1075,8 +1088,8 @@ void KG::updateSingularMatchings(){
         }
     }
 
-    polyscope::registerPointCloud("course line seg pairs", coursePPos);
-    polyscope::registerPointCloud("wale line seg pairs", walePPos);
+    // polyscope::registerPointCloud("course line seg pairs", coursePPos);
+    // polyscope::registerPointCloud("wale line seg pairs", walePPos);
 
 
 }
@@ -1370,4 +1383,266 @@ void KG::makeAdjustedFaceConnections(){
             }
         }
     }
+
+    for (Face f : gluedGeometry->mesh.faces()) {
+        auto& F = adjustedFaceKGVertices[f];
+        for (KGVertex* v : F){
+            if (v->row_out_vertex != nullptr) ensure (v -> beta_tag < v -> row_out_vertex -> beta_tag && "row ordering assertion failed on adjusted vertices");
+            if (v->col_out_vertex[0] != nullptr) ensure (v -> alpha_tag < v -> col_out_vertex[0] -> alpha_tag && "column ordering assertion failed on adjusted vertices");
+        }
+    }
+}
+
+void KG::adjustedIntrinsicMerge(){
+
+    //before we do anything else 
+    //ensure that all real vertices have connections 
+    for (auto& up : adjustedVertices) {
+        KGVertex* v = up.get();
+        if (v->isAlphaVirtual || v->isBetaVirtual) continue;
+        ensure(v->row_in_vertex != nullptr && "real vertex doesn't have row_in set");
+        ensure(v->row_out_vertex != nullptr && "real vertex doesn't have row_out set");
+        ensure(v->col_in_vertex[0] != nullptr && "real vertex doesn't have col_in[0] set");
+        ensure(v->col_out_vertex[0] != nullptr && "real vertex doesn't have col_out[0] set");
+    }
+
+    //also ensure all the ordering is correct
+    for (Face f : gluedGeometry->mesh.faces()) {
+        auto& F = adjustedFaceKGVertices[f];
+        for (KGVertex* v : F){
+            if (v->row_out_vertex != nullptr) ensure (v -> beta_tag < v -> row_out_vertex -> beta_tag && "row ordering assertion failed on adjusted vertices");
+            if (v->col_out_vertex[0] != nullptr) ensure (v -> alpha_tag < v -> col_out_vertex[0] -> alpha_tag && "column ordering assertion failed on adjusted vertices");
+        }
+    }
+
+    std::cout << "Ordering assertion passed" << std::endl;
+
+    // const double epsT = 1e-12; // tolerance for "same place" along the edge
+
+    // // Param along an oriented halfedge (same convention you used earlier)
+    // auto edgeParam = [](KGVertex* v) -> double {
+    //     Halfedge he = v->halfedge.value();
+    //     Face f = he.face();
+    //     Halfedge h0 = f.halfedge();
+    //     Halfedge h1 = h0.next();
+    //     Halfedge h2 = h1.next();
+    //     if (he == h0)      return v->baryCoords[1]; // (i->j): t = b_j
+    //     else if (he == h1) return v->baryCoords[2]; // (j->k): t = b_k
+    //     else               return v->baryCoords[0]; // (k->i): t = b_i
+    // };
+
+    // // Store these vertices in order of the "direction of the halfedge"
+    // std::map<Halfedge, std::vector<KGVertex*>> halfedgeCourseVertices;
+    // std::map<Halfedge, std::vector<KGVertex*>> halfedgeWaleVertices;
+    // for (const auto& v : adjustedVertices){
+    //     if (v->isAlphaVirtual) halfedgeCourseVertices[v->halfedge.value()].push_back(v.get());
+    //     if (v->isBetaVirtual) halfedgeWaleVertices[v->halfedge.value()].push_back(v.get());
+    // }
+
+    // // Connect course vertices 
+    // for (Edge e : (gluedGeometry->mesh).edges()) {
+    //     if (e.isBoundary()) continue;//don't need to handle boundary vertices
+
+    //     std::vector<KGVertex*> he1Vertices = halfedgeCourseVertices[e.halfedge()];
+    //     std::vector<KGVertex*> he2Vertices = halfedgeCourseVertices[e.halfedge().twin()];
+        
+    //     // Matchings across regular edges
+    //     if (courseSingularEdgesGlued[e] == 0){ 
+        
+    //         ensure(he1Vertices.size() == he2Vertices.size() && "non course singular edge has unequal number of virtual vertices on either side of the halfedge");
+    //         std::vector<std::pair<int, int>> regularMatchings;
+    //         for (int i = 0; i < he1Vertices.size(); i++) {
+    //             regularMatchings.push_back({i, (he1Vertices.size() - i) - 1});
+    //         }
+
+    //         // Connect the virtual matchings first
+    //         for (auto [i1, i2] : regularMatchings) {
+    //             KGVertex* v1 = he1Vertices[i1];
+    //             KGVertex* v2 = he2Vertices[i2];
+    //             ensure(v1->isAlphaVirtual && "vertex on halfedge is not virtual");
+    //             ensure(v2->isAlphaVirtual && "vertex on halfege is not virtual");
+    //             if (v1->row_in_vertex == nullptr && v2->row_in_vertex != nullptr){
+    //                 v2->row_out_vertex = v1;
+    //                 v1->row_in_vertex = v2;
+    //             }
+    //             if (v2->row_in_vertex == nullptr && v1->row_in_vertex != nullptr){
+    //                 v1->row_out_vertex = v2;
+    //                 v2->row_in_vertex = v1;                   
+    //             }
+    //         }
+    //     }
+    //     else{
+            
+    //         if (he1Vertices.size() > he2Vertices.size())
+    //             swap(he1Vertices, he2Vertices);
+
+    //         // he1Vertices.size() < he2Vertices.size() guaranteed by your swap above
+    //         ensure(he2Vertices.size() - he1Vertices.size() == 1 && "More than one stripe born/dying at singular edge");
+
+    //         // Build params for both sides in the SAME orientation (he1's)
+    //         std::vector<std::pair<double, KGVertex*>> L, R;
+    //         L.reserve(he1Vertices.size());
+    //         R.reserve(he2Vertices.size());
+
+    //         for (KGVertex* v : he1Vertices) L.emplace_back(edgeParam(v), v);
+    //         for (KGVertex* v : he2Vertices) R.emplace_back(1.0 - edgeParam(v), v); // flip twin into he1 frame
+
+    //         std::sort(L.begin(), L.end(), [](auto& a, auto& b){ return a.first < b.first; });
+    //         std::sort(R.begin(), R.end(), [](auto& a, auto& b){ return a.first < b.first; });
+
+    //         // Two-pointer: for every v1 in he1, find exactly-one v2 in he2 at the same param
+    //         size_t i = 0, j = 0;
+    //         while (i < L.size() && j < R.size()) {
+    //             double tL = L[i].first;
+    //             double tR = R[j].first;
+
+    //             if (std::abs(tL - tR) <= epsT) {
+    //                 KGVertex* v1 = L[i].second;   // on he1
+    //                 KGVertex* v2 = R[j].second;   // on he2 (twin)
+
+    //                 ensure(v1->isAlphaVirtual && v2->isAlphaVirtual && "expected alpha-virtuals on course singular edge");
+
+    //                 if (v1->row_in_vertex == nullptr && v2->row_in_vertex != nullptr){
+    //                     v2->row_out_vertex = v1;
+    //                     v1->row_in_vertex = v2;
+    //                 }
+    //                 if (v2->row_in_vertex == nullptr && v1->row_in_vertex != nullptr){
+    //                     v1->row_out_vertex = v2;
+    //                     v2->row_in_vertex = v1;                   
+    //                 }
+    //                 ++i; ++j;
+    //             } else if (tL < tR) {
+    //                 ++i; // advance left to catch up
+    //             } else {
+    //                 ++j; // advance right to catch up
+    //             }
+    //         }
+    //     }
+    // }
+
+    // // Connect wale vertices 
+    // for (Edge e : (gluedGeometry->mesh).edges()) {
+    //     if (e.isBoundary()) continue;//don't need to handle boundary vertices
+
+    //     std::vector<KGVertex*> he1Vertices = halfedgeWaleVertices[e.halfedge()];
+    //     std::vector<KGVertex*> he2Vertices = halfedgeWaleVertices[e.halfedge().twin()];
+        
+    //     // Matchings across regular edges
+    //     if (waleSingularEdgesGlued[e] == 0){ 
+        
+    //         ensure(he1Vertices.size() == he2Vertices.size() && "non course singular edge has unequal number of virtual vertices on either side of the halfedge");
+    //         std::vector<std::pair<int, int>> regularMatchings;
+    //         for (int i = 0; i < he1Vertices.size(); i++) {
+    //             regularMatchings.push_back({i, (he1Vertices.size() - i) - 1});
+    //         }
+
+    //         // Connect the virtual matchings first
+    //         for (auto [i1, i2] : regularMatchings) {
+    //             KGVertex* v1 = he1Vertices[i1];
+    //             KGVertex* v2 = he2Vertices[i2];
+    //             ensure(v1->isBetaVirtual && "vertex on halfedge is not virtual");
+    //             ensure(v2->isBetaVirtual && "vertex on halfege is not virtual");
+    //             if (v1->col_in_vertex[0] == nullptr && v2->col_in_vertex[0] != nullptr){
+    //                 v1->col_in_vertex[0] = v2;
+    //                 v2->col_out_vertex[0] = v1;
+    //             }
+    //             if (v2->col_in_vertex[0] == nullptr && v1->col_in_vertex[0] != nullptr){
+    //                 v1->col_out_vertex[0] = v2;
+    //                 v2->col_in_vertex[0] = v1;
+    //             }
+    //         }
+    //     }
+    //     else{
+            
+    //         if (he1Vertices.size() > he2Vertices.size())
+    //             swap(he1Vertices, he2Vertices);
+
+    //         // he1Vertices.size() < he2Vertices.size() guaranteed by your swap above
+    //         ensure(he2Vertices.size() - he1Vertices.size() == 1 && "More than one stripe born/dying at singular edge");
+
+    //         // Build params for both sides in the SAME orientation (he1's)
+    //         std::vector<std::pair<double, KGVertex*>> L, R;
+    //         L.reserve(he1Vertices.size());
+    //         R.reserve(he2Vertices.size());
+
+    //         for (KGVertex* v : he1Vertices) L.emplace_back(edgeParam(v), v);
+    //         for (KGVertex* v : he2Vertices) R.emplace_back(1.0 - edgeParam(v), v); // flip twin into he1 frame
+
+    //         std::sort(L.begin(), L.end(), [](auto& a, auto& b){ return a.first < b.first; });
+    //         std::sort(R.begin(), R.end(), [](auto& a, auto& b){ return a.first < b.first; });
+
+    //         // Two-pointer: for every v1 in he1, find exactly-one v2 in he2 at the same param
+    //         size_t i = 0, j = 0;
+    //         while (i < L.size() && j < R.size()) {
+    //             double tL = L[i].first;
+    //             double tR = R[j].first;
+
+    //             if (std::abs(tL - tR) <= epsT) {
+    //                 KGVertex* v1 = L[i].second;   // on he1
+    //                 KGVertex* v2 = R[j].second;   // on he2 (twin)
+
+    //                 ensure(v1->isBetaVirtual && v2->isBetaVirtual && "expected beta-virtuals on course singular edge");
+
+    //                 if (v1->col_in_vertex[0] == nullptr && v2->col_in_vertex[0] != nullptr){
+    //                     v1->col_in_vertex[0] = v2;
+    //                     v2->col_out_vertex[0] = v1;
+    //                 }
+    //                 if (v2->col_in_vertex[0] == nullptr && v1->col_in_vertex[0] != nullptr){
+    //                     v1->col_out_vertex[0] = v2;
+    //                     v2->col_in_vertex[0] = v1;
+    //                 }
+    //                 ++i; ++j;
+    //             } else if (tL < tR) {
+    //                 ++i; // advance left to catch up
+    //             } else {
+    //                 ++j; // advance right to catch up
+    //             }
+    //         }
+    //     }
+    // }
+
+    // // Now connect real vertices to one another
+    // for (auto& up : adjustedVertices) {
+    //     KGVertex* v0 = up.get();
+    //     if (v0->isAlphaVirtual || v0->isBetaVirtual) continue; // only real vertices
+
+    //     // --------Course--------
+    //     {
+    //         KGVertex* v = v0->row_out_vertex;     // start from immediate neighbor
+    //         bool isGluedPath = false;
+
+    //         while (v && v->isAlphaVirtual) {
+    //             if (v->halfedge && isGlued[v->halfedge->edge()]) isGluedPath = true;
+    //             v = v->row_out_vertex;            // step
+    //         }
+
+    //         if (!v || v->isAlphaVirtual) {
+    //             v0->row_out_vertex = nullptr;     // no real neighbor reachable
+    //         } else {
+    //             v0->row_out_vertex = v;           // connect reciprocally
+    //             v->row_in_vertex   = v0;
+    //             if (isGluedPath) stitchedVertices.emplace_back(v0->id, v->id);
+    //         }
+    //     }
+
+    //     // --------Wale--------
+    //     {
+    //         KGVertex* v = v0->col_out_vertex[0];
+    //         bool isGluedPath = false;
+
+    //         while (v && v->isBetaVirtual) {
+    //             if (v->halfedge && isGlued[v->halfedge->edge()]) isGluedPath = true;
+    //             v = v->col_out_vertex[0];
+    //         }
+
+    //         if (!v || v->isBetaVirtual) {
+    //             v0->col_out_vertex[0] = nullptr;
+    //         } else {
+    //             v0->col_out_vertex[0] = v;
+    //             v->col_in_vertex[0]   = v0;
+    //             if (isGluedPath) stitchedVertices.emplace_back(v0->id, v->id);
+    //         }
+    //     }
+    // }
+
 }
