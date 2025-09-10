@@ -1790,8 +1790,6 @@ void KG::tagIncreasesAndDecreases(){
         KGVertex* v = up.get();
         if (v -> col_out_vertex[1] != nullptr){//found a vertex with an increase
             if (v -> col_out_vertex[1] -> row_out_vertex == v -> col_out_vertex[0]){//1 points to 0, needs flipping
-                KGVertex* v1Copy = v -> col_out_vertex[1];
-                KGVertex* v0Copy = v -> col_out_vertex[0];
                 std::swap(v -> col_out_vertex[0], v -> col_out_vertex[1]);
             }
         }
