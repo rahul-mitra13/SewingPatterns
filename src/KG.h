@@ -227,6 +227,9 @@ class KG{
 
             //render the final graph 
             void renderFinalGraph();
+
+            //write knit graph to txt file
+            void writeKnitGraphToTxtFile();
             
 
             

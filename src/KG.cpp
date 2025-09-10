@@ -76,6 +76,7 @@ void KG::buildGraph(){
     //final graph stuff 
     buildFinalVerticesFromAdjusted();
     renderFinalGraph();
+    writeKnitGraphToTxtFile();
 }
 
 //Makes virtual vertices in the course direction
@@ -815,7 +816,8 @@ void KG::intrinsicMerge(){
             } else {
                 v0->row_out_vertex = v;           // connect reciprocally
                 v->row_in_vertex   = v0;
-                if (isGluedPath) stitchedVertices.emplace_back(v0->id, v->id);
+                //don't write stitched vertices till we make the final model
+                //if (isGluedPath) stitchedVertices.emplace_back(v0->id, v->id); 
             }
         }
 
@@ -834,7 +836,8 @@ void KG::intrinsicMerge(){
             } else {
                 v0->col_out_vertex[0] = v;
                 v->col_in_vertex[0]   = v0;
-                if (isGluedPath) stitchedVertices.emplace_back(v0->id, v->id);
+                //don't write stitched vertices till we make the final model
+                //if (isGluedPath) stitchedVertices.emplace_back(v0->id, v->id);
             }
         }
     }
@@ -1821,45 +1824,34 @@ void KG::renderFinalGraph(){
 
 
     }
-
-    // for (auto& up : finalVertices) {
-    //     KGVertex* v = up.get();
-    //     // compute 3D position from barycentrics on the corresponding global face
-    //     int fIndex = v->halfedge->face().getIndex();
-    //     Face f = globalGeometry->mesh.face(fIndex);
-    //     Vertex vI = f.halfedge().vertex();
-    //     Vertex vJ = f.halfedge().next().vertex();
-    //     Vertex vK = f.halfedge().next().next().vertex();
-    //     Vector3 pI = globalGeometry->vertexPositions[vI];
-    //     Vector3 pJ = globalGeometry->vertexPositions[vJ];
-    //     Vector3 pK = globalGeometry->vertexPositions[vK];
-    //     v->position = v->baryCoords[0] * pI + v->baryCoords[1] * pJ + v->baryCoords[2] * pK;
-
-    //     int i = static_cast<int>(realVs.size());
-    //     idxOf[v] = i;                    // pointer -> node index
-    //     realVs.emplace_back(v->position);
-    // }
-
-    // // helper to add an edge only if both endpoints are in the node set
-    // auto addEdge = [&](KGVertex* a, KGVertex* b) {
-    //     auto ia = idxOf.find(a);
-    //     auto ib = idxOf.find(b);
-    //     if (ia == idxOf.end() || ib == idxOf.end()) return; // skip if an endpoint wasn't rendered
-    //     if (ia->second == ib->second) return;               // skip self-loop
-    //     realEdges.push_back({ ia->second, ib->second });
-    // };
-
-    // // 2) Add edges using the pointer->index map (NOT vertex ids)
-    // for (auto& up : finalVertices) {
-    //     KGVertex* v = up.get();
-    //     if (!v) continue;
-    //     addEdge(v, v->row_out_vertex);
-    //     addEdge(v, v -> col_out_vertex[0]);
-    //     // for increases/decreases
-    //     addEdge(v, v->col_out_vertex[1]);
-    // }
-
-    // // 3) Register the network
     polyscope::registerCurveNetwork("Adjusted vertices knit graph", realVs, realEdges);
+}
 
+//write knit graph to txt file 
+void KG::writeKnitGraphToTxtFile(){
+    
+
+    std::ofstream file("model_knitgraph_new.txt");
+    
+
+    for (auto &up : finalVertices){
+        KGVertex* v = up.get();
+        int id = v -> id;
+        int row_in = v -> row_in_vertex ? v -> row_in_vertex -> id : -1;
+        int row_out = v -> row_out_vertex ? v -> row_out_vertex -> id : -1;
+        int col_in_0 = v -> col_in_vertex[0] ? v -> col_in_vertex[0] -> id : -1;
+        int col_in_1 = v -> col_in_vertex[1] ? v -> col_in_vertex[1] -> id : -1;
+        int col_out_0 = v -> col_out_vertex[0] ? v -> col_out_vertex[0] -> id : -1;
+        int col_out_1 = v -> col_out_vertex[1] ? v -> col_out_vertex[1] -> id : -1;
+        Vector3 pos = getKGPosition(v);
+        file << id << " " << pos[0] << " " << pos[1] << " " << pos[2] << " " << row_in << " " << row_out << 
+        " " << col_in_0 << " " << col_in_1 << " " << col_out_0 << " " << col_out_1 << "\n";
+    }
+
+    // Write pairs of stitched vertices
+    for (const auto &[v1,v2] : stitchedVertices)
+        file << "s " << v1 << " " << v2 << "\n";
+
+    // file.close();
+    std::cout << "wrote knit graph to txt file " << std::endl;
 }
