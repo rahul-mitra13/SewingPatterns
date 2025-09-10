@@ -221,6 +221,12 @@ class KG{
 
             //tag increases and decreases()
             void tagIncreasesAndDecreases();
+
+            //make final vertices
+            void buildFinalVerticesFromAdjusted();
+
+            //render the final graph 
+            void renderFinalGraph();
             
 
             

@@ -65,7 +65,7 @@ void KG::buildGraph(){
     findLineSegmentPairs();
     updateSingularMatchings();
 
-    //new knit graph construction
+    //new knit graph construction with adjusted vertices
     makeAdjustedCourseVirtualVertices();
     makeAdjustedWaleVirtualVertices();
     makeAdjustedRealVertices();
@@ -73,57 +73,9 @@ void KG::buildGraph(){
     adjustedIntrinsicMerge();
     tagIncreasesAndDecreases();
 
-    //render the graph
-    //1) Collect real vertices and build a pointer->index map
-    std::vector<Vector3> realVs;
-    std::vector<std::array<int, 2>> realEdges;
-    realVs.reserve(allVertices.size());
-
-    std::map<KGVertex*, int> idxOf;  // which index in realVs each real vertex has
-
-    for (auto& up : adjustedVertices) {
-        KGVertex* v = up.get();
-        if (v->isAlphaVirtual || v->isBetaVirtual) continue; // render only real vertices
-        // compute 3D position from barycentrics on the corresponding global face
-        int fIndex = v->halfedge->face().getIndex();
-        Face f = globalGeometry->mesh.face(fIndex);
-        Vertex vI = f.halfedge().vertex();
-        Vertex vJ = f.halfedge().next().vertex();
-        Vertex vK = f.halfedge().next().next().vertex();
-        Vector3 pI = globalGeometry->vertexPositions[vI];
-        Vector3 pJ = globalGeometry->vertexPositions[vJ];
-        Vector3 pK = globalGeometry->vertexPositions[vK];
-        v->position = v->baryCoords[0] * pI + v->baryCoords[1] * pJ + v->baryCoords[2] * pK;
-
-        int i = static_cast<int>(realVs.size());
-        idxOf[v] = i;                    // pointer -> node index
-        realVs.emplace_back(v->position);
-    }
-
-    // helper to add an edge only if both endpoints are in the node set
-    auto addEdge = [&](KGVertex* a, KGVertex* b) {
-        auto ia = idxOf.find(a);
-        auto ib = idxOf.find(b);
-        if (ia == idxOf.end() || ib == idxOf.end()) return; // skip if an endpoint wasn't rendered
-        if (ia->second == ib->second) return;               // skip self-loop
-        realEdges.push_back({ ia->second, ib->second });
-    };
-
-    // 2) Add edges using the pointer->index map (NOT vertex ids)
-    for (auto& up : adjustedVertices) {
-        KGVertex* v = up.get();
-        if (!v) continue;
-        if (v->isAlphaVirtual || v->isBetaVirtual) continue;
-        addEdge(v, v->row_out_vertex);
-        addEdge(v, v -> col_out_vertex[0]);
-        // for increases/decreases
-        addEdge(v, v->col_out_vertex[1]);
-    }
-
-    // 3) Register the network
-    polyscope::registerCurveNetwork("Adjusted vertices knit graph", realVs, realEdges);
-    //polyscope::registerPointCloud("Real Vs", realVs);
-
+    //final graph stuff 
+    buildFinalVerticesFromAdjusted();
+    renderFinalGraph();
 }
 
 //Makes virtual vertices in the course direction
@@ -888,17 +840,6 @@ void KG::intrinsicMerge(){
     }
 
     double eps = 1e-12;
-    // for (Face f : gluedGeometry->mesh.faces()) {
-    //     auto& F = faceKGVertices[f];
-    //     for (KGVertex* v : F) {
-    //         if (v->row_out_vertex) {
-    //             ensure(v->beta_tag + eps <= v->row_out_vertex->beta_tag);
-    //         }
-    //         if (v->col_out_vertex[0]) {
-    //             ensure(v->alpha_tag + eps <= v->col_out_vertex[0]->alpha_tag);
-    //         }
-    //     }
-    // }
 }
 
 
@@ -1802,4 +1743,123 @@ void KG::tagIncreasesAndDecreases(){
 
     polyscope::registerPointCloud("standardDecreases", standardDecreases);
     polyscope::registerPointCloud("standardIncreases", standardIncreases);
+}
+
+void KG::buildFinalVerticesFromAdjusted() {
+    finalVertices.clear();
+    finalVertices.reserve(adjustedVertices.size());
+
+    // Map original real vertex -> cloned real vertex stored in finalVertices
+    std::unordered_map<KGVertex*, KGVertex*> toClone;
+
+    // 1) Clone only real vertices
+    for (auto& up : adjustedVertices) {
+        KGVertex* v = up.get();
+        if (!v) continue;
+        if (v->isAlphaVirtual || v->isBetaVirtual) continue; // real only
+
+        auto nv = std::make_unique<KGVertex>(*v); // shallow field copy
+        KGVertex* raw = nv.get();
+
+        // wipe neighbor pointers
+        raw->row_in_vertex  = nullptr;
+        raw->row_out_vertex = nullptr;
+        raw->col_in_vertex  = {nullptr, nullptr};
+        raw->col_out_vertex = {nullptr, nullptr};
+
+        toClone[v] = raw;
+        finalVertices.emplace_back(std::move(nv));
+    }
+
+    // 2) Rewire neighbor pointers on the clones to other clones (real-only graph)
+    auto remap = [&](KGVertex* p) -> KGVertex* {
+        if (!p) return nullptr;
+        auto it = toClone.find(p);
+        return (it == toClone.end()) ? nullptr : it->second;
+    };
+
+    for (auto& up : adjustedVertices) {
+        KGVertex* v = up.get();
+        if (!v) continue;
+        if (v->isAlphaVirtual || v->isBetaVirtual) continue;
+
+        KGVertex* cv = toClone[v];  // cloned self
+
+        cv->row_in_vertex          = remap(v->row_in_vertex);
+        cv->row_out_vertex         = remap(v->row_out_vertex);
+        cv->col_in_vertex[0]       = remap(v->col_in_vertex[0]);
+        cv->col_in_vertex[1]       = remap(v->col_in_vertex[1]);
+        cv->col_out_vertex[0]      = remap(v->col_out_vertex[0]);
+        cv->col_out_vertex[1]      = remap(v->col_out_vertex[1]);
+    }
+
+    // 3) Renumber ids to start at 0
+    for (size_t i = 0; i < finalVertices.size(); ++i) {
+        finalVertices[i]->id = static_cast<int>(i);
+    }
+}
+
+
+void KG::renderFinalGraph(){
+
+    std::vector<Vector3> realVs;
+    std::vector<std::array<int, 2>> realEdges;
+    realVs.reserve(finalVertices.size());
+
+    std::map<KGVertex*, int> idxOf;  // which index in realVs each real vertex has
+
+    for (auto& up : finalVertices){
+        KGVertex* v = up.get();
+        realVs.emplace_back(getKGPosition(v));
+        if (v -> row_out_vertex) realEdges.emplace_back(std::array<int, 2>{v -> id, v -> row_out_vertex -> id});
+        if (v -> row_in_vertex) realEdges.emplace_back(std::array<int, 2>{v -> id, v -> row_in_vertex -> id});
+        if (v -> col_out_vertex[0]) realEdges.emplace_back(std::array<int, 2>{v -> id, v -> col_out_vertex[0] -> id});
+        if (v -> col_out_vertex[1]) realEdges.emplace_back(std::array<int, 2>{v -> id, v -> col_out_vertex[1] -> id});
+        if (v -> col_in_vertex[0]) realEdges.emplace_back(std::array<int, 2>{v -> id, v -> col_in_vertex[0] -> id});
+        if (v -> col_in_vertex[1]) realEdges.emplace_back(std::array<int, 2>{v -> id, v -> col_in_vertex[1] -> id});
+
+
+
+    }
+
+    // for (auto& up : finalVertices) {
+    //     KGVertex* v = up.get();
+    //     // compute 3D position from barycentrics on the corresponding global face
+    //     int fIndex = v->halfedge->face().getIndex();
+    //     Face f = globalGeometry->mesh.face(fIndex);
+    //     Vertex vI = f.halfedge().vertex();
+    //     Vertex vJ = f.halfedge().next().vertex();
+    //     Vertex vK = f.halfedge().next().next().vertex();
+    //     Vector3 pI = globalGeometry->vertexPositions[vI];
+    //     Vector3 pJ = globalGeometry->vertexPositions[vJ];
+    //     Vector3 pK = globalGeometry->vertexPositions[vK];
+    //     v->position = v->baryCoords[0] * pI + v->baryCoords[1] * pJ + v->baryCoords[2] * pK;
+
+    //     int i = static_cast<int>(realVs.size());
+    //     idxOf[v] = i;                    // pointer -> node index
+    //     realVs.emplace_back(v->position);
+    // }
+
+    // // helper to add an edge only if both endpoints are in the node set
+    // auto addEdge = [&](KGVertex* a, KGVertex* b) {
+    //     auto ia = idxOf.find(a);
+    //     auto ib = idxOf.find(b);
+    //     if (ia == idxOf.end() || ib == idxOf.end()) return; // skip if an endpoint wasn't rendered
+    //     if (ia->second == ib->second) return;               // skip self-loop
+    //     realEdges.push_back({ ia->second, ib->second });
+    // };
+
+    // // 2) Add edges using the pointer->index map (NOT vertex ids)
+    // for (auto& up : finalVertices) {
+    //     KGVertex* v = up.get();
+    //     if (!v) continue;
+    //     addEdge(v, v->row_out_vertex);
+    //     addEdge(v, v -> col_out_vertex[0]);
+    //     // for increases/decreases
+    //     addEdge(v, v->col_out_vertex[1]);
+    // }
+
+    // // 3) Register the network
+    polyscope::registerCurveNetwork("Adjusted vertices knit graph", realVs, realEdges);
+
 }
