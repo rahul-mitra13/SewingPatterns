@@ -22,9 +22,9 @@ struct VoronoiResult {
 struct VoronoiOptions {
   size_t nSites = 1;                      // number of sites to place
   std::vector<SurfacePoint> initialSites; // desired locations for sites. If blank, locations are chosen randomly
-  size_t iterations = 200;                // number of iterations to run for
+  size_t iterations = 2000;                // number of iterations to run for
   size_t descIter = 10;                   // number of steps of gradient descent for weights update 
-  double stepSize = 1.0;                  // step size for steps towards cell centers
+  double stepSize = 0.8;                  // step size for steps towards cell centers
   bool useDelaunay = true;                // solve on an intrinsic Delaunay triangulation of the input
   bool computeDistributions = false;      // return the indicator functions for each cell (`result.siteDistributions`)
   double tCoef = 1.0;                     // diffusion time for vector heat method
@@ -34,7 +34,7 @@ struct VoronoiOptions {
   bool useLineSearch = false;             // whether to use line search for weights update
   VertexData<double> measure;             // the measure we're trying to quantize
   double shortTime;                       // short time parameter for heat diffusion
-  // double epsWeights = 1e-5;            // stopping criterion on the weight optimization gradient norm
+  double epsWeights = 1e-8;            // stopping criterion on the weight optimization gradient norm
 };
 
 
@@ -68,8 +68,7 @@ VoronoiResult computeSitesWithFunction(SurfaceMesh& mesh, IntrinsicGeometryInter
                                       VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
 
 //computing equal weights using LBFGS
-Eigen::VectorXd computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom,
-                                        VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
+std::vector<double> computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom, std::vector<double>& initWeights, std::vector<VectorHeatMethodSolver>& vSolvers, VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
 
 
 //defining a class to do LBFGS with F_OT as defined by the seminal work, "Stochastic Wassertein Barycenters"
@@ -143,6 +142,7 @@ class F_OT{
         desiredMass +=  geom.vertexDualAreas[v] * options.measure[v];
       }
       desiredMass /= options.nSites;
+      // std::cout << "Desired mass: " << desiredMass << std::endl;
 
       // VertexData<double> normD(mesh, 0); // denominator for the rho's
       // for (size_t iSite = 0; iSite < options.nSites; iSite++) {

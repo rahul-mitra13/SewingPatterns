@@ -3708,17 +3708,20 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //     // posMeasure[v] = std::exp(globalGeometry.vertexPositions[v].x);
     // }
 
-    // //------------------------------//
-    //test LBFGS implementation
-    VoronoiOptions posLBFGSOptions = defaultVoronoiOptions;
-    posLBFGSOptions.nSites = std::round(avgTotalMeasure / period);
-    posLBFGSOptions.useDelaunay = false;
-    posLBFGSOptions.seed = 42;
-    std::cout << "Testing LBFGS..." << std::endl;
-    Eigen::VectorXd weights = computePhiWeights(globalMesh, globalGeometry, posLBFGSOptions, posMeasure, psMesh);
-    std::cout << "Finished testing LBFGS..." << std::endl;
-    polyscope::show();
-    //----------------------------//
+    // // //------------------------------//
+    // //test LBFGS implementation
+    // VoronoiOptions posLBFGSOptions = defaultVoronoiOptions;
+    // posLBFGSOptions.nSites = std::round(avgTotalMeasure / period);
+    // posLBFGSOptions.useDelaunay = false;
+    // posLBFGSOptions.seed = 42;
+    // std::cout << "Testing LBFGS..." << std::endl;
+    // Eigen::VectorXd weights = computePhiWeights(globalMesh, globalGeometry, posLBFGSOptions, posMeasure, psMesh);
+    // // H(weights);
+
+
+    // std::cout << "Finished testing LBFGS..." << std::endl;
+    // polyscope::show();
+    // //----------------------------//
 
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
@@ -3801,9 +3804,9 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     for (size_t i = 0; i < posSiteDistributions.size(); i++){
         double mass = 0;
         for (Vertex v : globalMesh.vertices()){ 
-            if (std::fabs(posSiteDistributions[i][v]) > 1e-8){
-                mass += posSiteDistributions[i][v];
-            }
+            // if (std::fabs(posSiteDistributions[i][v]) > 1e-8){
+                mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
+            // }
         }
         std::cout << "positive mass at site " << i << " = " << mass << std::endl;
         psMesh.addVertexScalarQuantity("unaligned site distribution (+) " + std::to_string(i), posSiteDistributions[i]);
