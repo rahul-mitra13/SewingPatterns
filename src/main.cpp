@@ -176,7 +176,7 @@ void showStripePatterns(){
   // polyscope::show();
 
   std::string richDataFile;
-  // richDataFile = "info.ply";
+  // richDataFile = "bunny_new_2.0.ply";
   richDataFile = "sock_info_0.0035.ply";
   // richDataFile = "bunny_2.0_passed.ply";
 
@@ -310,7 +310,6 @@ void showStripePatterns(){
   for (Corner c : gluedELG->mesh.corners()){
     waleStripeValuesGlued[c] = waleStripeValues[c.getIndex()];
   }
-
 
   // generate the new knit graph
   KG graph = KG(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,

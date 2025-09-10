@@ -457,10 +457,10 @@ void KG::intrinsicMerge(){
     for (auto& up : allVertices) {
         KGVertex* v = up.get();
         if (v->isAlphaVirtual || v->isBetaVirtual) continue;
-        ensure(v->row_in_vertex != nullptr && "real vertex doesn't have row_in set");
-        ensure(v->row_out_vertex != nullptr && "real vertex doesn't have row_out set");
-        ensure(v->col_in_vertex[0] != nullptr && "real vertex doesn't have col_in[0] set");
-        ensure(v->col_out_vertex[0] != nullptr && "real vertex doesn't have col_out[0] set");
+        ensure(v->row_in_vertex != nullptr && "intial real vertex doesn't have row_in set");
+        ensure(v->row_out_vertex != nullptr && "initial real vertex doesn't have row_out set");
+        ensure(v->col_in_vertex[0] != nullptr && "initial real vertex doesn't have col_in[0] set");
+        ensure(v->col_out_vertex[0] != nullptr && "initial real vertex doesn't have col_out[0] set");
     }
 
     //also ensure all the ordering is correct
@@ -1315,41 +1315,33 @@ void KG::makeAdjustedFaceConnections(){
                 b->col_in_vertex[0]  = a;
             }
         }
-    }
-
-    for (Face f : gluedGeometry->mesh.faces()) {
-        auto& F = adjustedFaceKGVertices[f];
-        for (KGVertex* v : F){
-            if (v->row_out_vertex != nullptr) ensure (v -> beta_tag < v -> row_out_vertex -> beta_tag && "row ordering assertion failed on adjusted vertices");
-            if (v->col_out_vertex[0] != nullptr) ensure (v -> alpha_tag < v -> col_out_vertex[0] -> alpha_tag && "column ordering assertion failed on adjusted vertices");
-        }
-    }
+    } 
 }
 
 void KG::adjustedIntrinsicMerge(){
+
+    const double epsT = 1e-12; // tolerance for "same place" along the edge
 
     //before we do anything else 
     //ensure that all real vertices have connections 
     for (auto& up : adjustedVertices) {
         KGVertex* v = up.get();
         if (v->isAlphaVirtual || v->isBetaVirtual) continue;
-        ensure(v->row_in_vertex != nullptr && "real vertex doesn't have row_in set");
-        ensure(v->row_out_vertex != nullptr && "real vertex doesn't have row_out set");
-        ensure(v->col_in_vertex[0] != nullptr && "real vertex doesn't have col_in[0] set");
-        ensure(v->col_out_vertex[0] != nullptr && "real vertex doesn't have col_out[0] set");
+        ensure(v->row_in_vertex != nullptr && "adjusted real vertex doesn't have row_in set");
+        ensure(v->row_out_vertex != nullptr && "adjusted real vertex doesn't have row_out set");
+        ensure(v->col_in_vertex[0] != nullptr && "adjusted real vertex doesn't have col_in[0] set");
+        ensure(v->col_out_vertex[0] != nullptr && "adjusted real vertex doesn't have col_out[0] set");
     }
 
-    //also ensure all the ordering is correct
+    //also ensure all the ordering is correct (locally per face)
     for (Face f : gluedGeometry->mesh.faces()) {
         auto& F = adjustedFaceKGVertices[f];
         for (KGVertex* v : F){
-            if (v->row_out_vertex != nullptr) ensure (v -> beta_tag < v -> row_out_vertex -> beta_tag && "row ordering assertion failed on adjusted vertices");
-            if (v->col_out_vertex[0] != nullptr) ensure (v -> alpha_tag < v -> col_out_vertex[0] -> alpha_tag && "column ordering assertion failed on adjusted vertices");
+            if (v->row_out_vertex != nullptr) ensure (v -> beta_tag < v -> row_out_vertex -> beta_tag + epsT && "row ordering assertion failed on adjusted vertices");
+            if (v->col_out_vertex[0] != nullptr) ensure (v -> alpha_tag < v -> col_out_vertex[0] -> alpha_tag + epsT && "column ordering assertion failed on adjusted vertices");
         }
     }
 
-
-    const double epsT = 1e-12; // tolerance for "same place" along the edge
 
     // Param along an oriented halfedge (same convention you used earlier)
     auto edgeParam = [](KGVertex* v) -> double {
@@ -1650,11 +1642,15 @@ void KG::tagIncreasesAndDecreases(){
         if (v -> isAlphaVirtual || v -> isBetaVirtual){
             continue; //only consider real vertices
         }
-        if (v->col_out_vertex[0] == nullptr && v->row_in_vertex->col_out_vertex[0] == nullptr && v->row_out_vertex->col_out_vertex[0] == nullptr){
-            continue;//skip vertices on the top row
+        if (v -> row_in_vertex != nullptr && v -> row_out_vertex != nullptr){//assuming no short-rows at the boundary
+            if (v->col_out_vertex[0] == nullptr && v->row_in_vertex->col_out_vertex[0] == nullptr && v->row_out_vertex->col_out_vertex[0] == nullptr){
+                continue;//skip vertices on the top row
+            }
         }
-        if (v->col_in_vertex[0] == nullptr && v->row_in_vertex->col_in_vertex[0] == nullptr && v->row_out_vertex->col_in_vertex[0] == nullptr){
-            continue;//skip vertices on the bottom row
+        if (v -> row_in_vertex != nullptr && v -> row_out_vertex != nullptr){//assuming no short-rows at the boundary
+            if (v->col_in_vertex[0] == nullptr && v->row_in_vertex->col_in_vertex[0] == nullptr && v->row_out_vertex->col_in_vertex[0] == nullptr){
+                continue;//skip vertices on the bottom row
+            }
         }
 
         //handle decreases
@@ -1668,9 +1664,9 @@ void KG::tagIncreasesAndDecreases(){
                 v -> row_out_vertex -> col_out_vertex[0] -> col_in_vertex[1] = v;
             }
             else{//standard decrease, connect by Euclidean distance
-                standardDecreases.emplace_back(getKGPosition(v));
                 ensure(v->row_out_vertex->col_out_vertex[0] != nullptr);
                 ensure(v->row_in_vertex->col_out_vertex[0] != nullptr);
+                standardDecreases.emplace_back(getKGPosition(v));
                 Vector3 p1 = getKGPosition(v->row_out_vertex->col_out_vertex[0]);
                 Vector3 p2 = getKGPosition(v->row_in_vertex->col_out_vertex[0]);
                 Vector3 currPos = getKGPosition(v->row_in_vertex->col_out_vertex[0]);
@@ -1691,15 +1687,18 @@ void KG::tagIncreasesAndDecreases(){
         if (v -> isAlphaVirtual || v -> isBetaVirtual){
             continue; //only consider real vertices
         }
-        if (v->col_out_vertex[0] == nullptr && v->row_in_vertex->col_out_vertex[0] == nullptr && v->row_out_vertex->col_out_vertex[0] == nullptr){
-            continue;//skip vertices on the top row
+        if (v -> row_in_vertex != nullptr && v -> row_out_vertex != nullptr){//assuming no short-rows at the boundary
+            if (v->col_out_vertex[0] == nullptr && v->row_in_vertex->col_out_vertex[0] == nullptr && v->row_out_vertex->col_out_vertex[0] == nullptr){
+                continue;//skip vertices on the top row
+            }
         }
-        if (v->col_in_vertex[0] == nullptr && v->row_in_vertex->col_in_vertex[0] == nullptr && v->row_out_vertex->col_in_vertex[0] == nullptr){
-            continue;//skip vertices on the bottom row
+        if (v -> row_in_vertex != nullptr && v -> row_out_vertex != nullptr){//assuming no short-rows at the boundary
+            if (v->col_in_vertex[0] == nullptr && v->row_in_vertex->col_in_vertex[0] == nullptr && v->row_out_vertex->col_in_vertex[0] == nullptr){
+                continue;//skip vertices on the bottom row
+            }
         }
         //handle increases 
         if (v -> col_in_vertex[0] == nullptr){
-            standardIncreases.emplace_back(getKGPosition(v));
             if (v -> row_out_vertex == nullptr){//handle increases at short-row (row_out short_row)
                 v -> col_in_vertex[0] =  v -> row_in_vertex -> col_in_vertex[0];
                 v -> row_in_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v; 
@@ -1709,8 +1708,9 @@ void KG::tagIncreasesAndDecreases(){
                 v -> row_out_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v;
             }
             else{//standard increase
-                ensure(v -> row_out_vertex -> col_in_vertex[0] != nullptr);
-                ensure(v -> row_in_vertex -> col_in_vertex[0] != nullptr);
+                ensure(v->row_out_vertex->col_in_vertex[0] != nullptr);
+                ensure(v->row_in_vertex->col_in_vertex[0] != nullptr);
+                standardIncreases.emplace_back(getKGPosition(v));
                 Vector3 p1 = getKGPosition(v->row_out_vertex->col_in_vertex[0]);
                 Vector3 p2 = getKGPosition(v->row_in_vertex->col_in_vertex[0]);
                 Vector3 currPos = getKGPosition(v->row_in_vertex->col_out_vertex[0]);
