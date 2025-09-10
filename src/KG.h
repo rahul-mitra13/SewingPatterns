@@ -115,6 +115,9 @@ class KG{
         //vertices in the graph after adjusting the level sets
         std::vector<std::unique_ptr<KGVertex>> adjustedVertices;
 
+        //final vertices in our knit graph
+        std::vector<std::unique_ptr<KGVertex>> finalVertices;
+
         // Pairs of stitched (real) vertices
         std::vector<std::pair<int, int>> stitchedVertices;
 

@@ -71,6 +71,7 @@ void KG::buildGraph(){
     makeAdjustedRealVertices();
     makeAdjustedFaceConnections();
     adjustedIntrinsicMerge();
+    tagIncreasesAndDecreases();
 
     //render the graph
     //1) Collect real vertices and build a pointer->index map
@@ -115,8 +116,8 @@ void KG::buildGraph(){
         if (v->isAlphaVirtual || v->isBetaVirtual) continue;
         addEdge(v, v->row_out_vertex);
         addEdge(v, v -> col_out_vertex[0]);
-        // for increases
-        // addEdge(v, v->col_out_vertex[1]);
+        // for increases/decreases
+        addEdge(v, v->col_out_vertex[1]);
     }
 
     // 3) Register the network
@@ -1681,10 +1682,126 @@ void KG::adjustedIntrinsicMerge(){
 
 void KG::tagIncreasesAndDecreases(){
 
+    std::vector<Vector3> standardIncreases;
+    std::vector<Vector3> standardDecreases;
+
+    //remove lingering connections from real vertices to virtual vertices 
     for (auto& up : adjustedVertices) {
         KGVertex* v = up.get();
-        if (v -> isAlphaVirtual || v -> isBetaVirtual) continue;
-
+        if (v -> isAlphaVirtual || v -> isBetaVirtual){
+            continue; //only consider real vertices
+        }
+        if (v -> row_out_vertex != nullptr)
+            if((v -> row_out_vertex -> isAlphaVirtual) || (v -> row_out_vertex -> isBetaVirtual)) v -> row_out_vertex = nullptr;
+        if (v -> row_in_vertex != nullptr)
+            if((v -> row_in_vertex -> isAlphaVirtual) || (v -> row_in_vertex -> isBetaVirtual)) v -> row_in_vertex = nullptr;
+        if (v -> col_in_vertex[0] != nullptr)
+            if((v -> col_in_vertex[0] -> isAlphaVirtual) || (v -> col_in_vertex[0] -> isBetaVirtual)) v -> col_in_vertex[0] = nullptr;
+        if (v -> col_out_vertex[0] != nullptr)
+            if((v -> col_out_vertex[0] -> isAlphaVirtual) || (v -> col_out_vertex[0] -> isBetaVirtual)) v -> col_out_vertex[0] = nullptr;
     }
 
+    for (auto& up : adjustedVertices) {
+        KGVertex* v = up.get();
+        if (v -> isAlphaVirtual || v -> isBetaVirtual){
+            continue; //only consider real vertices
+        }
+        if (v->col_out_vertex[0] == nullptr && v->row_in_vertex->col_out_vertex[0] == nullptr && v->row_out_vertex->col_out_vertex[0] == nullptr){
+            continue;//skip vertices on the top row
+        }
+        if (v->col_in_vertex[0] == nullptr && v->row_in_vertex->col_in_vertex[0] == nullptr && v->row_out_vertex->col_in_vertex[0] == nullptr){
+            continue;//skip vertices on the bottom row
+        }
+
+        //handle decreases
+        if (v -> col_out_vertex[0] == nullptr){
+            if (v -> row_out_vertex == nullptr){//handle decreases at short rows (row_out short rows)
+                v -> col_out_vertex[0] = v -> row_in_vertex -> col_out_vertex[0];
+                v -> row_in_vertex -> col_out_vertex[0] -> col_in_vertex[1] = v;
+            }
+            else if (v -> row_in_vertex == nullptr){//handle decreases at short rows (row_in short rows)
+                v -> col_out_vertex[0] = v -> row_out_vertex -> col_out_vertex[0];
+                v -> row_out_vertex -> col_out_vertex[0] -> col_in_vertex[1] = v;
+            }
+            else{//standard decrease, connect by Euclidean distance
+                standardDecreases.emplace_back(getKGPosition(v));
+                ensure(v->row_out_vertex->col_out_vertex[0] != nullptr);
+                ensure(v->row_in_vertex->col_out_vertex[0] != nullptr);
+                Vector3 p1 = getKGPosition(v->row_out_vertex->col_out_vertex[0]);
+                Vector3 p2 = getKGPosition(v->row_in_vertex->col_out_vertex[0]);
+                Vector3 currPos = getKGPosition(v->row_in_vertex->col_out_vertex[0]);
+                if (norm(currPos - p1) < norm(currPos - p2)){
+                    v -> col_out_vertex[0] = v -> row_out_vertex -> col_out_vertex[0];
+                    v -> row_out_vertex -> col_out_vertex[0] -> col_in_vertex[1] = v;
+                }
+                else{
+                    v -> col_out_vertex[0] = v -> row_in_vertex -> col_out_vertex[0];
+                    v -> row_in_vertex -> col_out_vertex[0] -> col_in_vertex[1] = v;
+                }
+            }
+        }
+    }
+
+    for (auto& up : adjustedVertices) {
+        KGVertex* v = up.get();
+        if (v -> isAlphaVirtual || v -> isBetaVirtual){
+            continue; //only consider real vertices
+        }
+        if (v->col_out_vertex[0] == nullptr && v->row_in_vertex->col_out_vertex[0] == nullptr && v->row_out_vertex->col_out_vertex[0] == nullptr){
+            continue;//skip vertices on the top row
+        }
+        if (v->col_in_vertex[0] == nullptr && v->row_in_vertex->col_in_vertex[0] == nullptr && v->row_out_vertex->col_in_vertex[0] == nullptr){
+            continue;//skip vertices on the bottom row
+        }
+        //handle increases 
+        if (v -> col_in_vertex[0] == nullptr){
+            standardIncreases.emplace_back(getKGPosition(v));
+            if (v -> row_out_vertex == nullptr){//handle increases at short-row (row_out short_row)
+                v -> col_in_vertex[0] =  v -> row_in_vertex -> col_in_vertex[0];
+                v -> row_in_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v; 
+            }
+            else if (v -> row_in_vertex == nullptr){//handle increases at short-row (row_in short row)
+                v -> col_in_vertex[0] = v -> row_out_vertex -> col_in_vertex[0];
+                v -> row_out_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v;
+            }
+            else{//standard increase
+                ensure(v -> row_out_vertex -> col_in_vertex[0] != nullptr);
+                ensure(v -> row_in_vertex -> col_in_vertex[0] != nullptr);
+                Vector3 p1 = getKGPosition(v->row_out_vertex->col_in_vertex[0]);
+                Vector3 p2 = getKGPosition(v->row_in_vertex->col_in_vertex[0]);
+                Vector3 currPos = getKGPosition(v->row_in_vertex->col_out_vertex[0]);
+                if (norm(currPos - p1) < norm(currPos - p2)){
+                    v -> col_in_vertex[0] = v -> row_out_vertex -> col_in_vertex[0];
+                    v -> row_out_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v;
+                }
+                else{
+                    v -> col_in_vertex[0] = v -> row_in_vertex -> col_in_vertex[0];
+                    v -> row_in_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v;
+                }
+
+            }
+
+        }
+    }
+
+    //finally, check if the increases decreases need flipping 
+    //not really sure about the std::swap here
+    for (auto& up : adjustedVertices) {
+        KGVertex* v = up.get();
+        if (v -> col_out_vertex[1] != nullptr){//found a vertex with an increase
+            if (v -> col_out_vertex[1] -> row_out_vertex == v -> col_out_vertex[0]){//1 points to 0, needs flipping
+                KGVertex* v1Copy = v -> col_out_vertex[1];
+                KGVertex* v0Copy = v -> col_out_vertex[0];
+                std::swap(v -> col_out_vertex[0], v -> col_out_vertex[1]);
+            }
+        }
+        if (v -> col_in_vertex[1] != nullptr){//found a vertex with an decrease{
+            if (v -> col_in_vertex[1] -> row_out_vertex == v -> col_in_vertex[0]){//1 points to 0, needs flipping
+                std::swap(v -> col_in_vertex[0], v -> col_in_vertex[1]);
+            }
+        }
+    }
+
+    polyscope::registerPointCloud("standardDecreases", standardDecreases);
+    polyscope::registerPointCloud("standardIncreases", standardIncreases);
 }
