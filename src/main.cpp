@@ -179,7 +179,7 @@ void showStripePatterns(){
   // richDataFile = "info.ply";
   // richDataFile = "bunny_new_2.0.ply";
   // richDataFile = "sock_info_0.0035.ply";
-  // richDataFile = "bunny_2.0_passed.ply";
+  // richDataFile = "misc_cactus_info_0.1.ply";
 
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
@@ -311,6 +311,8 @@ void showStripePatterns(){
   for (Corner c : gluedELG->mesh.corners()){
     waleStripeValuesGlued[c] = waleStripeValues[c.getIndex()];
   }
+
+  // polyscope::show();
 
   // generate the new knit graph
   KG graph = KG(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,

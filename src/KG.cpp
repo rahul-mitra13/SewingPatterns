@@ -631,6 +631,8 @@ void KG::intrinsicMerge(){
                             connectTo = rightVertices[leftVertices.size()-1-indexAlongHalfedge];
                         }
                         ensure(connectTo->isAlphaVirtual && "connectTo vertex is not alpha virtual");
+                        ensure(walker != nullptr && "walker has become null");
+                        ensure(connectTo != nullptr && "connectTo has become null");
                         matchings[walker] = connectTo;
                         matchings[connectTo] = walker;
                         walker = connectTo;
@@ -683,7 +685,7 @@ void KG::intrinsicMerge(){
         }
     }
     //polyscope::registerPointCloud("course matchings", courseMatchingsLocations);
-    
+
     
     // Now actually connect all course matchings
     for (auto [i1, i2] : matchings) {
@@ -1713,6 +1715,8 @@ void KG::tagIncreasesAndDecreases(){
         }
         //handle increases 
         if (v -> col_in_vertex[0] == nullptr){
+            // if (v->row_out_vertex->col_in_vertex[0] == nullptr) problemIncrease.emplace_back(getKGPosition(v));
+            // if (v->row_in_vertex->col_in_vertex[0] == nullptr) problemIncrease.emplace_back(getKGPosition(v));
             standardIncreases.emplace_back(getKGPosition(v));
             if (v -> row_out_vertex == nullptr){//handle increases at short-row (row_out short_row)
                 v -> col_in_vertex[0] =  v -> row_in_vertex -> col_in_vertex[0];
@@ -1723,8 +1727,6 @@ void KG::tagIncreasesAndDecreases(){
                 v -> row_out_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v;
             }
             else{//standard increase
-                // if (v->row_out_vertex->col_in_vertex[0] == nullptr) problemIncrease.emplace_back(getKGPosition(v));
-                // if (v->row_in_vertex->col_in_vertex[0] == nullptr) problemIncrease.emplace_back(getKGPosition(v));
                 ensure(v->row_out_vertex->col_in_vertex[0] != nullptr);
                 ensure(v->row_in_vertex->col_in_vertex[0] != nullptr);
                 if (v -> row_out_vertex -> col_in_vertex[0] -> row_in_vertex == nullptr){//this is a short row, no choice but to connect it to another candidate
