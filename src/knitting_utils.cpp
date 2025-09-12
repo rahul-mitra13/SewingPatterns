@@ -1998,7 +1998,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         double mass = 0;
         for (Vertex v : globalMesh.vertices()){
             if (std::fabs(posSiteDistributions[i][v]) > 1e-8){
-                mass += posSiteDistributions[i][v];
+                mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
             }
         }
         std::cout << "positive mass at site " << i << " = " << mass << std::endl;
@@ -2026,7 +2026,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         double mass = 0;
         for (Vertex v : globalMesh.vertices()){
             if (std::fabs(negSiteDistributions[i][v]) > 1e-8){
-                mass += negSiteDistributions[i][v];
+                mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
             }
         }
         std::cout << "negative mass at site " << i << " = " << mass << std::endl;
@@ -3905,7 +3905,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         double mass = 0;
         for (Vertex v : globalMesh.vertices()){
             if (std::fabs(negSiteDistributions[i][v]) > 1e-8){
-                mass += negSiteDistributions[i][v];
+                mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
             }
         }
         std::cout << "negative mass at site " << i << " = " << mass << std::endl;
