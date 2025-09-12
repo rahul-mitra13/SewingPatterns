@@ -177,7 +177,7 @@ void showStripePatterns(){
 
   std::string richDataFile;
   // richDataFile = "info.ply";
-  // richDataFile = "bunny_new_2.0.ply";
+  // richDataFile = "bunny_info_2.0.ply";
   // richDataFile = "sock_info_0.0035.ply";
   // richDataFile = "misc_cactus_info_0.1.ply";
 
