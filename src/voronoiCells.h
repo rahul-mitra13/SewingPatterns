@@ -34,7 +34,7 @@ struct VoronoiOptions {
   bool useLineSearch = false;             // whether to use line search for weights update
   VertexData<double> measure;             // the measure we're trying to quantize
   double shortTime;                       // short time parameter for heat diffusion
-  double epsWeights = 1e-8;            // stopping criterion on the weight optimization gradient norm
+  double epsWeights = 1e-8;               // stopping criterion on the weight optimization gradient norm
 };
 
 
