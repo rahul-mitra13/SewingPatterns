@@ -180,6 +180,7 @@ void showStripePatterns(){
   // richDataFile = "bunny_info_2.0.ply";
   // richDataFile = "sock_info_0.0035.ply";
   // richDataFile = "misc_cactus_info_0.1.ply";
+  // richDataFile = "teddy_info_0.169131.ply";
 
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);

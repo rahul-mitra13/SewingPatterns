@@ -452,6 +452,7 @@ void KG::makeFaceConnections(){
 //this will give us the matchings across singular edges
 void KG::intrinsicMerge(){
 
+    //std::vector<Vector3> problemVertex; 
     //before we do anything else 
     //ensure that all real vertices have connections 
     for (auto& up : allVertices) {
@@ -462,6 +463,9 @@ void KG::intrinsicMerge(){
         ensure(v->col_in_vertex[0] != nullptr && "initial real vertex doesn't have col_in[0] set");
         ensure(v->col_out_vertex[0] != nullptr && "initial real vertex doesn't have col_out[0] set");
     }
+
+    // polyscope::registerPointCloud("problem vertices", problemVertex);
+    // polyscope::show();
 
     //also ensure all the ordering is correct
     for (Face f : gluedGeometry->mesh.faces()) {
