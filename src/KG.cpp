@@ -452,7 +452,7 @@ void KG::makeFaceConnections(){
 //this will give us the matchings across singular edges
 void KG::intrinsicMerge(){
 
-    //std::vector<Vector3> problemVertex; 
+    std::vector<Vector3> problemVertex; 
     //before we do anything else 
     //ensure that all real vertices have connections 
     for (auto& up : allVertices) {
@@ -462,6 +462,10 @@ void KG::intrinsicMerge(){
         ensure(v->row_out_vertex != nullptr && "initial real vertex doesn't have row_out set");
         ensure(v->col_in_vertex[0] != nullptr && "initial real vertex doesn't have col_in[0] set");
         ensure(v->col_out_vertex[0] != nullptr && "initial real vertex doesn't have col_out[0] set");
+        // if(v->row_in_vertex == nullptr) problemVertex.emplace_back(getKGPosition(v));
+        // if(v->row_out_vertex == nullptr) problemVertex.emplace_back(getKGPosition(v));
+        // if(v->col_in_vertex[0] == nullptr) problemVertex.emplace_back(getKGPosition(v));
+        // if(v->col_out_vertex[0] == nullptr) problemVertex.emplace_back(getKGPosition(v));
     }
 
     // polyscope::registerPointCloud("problem vertices", problemVertex);
