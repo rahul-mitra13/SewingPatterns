@@ -1262,6 +1262,7 @@ std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeomet
             }
             //add the constraints for the homology generators
             model.addConstr(pathIntegral == period * generatorIntegers[i]);
+            //model.addConstr(pathIntegral == 0.);
         }
 
         // constraint: 
@@ -4934,7 +4935,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
             }
             //add the constraints for the homology generators
             //model.addConstr(pathIntegral == period * generatorIntegers[i]);
-            model.addConstr(pathIntegral == period * 0.0);  
+            model.addConstr(pathIntegral == period * 0.0);//this should use some integer rounding
         }
         
         //constraint: add bdy-bdy path constraint 
