@@ -176,7 +176,7 @@ void showStripePatterns(){
   // polyscope::show();
 
   std::string richDataFile;
-  richDataFile = "sock_info_0.0025.ply";
+  //richDataFile = "info.ply";
 
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
