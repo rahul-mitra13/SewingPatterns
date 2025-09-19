@@ -167,7 +167,7 @@ void showStripePatterns(){
 
   G = grad;
 
-  // // Call Matteo's revealCurl
+  // Call Matteo's revealCurl
   // Model model;
   // model.setPeriod(period);
   // model.setBdyEdges(globalBdyConditions.courseBdyEdges);
@@ -491,15 +491,6 @@ int main(int argc, char **argv) {
   globalPSMesh -> setEdgePermutation(perm);
   //create the glued edge length geometry
   gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, vertexMap, edgeMap, gluedOneRingMap);
-
-  std::cout << "Number of boundary loops = " << gluedELG -> mesh.nBoundaryLoops() << std::endl;
-
-  //visualizing the cotan weights
-  // globalGeometry->requireEdgeCotanWeights();
-  // for (Edge e : globalMesh -> edges()){
-  //   if (globalGeometry->edgeCotanWeights[e] < 0) negativeWeights[e] = 1.0;
-  // }
-  // globalPSMesh->addEdgeScalarQuantity("negative cotan weights", negativeWeights);
 
   // Halfedge permutation (global -> glued)
   // Note: this works as long as the global and glued faces have the same order.
