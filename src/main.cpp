@@ -22,13 +22,10 @@
 #include "imgui.h"
 
 //file includes
-#include "knitting_utils.h"
+#include "powerCells.h"
 #include "stripe_patterns_helpers.h"
-#include "iterative_assignment.h"
-//#include "experiments.h"
-#include "KnitGraph.h"
 #include "KG.h"
-
+#include "KnitGraph.h"
 #include "homology_generators.h"
 
 using namespace geometrycentral;
@@ -82,6 +79,8 @@ Eigen::SparseMatrix<double, Eigen::RowMajor> G;
 
 //the knit graph over the model 
 KnitGraph graph;
+
+
 
 // Global configuration options
 // TODO: setup command line interface with CLI11
@@ -176,7 +175,7 @@ void showStripePatterns(){
   // polyscope::show();
 
   std::string richDataFile;
-  richDataFile = "dress_info_0.05.ply";
+  //richDataFile = "dress_info_0.05.ply";
 
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
@@ -205,11 +204,16 @@ void showStripePatterns(){
                                                                       homologyGenerators);
 
     
-    // // globalPSMesh->addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
-    // // globalPSMesh->addEdgeScalarQuantity("wale singular edges", waleSingularEdgesGlobal);
+    // globalPSMesh->addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
+    // globalPSMesh->addEdgeScalarQuantity("wale singular edges", waleSingularEdgesGlobal);
     
-    //options for the fuzzy power cells
-    powerCellOptions pcOptions;    
+    // options for the fuzzy power cells
+    powerCellOptions pcOptions{};         
+    pcOptions.gluedMesh      = gluedELG.get();    // keep ownership in gluedELG
+    pcOptions.globalMesh     = globalMesh.get();
+    pcOptions.globalGeometry = globalGeometry.get();
+    pcOptions.vertexMap      = vertexMap;         // copies the maps
+    pcOptions.edgeMap        = edgeMap;
 
     globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
     // Store course singular edges for rendering later
