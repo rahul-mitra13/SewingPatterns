@@ -176,7 +176,7 @@ void showStripePatterns(){
   // polyscope::show();
 
   std::string richDataFile;
-  //richDataFile = "info.ply";
+  richDataFile = "dress_info_0.05.ply";
 
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
@@ -207,6 +207,9 @@ void showStripePatterns(){
     
     // // globalPSMesh->addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
     // // globalPSMesh->addEdgeScalarQuantity("wale singular edges", waleSingularEdgesGlobal);
+    
+    //options for the fuzzy power cells
+    powerCellOptions pcOptions;    
 
     globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
     // Store course singular edges for rendering later
