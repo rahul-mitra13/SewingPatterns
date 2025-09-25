@@ -4195,7 +4195,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         FaceData<int> facePath(globalGeometry.mesh, 0);
         for (Face f : faces) facePath[f] = 1;
         psMesh.addFaceScalarQuantity("faces for pair " + std::to_string(i), facePath);
-        //psMesh.addHalfedgeScalarQuantity("halfedge strip path " + std::to_string(i), stripHalfedgePath);
+        psMesh.addHalfedgeScalarQuantity("halfedge strip path " + std::to_string(i), stripHalfedgePath);
         std::vector<double> edgePath(globalMesh.nEdges(), 0.0);
         // for (Halfedge he : globalMesh.halfedges()){
         //     if (stripHalfedgePath[he]){

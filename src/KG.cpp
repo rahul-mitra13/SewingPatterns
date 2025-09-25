@@ -628,6 +628,12 @@ void KG::intrinsicMerge(){
                             connectTo = rightVertices[rightVertices.size()-1-indexAlongHalfedge];
                         } else {
                             // Go above (also happens if we looped to the starting edge)
+                            H((int)leftVertices.size()-1-indexAlongHalfedge);
+                            if ((int)leftVertices.size()-1-indexAlongHalfedge >= rightVertices.size()) {
+                                showEdges("debug", {globalGeometry->mesh.edge(edge.getIndex())}, *globalGeometry);
+                                polyscope::show();
+                            }
+                            
                             connectTo = rightVertices[leftVertices.size()-1-indexAlongHalfedge];
                         }
                         ensure(connectTo->isAlphaVirtual && "connectTo vertex is not alpha virtual");
