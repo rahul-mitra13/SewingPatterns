@@ -22,13 +22,10 @@
 #include "imgui.h"
 
 //file includes
-#include "knitting_utils.h"
+#include "powerCells.h"
 #include "stripe_patterns_helpers.h"
-#include "iterative_assignment.h"
-//#include "experiments.h"
-#include "KnitGraph.h"
 #include "KG.h"
-
+#include "KnitGraph.h"
 #include "homology_generators.h"
 
 using namespace geometrycentral;
@@ -82,6 +79,8 @@ Eigen::SparseMatrix<double, Eigen::RowMajor> G;
 
 //the knit graph over the model 
 KnitGraph graph;
+
+
 
 // Global configuration options
 // TODO: setup command line interface with CLI11
@@ -167,7 +166,7 @@ void showStripePatterns(){
 
   G = grad;
 
-  // // Call Matteo's revealCurl
+  // Call Matteo's revealCurl
   // Model model;
   // model.setPeriod(period);
   // model.setBdyEdges(globalBdyConditions.courseBdyEdges);
@@ -181,6 +180,7 @@ void showStripePatterns(){
   // richDataFile = "bunny_info_3.5.ply";
   // richDataFile = "sock_info_0.0035.ply";
   // richDataFile = "misc_cactus_info_0.1.ply";
+  //richDataFile = "ducK_info_0.02.ply";
 
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
@@ -209,8 +209,16 @@ void showStripePatterns(){
                                                                       homologyGenerators);
 
     
-    // // globalPSMesh->addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
-    // // globalPSMesh->addEdgeScalarQuantity("wale singular edges", waleSingularEdgesGlobal);
+    // globalPSMesh->addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
+    // globalPSMesh->addEdgeScalarQuantity("wale singular edges", waleSingularEdgesGlobal);
+    // options for the fuzzy power cells
+    powerCellOptions pcOptions{};         
+    pcOptions.gluedGeometry    = gluedELG.get();  
+    pcOptions.globalGeometry   = globalGeometry.get();
+    pcOptions.vertexMap        = vertexMap;     
+    pcOptions.edgeMap          = edgeMap;
+    pcOptions.normalizedTFGrad = timeFunctionGradientGlobalNormalized;
+    pcOptions.gluedOneRingMap  = gluedOneRingMap;
 
     globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
     // Store course singular edges for rendering later
@@ -495,15 +503,6 @@ int main(int argc, char **argv) {
   globalPSMesh -> setEdgePermutation(perm);
   //create the glued edge length geometry
   gluedELG = createGluedEdgeLengthGeometry(*globalGeometry, vertexMappingsPairs, vertexMap, edgeMap, gluedOneRingMap);
-
-  std::cout << "Number of boundary loops = " << gluedELG -> mesh.nBoundaryLoops() << std::endl;
-
-  //visualizing the cotan weights
-  // globalGeometry->requireEdgeCotanWeights();
-  // for (Edge e : globalMesh -> edges()){
-  //   if (globalGeometry->edgeCotanWeights[e] < 0) negativeWeights[e] = 1.0;
-  // }
-  // globalPSMesh->addEdgeScalarQuantity("negative cotan weights", negativeWeights);
 
   // Halfedge permutation (global -> glued)
   // Note: this works as long as the global and glued faces have the same order.

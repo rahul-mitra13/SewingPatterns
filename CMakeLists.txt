@@ -151,7 +151,7 @@ add_executable(
 	      src/stripe_patterns_helpers.cpp
         src/iterative_assignment.cpp
         src/path_constraints.cpp
-        #src/experiments.cpp
+        src/powerCells.cpp
         src/KnitGraph.cpp
         src/voronoiCells.cpp
         src/KG.cpp

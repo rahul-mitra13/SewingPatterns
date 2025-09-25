@@ -1262,6 +1262,7 @@ std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeomet
             }
             //add the constraints for the homology generators
             model.addConstr(pathIntegral == period * generatorIntegers[i]);
+            // model.addConstr(pathIntegral == 0.);
         }
 
         // constraint: 
@@ -1277,6 +1278,7 @@ std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeomet
 
         //third constraint 
         //add boundary constraints in the wale direction
+        //the homology constraints go here as well
         for (int i = 0; i < edgePathConstraints.size(); i++){
             std::vector<double> path = edgePathConstraints[i].first;
             GRBLinExpr pathIntegral = 0;
@@ -1943,7 +1945,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         }
         //have a hard mask in the course direction
         for (Vertex v : globalMesh.vertices()){
-            waleWeighting[v] = (allDist[v] > 1.5 * period);
+            waleWeighting[v] = (allDist[v] > 4.0 * period);
             curlMeasure[v] = waleWeighting[v] * curlMeasure[v];
         }
     }
@@ -2113,7 +2115,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     // Compute (integer) sum of indices
     int sumIndices = 0;
     for (int i = 0; i < gluedGeometry.mesh.nEdges(); i++)
-        sumIndices += edgeIndices[i]; // I think the sign convention in edgeIndices is wrong, which is why we have to put a negative here
+        sumIndices += edgeIndices[i];
 
     // Compute (non-integer) number of stripes on boundaries
     std::vector<double> boundaryStripes;
@@ -2125,7 +2127,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         }
         boundaryStripes.push_back(integral / period);
     }
-
     // Round it up
     std::vector<int> boundaryStripesInt = roundWithSum(boundaryStripes, sumIndices);
 
@@ -2135,6 +2136,25 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
         waleEdgePathConstraints.push_back(std::make_pair(path, -boundaryStripesInt[i]));
     }
+
+    //find integer for homology generator 
+    // std::vector<double> homologyStripes;
+    // for (std::vector<double> path : homologyGenerators){
+    //     double integral = 0;
+    //     for (int i = 0; i < path.size(); i++) if (path[i] != 0) {
+    //         Edge e = gluedGeometry.mesh.edge(i);
+    //         integral += sigmaWaleGlued[e.halfedge()] * path[i];
+    //     }
+    //     homologyStripes.push_back(integral / period);
+    // }
+    // // Round it up
+    // std::vector<int> homologyStripesInt = roundWithSum(homologyStripes, sumIndices);
+    // // Set up the edge path constraints 
+    // for (int i = 0; i < homologyGenerators.size(); i++){
+    //     std::vector<double> path = homologyGenerators[i];
+    //     waleEdgePathConstraints.push_back(std::make_pair(path, homologyStripesInt[i]));
+    // }
+
 
     // solve the model with all the path constraints and boundary constraints 
     //modelWale.setBdyEdges(waleBdyEdges);
@@ -4934,7 +4954,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
             }
             //add the constraints for the homology generators
             //model.addConstr(pathIntegral == period * generatorIntegers[i]);
-            model.addConstr(pathIntegral == period * 0.0);  
+            model.addConstr(pathIntegral == period * 0.0);//this should use some integer rounding
         }
         
         //constraint: add bdy-bdy path constraint 
