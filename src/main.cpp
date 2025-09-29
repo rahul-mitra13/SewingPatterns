@@ -86,8 +86,8 @@ void showStripePatterns(){
   H(coursePeriod);
   
   //set the wale period 
-  walePeriod = ((1.0/1.6) * coursePeriod); // rendering setting
-  // walePeriod = 1.0 * coursePeriod; // knitting setting
+  // walePeriod = ((1.0/1.6) * coursePeriod); // rendering setting
+  walePeriod = 1.0 * coursePeriod; // knitting setting
   //time function on the glued mesh 
   VertexData<double> timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
   //time function on the global mesh 
@@ -148,6 +148,19 @@ void showStripePatterns(){
   }
   globalPSMesh -> addFaceVectorQuantity("normalized time function gradient", timeFunctionGradientGlobalNormalized);
 
+  // Rotate time function gradient
+  globalGeometry->requireFaceNormals();
+  FaceData<Vector3> timeFunctionGradientGlobalNormalizedRotated(*globalMesh);
+  for (Face f : globalMesh->faces()){ 
+      timeFunctionGradientGlobalNormalizedRotated[f] = timeFunctionGradientGlobalNormalized[f];
+      timeFunctionGradientGlobalNormalizedRotated[f] = timeFunctionGradientGlobalNormalizedRotated[f].rotateAround(globalGeometry->faceNormals[f], PI/2.);
+  }
+
+  globalPSMesh->addFaceVectorQuantity("normalized time function gradient rotated", timeFunctionGradientGlobalNormalizedRotated);
+
+
+  // polyscope::show();
+
   // Compute intrinsic time function gradient
   gluedELG->requireEdgeLengths();
   FaceData<Vector2> timeFunctionGradientIntrinsic = computeTimeFunctionFaceGradIntrinsic(*gluedELG, timeFunctionGlued);
@@ -155,6 +168,7 @@ void showStripePatterns(){
   VertexData<double> timeFunctionAligned = computeTimeFunctionAligned(*gluedELG, globalBdyConditions, timeFunctionGradientIntrinsic);
   VertexData<double> timeFunctionAlignedGlobal = convertGluedToGlobalVertexFunction(*globalGeometry, *gluedELG, timeFunctionAligned, vertexMap);
   globalPSMesh->addVertexScalarQuantity("time function aligned", timeFunctionAlignedGlobal)->setEnabled(false);
+
 
   G = grad;
 
@@ -165,7 +179,7 @@ void showStripePatterns(){
   FaceData<Vector3> courseOneFormGrad(globalGeometry -> mesh);
 
   std::string courseDataFile;
-  courseDataFile = "../data/fertility/courseData.ply";
+  // courseDataFile = "bobPeriod2.0/courseData.ply";
 
   if (courseDataFile.size() > 0) { // if a file is specified, load it
     RichSurfaceMeshData courseData(globalGeometry->mesh, courseDataFile);
@@ -195,20 +209,23 @@ void showStripePatterns(){
   std::vector<Vector3> singularEdgePointsNeg;
   std::vector<std::array<int,2>> singularEdgesPos;
   std::vector<std::array<int,2>> singularEdgesNeg;
+  std::vector<std::vector<int>> singularFaces; // specifically for outputting courseSingularFaces json
   for (Edge e : globalMesh->edges()) if (courseSingularEdgesGlobal[e] != 0) {
       if (courseSingularEdgesGlobal[e] > 0) {
         singularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
         singularEdgePointsPos.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
         singularEdgesPos.push_back({(int)singularEdgePointsPos.size()-2, (int)singularEdgePointsPos.size()-1});
+        singularFaces.push_back({(int)e.halfedge().face().getIndex(), +1});
       } else {
         singularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.firstVertex()]);
         singularEdgePointsNeg.push_back(globalGeometry->vertexPositions[e.secondVertex()]);
         singularEdgesNeg.push_back({(int)singularEdgePointsNeg.size()-2, (int)singularEdgePointsNeg.size()-1});
+        singularFaces.push_back({(int)e.halfedge().face().getIndex(), -1});
       }
   }
   polyscope::registerCurveNetwork("course singular edges (+1)", singularEdgePointsPos, singularEdgesPos)->setRadius(0.003)->setColor({1,0,0})->setEnabled(false);
   polyscope::registerCurveNetwork("course singular edges (-1)", singularEdgePointsNeg, singularEdgesNeg)->setRadius(0.003)->setColor({0,0,1})->setEnabled(false);
-
+  H(singularFaces);
 
   FaceData<int> stripeIndicesSigmaCourse(*globalMesh, 0);
   std::vector<Vector3> positionsCourse;
@@ -228,7 +245,18 @@ void showStripePatterns(){
   //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
   polyscope::registerCurveNetwork("course stripes with offset", positionsCourse, edgesCourse)->setRadius(0.002)->setColor({50.0/255, 205.0/255, 50.0/255})->setEnabled(false);
 
-  // polyscope::show();
+  // Compute and draw course gradient
+  FaceData<Vector3> courseGrad = computeFaceGrad(*globalGeometry, courseStripeValues);
+  globalPSMesh -> addFaceVectorQuantity("course grad", courseGrad);
+
+  // Compute and draw course vertex curl
+  std::vector<int> edgeIndices(globalMesh->nEdges());
+  for (Edge e : globalMesh->edges())
+    edgeIndices[e.getIndex()] = round(courseSingularEdgesGlobal[e]);
+  HeatMethodDistanceSolver heatSolver(*gluedELG);
+  VertexData<double> vertexCurl = computeCourseVertexCurl(*globalGeometry, *gluedELG, courseGrad, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
+  globalPSMesh->addVertexScalarQuantity("course curl", vertexCurl);
+
 
   //-------iteratively find WALE stripes and course singularities----------//
 
@@ -240,9 +268,10 @@ void showStripePatterns(){
   FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
 
   std::string waleDataFile;
+  // waleDataFile = "sockWaleData.ply";
   // waleDataFile = "bobWaleData10pairs.ply";
   // waleDataFile = "bobPeriod2.0/waleData.ply";
-  waleDataFile = "../data/fertility/waleData.ply";
+  // waleDataFile = "../data/fertility/waleData.ply";
 
   if (waleDataFile.size() > 0) { // if a file is specified, load it
     RichSurfaceMeshData waleData(globalGeometry->mesh, waleDataFile);
@@ -273,6 +302,11 @@ void showStripePatterns(){
   globalPSMesh -> addEdgeScalarQuantity("wale singularities", waleSingularEdgesGlobal);
   waleStripes -> setRadius(0.001);
   waleStripes -> setEnabled(false);
+
+  // Compute and draw wale gradient
+  FaceData<Vector3> waleGrad = computeFaceGrad(*globalGeometry, waleStripeValues);
+  globalPSMesh -> addFaceVectorQuantity("wale grad", waleGrad);
+  // polyscope::show();
 
   // Draw wale singular edges as a curve network
   std::vector<Vector3> waleSingularEdgePointsPos;
@@ -305,6 +339,103 @@ void showStripePatterns(){
   
   std::cout << "Done with wale stripes" << std::endl;
   // polyscope::show();
+
+  // Setup animation
+  if (courseDataFile.empty() && waleDataFile.empty()) { // only do animation if we recomputed everything, otherwise the iterations won't be available
+
+    // Fetch stripes steps from polyscope
+    std::vector<polyscope::CurveNetwork*> courseStripesSteps, waleStripesSteps, posCourseSingEdgesSteps, negCourseSingEdgesSteps; // keep track of curve networks for animation
+    int nCourseSteps = singularEdgesPos.size()+1;
+    // Course stripes
+    for (int step = 0; step < nCourseSteps; step++) {
+      polyscope::CurveNetwork* courseStripes = polyscope::getCurveNetwork("sigma tilde stripes after " + std::to_string(step) + " singularity insertions");
+      if (courseStripes == NULL) break;
+      courseStripesSteps.push_back(courseStripes);
+    }
+    // // Wale stripes
+    // for (int step = 0; step < nCourseSteps; step++) {
+    //   polyscope::CurveNetwork* waleStripes = polyscope::getCurveNetwork("wale stripes after " + std::to_string(step) + "wale singularities");
+    //   if (waleStripes == NULL) break;
+    //   waleStripesSteps.push_back(waleStripes);
+    // }
+    // Positive course singular edges
+    polyscope::registerCurveNetwork("pos singular edges after 0", std::vector<Vector3>{}, std::vector<std::array<int,2>>{}); // empty curve network for iteration 0
+    for (int step = 0; step < nCourseSteps; step++) {
+      polyscope::CurveNetwork* posCourseSingEdges = polyscope::getCurveNetwork("pos singular edges after " + std::to_string(step));
+      if (posCourseSingEdges == NULL) break;
+      posCourseSingEdgesSteps.push_back(posCourseSingEdges);
+    }
+    // Negative course singular edges
+    polyscope::registerCurveNetwork("neg singular edges after 0", std::vector<Vector3>{}, std::vector<std::array<int,2>>{}); // empty curve network for iteration 0
+    for (int step = 0; step < nCourseSteps; step++) {
+      polyscope::CurveNetwork* negCourseSingEdges = polyscope::getCurveNetwork("neg singular edges after " + std::to_string(step));
+      if (negCourseSingEdges == NULL) break;
+      negCourseSingEdgesSteps.push_back(negCourseSingEdges);
+    }
+    
+
+    
+    // stripes evolution animation
+    //write a nested callback to debug the evolution of our method
+    //Register the callback which creates the UI and does the hard work
+    int step = 0; // needs to be declared outside!
+    auto focusedPopupUI = [&](){
+        static bool showWindow = true;
+        ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
+        ImGui::Begin("Course stripes animation", &showWindow);
+        ImGui::PushItemWidth(400);
+        ImGui::Separator();
+        ImGui::InputInt("Time Step", &step);
+
+        // Clamp to bounds after user input
+        // iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
+        // step = (step % stripesSteps.size() + stripesSteps.size()) % stripesSteps.size(); // unsigned modulo
+        step = std::clamp(step, -1, (int)courseStripesSteps.size()-1);
+        //need setEnabled(true) otherwise we run into OpenGL errors? weird
+
+        for (auto stripes : courseStripesSteps)
+            stripes->setEnabled(false);
+        if (step != -1) courseStripesSteps[step]->setEnabled(true);
+
+        // auto courseStripes = polyscope::registerCurveNetwork("course stripes", uniquePos, uniqueEdges);
+        // polyscope::registerPointCloud("site ", std::vector<Vector3>{steps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+        if (ImGui::Button("Done")) {
+            
+            for (int step = 0; step < courseStripesSteps.size(); step++) {
+                courseStripesSteps[step]->setEnabled(false);
+                posCourseSingEdgesSteps[step]->setEnabled(false);
+                negCourseSingEdgesSteps[step]->setEnabled(false);
+            }
+            for (int step = 0; step < courseStripesSteps.size(); step++) {
+                courseStripesSteps[step]->setEnabled(true);
+                posCourseSingEdgesSteps[step]->setEnabled(true);
+                negCourseSingEdgesSteps[step]->setEnabled(true);
+                std::ostringstream oss; oss << std::setw(3) << std::setfill('0') << step;
+                polyscope::screenshot("stripes-anim/step" + oss.str() + ".png");
+                courseStripesSteps[step]->setEnabled(false);
+                posCourseSingEdgesSteps[step]->setEnabled(false);
+                negCourseSingEdgesSteps[step]->setEnabled(false);
+
+            }
+            // Add 10 frames with last iteration
+            int lastStep = (int)courseStripesSteps.size()-1;
+            courseStripesSteps[lastStep]->setEnabled(true);
+            posCourseSingEdgesSteps[lastStep]->setEnabled(true);
+            negCourseSingEdgesSteps[lastStep]->setEnabled(true);
+            for (int i = 0; i < 10; i++) {
+              int step = courseStripesSteps.size() + i;
+              std::ostringstream oss; oss << std::setw(3) << std::setfill('0') << step;
+              polyscope::screenshot("stripes-anim/step" + oss.str() + ".png");
+            }
+
+            // polyscope::popContext();
+            
+        }
+        ImGui::SameLine();
+    };
+    polyscope::pushContext(focusedPopupUI);  
+  }
+
 
   // generate the knit graph
   graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
@@ -418,8 +549,8 @@ int main(int argc, char **argv) {
       maxLength = length;
   }
   H(maxLength);
-  coursePeriod = 1.8 * maxLength; // let's push it :-)
-  // coursePeriod = 2.0 * maxLength; //set the default period to be twice the max edge length
+  // coursePeriod = 1.8 * maxLength; // let's push it :-)
+  coursePeriod = 2.0 * maxLength; //set the default period to be twice the max edge length. For bob!
   // coursePeriod = 1.0 * maxLength; // skirt with seam
 
   // Parse stripe period, if available
@@ -444,6 +575,7 @@ int main(int argc, char **argv) {
   H(coursePeriod);
 
   globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(data["model_path"]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
+  globalPSMesh->setSurfaceColor({1,1,1});
   
   // Internally, Polyscope numbers the edges by looping over faces.
   // Since our numbering is different than that after fixDelaunay, we need to specify the new numbering by providing a permutation.

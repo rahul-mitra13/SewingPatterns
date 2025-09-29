@@ -63,6 +63,9 @@ VertexData<double> computeTimeFunctionAligned(EdgeLengthGeometry& geometry, glob
 //@return       faceGradients           FaceData<Vector3>               #F by 3 vector per face
 FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, VertexData<double>& vertexScalarFunction);
 
+// Compute face gradient for (discontinuous) corner data
+FaceData<Vector3> computeFaceGrad(VertexPositionGeometry& geometry, CornerData<double>& function);
+
 //compute the gradient of the a function defined as a scalar over vertices in the glued mesh setting 
 //Don't think the formula I'm using in here is right
 FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, VertexData<double>& vertexScalarFunction);

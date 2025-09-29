@@ -280,6 +280,34 @@ FaceData<Vector3> computeTimeFunctionFaceGrad(VertexPositionGeometry& geometry, 
     return faceGradients;
 }
 
+// Compute face gradient for (discontinuous) corner data
+FaceData<Vector3> computeFaceGrad(VertexPositionGeometry& geometry, CornerData<double>& function) {
+    // We construct a gradient operator for every triangle.
+    // Not very efficient but it does the job.
+
+    SurfaceMesh& mesh = geometry.mesh;
+
+    Eigen::MatrixXd V(mesh.nVertices(), 3); // vertex coordinates
+    Eigen::MatrixXi F(mesh.nFaces(), 3);    // face vertices
+    std::tie(V, F) = getVertexPositionsandFaceLists(geometry);
+
+    // Get gradient operator from IGL: #F*3 by #V
+    SparseMatrix<double> G;
+    igl::grad(V,F,G);
+
+    FaceData<Vector3> faceGradients(mesh);
+    for (Face f : mesh.faces()) {
+        Eigen::VectorXd U(mesh.nVertices()); U.setZero();
+        for (Corner co : f.adjacentCorners()) {
+            U(co.vertex().getIndex()) = function[co];
+        }
+        Eigen::MatrixXd GU = (G*U);
+        int iF = f.getIndex();
+        faceGradients[f] = Vector3{GU(iF), GU(iF + F.rows()), GU(iF + 2 * F.rows())};
+    }
+    return faceGradients;
+}
+
 //compute the gradient of the a function defined as a scalar over vertices in the glued mesh setting 
 //don't think the formula I'm using in here is right
 FaceData<Vector3> computeTimeFunctionFaceGrad(EdgeLengthGeometry& geometry, VertexData<double>& vertexScalarFunction){
@@ -1577,10 +1605,11 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                                                                     EdgeData<double>& courseSingularEdgesGlobal, std::map<int, std::vector<Halfedge>> gluedOneRingMap, polyscope::SurfaceMesh& psMesh, 
                                                                     std::vector<std::vector<double>>& allSaddleLoops, std::vector<std::vector<double>>& homologyGenerators){
     
-    // double maskSize = 2.00 * period; // for skirt without seam
-    double maskSize = 2.50 * period; // for bob the duck
+    double maskSize = 2.00 * period; // for skirt without seam, sock?
+    // double maskSize = 2.50 * period; // for bob the duck
     // double maskSize = 1.5 * period; // for skirt with seam
-    
+
+    glm::vec3 waleStripesColor {0,0,0};
 
     // Create the Heat Method solver
     HeatMethodDistanceSolver heatSolver(gluedGeometry, 1.0);
@@ -1657,6 +1686,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     auto knoppelStripes = polyscope::registerCurveNetwork("knoppel wale stripes stripes", knoppelPos, knoppelEdges);
     knoppelStripes -> setRadius(0.001);
     knoppelStripes -> setEnabled(false);
+    
 
     //average the final course 1-form gradient onto edges
     EdgeData<double> omegaWaleGlobal = computeMatchingOneForm(globalGeometry, 1, courseOneFormGrad, edgeMappingsPairs);
@@ -1774,12 +1804,14 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     for (Vertex v : globalGeometry.mesh.vertices()) if (v.isBoundary())
         heatSourceVerts.push_back(gluedGeometry.mesh.vertex(vertexMap[v.getIndex()]));
 
-    for (Edge e : globalGeometry.mesh.edges()){
-        if (std::fabs(courseSingularEdgesGlobal[e]) > 0){
-            heatSourceVerts.push_back(gluedGeometry.mesh.vertex(vertexMap[e.halfedge().tailVertex().getIndex()]));
-            heatSourceVerts.push_back(gluedGeometry.mesh.vertex(vertexMap[e.halfedge().tipVertex().getIndex()]));
-        }
-    }
+    // // Keep wale sings away from course singularities
+    // for (Edge e : globalGeometry.mesh.edges()){
+    //     if (std::fabs(courseSingularEdgesGlobal[e]) > 0){
+    //         heatSourceVerts.push_back(gluedGeometry.mesh.vertex(vertexMap[e.halfedge().tailVertex().getIndex()]));
+    //         heatSourceVerts.push_back(gluedGeometry.mesh.vertex(vertexMap[e.halfedge().tipVertex().getIndex()]));
+    //     }
+    // }
+
     VertexData<double> waleVertexCurl = computeCourseVertexCurl(globalGeometry, gluedGeometry, waleCurlFunctionGrad, gluedOneRingMap,
                                                          gluedEdgeSingularities, heatSolver, vertexMap);
     VertexData<double> allDist(gluedGeometry.mesh, 1.0);
@@ -1824,6 +1856,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     psMesh.addVertexScalarQuantity("initial wale weighting", waleWeighting);
     psMesh.addVertexScalarQuantity("initial all distance wale", allDistGlobal);
     EdgeData<double> waleEdgeCurl = computeVertexAveragedEdgeCurl(globalGeometry, waleVertexCurl);
+    // psMesh.addVertexScalarQuantity("initial wale vertex curl", -waleVertexCurl);
     psMesh.addVertexScalarQuantity("initial wale vertex curl", waleVertexCurl);
     psMesh.addEdgeScalarQuantity("wale edge curl without any wale singularities", waleEdgeCurl);
 
@@ -1974,6 +2007,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 auto waleStripes = polyscope::registerCurveNetwork("wale stripes after " + std::to_string(numWaleSingularities) + "wale singularities", positionsWale, edgesWale);
                 waleStripes -> setRadius(0.001);
                 waleStripes -> setEnabled(false);
+                waleStripes->setColor(waleStripesColor);
+
 
                 //compute the impulse function 
                 HalfedgeData<double> waleVirtualSigma = computeWaleVirtualSigma(globalGeometry, gluedGeometry, modelWale);
@@ -3523,6 +3558,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     double maskSize = 2.00 * period;
     // double maskSize = 2.50 * period;
 
+    glm::vec3 stripesColor {0,0,0};    
+
     //set the period for the model 
     model.setPeriod(period);
     model.setBdyEdges(boundaryConditions.courseBdyEdges);
@@ -3647,12 +3684,15 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //psMesh.addHalfedgeScalarQuantity("gluedSigmaTilde after " + std::to_string(numRuns-1) + " runs", gluedSigmaTilde);
     //psMesh.addCornerScalarQuantity("stripeValuesSigmaCourse after " + std::to_string(numRuns-1) + " runs", prepareCornerData(stripeValuesSigmaCourse));
 
+
     std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
                                                                     edgeMap, components);
-    auto courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes " + std::to_string(numRuns - 1) + 
+    auto courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numRuns - 1) + 
                                                     " singularity insertions", uniquePos, uniqueEdges);
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
+    courseStripes->setColor(stripesColor);
+    // stripesSteps.push_back(courseStripes);
     gradSigmaTilde = computeOneFormFaceGrad(globalGeometry, gluedGeometry, gluedSigmaTilde);
     courseOneFormGrad = gradSigmaTilde;
 
@@ -3898,8 +3938,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
                 courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numSingularities) + 
                                                     " singularity insertions", uniquePos, uniqueEdges);
-                courseStripes -> setRadius(0.001);
-                courseStripes -> setEnabled(false);
+                courseStripes->setRadius(0.001);
+                courseStripes->setEnabled(false);
+                courseStripes->setColor(stripesColor);
+                // stripesSteps.push_back(courseStripes);
                 //update the gradients for the next round of the model 
                 //model.setFaceGradients(gradSigmaTilde);
                 //compute curl quantities without accounting for impulse function
@@ -3957,14 +3999,24 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numSingularities) + " singularity insertion", edgeSingularities);
 
                 // Draw curve network for singular edges
-                std::vector<Vector3> singularEdgePoints;
-                std::vector<std::array<int,2>> singularEdges;
-                for (Edge e : globalMesh.edges()) if (edgeSingularities[e] != 0) {
-                    singularEdgePoints.push_back(globalGeometry.vertexPositions[e.firstVertex()]);
-                    singularEdgePoints.push_back(globalGeometry.vertexPositions[e.secondVertex()]);
-                    singularEdges.push_back({(int)singularEdgePoints.size()-2, (int)singularEdgePoints.size()-1});
+                std::vector<Vector3> posSingularEdgePoints, negSingularEdgePoints;
+                std::vector<std::array<int,2>> posSingularEdges, negSingularEdges;
+                for (Edge e : globalMesh.edges()) {
+                    if (edgeSingularities[e] > 0) {
+                        posSingularEdgePoints.push_back(globalGeometry.vertexPositions[e.firstVertex()]);
+                        posSingularEdgePoints.push_back(globalGeometry.vertexPositions[e.secondVertex()]);
+                        posSingularEdges.push_back({(int)posSingularEdgePoints.size()-2, (int)posSingularEdgePoints.size()-1});
+                    } else if (edgeSingularities[e] < 0) {
+                        negSingularEdgePoints.push_back(globalGeometry.vertexPositions[e.firstVertex()]);
+                        negSingularEdgePoints.push_back(globalGeometry.vertexPositions[e.secondVertex()]);
+                        negSingularEdges.push_back({(int)negSingularEdgePoints.size()-2, (int)negSingularEdgePoints.size()-1});
+
+                    }
                 }
-                polyscope::registerCurveNetwork("singular edges after " + std::to_string(numSingularities), singularEdgePoints, singularEdges)->setEnabled(false);
+                glm::vec3 red {1,0,0};
+                glm::vec3 blue {0,0,1};
+                polyscope::registerCurveNetwork("pos singular edges after " + std::to_string(numSingularities), posSingularEdgePoints, posSingularEdges)->setColor(red)->setEnabled(false);
+                polyscope::registerCurveNetwork("neg singular edges after " + std::to_string(numSingularities), negSingularEdgePoints, negSingularEdges)->setColor(blue)->setEnabled(false);
 
                 break;
             }
@@ -3973,7 +4025,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         
         // if (numSingularities == 5) break; // for debug
     }
-
 
     //solve the final model with the singularities and homology generators 
     std::cout << "solving final course stripes...." << std::endl;
