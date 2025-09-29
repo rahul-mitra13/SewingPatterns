@@ -115,6 +115,12 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
   result.stepSiteDistribution.resize(nSites);
   result.initialSites = siteLocations;
 
+  // Handle case where there's no sites at all
+  if (siteLocations.empty()) {
+    result.siteLocations = siteLocations;
+    return result;
+  }
+
   geom.requireShapeLengthScale();
   double M = 0; // maximum measure
   for (Vertex v : mesh.vertices())
