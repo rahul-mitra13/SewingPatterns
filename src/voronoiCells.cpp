@@ -365,23 +365,21 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
 // but it should be a pretty good guess.
 void projectOnIsoline(SurfacePoint& point, double target, SurfaceMesh& mesh, IntrinsicGeometryInterface& geom, alignOptions& options, FaceData<Vector2>& timeFunctionGrad) {
 
-  SurfacePoint initPoint = point; // keep a copy
-  Vector2 v = timeFunctionGrad[initPoint.face]; // search direction
-  v = v.normalize();
+  HeatMethodDistanceSolver heatSolver(geom);
+  VertexData<double> dist = heatSolver.computeDistance(point);
 
-  geom.requireShapeLengthScale(); // used to scale the search direction
-
-  // Binary search in direction v to find the target time value
-  double lower = -1, upper = +1.1; // is it enough? For some reason if mid=0, traceGeodesic fails
-  while(upper - lower > 1e-6) {
-    double mid = (lower+upper) / 2;
-    TraceGeodesicResult traceResult = traceGeodesic(geom, initPoint, mid*v*geom.shapeLengthScale);
-    point = traceResult.endPoint;
-    double t = point.interpolate(options.timeFunction);
-    if (t > target)
-      upper = mid;
-    else 
-      lower = mid;
+  double bestDist = DBL_MAX;
+  for (Edge e : mesh.edges()) {
+    Vertex v1 = e.firstVertex(), v2 = e.secondVertex();
+    double t1 = options.timeFunction[v1], t2 = options.timeFunction[v2];
+    if (fmin(t1, t2) < target && target < fmax(t1, t2)) { // edge is a candidate as it crosses the target isoline
+      double eDist = (dist[v1] + dist[v2]) / 2;
+      if (eDist < bestDist) {
+        bestDist = eDist;
+        double t = (target - t1) / (t2 - t1); // exact location along the edge
+        point = SurfacePoint(e, t); // pick the middle of the edge
+      }
+    }
   }
 }
 
