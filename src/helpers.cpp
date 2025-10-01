@@ -881,6 +881,64 @@ std::vector<std::vector<int>> findConnectedComponents(EdgeLengthGeometry& gluedG
     }
     return faceComponents;
 }
+
+//find the components of the original mesh
+FaceData<int> componentsCutByLoops(EdgeLengthGeometry& geom,
+                                std::vector<std::vector<double>>& loops) {
+  // IMPORTANT: don't copy the mesh; reference it
+  SurfaceMesh& mesh = geom.mesh;
+
+  // Mark cut edges
+  EdgeData<bool> isCut(mesh, false);
+  for (const auto& loop : loops) {
+    for (int i = 0; i < mesh.nEdges(); i++) {
+      double eVal = loop[i];
+      if (std::fabs(eVal) > 0){
+        Edge e = mesh.edge(i);
+        isCut[e] = true;
+      }
+    }
+  }
+
+  // Output labels; -1 means unvisited
+  FaceData<int> component(mesh, -1);
+
+  int compId = 0;
+  std::queue<Face> q;
+
+  for (Face f : mesh.faces()) {
+    if (component[f] != -1) continue;
+
+    // start a new component
+    component[f] = compId;
+    q.push(f);
+
+    // BFS over faces, but don't cross cut edges
+    while (!q.empty()) {
+      Face cur = q.front();
+      q.pop();
+
+      for (Halfedge he : cur.adjacentHalfedges()) {
+        Edge e = he.edge();
+        if (isCut[e]) continue;                 // blocked by loop
+
+        Halfedge ht = he.twin();
+        if (!ht.isInterior()) continue;         // boundary/no opposite face
+
+        Face nbr = ht.face();
+        if (component[nbr] != -1) continue;
+
+        component[nbr] = compId;
+        q.push(nbr);
+      }
+    }
+    ++compId;
+
+    std::cout << "compId = " << compId << std::endl;
+  }
+
+  return component;  // component[f] gives the id for each face
+}
     
 std::vector<double> prepareCornerData(CornerData<double> cornerData) {
   std::vector<double> preparedData;
