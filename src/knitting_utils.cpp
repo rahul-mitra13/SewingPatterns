@@ -3616,6 +3616,12 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         }
     }
 
+    //this is in the glued setting 
+    FaceData<int> faceComponentsGlued =  componentsCutByLoops(gluedGeometry, allSaddleLoops);
+    psMesh.addFaceScalarQuantity("face components", faceComponentsGlued);
+    polyscope::show();
+
+
     // std::vector<Vertex> saddleVertices = getSaddleVertices(gluedGeometry, globalTimeFunction);
     // for (auto v : saddleVertices){
     //     heatSourceVerts.push_back(v);
@@ -5995,7 +6001,7 @@ std::vector<std::vector<double>> findAllSaddleLoops(IntrinsicGeometryInterface& 
             }
             allSaddleLoops.push_back(saddleLoop);
             // visualization (uncomment if you don't care)
-            //std::string network = "edge loop" + std::to_string(loopCounter++);
+            std::string network = "edge loop" + std::to_string(loopCounter++);
             //registerCurveNetworkFromEdges(geometry, edgeLoop, network); 
             //std::cout << "the size of loop " << i++ << "is: " << edgeLoop.size() << std::endl;
             //std::cout << "the size of halfedge loop " << i++ << "is: " << halfedgeLoop.size() << std::endl;
