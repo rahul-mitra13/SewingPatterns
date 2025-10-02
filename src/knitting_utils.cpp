@@ -5935,6 +5935,26 @@ std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geom
                     saddleLoop[he.edge().getIndex()] = -1.0;
                 }
             }
+
+            //prune dangling edges from the saddle loop 
+            // degree of each vertex within the marked edge set
+            VertexData<int> deg(geometry.mesh, 0);
+                for (Edge e : geometry.mesh.edges()) {
+                double s = saddleLoop[e.getIndex()];
+                if (std::abs(s) <= 1e-8) continue; // not in the loop
+                Halfedge he = e.halfedge();
+                deg[he.tailVertex()] += 1;
+                deg[he.tipVertex()]  += 1;
+            }
+
+            for (Vertex v : geometry.mesh.vertices()){
+                if (deg[v] != 0){
+                    std::cout << "degree of vertex " << deg[v] << std::endl;
+                }
+            }
+
+
+
             allSaddleLoops.push_back(saddleLoop);
             // visualization (uncomment if you don't care)
             std::string network = "edge loop" + std::to_string(loopCounter++);

@@ -80,8 +80,6 @@ Eigen::SparseMatrix<double, Eigen::RowMajor> G;
 //the knit graph over the model 
 KnitGraph graph;
 
-
-
 // Global configuration options
 // TODO: setup command line interface with CLI11
 Options opts; 
