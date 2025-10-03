@@ -147,6 +147,10 @@ void showStripePatterns(){
       polyscope::registerPointCloud("saddle vertices", saddleVertexPos);
       allSaddleLoops = findAllSaddleLoops(*globalGeometry, saddleVertices, timeFunctionGlobal);
       homologyGenerators = buildHomologyGeneratorsVector(*globalGeometry, *globalMesh);
+      int k = 0;
+      for (auto p : allSaddleLoops){
+        globalPSMesh->addEdgeScalarQuantity("saddle loop " + std::to_string(k++), p);
+      }
   }
   else{
     //in this intrinsic setting, can't visualize saddle loops

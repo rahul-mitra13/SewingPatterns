@@ -5926,58 +5926,47 @@ std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geom
             auto uniqueEdges = findUniqueEdgesInTriangleStrip(strip);
             auto edgeLoop = chooseEdgeLoop(uniqueEdges, strip);
             auto halfedgeLoop = chooseHalfEdgeLoop(uniqueEdges, strip);
+            //commenting out cause this bit of Erick's code is buggy
             // construct the output here
-            for (const Halfedge &he : halfedgeLoop) {
-                if (he.edge().halfedge() == he) {
-                    saddleLoop[he.edge().getIndex()] = 1.0;
-                }
-                else {
-                    saddleLoop[he.edge().getIndex()] = -1.0;
-                }
+            // for (const Halfedge &he : halfedgeLoop) {
+            //     if (he.edge().halfedge() == he) {
+            //         saddleLoop[he.edge().getIndex()] = 1.0;
+            //     }
+            //     else {
+            //         saddleLoop[he.edge().getIndex()] = -1.0;
+            //     }
+            // }
+
+            std::vector<double> testLoop(geometry.mesh.nEdges(), 0.0);
+            for (Edge e : edgeLoop){
+                testLoop[e.getIndex()] = 1.0;
             }
 
-            if (loopCounter == 1){
-                //prune dangling edges from the saddle loop 
-                // degree of each vertex within the marked edge set
-                VertexData<int> deg(geometry.mesh, 0);
-                    for (Edge e : geometry.mesh.edges()) {
-                        double s = saddleLoop[e.getIndex()];
-                        if (std::abs(s) <= 1e-8) continue; // not in the loop
-                        Halfedge he = e.halfedge();
-                        deg[he.tailVertex()] += 1;
-                        deg[he.tipVertex()]  += 1;
-                    }
-
-                    for (Vertex v : geometry.mesh.vertices()){
-                        if (deg[v] != 0){
-                            std::cout << "degree of vertex " << v.getIndex() << " is " << deg[v] << std::endl;
-                        }
-                        if (deg[v] == 1){
-                            std::cout << "vertex at " << v.getIndex() << " has degree 1 " << std::endl;
-                        }
-                }
-
-                // remove any edge with an endpoint of degree 2
-                // for (Edge e : geometry.mesh.edges()) {
-                //     double s = saddleLoop[e.getIndex()];
-                //     if (std::abs(s) <= 0.5) continue;
-                //     Halfedge he = e.halfedge();
-                //     Vertex a = he.tailVertex();
-                //     Vertex b = he.tipVertex();
-                //     if (deg[a] != 2 || deg[b] != 2) {
-                //         saddleLoop[e.getIndex()] = 0.0; // drop the stray edge                          
-                //     }
-                // }
+            //prune dangling edges from the saddle loop 
+            // degree of each vertex within the marked edge set
+            VertexData<int> deg(geometry.mesh, 0);
+            for (Edge e : geometry.mesh.edges()) {
+                double s = testLoop[e.getIndex()];
+                if (std::abs(s) <= 1e-8) continue; // not in the loop
+                Halfedge he = e.halfedge();
+                deg[he.tailVertex()] += 1;
+                deg[he.tipVertex()]  += 1;
             }
-
-
-            std::vector<Edge> newLoop;
-            for (int i = 0; i < saddleLoop.size(); i++){
-                if (std::fabs(saddleLoop[i]) != 0){
-                    newLoop.emplace_back(geometry.mesh.edge(i));
+            // remove any edge with an endpoint of degree of 1
+            for (Edge e : geometry.mesh.edges()) {
+                double s = saddleLoop[e.getIndex()];
+                if (std::abs(s) <= 0.5) continue;
+                Halfedge he = e.halfedge();
+                Vertex a = he.tailVertex();
+                Vertex b = he.tipVertex();
+                if (deg[a] == 1 || deg[b] == 1) {
+                    testLoop[e.getIndex()] = 0.0; // drop the stray edge                          
                 }
             }
-            allSaddleLoops.push_back(saddleLoop);
+            //auto signedLoop = signedCycleFromIndicator(geometry.mesh, testLoop);
+
+            //allSaddleLoops.push_back(saddleLoop);
+            allSaddleLoops.push_back(testLoop);
             // visualization (uncomment if you don't care)
             std::string network = "edge loop" + std::to_string(loopCounter++);
             registerCurveNetworkFromEdges(geometry, edgeLoop, network); 
@@ -6032,18 +6021,48 @@ std::vector<std::vector<double>> findAllSaddleLoops(IntrinsicGeometryInterface& 
             auto uniqueEdges = findUniqueEdgesInTriangleStrip(strip);
             auto edgeLoop = chooseEdgeLoop(uniqueEdges, strip);
             auto halfedgeLoop = chooseHalfEdgeLoop(uniqueEdges, strip);
+            //commenting this out cause this bit of Erick's code is buggy
             // construct the output here
-            for (const Halfedge &he : halfedgeLoop) {
-                if (he.edge().halfedge() == he) {
-                    saddleLoop[he.edge().getIndex()] = 1.0;
-                }
-                else {
-                    saddleLoop[he.edge().getIndex()] = -1.0;
+            // for (const Halfedge &he : halfedgeLoop) {
+            //     if (he.edge().halfedge() == he) {
+            //         saddleLoop[he.edge().getIndex()] = 1.0;
+            //     }
+            //     else {
+            //         saddleLoop[he.edge().getIndex()] = -1.0;
+            //     }
+            // }
+
+            std::vector<double> testLoop(geometry.mesh.nEdges(), 0.0);
+            for (Edge e : edgeLoop){
+                testLoop[e.getIndex()] = 1.0;
+            }
+
+            //prune dangling edges from the saddle loop 
+            // degree of each vertex within the marked edge set
+            VertexData<int> deg(geometry.mesh, 0);
+            for (Edge e : geometry.mesh.edges()) {
+                double s = testLoop[e.getIndex()];
+                if (std::abs(s) <= 1e-8) continue; // not in the loop
+                Halfedge he = e.halfedge();
+                deg[he.tailVertex()] += 1;
+                deg[he.tipVertex()]  += 1;
+            }
+            // remove any edge with an endpoint of degree of 1
+            for (Edge e : geometry.mesh.edges()) {
+                double s = saddleLoop[e.getIndex()];
+                if (std::abs(s) <= 0.5) continue;
+                Halfedge he = e.halfedge();
+                Vertex a = he.tailVertex();
+                Vertex b = he.tipVertex();
+                if (deg[a] == 1 || deg[b] == 1) {
+                    testLoop[e.getIndex()] = 0.0; // drop the stray edge                          
                 }
             }
-            allSaddleLoops.push_back(saddleLoop);
+
+            //allSaddleLoops.push_back(saddleLoop);
+            allSaddleLoops.push_back(testLoop);
             // visualization (uncomment if you don't care)
-            std::string network = "edge loop" + std::to_string(loopCounter++);
+            // std::string network = "edge loop" + std::to_string(loopCounter++);
             //registerCurveNetworkFromEdges(geometry, edgeLoop, network); 
             //std::cout << "the size of loop " << i++ << "is: " << edgeLoop.size() << std::endl;
             //std::cout << "the size of halfedge loop " << i++ << "is: " << halfedgeLoop.size() << std::endl;
