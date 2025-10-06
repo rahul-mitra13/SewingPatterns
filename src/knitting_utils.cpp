@@ -5921,32 +5921,19 @@ std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geom
         int i = 0;
         // by this point all of the unique triangle strips for this particular vertex will be added to the list  
         for (const auto &strip : allTriangleStripsPerVertex) {
-            std::vector<double> saddleLoop(geometry.mesh.nEdges());
-            std::fill(saddleLoop.begin(), saddleLoop.end(), 0.0);
             auto uniqueEdges = findUniqueEdgesInTriangleStrip(strip);
             auto edgeLoop = chooseEdgeLoop(uniqueEdges, strip);
             auto halfedgeLoop = chooseHalfEdgeLoop(uniqueEdges, strip);
-            //commenting out cause this bit of Erick's code is buggy
-            // construct the output here
-            // for (const Halfedge &he : halfedgeLoop) {
-            //     if (he.edge().halfedge() == he) {
-            //         saddleLoop[he.edge().getIndex()] = 1.0;
-            //     }
-            //     else {
-            //         saddleLoop[he.edge().getIndex()] = -1.0;
-            //     }
-            // }
-
-            std::vector<double> testLoop(geometry.mesh.nEdges(), 0.0);
+            std::vector<double> saddleLoop(geometry.mesh.nEdges(), 0.0);
             for (Edge e : edgeLoop){
-                testLoop[e.getIndex()] = 1.0;
+                saddleLoop[e.getIndex()] = 1.0;
             }
 
             //prune dangling edges from the saddle loop 
             // degree of each vertex within the marked edge set
             VertexData<int> deg(geometry.mesh, 0);
             for (Edge e : geometry.mesh.edges()) {
-                double s = testLoop[e.getIndex()];
+                double s = saddleLoop[e.getIndex()];
                 if (std::abs(s) <= 1e-8) continue; // not in the loop
                 Halfedge he = e.halfedge();
                 deg[he.tailVertex()] += 1;
@@ -5955,21 +5942,26 @@ std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geom
             // remove any edge with an endpoint of degree of 1
             for (Edge e : geometry.mesh.edges()) {
                 double s = saddleLoop[e.getIndex()];
-                if (std::abs(s) <= 0.5) continue;
+                if (!(std::fabs(s) > 0.)) continue;
                 Halfedge he = e.halfedge();
                 Vertex a = he.tailVertex();
                 Vertex b = he.tipVertex();
                 if (deg[a] == 1 || deg[b] == 1) {
-                    testLoop[e.getIndex()] = 0.0; // drop the stray edge                          
+                    saddleLoop[e.getIndex()] = 0.0; // drop the stray edge                          
                 }
             }
-            //auto signedLoop = signedCycleFromIndicator(geometry.mesh, testLoop);
+            std::vector<Edge> saddleLoopEdges; 
+            for (Edge e : geometry.mesh.edges()){
+                if (std::fabs(saddleLoop[e.getIndex()]) > 0) saddleLoopEdges.emplace_back(e);
+            }
+            //auto signedLoop = signedCycleFromIndicator(geometry.mesh, saddleLoop);
 
             //allSaddleLoops.push_back(saddleLoop);
-            allSaddleLoops.push_back(testLoop);
+            allSaddleLoops.push_back(saddleLoop);
             // visualization (uncomment if you don't care)
             std::string network = "edge loop" + std::to_string(loopCounter++);
-            registerCurveNetworkFromEdges(geometry, edgeLoop, network); 
+            //registerCurveNetworkFromEdges(geometry, edgeLoop, network); 
+            registerCurveNetworkFromEdges(geometry, saddleLoopEdges, network);
             //std::cout << "the size of loop " << i++ << "is: " << edgeLoop.size() << std::endl;
             //std::cout << "the size of halfedge loop " << i++ << "is: " << halfedgeLoop.size() << std::endl;
         }
@@ -6016,32 +6008,19 @@ std::vector<std::vector<double>> findAllSaddleLoops(IntrinsicGeometryInterface& 
         int i = 0;
         // by this point all of the unique triangle strips for this particular vertex will be added to the list  
         for (const auto &strip : allTriangleStripsPerVertex) {
-            std::vector<double> saddleLoop(geometry.mesh.nEdges());
-            std::fill(saddleLoop.begin(), saddleLoop.end(), 0.0);
             auto uniqueEdges = findUniqueEdgesInTriangleStrip(strip);
             auto edgeLoop = chooseEdgeLoop(uniqueEdges, strip);
             auto halfedgeLoop = chooseHalfEdgeLoop(uniqueEdges, strip);
-            //commenting this out cause this bit of Erick's code is buggy
-            // construct the output here
-            // for (const Halfedge &he : halfedgeLoop) {
-            //     if (he.edge().halfedge() == he) {
-            //         saddleLoop[he.edge().getIndex()] = 1.0;
-            //     }
-            //     else {
-            //         saddleLoop[he.edge().getIndex()] = -1.0;
-            //     }
-            // }
-
-            std::vector<double> testLoop(geometry.mesh.nEdges(), 0.0);
+            std::vector<double> saddleLoop(geometry.mesh.nEdges(), 0.0);
             for (Edge e : edgeLoop){
-                testLoop[e.getIndex()] = 1.0;
+                saddleLoop[e.getIndex()] = 1.0;
             }
 
             //prune dangling edges from the saddle loop 
             // degree of each vertex within the marked edge set
             VertexData<int> deg(geometry.mesh, 0);
             for (Edge e : geometry.mesh.edges()) {
-                double s = testLoop[e.getIndex()];
+                double s = saddleLoop[e.getIndex()];
                 if (std::abs(s) <= 1e-8) continue; // not in the loop
                 Halfedge he = e.halfedge();
                 deg[he.tailVertex()] += 1;
@@ -6050,22 +6029,19 @@ std::vector<std::vector<double>> findAllSaddleLoops(IntrinsicGeometryInterface& 
             // remove any edge with an endpoint of degree of 1
             for (Edge e : geometry.mesh.edges()) {
                 double s = saddleLoop[e.getIndex()];
-                if (std::abs(s) <= 0.5) continue;
+                if (!(std::fabs(s) > 0.)) continue;
                 Halfedge he = e.halfedge();
                 Vertex a = he.tailVertex();
                 Vertex b = he.tipVertex();
                 if (deg[a] == 1 || deg[b] == 1) {
-                    testLoop[e.getIndex()] = 0.0; // drop the stray edge                          
+                    saddleLoop[e.getIndex()] = 0.0; // drop the stray edge                          
                 }
             }
-
-            //allSaddleLoops.push_back(saddleLoop);
-            allSaddleLoops.push_back(testLoop);
-            // visualization (uncomment if you don't care)
-            // std::string network = "edge loop" + std::to_string(loopCounter++);
-            //registerCurveNetworkFromEdges(geometry, edgeLoop, network); 
-            //std::cout << "the size of loop " << i++ << "is: " << edgeLoop.size() << std::endl;
-            //std::cout << "the size of halfedge loop " << i++ << "is: " << halfedgeLoop.size() << std::endl;
+            std::vector<Edge> saddleLoopEdges; 
+            for (Edge e : geometry.mesh.edges()){
+                if (std::fabs(saddleLoop[e.getIndex()]) > 0) saddleLoopEdges.emplace_back(e);
+            }
+            allSaddleLoops.push_back(saddleLoop);
         }
     }
 

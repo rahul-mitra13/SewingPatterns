@@ -933,8 +933,6 @@ FaceData<int> componentsCutByLoops(EdgeLengthGeometry& geom,
       }
     }
     ++compId;
-
-    std::cout << "compId = " << compId << std::endl;
   }
 
   return component;  // component[f] gives the id for each face
