@@ -394,6 +394,7 @@ void alignPointsOnIsolineFast(SurfaceMesh& mesh, IntrinsicGeometryInterface& geo
     double t1 = s1.interpolate(options.timeFunction), t2 = s2.interpolate(options.timeFunction);
     projectOnIsoline(s1, (t1+t2)/2, mesh, geom, options, timeFunctionGrad);
     projectOnIsoline(s2, (t1+t2)/2, mesh, geom, options, timeFunctionGrad);
+    ensure(abs(s1.interpolate(options.timeFunction) - s2.interpolate(options.timeFunction)) < 1e-6); // sanity check
   }
 }
 

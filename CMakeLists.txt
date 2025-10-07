@@ -107,6 +107,21 @@ find_package(PythonLibs 3)
 
 # include_directories(${SUITESPARSE_INCLUDE_DIRS})
 
+# Gmsh dependency
+include(FetchContent)
+set(GMSH_DIR ${CMAKE_BINARY_DIR}/deps/gmsh)
+set(GMSH_URL "https://gmsh.info/bin/macOS/gmsh-4.13.1-MacOSARM-sdk.tgz") # TODO: for now it only works on Apple Silicon
+FetchContent_Declare(
+    gmsh
+    URL ${GMSH_URL}
+    SOURCE_DIR ${GMSH_DIR}
+)
+FetchContent_MakeAvailable(gmsh)
+set(GMSH_INCLUDE_DIR ${GMSH_DIR}/include)
+set(GMSH_LIB_DIR ${GMSH_DIR}/lib)
+find_library(GMSH_LIB NAMES gmsh PATHS ${GMSH_LIB_DIR} REQUIRED)
+message(${GMSH_LIB})
+
 include_directories(${GUROBI_INCLUDE_DIRS})
 include_directories(${PYTHON_INCLUDE_DIRS})
 
@@ -155,6 +170,7 @@ add_executable(
         src/KnitGraph.cpp
         src/voronoiCells.cpp
         src/KG.cpp
+        src/gmsh_helpers.cpp
 )
 
 # Include settings
@@ -167,6 +183,8 @@ target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/de
 target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/polyscope/deps/json/include/")
 #add python 
 #target_include_directories(SewingPatterns PRIVATE ${PYTHON_LIBRARIES})
+#add Gmsh
+target_include_directories(SewingPatterns PRIVATE ${GMSH_INCLUDE_DIR})
 
 if(CXX)
   target_link_libraries(SewingPatterns optimized ${GUROBI_CXX_LIBRARY}
@@ -183,7 +201,8 @@ target_link_libraries(SewingPatterns
 			polyscope
 			Eigen3::Eigen
 			geometry-central
-			${GUROBI_LIBRARY})
+			${GUROBI_LIBRARY}
+      ${GMSH_LIB})
 
 # target_link_libraries(SewingPatterns
 # 			polyscope

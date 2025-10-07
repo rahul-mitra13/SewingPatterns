@@ -126,28 +126,81 @@ VertexData<double> computeTimeFunction(VertexPositionGeometry& geometry, std::ve
 //compute time function directly in the glued mesh setting 
 VertexData<double> computeTimeFunction(EdgeLengthGeometry& gluedGeometry, globalBoundaryConditions& bdyConditions){
 
+    P("Computing time function...");
+
     SurfaceMesh& gluedMesh = gluedGeometry.mesh; 
     VertexData<double> gluedTimeFunction(gluedMesh);
     gluedGeometry.requireCotanLaplacian();
     Eigen::SparseMatrix<double> L = gluedGeometry.cotanLaplacian;
-    //force boundary conditions 
-    Eigen::VectorXd b = Eigen::VectorXd::Zero(gluedMesh.nVertices());
-    for (int v : bdyConditions.courseStartBoundaryVertices){
-        L.row(v) *= 0.0;
-        L.coeffRef(v, v) = 1.0;
-        b(v) = 0;
+
+    int n = gluedMesh.nVertices();
+    int m1 = bdyConditions.courseStartBoundaryVertices.size();
+    int m2 = bdyConditions.courseEndBoundaryVertices.size();
+    int m3 = bdyConditions.courseBdyEdges.size();
+
+    // Setup constraints matrix Ax = b
+    Eigen::MatrixXd A(m1+m2+m3, n); A.setZero();
+    Eigen::VectorXd b = Eigen::VectorXd::Zero(m1+m2+m3); // right-hand side
+
+    // Knitting start (t=0)
+    for (int i = 0; i < m1; i++) {
+        int v = bdyConditions.courseStartBoundaryVertices[i];
+        A(i, v) = 1;
+        b(i) = 0;
     }
-    for (int v : bdyConditions.courseEndBoundaryVertices){
-        L.row(v) *= 0.0;
-        L.coeffRef(v, v) = 1.0;
-        b(v) = 1.0;
+
+    // Knitting end (t=1)
+    for (int i = 0; i < m2; i++) {
+        int v = bdyConditions.courseEndBoundaryVertices[i];
+        A(m1+i, v) = 1;
+        b(m1+i) = 1;
     }
+
+    // Other feature curves (courseBdyEdges)
+    for (int i = 0; i < m3; i++) {
+        Edge e = gluedMesh.edge(bdyConditions.courseBdyEdges[i]);
+        int v1 = e.firstVertex().getIndex(), v2 = e.secondVertex().getIndex(); // vertices for which we impose t(v1) = t(v2)
+        A(m1+m2+i, v1) = +1;
+        A(m1+m2+i, v2) = -1;
+        b(m1+m2+i) = 0;
+    }
+
+    // Find out independent rows of A
+    Eigen::FullPivLU<Eigen::MatrixXd> lu(A.transpose());
+    lu.setThreshold(1e-6); // tune threshold if needed
+    int rank = lu.rank();
+    auto perm = lu.permutationQ().indices();
+    std::vector<int> indep_rows(rank);
+    for (int i = 0; i < rank; i++)
+        indep_rows[i] = perm[i];
+
+    // Assemble full system
+    std::vector<Eigen::Triplet<double>> triplets;
+    Eigen::VectorXd rhs = Eigen::VectorXd::Zero(n+rank); // right-hand side
+    for (int k = 0; k < n; ++k) {
+        for (Eigen::SparseMatrix<double>::InnerIterator it(L, k); it; ++it) {
+            triplets.emplace_back(it.row(), it.col(), it.value());
+        }
+    }
+    for (int k = 0; k < rank; k++) {
+        int row = indep_rows[k];
+        for (int col = 0; col < n; col++)
+            if (std::abs(A(row,col)) > 1e-9) {
+                triplets.emplace_back(n+k, col, A(row,col));
+                triplets.emplace_back(col, n+k, A(row,col)); // symmetric
+            }
+        rhs(n+k) = b(indep_rows[k]);
+    }
+    
+    Eigen::SparseMatrix<double> Laug(n+rank, n+rank); // augmented matrix
+    Laug.setFromTriplets(triplets.begin(), triplets.end());
+
     Eigen::SparseLU<SparseMatrix<double>> solver;
-    solver.compute(L);
+    solver.compute(Laug);
     if (solver.info() != Eigen::Success) {
         std::cerr << "Decomposition failed" << std::endl;
     }
-    Eigen::VectorXd u = solver.solve(b);
+    Eigen::VectorXd u = solver.solve(rhs);
     if (solver.info() != Eigen::Success) {
         std::cerr << "Solving failed" << std::endl;
     }
@@ -1822,6 +1875,12 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 std::cout << "not breaking after " << std::to_string(numWaleSingularities) << " singularity insertions " << std::endl;
                 std::cout << "new objective = " << currObj << std::endl;
                 std::cout << "old objective = " << oldObj << std::endl;
+
+                if (numWaleSingularities == maxWaleSingularities) {
+                    toBreak = true;
+                    break;
+                }
+
                 //oldDistance = newDistance;
                 oldObj = currObj;
                 //oldL1Distance = newL1Distance;
@@ -4540,6 +4599,10 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                 if (opts.showAllIterations) psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numSingularities) + " singularity insertions (after subtracting)", edgeCurl);
                 if (opts.showAllIterations) psMesh.addEdgeScalarQuantity("edge singularities after " + std::to_string(numSingularities) + " singularity insertion", edgeSingularities);
                 //polyscope::registerCurveNetwork("edge singularities network after " + std::to_string(numSingularities) + " singularitiy insertion", singPos, edges);
+
+                if (numSingularities == 4)
+                    toBreak = true; // force a specific number of sing pairs for debugging
+
                 break;
             }
         }
@@ -4555,8 +4618,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
     std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
     std::tie(uniquePos, uniqueEdges, components) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, edgeMap);
-    courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numSingularities) + 
-                                                    " singularity insertions (no correction)", uniquePos, uniqueEdges);
+    courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numSingularities) + " singularity insertions (no correction)", uniquePos, uniqueEdges);
+    courseStripes->setEnabled(false);
 
     // With helicing correction
     model.useHelicingCorrection = true;
@@ -4575,7 +4638,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
                                                     " singularity insertions", uniquePos, uniqueEdges);
     courseStripes -> setRadius(0.001);
     courseStripes -> setEnabled(false);
-    registerShortRows("short rows after " + std::to_string(numSingularities) + " singularity insertions", components);    
+    registerShortRows("short rows after " + std::to_string(numSingularities) + " singularity insertions", components)->setEnabled(false);    
 
     model.useHelicingCorrection = true;
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
