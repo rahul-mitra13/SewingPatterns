@@ -3972,6 +3972,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
 
     HalfedgeData<double> heWeights = gluedHeWeights;
+    psMesh.addHalfedgeScalarQuantity("matching weights", heWeights);
     std::vector<std::pair<Vertex, Vertex>> matchedVertices = performOptimalMatching(globalGeometry, heWeights, singularities, globalTimeFunction);
 
     //specify options for alignment
