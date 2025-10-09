@@ -1995,17 +1995,41 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     polyscope::registerPointCloud("positive voronoi sites (wale)", positiveCenters)->setEnabled(false);
     std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
 
-    //print the masses
+    //print the positive masses 
+    //render the fuzzy cells
+    std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
+    std::vector<Vector3> posSiteColors(posSiteDistributions.size());
+    for (size_t i = 0; i < posSiteDistributions.size(); i++){
+        double r,g,b;
+        hsv_to_rgb((double)i/posSiteDistributions.size() * 360, 0.75, 1., r, g, b);
+        posSiteColors[i] = {r,g,b};
+    }
+    std::random_device rd;              // non-deterministic seed
+    std::mt19937 g(rd());               // Mersenne Twister engine
+    std::shuffle(posSiteColors.begin(), posSiteColors.end(), g);
+
     for (size_t i = 0; i < posSiteDistributions.size(); i++){
         double mass = 0;
-        for (Vertex v : globalMesh.vertices()){
-            if (std::fabs(posSiteDistributions[i][v]) > 1e-8){
-                mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
-            }
+        for (Vertex v : globalMesh.vertices()){ 
+            mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
         }
         std::cout << "positive mass at site " << i << " = " << mass << std::endl;
-        psMesh.addVertexScalarQuantity("positve site distribution (wale)" + std::to_string(i), posSiteDistributions[i]);
+        psMesh.addVertexScalarQuantity("unaligned site distribution (+) " + std::to_string(i), posSiteDistributions[i]);
+
+        // Vector3 siteColor {geometrycentral::unitRand(), geometrycentral::unitRand(), geometrycentral::unitRand()};
+
+        // // Define blended color map
+        // double r,g,b;
+        // hsv_to_rgb(unitRand() * 360, 0.75, 1., r, g, b);
+        // Vector3 siteColor {r,g,b};
+
+        for (Vertex v : globalMesh.vertices()) {
+            // H(posSiteDistributions[i][v] / maxPosCurl);
+            // posSiteDistributionColor[v.getIndex()] -= siteColor * posSiteDistributions[i][v] / maxPosCurl;
+            posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
+        }
     }
+    psMesh.addVertexColorQuantity("pos site dist blend (wale)", posSiteDistributionColor)->setEnabled(true);
 
    
     VoronoiOptions negOptions = defaultVoronoiOptions;
@@ -2023,17 +2047,32 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     polyscope::registerPointCloud("negative voronoi sites (wale)", negativeCenters)->setEnabled(false);
     std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
 
-    //print the masses
+    //print the negative masses 
+    //render the fuzzy cells
+    std::vector<Vector3> negSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
+    std::vector<Vector3> negSiteColors(negSiteDistributions.size());
+    for (size_t i = 0; i < negSiteDistributions.size(); i++){
+        double r,g,b;
+        hsv_to_rgb((double)i/negSiteDistributions.size() * 360, 0.75, 1., r, g, b);
+        negSiteColors[i] = {r,g,b};
+    }
+    std::shuffle(negSiteColors.begin(), negSiteColors.end(), g);
+
     for (size_t i = 0; i < negSiteDistributions.size(); i++){
         double mass = 0;
-        for (Vertex v : globalMesh.vertices()){
-            if (std::fabs(negSiteDistributions[i][v]) > 1e-8){
-                mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
-            }
+        for (Vertex v : globalMesh.vertices()){ 
+            mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
         }
         std::cout << "negative mass at site " << i << " = " << mass << std::endl;
-        psMesh.addVertexScalarQuantity("negative site distribution (wale)" + std::to_string(i), negSiteDistributions[i]);
+        psMesh.addVertexScalarQuantity("unaligned site distribution (-) " + std::to_string(i), negSiteDistributions[i]);
+
+        for (Vertex v : globalMesh.vertices()) {
+            negSiteDistributionColor[v.getIndex()] += negSiteColors[i] * negSiteDistributions[i][v];
+        }
     }
+    psMesh.addVertexColorQuantity("neg site dist blend (wale)", negSiteDistributionColor)->setEnabled(true);
+
+    polyscope::show();
 
     //store a vector of vertex ids and singularity indices (for optimal matching)
     std::vector<std::pair<Vertex, int>> singularities;
@@ -3816,6 +3855,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         maxPosCurl = std::max(maxPosCurl, posMeasure[v]);
 
     //print the positive masses
+    //render the fuzzy cells
     std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
     std::vector<Vector3> posSiteColors(posSiteDistributions.size());
     for (size_t i = 0; i < posSiteDistributions.size(); i++){
@@ -3830,9 +3870,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     for (size_t i = 0; i < posSiteDistributions.size(); i++){
         double mass = 0;
         for (Vertex v : globalMesh.vertices()){ 
-            // if (std::fabs(posSiteDistributions[i][v]) > 1e-8){
-                mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
-            // }
+            mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
         }
         std::cout << "positive mass at site " << i << " = " << mass << std::endl;
         psMesh.addVertexScalarQuantity("unaligned site distribution (+) " + std::to_string(i), posSiteDistributions[i]);
@@ -3850,7 +3888,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
         }
     }
-    psMesh.addVertexColorQuantity("pos site dist blend", posSiteDistributionColor)->setEnabled(true);
+    psMesh.addVertexColorQuantity("pos site dist blend (course)", posSiteDistributionColor)->setEnabled(true);
 
     for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
         std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
@@ -3866,8 +3904,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         polyscope::registerPointCloud("site " + std::to_string(i) + " initialization ", std::vector<Vector3>{p})->setEnabled(false);
     }
     
-
-    polyscope::show();
 
     // NEGATIVE COURSE
 
@@ -3927,16 +3963,40 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
 
     //print the negative masses
+    //render the fuzzy cells
+    std::vector<Vector3> negSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
+    std::vector<Vector3> negSiteColors(posSiteDistributions.size());
+    for (size_t i = 0; i < negSiteDistributions.size(); i++){
+        double r,g,b;
+        hsv_to_rgb((double)i/negSiteDistributions.size() * 360, 0.75, 1., r, g, b);
+        posSiteColors[i] = {r,g,b};
+    }
+    std::shuffle(negSiteColors.begin(), negSiteColors.end(), g);
+
     for (size_t i = 0; i < negSiteDistributions.size(); i++){
         double mass = 0;
-        for (Vertex v : globalMesh.vertices()){
-            if (std::fabs(negSiteDistributions[i][v]) > 1e-8){
-                mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
-            }
+        for (Vertex v : globalMesh.vertices()){ 
+            mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
         }
         std::cout << "negative mass at site " << i << " = " << mass << std::endl;
         psMesh.addVertexScalarQuantity("unaligned site distribution (-) " + std::to_string(i), negSiteDistributions[i]);
+
+        // Vector3 siteColor {geometrycentral::unitRand(), geometrycentral::unitRand(), geometrycentral::unitRand()};
+
+        // // Define blended color map
+        // double r,g,b;
+        // hsv_to_rgb(unitRand() * 360, 0.75, 1., r, g, b);
+        // Vector3 siteColor {r,g,b};
+
+        for (Vertex v : globalMesh.vertices()) {
+            // H(posSiteDistributions[i][v] / maxPosCurl);
+            // posSiteDistributionColor[v.getIndex()] -= siteColor * posSiteDistributions[i][v] / maxPosCurl;
+            negSiteDistributionColor[v.getIndex()] += posSiteColors[i] * negSiteDistributions[i][v];
+        }
     }
+    psMesh.addVertexColorQuantity("neg site dist blend (course)", negSiteDistributionColor)->setEnabled(true);
+    
+    polyscope::show();
     
 
     
