@@ -2058,17 +2058,41 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     polyscope::registerPointCloud("positive voronoi sites (wale)", positiveCenters)->setEnabled(false);
     std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
 
-    //print the masses
+    //print the positive masses 
+    //render the fuzzy cells
+    std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
+    std::vector<Vector3> posSiteColors(posSiteDistributions.size());
+    for (size_t i = 0; i < posSiteDistributions.size(); i++){
+        double r,g,b;
+        hsv_to_rgb((double)i/posSiteDistributions.size() * 360, 0.75, 1., r, g, b);
+        posSiteColors[i] = {r,g,b};
+    }
+    std::random_device rd;              // non-deterministic seed
+    std::mt19937 g(rd());               // Mersenne Twister engine
+    std::shuffle(posSiteColors.begin(), posSiteColors.end(), g);
+
     for (size_t i = 0; i < posSiteDistributions.size(); i++){
         double mass = 0;
-        for (Vertex v : globalMesh.vertices()){
-            if (std::fabs(posSiteDistributions[i][v]) > 1e-8){
-                mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
-            }
+        for (Vertex v : globalMesh.vertices()){ 
+            mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
         }
         std::cout << "positive mass at site " << i << " = " << mass << std::endl;
-        psMesh.addVertexScalarQuantity("positve site distribution (wale)" + std::to_string(i), posSiteDistributions[i]);
+        psMesh.addVertexScalarQuantity("unaligned site distribution (+) " + std::to_string(i), posSiteDistributions[i]);
+
+        // Vector3 siteColor {geometrycentral::unitRand(), geometrycentral::unitRand(), geometrycentral::unitRand()};
+
+        // // Define blended color map
+        // double r,g,b;
+        // hsv_to_rgb(unitRand() * 360, 0.75, 1., r, g, b);
+        // Vector3 siteColor {r,g,b};
+
+        for (Vertex v : globalMesh.vertices()) {
+            // H(posSiteDistributions[i][v] / maxPosCurl);
+            // posSiteDistributionColor[v.getIndex()] -= siteColor * posSiteDistributions[i][v] / maxPosCurl;
+            posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
+        }
     }
+    psMesh.addVertexColorQuantity("pos site dist blend (wale)", posSiteDistributionColor)->setEnabled(true);
 
    
     VoronoiOptions negOptions = defaultVoronoiOptions;
@@ -2086,17 +2110,32 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     polyscope::registerPointCloud("negative voronoi sites (wale)", negativeCenters)->setEnabled(false);
     std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
 
-    //print the masses
+    //print the negative masses 
+    //render the fuzzy cells
+    std::vector<Vector3> negSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
+    std::vector<Vector3> negSiteColors(negSiteDistributions.size());
+    for (size_t i = 0; i < negSiteDistributions.size(); i++){
+        double r,g,b;
+        hsv_to_rgb((double)i/negSiteDistributions.size() * 360, 0.75, 1., r, g, b);
+        negSiteColors[i] = {r,g,b};
+    }
+    std::shuffle(negSiteColors.begin(), negSiteColors.end(), g);
+
     for (size_t i = 0; i < negSiteDistributions.size(); i++){
         double mass = 0;
-        for (Vertex v : globalMesh.vertices()){
-            if (std::fabs(negSiteDistributions[i][v]) > 1e-8){
-                mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
-            }
+        for (Vertex v : globalMesh.vertices()){ 
+            mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
         }
         std::cout << "negative mass at site " << i << " = " << mass << std::endl;
-        psMesh.addVertexScalarQuantity("negative site distribution (wale)" + std::to_string(i), negSiteDistributions[i]);
+        psMesh.addVertexScalarQuantity("unaligned site distribution (-) " + std::to_string(i), negSiteDistributions[i]);
+
+        for (Vertex v : globalMesh.vertices()) {
+            negSiteDistributionColor[v.getIndex()] += negSiteColors[i] * negSiteDistributions[i][v];
+        }
     }
+    psMesh.addVertexColorQuantity("neg site dist blend (wale)", negSiteDistributionColor)->setEnabled(true);
+
+    polyscope::show();
 
     //store a vector of vertex ids and singularity indices (for optimal matching)
     std::vector<std::pair<Vertex, int>> singularities;
@@ -3679,6 +3718,12 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         }
     }
 
+    //this is in the glued setting 
+    FaceData<int> faceComponentsGlued =  componentsCutByLoops(gluedGeometry, allSaddleLoops);
+    psMesh.addFaceScalarQuantity("face components", faceComponentsGlued);
+    polyscope::show();
+
+
     // std::vector<Vertex> saddleVertices = getSaddleVertices(gluedGeometry, globalTimeFunction);
     // for (auto v : saddleVertices){
     //     heatSourceVerts.push_back(v);
@@ -3873,6 +3918,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         maxPosCurl = std::max(maxPosCurl, posMeasure[v]);
 
     //print the positive masses
+    //render the fuzzy cells
     std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
     std::vector<Vector3> posSiteColors(posSiteDistributions.size());
     for (size_t i = 0; i < posSiteDistributions.size(); i++){
@@ -3887,9 +3933,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     for (size_t i = 0; i < posSiteDistributions.size(); i++){
         double mass = 0;
         for (Vertex v : globalMesh.vertices()){ 
-            // if (std::fabs(posSiteDistributions[i][v]) > 1e-8){
-                mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
-            // }
+            mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
         }
         std::cout << "positive mass at site " << i << " = " << mass << std::endl;
         psMesh.addVertexScalarQuantity("unaligned site distribution (+) " + std::to_string(i), posSiteDistributions[i]);
@@ -3907,7 +3951,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
         }
     }
-    psMesh.addVertexColorQuantity("pos site dist blend", posSiteDistributionColor)->setEnabled(false);
+    psMesh.addVertexColorQuantity("pos site dist blend (course)", posSiteDistributionColor)->setEnabled(false);
 
     for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
         std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
@@ -3923,7 +3967,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         polyscope::registerPointCloud("site " + std::to_string(i) + " initialization ", std::vector<Vector3>{p})->setEnabled(false);
     }
     
-
 
     // NEGATIVE COURSE
 
@@ -3983,16 +4026,40 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
 
     //print the negative masses
+    //render the fuzzy cells
+    std::vector<Vector3> negSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
+    std::vector<Vector3> negSiteColors(posSiteDistributions.size());
+    for (size_t i = 0; i < negSiteDistributions.size(); i++){
+        double r,g,b;
+        hsv_to_rgb((double)i/negSiteDistributions.size() * 360, 0.75, 1., r, g, b);
+        posSiteColors[i] = {r,g,b};
+    }
+    std::shuffle(negSiteColors.begin(), negSiteColors.end(), g);
+
     for (size_t i = 0; i < negSiteDistributions.size(); i++){
         double mass = 0;
-        for (Vertex v : globalMesh.vertices()){
-            if (std::fabs(negSiteDistributions[i][v]) > 1e-8){
-                mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
-            }
+        for (Vertex v : globalMesh.vertices()){ 
+            mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
         }
         std::cout << "negative mass at site " << i << " = " << mass << std::endl;
         psMesh.addVertexScalarQuantity("unaligned site distribution (-) " + std::to_string(i), negSiteDistributions[i]);
+
+        // Vector3 siteColor {geometrycentral::unitRand(), geometrycentral::unitRand(), geometrycentral::unitRand()};
+
+        // // Define blended color map
+        // double r,g,b;
+        // hsv_to_rgb(unitRand() * 360, 0.75, 1., r, g, b);
+        // Vector3 siteColor {r,g,b};
+
+        for (Vertex v : globalMesh.vertices()) {
+            // H(posSiteDistributions[i][v] / maxPosCurl);
+            // posSiteDistributionColor[v.getIndex()] -= siteColor * posSiteDistributions[i][v] / maxPosCurl;
+            negSiteDistributionColor[v.getIndex()] += posSiteColors[i] * negSiteDistributions[i][v];
+        }
     }
+    psMesh.addVertexColorQuantity("neg site dist blend (course)", negSiteDistributionColor)->setEnabled(true);
+    
+    polyscope::show();
     
 
     
@@ -6013,24 +6080,47 @@ std::vector<std::vector<double>> findAllSaddleLoops(VertexPositionGeometry& geom
         int i = 0;
         // by this point all of the unique triangle strips for this particular vertex will be added to the list  
         for (const auto &strip : allTriangleStripsPerVertex) {
-            std::vector<double> saddleLoop(geometry.mesh.nEdges());
-            std::fill(saddleLoop.begin(), saddleLoop.end(), 0.0);
             auto uniqueEdges = findUniqueEdgesInTriangleStrip(strip);
             auto edgeLoop = chooseEdgeLoop(uniqueEdges, strip);
             auto halfedgeLoop = chooseHalfEdgeLoop(uniqueEdges, strip);
-            // construct the output here
-            for (const Halfedge &he : halfedgeLoop) {
-                if (he.edge().halfedge() == he) {
-                    saddleLoop[he.edge().getIndex()] = 1.0;
-                }
-                else {
-                    saddleLoop[he.edge().getIndex()] = -1.0;
+            std::vector<double> saddleLoop(geometry.mesh.nEdges(), 0.0);
+            for (Edge e : edgeLoop){
+                saddleLoop[e.getIndex()] = 1.0;
+            }
+
+            //prune dangling edges from the saddle loop 
+            // degree of each vertex within the marked edge set
+            VertexData<int> deg(geometry.mesh, 0);
+            for (Edge e : geometry.mesh.edges()) {
+                double s = saddleLoop[e.getIndex()];
+                if (std::abs(s) <= 1e-8) continue; // not in the loop
+                Halfedge he = e.halfedge();
+                deg[he.tailVertex()] += 1;
+                deg[he.tipVertex()]  += 1;
+            }
+            // remove any edge with an endpoint of degree of 1
+            for (Edge e : geometry.mesh.edges()) {
+                double s = saddleLoop[e.getIndex()];
+                if (!(std::fabs(s) > 0.)) continue;
+                Halfedge he = e.halfedge();
+                Vertex a = he.tailVertex();
+                Vertex b = he.tipVertex();
+                if (deg[a] == 1 || deg[b] == 1) {
+                    saddleLoop[e.getIndex()] = 0.0; // drop the stray edge                          
                 }
             }
+            std::vector<Edge> saddleLoopEdges; 
+            for (Edge e : geometry.mesh.edges()){
+                if (std::fabs(saddleLoop[e.getIndex()]) > 0) saddleLoopEdges.emplace_back(e);
+            }
+            //auto signedLoop = signedCycleFromIndicator(geometry.mesh, saddleLoop);
+
+            //allSaddleLoops.push_back(saddleLoop);
             allSaddleLoops.push_back(saddleLoop);
             // visualization (uncomment if you don't care)
             std::string network = "edge loop" + std::to_string(loopCounter++);
-            registerCurveNetworkFromEdges(geometry, edgeLoop, network); 
+            //registerCurveNetworkFromEdges(geometry, edgeLoop, network); 
+            registerCurveNetworkFromEdges(geometry, saddleLoopEdges, network);
             //std::cout << "the size of loop " << i++ << "is: " << edgeLoop.size() << std::endl;
             //std::cout << "the size of halfedge loop " << i++ << "is: " << halfedgeLoop.size() << std::endl;
         }
@@ -6077,26 +6167,40 @@ std::vector<std::vector<double>> findAllSaddleLoops(IntrinsicGeometryInterface& 
         int i = 0;
         // by this point all of the unique triangle strips for this particular vertex will be added to the list  
         for (const auto &strip : allTriangleStripsPerVertex) {
-            std::vector<double> saddleLoop(geometry.mesh.nEdges());
-            std::fill(saddleLoop.begin(), saddleLoop.end(), 0.0);
             auto uniqueEdges = findUniqueEdgesInTriangleStrip(strip);
             auto edgeLoop = chooseEdgeLoop(uniqueEdges, strip);
             auto halfedgeLoop = chooseHalfEdgeLoop(uniqueEdges, strip);
-            // construct the output here
-            for (const Halfedge &he : halfedgeLoop) {
-                if (he.edge().halfedge() == he) {
-                    saddleLoop[he.edge().getIndex()] = 1.0;
-                }
-                else {
-                    saddleLoop[he.edge().getIndex()] = -1.0;
+            std::vector<double> saddleLoop(geometry.mesh.nEdges(), 0.0);
+            for (Edge e : edgeLoop){
+                saddleLoop[e.getIndex()] = 1.0;
+            }
+
+            //prune dangling edges from the saddle loop 
+            // degree of each vertex within the marked edge set
+            VertexData<int> deg(geometry.mesh, 0);
+            for (Edge e : geometry.mesh.edges()) {
+                double s = saddleLoop[e.getIndex()];
+                if (std::abs(s) <= 1e-8) continue; // not in the loop
+                Halfedge he = e.halfedge();
+                deg[he.tailVertex()] += 1;
+                deg[he.tipVertex()]  += 1;
+            }
+            // remove any edge with an endpoint of degree of 1
+            for (Edge e : geometry.mesh.edges()) {
+                double s = saddleLoop[e.getIndex()];
+                if (!(std::fabs(s) > 0.)) continue;
+                Halfedge he = e.halfedge();
+                Vertex a = he.tailVertex();
+                Vertex b = he.tipVertex();
+                if (deg[a] == 1 || deg[b] == 1) {
+                    saddleLoop[e.getIndex()] = 0.0; // drop the stray edge                          
                 }
             }
+            std::vector<Edge> saddleLoopEdges; 
+            for (Edge e : geometry.mesh.edges()){
+                if (std::fabs(saddleLoop[e.getIndex()]) > 0) saddleLoopEdges.emplace_back(e);
+            }
             allSaddleLoops.push_back(saddleLoop);
-            // visualization (uncomment if you don't care)
-            //std::string network = "edge loop" + std::to_string(loopCounter++);
-            //registerCurveNetworkFromEdges(geometry, edgeLoop, network); 
-            //std::cout << "the size of loop " << i++ << "is: " << edgeLoop.size() << std::endl;
-            //std::cout << "the size of halfedge loop " << i++ << "is: " << halfedgeLoop.size() << std::endl;
         }
     }
 

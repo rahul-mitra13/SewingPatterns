@@ -88,8 +88,6 @@ Eigen::SparseMatrix<double, Eigen::RowMajor> G;
 //the knit graph over the model 
 KnitGraph graph;
 
-
-
 // Global configuration options
 // TODO: setup command line interface with CLI11
 Options opts;
@@ -172,17 +170,27 @@ void showStripePatterns(){
 
   //if doing the homology generators on the 3D models
   if (globalGeometry->mesh.nConnectedComponents() == 1){
-      //std::vector<Vertex> saddleVertices = getSaddleVertices(*globalGeometry, timeFunctionGlobal);
-      //allSaddleLoops = findAllSaddleLoops(*globalGeometry, saddleVertices, timeFunctionGlobal);
+      //call it on the global setting if you want to visualize the saddle loops
+      std::vector<Vertex> saddleVertices = getSaddleVertices(*globalGeometry, timeFunctionGlobal);
+      //visualize the saddle vertices 
+      std::vector<Vector3> saddleVertexPos; 
+      for (Vertex v : saddleVertices){
+        saddleVertexPos.emplace_back(globalGeometry -> vertexPositions[v]);
+      }
+      polyscope::registerPointCloud("saddle vertices", saddleVertexPos);
+      allSaddleLoops = findAllSaddleLoops(*globalGeometry, saddleVertices, timeFunctionGlobal);
       homologyGenerators = buildHomologyGeneratorsVector(*globalGeometry, *globalMesh);
+      int k = 0;
+      for (auto p : allSaddleLoops){
+        globalPSMesh->addEdgeScalarQuantity("saddle loop " + std::to_string(k++), p);
+      }
   }
-
-  //get the saddle loops on general patch models
-  std::vector<Vertex> saddleVertices = getSaddleVertices(*gluedELG, timeFunctionGlued);
-  allSaddleLoops = findAllSaddleLoops(*gluedELG, saddleVertices, timeFunctionGlued);
-
-  // std::cout << "size of all saddle loops = " << allSaddleLoops.size() << std::endl;
-
+  else{
+    //in this intrinsic setting, can't visualize saddle loops
+    //get the saddle loops on general patch models
+    std::vector<Vertex> saddleVertices = getSaddleVertices(*gluedELG, timeFunctionGlued);
+    //allSaddleLoops = findAllSaddleLoops(*gluedELG, saddleVertices, timeFunctionGlued);
+  }
 
   //gradient on the glued/global mesh
   //note that faces have a 1-to-1 mapping from global to glued setting
@@ -222,8 +230,7 @@ void showStripePatterns(){
 
   std::string richDataFile;
   // richDataFile = "info.ply";
-  // richDataFile = "bunny_new_2.0.ply";
-  // richDataFile = "bunny_info_3.5.ply";
+  // richDataFile = "bunny_info_2.0.ply";
   // richDataFile = "sock_info_0.0035.ply";
   // richDataFile = "misc_cactus_info_0.1.ply";
   //richDataFile = "ducK_info_0.02.ply";
