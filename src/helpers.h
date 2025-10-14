@@ -67,8 +67,13 @@ template<class T> std::ostream &operator<<(std::ostream &os, std::vector<T> v) {
 struct Options {
 
   // Add Polyscope quantities for every iteration of the algorithm
-  bool showAllIterations = true;
+  bool showAllIterations = false;
 
+  // Align course singularities into short rows
+  bool alignCourseSingularities = true;
+
+  // Use input V coordinate for wale guidance. Default will just rotate the time function gradient 90 degrees
+  bool useVCoordForWale = false;
 };
 
 //boundary conditions on the GLUED MESH

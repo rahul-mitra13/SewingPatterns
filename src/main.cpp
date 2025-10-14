@@ -59,6 +59,9 @@ std::unique_ptr<VertexPositionGeometry> globalGeometry;
 polyscope::SurfaceMesh *globalPSMesh;
 //global boundary conditions
 globalBoundaryConditions globalBdyConditions;
+// UV texture coordinates
+std::unique_ptr<CornerData<Vector2>> uvCoords;
+
 
 //1-form optimization course Period
 double coursePeriod = 1;
@@ -94,15 +97,39 @@ Options opts;
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
   
-  opts.showAllIterations = false;
+  if (uvCoords == nullptr) {
+    opts.useVCoordForWale = false;
+    P("V coordinate is not available for wale guidance! Defaulting to rotated time function gradient.");
+  }
 
   //set the wale period 
   //walePeriod = ((1.0/1.6) * coursePeriod);
   walePeriod = coursePeriod;
-  //time function on the glued mesh 
-  VertexData<double> timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
-  //time function on the global mesh 
-  VertexData<double> timeFunctionGlobal = convertGluedToGlobalVertexFunction(*globalGeometry, *gluedELG, timeFunctionGlued, vertexMap);
+
+  //time function on the glued and global mesh 
+  VertexData<double> timeFunctionGlued(gluedELG->mesh), timeFunctionGlobal(*globalMesh, 0.0);
+  VertexData<double> waleTimeFunction(*globalMesh, 0.0); // only used when we are given UV coordinates
+  if (uvCoords != nullptr) {
+
+    // We average the corner values to the vertices,
+    // being careful not to include corners of boundary loops
+    VertexData<int> nInteriorCorners(*globalMesh, 0);
+    for (Halfedge he : globalMesh->interiorHalfedges()) {
+      Corner co = he.corner();
+      Vertex v = he.vertex();
+      nInteriorCorners[v]++;
+      timeFunctionGlobal[v] += (*uvCoords)[co][0];
+      waleTimeFunction[v] += (*uvCoords)[co][1];
+    }
+    for (Vertex v : globalMesh->vertices()) {
+      timeFunctionGlobal[v] /= nInteriorCorners[v];
+      waleTimeFunction[v] /= nInteriorCorners[v];
+    }
+
+  } else {
+    timeFunctionGlued = computeTimeFunction(*gluedELG, globalBdyConditions);
+    timeFunctionGlobal = convertGluedToGlobalVertexFunction(*globalGeometry, *gluedELG, timeFunctionGlued, vertexMap);
+  }
   globalPSMesh -> addVertexScalarQuantity("time function", timeFunctionGlobal);
 
   // Compute a smooth 1-direction field
@@ -160,15 +187,28 @@ void showStripePatterns(){
   //gradient on the glued/global mesh
   //note that faces have a 1-to-1 mapping from global to glued setting
   FaceData<Vector3> timeFunctionGradientGlobal = computeTimeFunctionFaceGrad(*globalGeometry, timeFunctionGlobal);
-  //normalize the gradient of the timeFunction 
+  //normalize the gradient of the timeFunction, and computed the rotated one while we're here
   FaceData<Vector3> timeFunctionGradientGlobalNormalized(*globalMesh);
   FaceData<Vector3> timeFunctionGradientGlobalRotated(*globalMesh);
   for (Face f : globalMesh -> faces()){
     timeFunctionGradientGlobalNormalized[f] = timeFunctionGradientGlobal[f].normalize();
     timeFunctionGradientGlobalRotated[f] = timeFunctionGradientGlobal[f].rotateAround(globalGeometry->faceNormals[f], PI/2.);
   }
-  globalPSMesh -> addFaceVectorQuantity("normalized time function gradient", timeFunctionGradientGlobalNormalized);
+  globalPSMesh -> addFaceVectorQuantity("time function normalized gradient", timeFunctionGradientGlobalNormalized);
 
+  // wale time function gradient (case where we are given UV coordinates)
+  FaceData<Vector3> waleTimeFunctionGradient(*globalMesh);
+  if (opts.useVCoordForWale) {
+    waleTimeFunctionGradient = computeTimeFunctionFaceGrad(*globalGeometry, waleTimeFunction);
+    for (Face f : globalMesh->faces())
+      waleTimeFunctionGradient[f] = waleTimeFunctionGradient[f].normalize();
+  } else {
+    for (Face f : globalMesh->faces())
+      waleTimeFunctionGradient[f] = timeFunctionGradientGlobalRotated[f].normalize();
+  }
+  globalPSMesh -> addFaceVectorQuantity("wale guiding field", waleTimeFunctionGradient);
+  
+  
 
   G = grad;
 
@@ -210,14 +250,11 @@ void showStripePatterns(){
                                                                     globalBdyConditions, coursePeriod, V, F, G, courseOneFormGrad, gluedOneRingMap, 
                                                                     allSaddleLoops, homologyGenerators, opts);
     
-    polyscope::show();
-
     std::tie(waleStripeValues, waleSingularEdgesGlobal) = computeWaleStripeInfo(*globalGeometry, *gluedELG, 
-                                                                      edgeMappingsPairs, edgeMap, vertexMap, timeFunctionGlobal, timeFunctionGlued,
+                                                                      edgeMappingsPairs, edgeMap, vertexMap, waleTimeFunctionGradient,
                                                                       courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
                                                                       courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
                                                                       homologyGenerators);
-
     
     // globalPSMesh->addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
     // globalPSMesh->addEdgeScalarQuantity("wale singular edges", waleSingularEdgesGlobal);
@@ -462,6 +499,10 @@ int main(int argc, char **argv) {
     modelPath = inFilePath; // useful for later?
     parseMsh(inFilePath, globalMesh, globalGeometry, globalBdyConditions);
 
+  } else if (inFilePath.extension() == ".obj") {
+    
+    modelPath = inFilePath;
+    std::tie(globalMesh, globalGeometry, uvCoords) = readParameterizedManifoldSurfaceMesh(modelPath);
   } else {
     std::cout << "Unrecognized file format." << std::endl;
     throw std::exception();
@@ -509,6 +550,19 @@ int main(int argc, char **argv) {
 
   globalPSMesh->setSurfaceColor({1,1,1}); // white mesh
   
+  // Plot texture coords
+  if (uvCoords != nullptr) {
+    CornerData<double> u(*globalMesh);
+    CornerData<double> v(*globalMesh);
+    for (Corner co : globalMesh->corners()) {
+      u[co] = (*uvCoords)[co][0];
+      v[co] = (*uvCoords)[co][1];
+    }
+
+    globalPSMesh->addCornerScalarQuantity("u", prepareCornerData(u));
+    globalPSMesh->addCornerScalarQuantity("v", prepareCornerData(v));
+  }
+
   // Internally, Polyscope numbers the edges by looping over faces.
   // Since our numbering is different than that after fixDelaunay, we need to specify the new numbering by providing a permutation.
   // Note that this is only useful for EdgeData visualization; apart from that everything works fine.
