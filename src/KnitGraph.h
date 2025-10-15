@@ -61,8 +61,8 @@ class KnitGraph{
         //id counter of vertices 
         int vertexID = 0;
 
-        //period for sampling the knit graph 
-        double period; 
+        //period for sampling the knit graph (unused for now)
+        // double period; 
 
         //period for sampling the course stripes 
         double coursePeriod; 

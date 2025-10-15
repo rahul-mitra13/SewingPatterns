@@ -3183,7 +3183,7 @@ std::vector<std::pair<int, int>> findEdgeSingularityPairs(VertexPositionGeometry
         //find max curl over entire mesh 
         //find edge with max  curl
         for (Edge e : globalMesh.edges()){
-            if (curl[e] > maxCurl && !usedEdges.count(e.getIndex()) != 1){
+            if (curl[e] > maxCurl && usedEdges.count(e.getIndex()) > 0){
                 maxCurl = curl[e];
                 maxEdge = e.getIndex();
             }
@@ -3211,7 +3211,7 @@ std::vector<std::pair<int, int>> findEdgeSingularityPairs(VertexPositionGeometry
                     //check if current isoline crosses this edge
                     if ((isoVal > globalTimeFunction[e.halfedge().tailVertex()] && isoVal < globalTimeFunction[e.halfedge().tipVertex()])
                     || (isoVal > globalTimeFunction[e.halfedge().tipVertex()] && isoVal < globalTimeFunction[e.halfedge().tailVertex()])){
-                        if (curl[e] < minCurl && !usedEdges.count(e.getIndex()) != 1){
+                        if (curl[e] < minCurl && usedEdges.count(e.getIndex()) > 0){
                             minCurl = curl[e];
                             minEdge = e.getIndex();
                         }
@@ -3241,7 +3241,7 @@ std::vector<std::pair<int, int>> findEdgeSingularityPairs(VertexPositionGeometry
                     //check if current isoline crosses this edge
                     if ((isoVal > globalTimeFunction[e.halfedge().tailVertex()] && isoVal < globalTimeFunction[e.halfedge().tipVertex()])
                         ||(isoVal > globalTimeFunction[e.halfedge().tipVertex()] && isoVal < globalTimeFunction[e.halfedge().tailVertex()])){
-                        if (curl[e] > maxCurl && (!usedEdges.count(e.getIndex()) > 0)){
+                        if (curl[e] > maxCurl && usedEdges.count(e.getIndex()) == 0){
                             maxCurl = curl[e];
                             maxEdge = e.getIndex();
                         }
@@ -3249,7 +3249,7 @@ std::vector<std::pair<int, int>> findEdgeSingularityPairs(VertexPositionGeometry
                     //check if current isoline crosses this edge
                     if ((isoVal > globalTimeFunction[e.halfedge().tailVertex()] && isoVal < globalTimeFunction[e.halfedge().tipVertex()])
                         ||(isoVal > globalTimeFunction[e.halfedge().tipVertex()] && isoVal < globalTimeFunction[e.halfedge().tailVertex()])){
-                        if (curl[e] < minCurl && (!usedEdges.count(e.getIndex()) > 0)){
+                        if (curl[e] < minCurl && usedEdges.count(e.getIndex()) == 0){
                             minCurl = curl[e];
                             minEdge = e.getIndex();
                         }

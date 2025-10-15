@@ -193,7 +193,25 @@ endif()
 
 #target_link_libraries(SewingPatterns ${SUITESPARSE_LIBRARIES})
 
+# Helper function to silence warnings from third-party libraries
+function(silence_warnings_from target dependency)
+  get_target_property(_inc_dirs ${dependency} INTERFACE_INCLUDE_DIRECTORIES)
+  if(_inc_dirs)
+    target_include_directories(${target} SYSTEM PRIVATE ${_inc_dirs})
+  endif()
+endfunction()
 
+# Silence warnings from external dependencies
+silence_warnings_from(SewingPatterns Eigen3::Eigen)
+silence_warnings_from(SewingPatterns polyscope)
+silence_warnings_from(SewingPatterns geometry-central)
+
+# Add some compilation flags for our target SewingPatterns
+target_compile_options(SewingPatterns PRIVATE
+  -Wall
+  -Wno-unused-variable
+  -Wno-unused-but-set-variable
+)
 
 
 # Link settings
