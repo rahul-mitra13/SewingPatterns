@@ -122,6 +122,17 @@ set(GMSH_LIB_DIR ${GMSH_DIR}/lib)
 find_library(GMSH_LIB NAMES gmsh PATHS ${GMSH_LIB_DIR} REQUIRED)
 message(${GMSH_LIB})
 
+# CLI11 dependency
+if (NOT TARGET CLI11::CLI11)
+    FetchContent_Declare(cli11
+        GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+        GIT_TAG        main
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/CLI11"
+        )
+    FetchContent_MakeAvailable(cli11)
+endif()
+
+
 include_directories(${GUROBI_INCLUDE_DIRS})
 include_directories(${PYTHON_INCLUDE_DIRS})
 
@@ -220,7 +231,9 @@ target_link_libraries(SewingPatterns
 			Eigen3::Eigen
 			geometry-central
 			${GUROBI_LIBRARY}
-      ${GMSH_LIB})
+      ${GMSH_LIB}
+      CLI11::CLI11
+      )
 
 # target_link_libraries(SewingPatterns
 # 			polyscope

@@ -21,6 +21,7 @@
 #include "args/args.hxx"
 #include "nlohmann/json.hpp"
 #include "imgui.h"
+#include <CLI/CLI.hpp>
 
 //file includes
 #include "powerCells.h"
@@ -85,6 +86,9 @@ Eigen::SparseMatrix<double> grad;
 //gradient operator in the row major format
 Eigen::SparseMatrix<double, Eigen::RowMajor> G;
 
+// An optional .ply file containing pre-computed stripe values that the user can give
+optional<string> richDataFile;
+
 //the knit graph over the model 
 KnitGraph graph;
 
@@ -95,9 +99,10 @@ Options opts;
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
   
-  if (uvCoords == nullptr) {
-    opts.useVCoordForWale = false;
+  // Scold the user if they want to use V coord as guidance but have not specified it
+  if (uvCoords == nullptr && opts.useVCoordForWale) {
     P("V coordinate is not available for wale guidance! Defaulting to rotated time function gradient.");
+    opts.useVCoordForWale = false;
   }
 
   //set the wale period 
@@ -228,9 +233,9 @@ void showStripePatterns(){
   // P("revealCurl done");
   // polyscope::show();
 
-  std::string richDataFile;
+  // // Old .ply files, keeping those for reference
   // richDataFile = "info.ply";
-  // richDataFile = "bunny_info_2.0.ply";
+  // richDataFile = "bunny_info_3.5.ply";
   // richDataFile = "sock_info_0.0035.ply";
   // richDataFile = "misc_cactus_info_0.1.ply";
   //richDataFile = "ducK_info_0.02.ply";
@@ -244,9 +249,9 @@ void showStripePatterns(){
   CornerData<double> waleStripeValues;
   EdgeData<double> waleSingularEdgesGlobal;
   FaceData<int> waleSingularFaces(globalGeometry -> mesh, 0);//there are no face singularities
-  if (richDataFile.size() > 0) { // if a file is specified, load it
+  if (richDataFile) { // if a file is specified, load it
     std::cout << "Reading a file..." << std::endl;
-    RichSurfaceMeshData richData(globalGeometry->mesh, richDataFile);
+    RichSurfaceMeshData richData(globalGeometry->mesh, *richDataFile);
     courseStripeValues = richData.getCornerProperty<double>("courseStripeValues");
     courseSingularEdgesGlobal = richData.getEdgeProperty<double>("courseSingularEdges");
     waleStripeValues = richData.getCornerProperty<double>("waleStripeValues");
@@ -456,6 +461,21 @@ void callBacks() {
 
 int main(int argc, char **argv) {
 
+  // Setup command-line interface with CLI11
+  string inFileName;
+  optional<double> period;
+  
+  CLI::App app {"SewingPatterns"};
+  app.add_option("inFileName", inFileName, "Input mesh and metadata as .json, .obj or .msh.")->required()->check(CLI::ExistingFile);
+  app.add_option("-p,--period", period, "Period for the stripe pattern; default is 2*mesh_size.");
+  app.add_option("--ply", richDataFile, "Rich data file (.ply) containing precomputed stripe values.")->check(CLI::ExistingFile);
+
+  try {
+    app.parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app.exit(e);
+  }
+
   // Check how many CPUs are available
 #if defined(_OPENMP)
   int nThreads = omp_get_max_threads();
@@ -468,7 +488,7 @@ int main(int argc, char **argv) {
 
   polyscope::init();
 
-  std::filesystem::path inFilePath(argv[1]);
+  std::filesystem::path inFilePath(inFileName);
   nlohmann::json data;
   string modelPath;
   if (inFilePath.extension() == ".json") {
@@ -531,14 +551,12 @@ int main(int argc, char **argv) {
     if (length > maxLength)
       maxLength = length;
   }
-  coursePeriod = 2.0 * maxLength;//set the default length to twice the course period
+  
   avgEdgeLength = sum / globalMesh -> nEdges();
 
-  // Parse stripe period, if available
-  if (argc > 2) {
-    sscanf(argv[2], "%lf", &coursePeriod);
-    knoppelFrequency = 1.0 / coursePeriod; // to match course and wale periods
-  }
+  // Take CLI period if given, otherwise set it to twice the default length
+  coursePeriod = period ? *period : 2*maxLength;
+  knoppelFrequency = 1.0 / coursePeriod; // to match course and wale periods
 
   if (!(globalMesh -> isManifold())){
     std::cout << "Error: Mesh is not manifold" << std::endl;
