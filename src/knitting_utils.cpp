@@ -2135,7 +2135,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     }
     psMesh.addVertexColorQuantity("neg site dist blend (wale)", negSiteDistributionColor)->setEnabled(true);
 
-    polyscope::show();
+    // polyscope::show();
 
     //store a vector of vertex ids and singularity indices (for optimal matching)
     std::vector<std::pair<Vertex, int>> singularities;
@@ -3721,7 +3721,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     //this is in the glued setting 
     FaceData<int> faceComponentsGlued =  componentsCutByLoops(gluedGeometry, allSaddleLoops);
     psMesh.addFaceScalarQuantity("face components", faceComponentsGlued);
-    polyscope::show();
+    // polyscope::show();
 
 
     // std::vector<Vertex> saddleVertices = getSaddleVertices(gluedGeometry, globalTimeFunction);
@@ -4059,7 +4059,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
     psMesh.addVertexColorQuantity("neg site dist blend (course)", negSiteDistributionColor)->setEnabled(true);
     
-    polyscope::show();
+    // polyscope::show();
     
 
     
@@ -4292,24 +4292,27 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
         //set the singular edges where path exists
         std::vector<std::pair<int, int>> singularEdgesToUse;
+        std::vector<std::pair<Halfedge, Halfedge>> singularHalfedgesToUse;
         for (int i : indicesToUse){
             singularEdgesToUse.push_back(singularEdges[i]);
+            singularHalfedgesToUse.push_back(pairedHalfedges[i]);
         }
         model.setSingularEdges(singularEdgesToUse);
 
         // Set edgeSingularities[e] = ±i, where i is the ordering of the pair in time.
-        // Having the ordering will be useful for constructing the knit graph.
-        std::map<double, std::pair<Edge,Edge>> singularPairsByTime;
-        for (auto &[i1, i2] : singularEdgesToUse) {
-            Edge e1 = globalMesh.edge(i1);
-            Edge e2 = globalMesh.edge(i2);
-            singularPairsByTime[edgeToIsoVal[e1]] = {e1, e2};
-        }
+        // Having the ordering will be useful for constructing the knit graph,
+        // and for the ordering constraints.
+        std::map<double, std::pair<Halfedge,Halfedge>> singularPairsByTime;
+        for (auto &[he1, he2] : singularHalfedgesToUse)
+            singularPairsByTime[edgeToIsoVal[he1.edge()]] = {he1, he2};
+        
+        std::vector<std::pair<Halfedge, Halfedge>> singularHalfedgesOrdered; // list of halfedge pairs, nicely pruned and ordered
         int pairIndex = 1;
         for (auto &[t, p] : singularPairsByTime) {
-            edgeSingularities[p.first] = +pairIndex;
-            edgeSingularities[p.second] = -pairIndex;
+            edgeSingularities[p.first.edge()] = +pairIndex;
+            edgeSingularities[p.second.edge()] = -pairIndex;
             pairIndex++;
+            singularHalfedgesOrdered.push_back(p);
         }
 
         std::cout << "Set singular edges as constraints " << std::endl;
@@ -4410,7 +4413,26 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
         psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
         model.setHalfedgePathConstraints(halfedgePathConstraints);
+
+        // Short row ordering constraints
+        for (int iPair = 1; iPair < singularHalfedgesOrdered.size(); iPair++) {
+            Halfedge he1 = singularHalfedgesOrdered[iPair-1].first;
+            Halfedge he2 = singularHalfedgesOrdered[iPair].first;
+            std::vector<Halfedge> path = surface::shortestEdgePath(globalGeometry, he1.tailVertex(), he2.tipVertex());
+            std::vector<Edge> edgePath(path.size()); // just for viz
+            std::vector<double> heWeights(globalMesh.nHalfedges(), 0.0);
+            for (int i = 0; i < path.size(); i++) {
+                edgePath[i] = path[i].edge();
+                heWeights[path[i].getIndex()] = 1.0;
+            }
+            auto constraint = make_pair(heWeights, 0.);
+            model.addHalfedgePathInequalityConstraint(constraint);
+            showEdges("ordering path "+std::to_string(iPair), edgePath, globalGeometry)->setEnabled(false);
+        }
+
     }
+
+    
     
     
     model.setEdgeIndices(edgeIndices);
@@ -4837,6 +4859,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
     std::vector<int> bdyEdges = gbModel.getBdyEdges();
     std::vector<std::pair<std::vector<double>, double>> edgePathConstraints = gbModel.getEdgePathConstraints();
     std::vector<std::pair<std::vector<double>, double>> halfedgePathConstraints = gbModel.getHalfedgePathConstraints();
+    std::vector<std::pair<std::vector<double>, double>> halfedgePathInequalityConstraints = gbModel.getHalfedgePathInequalityConstraints();
     std::vector<std::vector<int>> stripeAlignmentConstraints = gbModel.getStripeAlignmentConstraints();
 
     gluedGeometry.requireDECOperators();
@@ -5156,6 +5179,15 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
             else
                 model.addConstr(pathIntegral == 0.0);
         }
+
+        // add halfedge path inequality constraints
+        for (auto &[path, rhs] : halfedgePathInequalityConstraints) {
+            GRBLinExpr pathIntegral = 0;
+            for (int k = 0; k < gluedMesh.nHalfedges(); k++)
+                pathIntegral += path[k] * sigma[k];
+            model.addConstr(pathIntegral >= rhs);
+        }
+
 
         //add stripe alignment constraints 
         std::vector<GRBVar> alignmentEqualities;

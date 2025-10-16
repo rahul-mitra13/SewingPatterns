@@ -36,6 +36,8 @@ class Model{
         //stores a pair of (edge indices, integral value of the path that those edge indices specify) 
         //the length of the vector is mesh->nHalfedges()
         std::vector<std::pair<std::vector<double>, double>> halfedgePathConstraints;
+        // same, but for inequality constraints (∑ x_e ≥ y)
+        std::vector<std::pair<std::vector<double>, double>> halfedgePathInequalityConstraints;
 
 
         //homology generator constraints 
@@ -102,6 +104,9 @@ class Model{
         //set halfedge path constraints
         void setHalfedgePathConstraints(std::vector<std::pair<std::vector<double>, double>>& edgePathConstraints);
 
+        void addHalfedgePathInequalityConstraint(std::pair<std::vector<double>, double>& constraint) {
+            this->halfedgePathInequalityConstraints.push_back(constraint); }
+
         //set stripe alignment constraint
         void setStripeAlignmentConstraints(std::vector<std::vector<int>> stripeAlignmentConstraints);
 
@@ -149,6 +154,9 @@ class Model{
 
         //get halfedge path constraints 
         std::vector<std::pair<std::vector<double>, double>> getHalfedgePathConstraints();
+
+        std::vector<std::pair<std::vector<double>, double>> getHalfedgePathInequalityConstraints() {
+            return this->halfedgePathInequalityConstraints; }
 
         //get stripe alignment constraint
         std::vector<std::vector<int>> getStripeAlignmentConstraints();

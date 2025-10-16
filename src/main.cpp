@@ -328,6 +328,7 @@ void showStripePatterns(){
   for (Corner co : globalMesh->corners())
       stripeValuesWithOffset[co] -= coursePeriod/4;
   std::tie(positionsCourse, edgesCourse, components) = findStripeConnectedComponents(*globalGeometry, *gluedELG, stripeValuesWithOffset, stripeIndicesSigmaCourse, coursePeriod, edgeMap);
+  globalPSMesh->addCornerScalarQuantity("course stripe values", prepareCornerData(stripeValuesWithOffset));
   polyscope::registerCurveNetwork("course stripes with offset", positionsCourse, edgesCourse)->setRadius(0.0005)->setColor({50.0/255, 205.0/255, 50.0/255})->setEnabled(false);
 
   // Plot wale stripe values with offset (to debug knit graph)
