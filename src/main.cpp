@@ -233,7 +233,7 @@ void showStripePatterns(){
   // P("revealCurl done");
   // polyscope::show();
 
-  // // Old .ply files, keeping those for reference
+  // Old .ply files, keeping those for reference
   // richDataFile = "info.ply";
   // richDataFile = "bunny_info_3.5.ply";
   // richDataFile = "sock_info_0.0035.ply";
