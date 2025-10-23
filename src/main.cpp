@@ -221,9 +221,16 @@ void showStripePatterns(){
   }
   globalPSMesh -> addFaceVectorQuantity("wale guiding field", waleTimeFunctionGradient);
   
-  
-
   G = grad;
+
+  // Plot boundary and homology generators path
+  for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++) {
+    auto &path = globalBdyConditions.waleBdyPathConstraints[i];
+    HalfedgeData<double> pathVisu(gluedELG->mesh, 0.0);
+    for (Edge e : gluedELG->mesh.edges())
+        pathVisu[e.halfedge()] = path[e.getIndex()];
+    globalPSMesh->addHalfedgeScalarQuantity("path bdy "+std::to_string(i), pathVisu);
+  }
 
   // Call Matteo's revealCurl
   // Model model;
