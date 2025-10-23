@@ -2164,7 +2164,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         for (int i = 0; i < steps.size(); i++){
             stepPos.push_back(steps[i].interpolate(globalGeometry.vertexPositions));
         }
-        polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos)->setEnabled(false);
+        // polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos)->setEnabled(false);
     }
 
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
@@ -3868,7 +3868,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
        positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-       polyscope::registerPointCloud("unaligned site (+) " + std::to_string(i), std::vector<Vector3>{posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions)})->setEnabled(false);
+       // polyscope::registerPointCloud("unaligned site (+) " + std::to_string(i), std::vector<Vector3>{posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions)})->setEnabled(false);
     }
 
 
@@ -3916,19 +3916,19 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     }
     psMesh.addVertexColorQuantity("pos site dist blend (course)", posSiteDistributionColor)->setEnabled(false);
 
-    for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
-        std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
-        std::vector<Vector3> stepPos;
-        for (int i = 0; i < steps.size(); i++){
-            stepPos.push_back(steps[i].interpolate(globalGeometry.vertexPositions));
-        }
-        polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos)->setEnabled(false);
-    }
+    // for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
+    //     std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
+    //     std::vector<Vector3> stepPos;
+    //     for (int i = 0; i < steps.size(); i++){
+    //         stepPos.push_back(steps[i].interpolate(globalGeometry.vertexPositions));
+    //     }
+    //     polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos)->setEnabled(false);
+    // }
 
-    for (int i = 0; i < posInitialSites.size(); i++){
-        Vector3 p = posInitialSites[i].interpolate(globalGeometry.vertexPositions);
-        polyscope::registerPointCloud("site " + std::to_string(i) + " initialization ", std::vector<Vector3>{p})->setEnabled(false);
-    }
+    // for (int i = 0; i < posInitialSites.size(); i++){
+    //     Vector3 p = posInitialSites[i].interpolate(globalGeometry.vertexPositions);
+    //     polyscope::registerPointCloud("site " + std::to_string(i) + " initialization ", std::vector<Vector3>{p})->setEnabled(false);
+    // }
     
 
     // NEGATIVE COURSE
@@ -3981,7 +3981,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<Vector3> negativeCenters;
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
        negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-       polyscope::registerPointCloud("unaligned site (-) " + std::to_string(i), std::vector<Vector3>{negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions)})->setEnabled(false);
+       // polyscope::registerPointCloud("unaligned site (-) " + std::to_string(i), std::vector<Vector3>{negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions)})->setEnabled(false);
     }
     polyscope::registerPointCloud("Voronoi sites unaligned (-)", negativeCenters)->setEnabled(false);
     std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
@@ -4065,7 +4065,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         // SHORT ROW ALIGNMENT
 
         HalfedgeData<double> heWeights = gluedHeWeights;
-        // psMesh.addHalfedgeScalarQuantity("matching weights", heWeights);
+        //psMesh.addHalfedgeScalarQuantity("matching weights", prepareHalfedgeData(heWeights));
         std::vector<std::pair<Vertex, Vertex>> matchedVertices = performOptimalMatching(globalGeometry, heWeights, singularities, globalTimeFunction);
 
         //specify options for alignment
@@ -4083,7 +4083,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             std::vector<Vector3> matchedSP;
             matchedSP.push_back(p.first.interpolate(globalGeometry.vertexPositions));
             matchedSP.push_back(p.second.interpolate(globalGeometry.vertexPositions));
-            polyscope::registerPointCloud("matched SPs " + std::to_string(i), matchedSP)->setEnabled(false);
+            // polyscope::registerPointCloud("matched SPs " + std::to_string(i), matchedSP)->setEnabled(false);
         }
         alignmentOptions.pairedSites = matchedSurfacePoints;
         alignmentOptions.usingPosCurl = true;
@@ -4258,7 +4258,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             courseSingularEdgePoints.push_back(globalGeometry.vertexPositions[negEdge.firstVertex()]);
             courseSingularEdgePoints.push_back(globalGeometry.vertexPositions[negEdge.secondVertex()]);
             courseSingularEdges.push_back({(int)courseSingularEdgePoints.size()-2, (int)courseSingularEdgePoints.size()-1});
-            polyscope::registerCurveNetwork("course singular edge pair " + std::to_string(i), courseSingularEdgePoints, courseSingularEdges)->setEnabled(false);
+            //polyscope::registerCurveNetwork("course singular edge pair " + std::to_string(i), courseSingularEdgePoints, courseSingularEdges)->setEnabled(false);
             double isoVal = 0.5 * (timeFuncPair.first + timeFuncPair.second);
             
             //testing triangle stripe code 
@@ -4292,14 +4292,14 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             FaceData<int> facePath(globalGeometry.mesh, 0);
             for (Face f : faces) facePath[f] = 1;
             psMesh.addFaceScalarQuantity("faces for pair " + std::to_string(i), facePath);
-            psMesh.addHalfedgeScalarQuantity("halfedge strip path " + std::to_string(i), stripHalfedgePath);
+            //psMesh.addHalfedgeScalarQuantity("halfedge strip path " + std::to_string(i), stripHalfedgePath);
             std::vector<double> edgePath(globalMesh.nEdges(), 0.0);
             halfedgePathConstraints.push_back(std::make_pair(stripHalfedgePath, 0.0));
             Eigen::MatrixXd iV;
             Eigen::MatrixXd iE;
             std::vector<int> f;
             std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, isoVal);
-            polyscope::registerCurveNetwork("isoval for pair " + std::to_string(i), iV, iE)->setRadius(0.001)->setEnabled(false);
+            //polyscope::registerCurveNetwork("isoval for pair " + std::to_string(i), iV, iE)->setRadius(0.001)->setEnabled(false);
 
             //error checking
             if (code == -1){
@@ -4325,7 +4325,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             }
             auto constraint = make_pair(heWeights, 0.);
             // model.addHalfedgePathInequalityConstraint(constraint);
-            showEdges("ordering path "+std::to_string(iPair), edgePath, globalGeometry)->setEnabled(false);
+            // showEdges("ordering path "+std::to_string(iPair), edgePath, globalGeometry)->setEnabled(false);
         }
 
     }
@@ -4865,26 +4865,6 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                 //something going wrong in these constraints? 
                 if ((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2Vector, gradientVector2) > dot(he2TwinVector, gradientVector2))){
                     
-                    //add constraints on singular edges 
-                    // model.addConstr(sigma[he1.getIndex()] == sigma[he2.twin().getIndex()]);
-                    // model.addConstr(sigma[he1.getIndex()] >= sigma[he1.twin().getIndex()]);
-                    // model.addConstr(sigma[he2.twin().getIndex()] <= sigma[he2.getIndex()]);
-                    // //add sign constraints for the rest of the halfedges on the face
-                    // model.addConstr(sigma[he1.next().getIndex()] >= 0.);
-                    // model.addConstr(sigma[he1.next().next().getIndex()] >= 0.);
-                    // model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
-                    // model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
-                    
-                    //just place the constraints for the positive singularity face for now 
-                    // model.addConstr(sigma[he1.twin().getIndex()] <= 0.);
-                    // model.addConstr(sigma[he1.next().getIndex()] >= 0.);
-                    // model.addConstr(sigma[he1.next().next().getIndex()] >= 0.);
-
-                    //add the constraints for the negative singularity face 
-                    // model.addConstr(sigma[he2.twin().getIndex()] >= 0.);
-                    // model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
-                    // model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
-                    
                     std::cout << "In case 1 " << std::endl; 
 
                     //ensure the saddle is in the bigon for the positive edge
@@ -4901,27 +4881,6 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
 
                 }
                 else if ((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2TwinVector, gradientVector2) > dot(he2Vector, gradientVector2))){
-                    //add constraints on singular edges
-                    // model.addConstr(sigma[he1.getIndex()] == sigma[he2.getIndex()]);
-                    // model.addConstr(sigma[he1.getIndex()] >= sigma[he1.twin().getIndex()]);
-                    // model.addConstr(sigma[he2.getIndex()] <= sigma[he2.twin().getIndex()]);
-                    // //add sign constraints for the rest of the halfedges on the face 
-                    // model.addConstr(sigma[he1.next().getIndex()] >= 0.);
-                    // model.addConstr(sigma[he1.next().next().getIndex()] >= 0.);
-                    // model.addConstr(sigma[he2.next().getIndex()] <= 0.);
-                    // model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
-
-                    //just place the constraints for the positive singularity face for now  
-                    // model.addConstr(sigma[he1.twin().getIndex()] <= 0.);
-                    // model.addConstr(sigma[he1.next().getIndex()] >= 0.);
-                    // model.addConstr(sigma[he1.next().next().getIndex()] >= 0.);
-
-                    // //add the constraints for the negative singularity face now 
-                    // model.addConstr(sigma[he2.getIndex()] >= 0.);
-                    // model.addConstr(sigma[he2.next().getIndex()] <= 0.);
-                    // model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
-
-
                     std::cout << "In case 2 " << std::endl;
 
                     //ensure the saddle is in the bigon for the positive edge
@@ -4937,27 +4896,6 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
 
                 }
                 else if((dot(he1TwinVector, gradientVector1) > dot(he1Vector, gradientVector1)) && (dot(he2Vector, gradientVector2) > dot(he2TwinVector, gradientVector2))){
-                    //add constraints on singular edges
-                    // model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.twin().getIndex()]);
-                    // model.addConstr(sigma[he1.twin().getIndex()] >= sigma[he1.getIndex()]);
-                    // model.addConstr(sigma[he2.twin().getIndex()] <= sigma[he2.getIndex()]);
-                    // //add sign constraints for the rest of the halfedges on the face
-                    // model.addConstr(sigma[he1.twin().next().getIndex()] >= 0.);
-                    // model.addConstr(sigma[he1.twin().next().next().getIndex()] >= 0.);
-                    // model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
-                    // model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
-
-                    //just place the constraints for the positive singularity face for now  
-                    // model.addConstr(sigma[he1.getIndex()] <= 0.);
-                    // model.addConstr(sigma[he1.twin().next().getIndex()] >= 0.);
-                    // model.addConstr(sigma[he1.twin().next().next().getIndex()] >= 0.);
-
-                    // //add the constraints for the negative singularity face 
-                    // model.addConstr(sigma[he2.twin().getIndex()] >= 0.);
-                    // model.addConstr(sigma[he2.twin().next().getIndex()] <= 0.);
-                    // model.addConstr(sigma[he2.twin().next().next().getIndex()] <= 0.);
-
-                    
                     std::cout << "In case 3 " << std::endl;
 
                     //ensure the saddle is in the bigon for the positive edge
@@ -4973,25 +4911,6 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
 
                 }
                 else if((dot(he1TwinVector, gradientVector1) > dot(he1Vector, gradientVector1)) && (dot(he2TwinVector, gradientVector2) > dot(he2Vector, gradientVector2))){
-                    //add constraints on singular edges
-                    // model.addConstr(sigma[he1.twin().getIndex()] == sigma[he2.getIndex()]);
-                    // model.addConstr(sigma[he1.twin().getIndex()] >= sigma[he1.getIndex()]);
-                    // model.addConstr(sigma[he2.getIndex()] <= sigma[he2.twin().getIndex()]);
-                    // //add sign constraints for the rest of the halfedges on the face
-                    // model.addConstr(sigma[he1.twin().next().getIndex()] >= 0.);
-                    // model.addConstr(sigma[he1.twin().next().next().getIndex()] >= 0.);
-                    // model.addConstr(sigma[he2.next().getIndex()] <= 0.);
-                    // model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
-
-                    //just place the constraints for the positive singularity face for now  
-                    // model.addConstr(sigma[he1.getIndex()] <= 0.);
-                    // model.addConstr(sigma[he1.twin().next().getIndex()] >= 0.);
-                    // model.addConstr(sigma[he1.twin().next().next().getIndex()] >= 0);
-
-                    // //add the constraints for the negative singularity face now 
-                    // model.addConstr(sigma[he2.getIndex()] >= 0.);
-                    // model.addConstr(sigma[he2.next().getIndex()] <= 0.);
-                    // model.addConstr(sigma[he2.next().next().getIndex()] <= 0.);
 
                     std::cout << "In case 4 " << std::endl; 
                     //ensure the saddle is in the bigon for the positive edge
@@ -5068,6 +4987,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                 model.addConstr(pathIntegral == 0.0);
         }
 
+
         // add halfedge path inequality constraints
         for (auto &[path, rhs] : halfedgePathInequalityConstraints) {
             GRBLinExpr pathIntegral = 0;
@@ -5083,6 +5003,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
             GRBVar equalityI = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_CONTINUOUS);
             alignmentEqualities.push_back(equalityI);//decision variables
         }
+        // H(stripeAlignmentConstraints);
         for (int i = 0; i < stripeAlignmentConstraints.size(); i++){
             std::vector<int> currHes = stripeAlignmentConstraints[i];
             for (int j = 0; j < gluedMesh.nHalfedges(); j++){

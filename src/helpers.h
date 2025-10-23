@@ -85,6 +85,9 @@ struct globalBoundaryConditions{
     std::vector<std::vector<double>> waleBdyPathConstraints;//vector of vectors (each of size nEdges()) where each entry stores the weight of the edge in the integration with \sigma (path around a boundary)
 
     std::vector<std::vector<double>> bdyBdyPathConstraints;//vector of vectors (each of size nEdges()) where each entry stores the weight of the edge in the integration with \sigma (boundary-boundary path)
+
+    std::vector<int> courseBoostedVertices;// vertices where the curl signal is boosted in the course direction 
+    std::vector<int> waleBoostedVertices;// vertices where the curl signal is boosted in the wale direction 
 };
 
 

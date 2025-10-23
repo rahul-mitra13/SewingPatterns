@@ -650,6 +650,26 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
         }
     }
 
+    //handle cases where the curl signal needs to get boosted 
+    //wale way points 
+    const nlohmann::json& waypoints = data.value("waypoints", nlohmann::json::object());
+    std::vector<std::pair<int,int>> waleWptPairs;
+    if (auto it = waypoints.find("wale"); it != waypoints.end() && it->is_array()) {
+        for (const auto& pairElem : *it) {
+            int a = pairElem[0].get<int>();
+            int b = pairElem[1].get<int>();
+            waleWptPairs.emplace_back(a, b);
+        }
+    }
+    //course way points
+    std::vector<std::pair<int,int>> courseWptPairs;
+    if (auto it = waypoints.find("course"); it != waypoints.end() && it->is_array()) {
+        for (const auto& pairElem : *it) {
+            int a = pairElem[0].get<int>();
+            int b = pairElem[1].get<int>();
+            courseWptPairs.emplace_back(a, b);
+        }
+    }
     return toReturn;
 }
 

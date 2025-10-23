@@ -229,7 +229,8 @@ void showStripePatterns(){
     HalfedgeData<double> pathVisu(gluedELG->mesh, 0.0);
     for (Edge e : gluedELG->mesh.edges())
         pathVisu[e.halfedge()] = path[e.getIndex()];
-    globalPSMesh->addHalfedgeScalarQuantity("path bdy "+std::to_string(i), pathVisu);
+    //running into bug here
+    //globalPSMesh->addHalfedgeScalarQuantity("path bdy "+std::to_string(i), prepareHalfedgeData(pathVisu));
   }
 
   // Call Matteo's revealCurl
