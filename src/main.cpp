@@ -644,14 +644,6 @@ int main(int argc, char **argv) {
     globalBdyConditions = parseJson(*gluedELG, data, vertexMap, edgeMap);
   }
 
-  //view the boosted point cloud of wale boosted vertices 
-  std::vector<Vector3> waleBoostedVertices;
-  for (int vi : globalBdyConditions.waleBoostedVertices){
-    Vertex v = globalGeometry->mesh.vertex(vi);
-    waleBoostedVertices.push_back(globalGeometry->vertexPositions[v]);
-  }
-  polyscope::registerPointCloud("Wale boosted vertices", waleBoostedVertices);
-
   //render the stitched vertices
   renderStitchedVertices(*globalGeometry, vertexMappingsPairs);
 

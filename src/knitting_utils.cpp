@@ -1704,7 +1704,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     }
 
     std::vector<Vertex> heatSourceVerts;
-    // heatSourceVerts = getSaddleVertices(gluedGeometry, timeFunctionGlued); // guess we don't need to do that if the whole saddle loop is avoided?
     //keep singualrities away from all saddle loops
     for (int i = 0; i < allSaddleLoops.size(); i++){
         std::vector<double> path = allSaddleLoops[i];
@@ -1977,11 +1976,41 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     */
 
     //-------------------------TESTING (WALE) ----------------------//
+
+    std::vector<Vertex> waleBoostedVertices;
+    std::vector<Vector3> waleBoostedVerticesPc;
+    for (int v : globalBdyConditions.waleBoostedVertices){
+        waleBoostedVertices.push_back(globalGeometry.mesh.vertex(v));
+        waleBoostedVerticesPc.push_back(globalGeometry.vertexPositions[v]);
+    }
+    polyscope::registerPointCloud("wale boosted vertices", waleBoostedVerticesPc);
+    VertexData<double> waleBoostedDistance = heatSolver.computeDistance(waleBoostedVertices);
+    psMesh.addVertexScalarQuantity("Wale Boosted Distance", waleBoostedDistance);
+
     //Attempting to find the center of distributions using Vector Heat Method
     VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     waleCurlFunctionGrad, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
-
+    
+    //update curl signal to account for boosted vertices
+    double curlMeasureSum = 0.;
+    double sigma = 2.0;
+    double a = 0.1;
+    double M;
+    double M_num = 0.0;
+    for (Vertex v : globalGeometry.mesh.vertices()){
+        curlMeasureSum += curlMeasure[v];
+        M_num += a * exp(-pow(waleBoostedDistance[v], 2)/pow(sigma, 2)) * curlMeasure[v];
+    }
+    M = M_num/curlMeasureSum;
+    // for (Vertex v : globalGeometry.mesh.vertices()){
+    //     curlMeasure[v] = (a * exp(-pow(waleBoostedDistance[v], 2)/pow(sigma, 2)) + 1 - M) * curlMeasure[v];
+    // }
+    double alpha = 1e5;
+    for (Vertex v : waleBoostedVertices){
+        curlMeasure[v] =  alpha * curlMeasure[v];
+    }
     psMesh.addVertexScalarQuantity("initial curl measure without masking (wale)", curlMeasure);
+    polyscope::show();
 
     if (heatSourceVerts.size() != 0){
         //mask the saddle 
@@ -2013,8 +2042,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         }
     }
     psMesh.addVertexScalarQuantity("initial curl measure with masking (wale)", curlMeasure);
-
-
 
 
     // Cap curl measure to avoid high concentration of singularities
