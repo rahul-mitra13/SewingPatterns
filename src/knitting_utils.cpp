@@ -3745,15 +3745,13 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         }
     }
 
+    //---------------------Testing-------------------------//
+    //ONLY IMPLEMENTED IN THE GLOBAL SETTING FOR NOW
+
     //this is in the glued setting 
     FaceData<int> faceComponentsGlued =  componentsCutByLoops(gluedGeometry, allSaddleLoops);
     psMesh.addFaceScalarQuantity("face components", faceComponentsGlued);
     polyscope::show();
-
-    //---------------------Testing-------------------------//
-
-    //ONLY IMPLEMENTED IN THE GLOBAL SETTING FOR NOW
-
 
     //Attempting to find the center of distributions using Vector Heat Method
     VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
@@ -3763,7 +3761,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
     if (heatSourceVerts.size() != 0){
         //mask the saddle 
-        //not sure if this is the correct way to go
         VertexData<double> allDist = heatSolver.computeDistance(heatSourceVerts);
         VertexData<double> courseWeighting(globalMesh);
         double maxVal = std::numeric_limits<double>::min();

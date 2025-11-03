@@ -27,9 +27,7 @@
 #include "powerCells.h"
 #include "stripe_patterns_helpers.h"
 #include "KG.h"
-#include "KnitGraph.h"
 #include "gmsh_helpers.h"
-
 #include "homology_generators.h"
 
 using namespace std;
@@ -88,9 +86,6 @@ Eigen::SparseMatrix<double, Eigen::RowMajor> G;
 
 // An optional .ply file containing pre-computed stripe values that the user can give
 optional<string> richDataFile;
-
-//the knit graph over the model 
-KnitGraph graph;
 
 // Global configuration options
 // TODO: setup command line interface with CLI11
@@ -286,7 +281,10 @@ void showStripePatterns(){
     pcOptions.edgeMap          = edgeMap;
     pcOptions.normalizedTFGrad = timeFunctionGradientGlobalNormalized;
     pcOptions.gluedOneRingMap  = gluedOneRingMap;
-
+    pcOptions.saddleLoops      = allSaddleLoops;
+    pcOptions.psMesh           = globalPSMesh;
+    computeCourseSingularities(pcOptions);
+  
     globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
     // Store course singular edges for rendering later
     RichSurfaceMeshData richData(globalGeometry->mesh);
@@ -400,65 +398,17 @@ void showStripePatterns(){
 
 }
 
-//repair a knit graph vertex that's missing connections
-//ugh 
-void manualKnitGraphRepair(){
-
-  std::vector<int> newInfo;
-  newInfo = repairKnitGraphVertex();
-
-  int id = newInfo[0];
-  int row_in = newInfo[1];
-  int row_out = newInfo[2];
-  int col_in_1 = newInfo[3];
-  int col_in_2 = newInfo[4];
-  int col_out_1 = newInfo[5];
-  int col_out_2 = newInfo[6];
-
-  //update the changes 
-  graph.getRealVertices()[id].row_in = row_in;
-  graph.getRealVertices()[row_in].row_out = id;
-
-  graph.getRealVertices()[id].row_out = row_out;
-  graph.getRealVertices()[row_out].row_in = id;
-
-  graph.getRealVertices()[id].col_in[0] = col_in_1;
-  graph.getRealVertices()[col_in_1].col_out[0] = id;
-
-  graph.getRealVertices()[id].col_in[1] = col_in_2;
-  graph.getRealVertices()[col_in_2].col_out[1] = id;
-
-  graph.getRealVertices()[id].col_out[0] = col_out_1;
-  graph.getRealVertices()[col_out_1].col_in[0] = id;
-
-  graph.getRealVertices()[id].col_out[1] = col_out_2;
-  graph.getRealVertices()[col_out_2].col_in[1] = id;
-
-  graph.renderGraph();
-  graph.sanityCheck();
-
-  //write the graph to a txt file 
-  graph.writeKnitGraphToTxtFile("model.obj");
-
-}
-
 // A user-defined callback, for creating control panels (etc)
 // Use ImGUI commands to build whatever you want here, see
 // https://github.com/ocornut/imgui/blob/master/imgui.h
 void callBacks() {
 
   ImGui::InputDouble("Course 1-form period", &coursePeriod);
-  //there needs to be a better way to constrain wale edges
-  //ImGui::InputFloat("Threshold", &threshold);
   //frequency for knoppel stripes
   ImGui::InputDouble("Knoppel frequency", &knoppelFrequency);
 
   if (ImGui::Button("Show Stripe Patterns")){
     showStripePatterns();
-  }
-
-  if (ImGui::Button("Manaul Repair")){
-    manualKnitGraphRepair();
   }
 
   if (ImGui::Button("Save view as JSON string")){
