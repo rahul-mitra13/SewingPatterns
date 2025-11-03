@@ -1977,6 +1977,12 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     //-------------------------TESTING (WALE) ----------------------//
 
+
+    //Attempting to find the center of distributions using Vector Heat Method
+    VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
+                                    waleCurlFunctionGrad, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
+    
+    //handle the boosting of wale vertices
     std::vector<Vertex> waleBoostedVertices;
     std::vector<Vector3> waleBoostedVerticesPc;
     for (int v : globalBdyConditions.waleBoostedVertices){
@@ -1986,29 +1992,25 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     polyscope::registerPointCloud("wale boosted vertices", waleBoostedVerticesPc);
     VertexData<double> waleBoostedDistance = heatSolver.computeDistance(waleBoostedVertices);
     psMesh.addVertexScalarQuantity("Wale Boosted Distance", waleBoostedDistance);
-
-    //Attempting to find the center of distributions using Vector Heat Method
-    VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
-                                    waleCurlFunctionGrad, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
-    
-    //update curl signal to account for boosted vertices
-    double curlMeasureSum = 0.;
-    double sigma = 2.0;
-    double a = 0.1;
-    double M;
-    double M_num = 0.0;
-    for (Vertex v : globalGeometry.mesh.vertices()){
-        curlMeasureSum += curlMeasure[v];
-        M_num += a * exp(-pow(waleBoostedDistance[v], 2)/pow(sigma, 2)) * curlMeasure[v];
-    }
-    M = M_num/curlMeasureSum;
+    // double curlMeasureSum = 0.;
+    // double sigma = 2.0;
+    // double a = 0.9;
+    // double M;
+    // double M_num = 0.0;
+    // for (Vertex v : globalGeometry.mesh.vertices()){
+    //     curlMeasureSum += curlMeasure[v];
+    //     M_num += a * exp(-pow(waleBoostedDistance[v], 2)/pow(sigma, 2)) * curlMeasure[v];
+    // }
+    // M = M_num/curlMeasureSum;
     // for (Vertex v : globalGeometry.mesh.vertices()){
     //     curlMeasure[v] = (a * exp(-pow(waleBoostedDistance[v], 2)/pow(sigma, 2)) + 1 - M) * curlMeasure[v];
     // }
+    //this is a simple linear scaling
     double alpha = 1e5;
     for (Vertex v : waleBoostedVertices){
         curlMeasure[v] =  alpha * curlMeasure[v];
     }
+
     psMesh.addVertexScalarQuantity("initial curl measure without masking (wale)", curlMeasure);
     polyscope::show();
 
@@ -2103,18 +2105,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
         }
         std::cout << "positive mass at site " << i << " = " << mass << std::endl;
-        psMesh.addVertexScalarQuantity("unaligned site distribution (+) " + std::to_string(i), posSiteDistributions[i]);
-
-        // Vector3 siteColor {geometrycentral::unitRand(), geometrycentral::unitRand(), geometrycentral::unitRand()};
-
-        // // Define blended color map
-        // double r,g,b;
-        // hsv_to_rgb(unitRand() * 360, 0.75, 1., r, g, b);
-        // Vector3 siteColor {r,g,b};
-
         for (Vertex v : globalMesh.vertices()) {
-            // H(posSiteDistributions[i][v] / maxPosCurl);
-            // posSiteDistributionColor[v.getIndex()] -= siteColor * posSiteDistributions[i][v] / maxPosCurl;
             posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
         }
     }
@@ -2153,8 +2144,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
         }
         std::cout << "negative mass at site " << i << " = " << mass << std::endl;
-        psMesh.addVertexScalarQuantity("unaligned site distribution (-) " + std::to_string(i), negSiteDistributions[i]);
-
         for (Vertex v : globalMesh.vertices()) {
             negSiteDistributionColor[v.getIndex()] += negSiteColors[i] * negSiteDistributions[i][v];
         }
@@ -3895,7 +3884,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
        positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-       // polyscope::registerPointCloud("unaligned site (+) " + std::to_string(i), std::vector<Vector3>{posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions)})->setEnabled(false);
     }
 
 
@@ -3926,36 +3914,12 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
         }
         std::cout << "positive mass at site " << i << " = " << mass << std::endl;
-        psMesh.addVertexScalarQuantity("unaligned site distribution (+) " + std::to_string(i), posSiteDistributions[i]);
-
-        // Vector3 siteColor {geometrycentral::unitRand(), geometrycentral::unitRand(), geometrycentral::unitRand()};
-
-        // // Define blended color map
-        // double r,g,b;
-        // hsv_to_rgb(unitRand() * 360, 0.75, 1., r, g, b);
-        // Vector3 siteColor {r,g,b};
-
+    
         for (Vertex v : globalMesh.vertices()) {
-            // H(posSiteDistributions[i][v] / maxPosCurl);
-            // posSiteDistributionColor[v.getIndex()] -= siteColor * posSiteDistributions[i][v] / maxPosCurl;
             posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
         }
     }
     psMesh.addVertexColorQuantity("pos site dist blend (course)", posSiteDistributionColor)->setEnabled(false);
-
-    // for (int i = 0; i < posVoronoiCenters.steps.size(); i++){
-    //     std::vector<SurfacePoint> steps = posVoronoiCenters.steps[i]; //steps for this site
-    //     std::vector<Vector3> stepPos;
-    //     for (int i = 0; i < steps.size(); i++){
-    //         stepPos.push_back(steps[i].interpolate(globalGeometry.vertexPositions));
-    //     }
-    //     polyscope::registerPointCloud("pos site " + std::to_string(i) + " steps ", stepPos)->setEnabled(false);
-    // }
-
-    // for (int i = 0; i < posInitialSites.size(); i++){
-    //     Vector3 p = posInitialSites[i].interpolate(globalGeometry.vertexPositions);
-    //     polyscope::registerPointCloud("site " + std::to_string(i) + " initialization ", std::vector<Vector3>{p})->setEnabled(false);
-    // }
     
 
     // NEGATIVE COURSE
@@ -3991,7 +3955,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         //need setEnabled(true) otherwise we run into OpenGL errors? weird
         psMesh.addVertexScalarQuantity("distribution", negStepSiteDistribution[iSite][step])->setEnabled(true);
         polyscope::registerPointCloud("site ", std::vector<Vector3>{negSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
-
         //should do this outside the ImGUI
         // std::vector<Vector3> currentSites; 
         // for (int i = 0; i < posOptions.nSites; i++){
@@ -4008,7 +3971,6 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     std::vector<Vector3> negativeCenters;
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
        negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-       // polyscope::registerPointCloud("unaligned site (-) " + std::to_string(i), std::vector<Vector3>{negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions)})->setEnabled(false);
     }
     polyscope::registerPointCloud("Voronoi sites unaligned (-)", negativeCenters)->setEnabled(false);
     std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
@@ -4030,18 +3992,8 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
             mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
         }
         std::cout << "negative mass at site " << i << " = " << mass << std::endl;
-        psMesh.addVertexScalarQuantity("unaligned site distribution (-) " + std::to_string(i), negSiteDistributions[i]);
-
-        // Vector3 siteColor {geometrycentral::unitRand(), geometrycentral::unitRand(), geometrycentral::unitRand()};
-
-        // // Define blended color map
-        // double r,g,b;
-        // hsv_to_rgb(unitRand() * 360, 0.75, 1., r, g, b);
-        // Vector3 siteColor {r,g,b};
-
+        
         for (Vertex v : globalMesh.vertices()) {
-            // H(posSiteDistributions[i][v] / maxPosCurl);
-            // posSiteDistributionColor[v.getIndex()] -= siteColor * posSiteDistributions[i][v] / maxPosCurl;
             negSiteDistributionColor[v.getIndex()] += posSiteColors[i] * negSiteDistributions[i][v];
         }
     }
