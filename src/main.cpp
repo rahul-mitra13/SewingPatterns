@@ -280,6 +280,7 @@ void showStripePatterns(){
     pcOptions.vertexMap        = vertexMap;     
     pcOptions.edgeMap          = edgeMap;
     pcOptions.normalizedTFGrad = timeFunctionGradientGlobalNormalized;
+    pcOptions.timeFunction     = timeFunctionGlued;
     pcOptions.gluedOneRingMap  = gluedOneRingMap;
     pcOptions.saddleLoops      = allSaddleLoops;
     pcOptions.psMesh           = globalPSMesh;

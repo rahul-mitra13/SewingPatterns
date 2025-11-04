@@ -14,6 +14,7 @@ struct powerCellOptions {
   bool maskSaddle = true;//masking the saddle vertices
   polyscope::SurfaceMesh* psMesh;//the polyscope mesh
   double period;//period of the stripe patterns
+  VertexData<double> timeFunction;//time function over the mesh 
 
 };
 
@@ -30,4 +31,4 @@ void computeCourseSingularities(powerCellOptions& options);
 VertexData<double> computeCourseCurlMeasure(powerCellOptions& options);
 
 //compute the singularity positions per bucket
-void computeBucketSingularities(powerCellOptions& options, VertexData<double>& bucketCurl);
+std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(powerCellOptions& options, VertexData<double>& bucketCurl);

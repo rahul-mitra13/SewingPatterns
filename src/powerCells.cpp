@@ -54,6 +54,9 @@ void computeCourseSingularities(powerCellOptions& options){
         }
     }//GENERAL TO-DO: \sigma should integrate to 0 around saddle loops
 
+    psMesh -> addVertexScalarQuantity("Curl measure from PC file", courseMeasure);
+    polyscope::show();
+
     //find the decompositions per face 
     FaceData<int> faceComponentsGlued =  componentsCutByLoops(*gluedGeometry, saddleLoops);
 
@@ -77,14 +80,30 @@ void computeCourseSingularities(powerCellOptions& options){
         }
     }
 
-    //solve the proble per bucket of vertices
-    for (auto bucket : buckets){
+    //solve the problem per bucket of vertices
+    for (int i = 0; i < buckets.size(); i++){
         VertexData<double> bucketCurl(gluedMesh, 0.);
+        auto bucket = buckets[i];
         //update the measure for vertices in this bucket
         for (Vertex v : bucket){
             bucketCurl[v] = courseMeasure[v];
         }
-        computeBucketSingularities(options, bucketCurl);
+        auto matchedPairs = computeBucketSingularities(options, bucketCurl);
+        std::vector<Vector3> positiveCenters;
+        for (int i = 0; i < matchedPairs.size(); i++){
+            auto sp = matchedPairs[i].first;
+            positiveCenters.push_back(sp.interpolate(globalGeometry->vertexPositions));
+        }
+        std::vector<Vector3> negativeCenters;
+        for (int i = 0; i < matchedPairs.size(); i++){
+            auto sp = matchedPairs[i].second;
+            negativeCenters.push_back(sp.interpolate(globalGeometry->vertexPositions));
+        }
+        psMesh->addVertexScalarQuantity("Curl for bucket " + std::to_string(i), bucketCurl);
+        polyscope::registerPointCloud("(+) Aligned Pts for bucket " + std::to_string(i), positiveCenters);
+        polyscope::registerPointCloud("(-) Aligned Pts for bucket " + std::to_string(i), negativeCenters);
+
+        polyscope::show();
     }
 }
 
@@ -122,7 +141,7 @@ VertexData<double> computeCourseCurlMeasure(powerCellOptions& options){
     return curlGlued;
 }
 
-void computeBucketSingularities(powerCellOptions& options, VertexData<double>& curlMeasure){
+std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(powerCellOptions& options, VertexData<double>& curlMeasure){
     
     EdgeLengthGeometry* gluedGeometry = options.gluedGeometry;
     SurfaceMesh& gluedMesh = gluedGeometry->mesh;
@@ -130,17 +149,14 @@ void computeBucketSingularities(powerCellOptions& options, VertexData<double>& c
     SurfaceMesh& globalMesh = globalGeometry->mesh;
     polyscope::SurfaceMesh* psMesh = options.psMesh;
     double period = options.period;
-    std::cout << "period = " << period << std::endl;
-    psMesh->addVertexScalarQuantity("Curl measure from PC file 0 ", curlMeasure);
-
+    VertexData<double> timeFunction = options.timeFunction;
+    
     // Cap curl measure to avoid high concentration of singularities
     for (Vertex v : gluedMesh.vertices()) {
         curlMeasure[v] = fmin(curlMeasure[v], period / (3*globalGeometry->vertexDualAreas[v]));
         curlMeasure[v] = fmax(curlMeasure[v], -period / (3*globalGeometry->vertexDualAreas[v]));
     }
-
-    psMesh->addVertexScalarQuantity("Curl measure from PC file 1 ", curlMeasure);
-                              
+                          
     //now divide the measure into positive and negative 
     VertexData<double> posMeasure(gluedMesh, 0.0);
     VertexData<double> negMeasure(gluedMesh, 0.0);
@@ -157,9 +173,7 @@ void computeBucketSingularities(powerCellOptions& options, VertexData<double>& c
         }
     }
     double avgTotalMeasure = (totalPosMeasure + totalNegMeasure) / 2;
-    psMesh->addVertexScalarQuantity("Pos measure from PC file 2 ", posMeasure);
-    psMesh->addVertexScalarQuantity("Neg measure from PC file 3 ", negMeasure);
-
+    
     //positive sites
     VoronoiOptions posOptions = defaultVoronoiOptions;
     posOptions.nSites = std::round(avgTotalMeasure / period);
@@ -167,9 +181,15 @@ void computeBucketSingularities(powerCellOptions& options, VertexData<double>& c
     posOptions.computeDistributions = true;
     posOptions.seed = 42;
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, *globalGeometry, posOptions, posMeasure, *psMesh);
-    std::vector<std::vector<VertexData<double>>> posStepSiteDistribution = posVoronoiCenters.stepSiteDistribution;
-    std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
-    std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
+    std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
+    for (size_t i = 0; i < posSiteDistributions.size(); i++){
+        double mass = 0;
+        for (Vertex v : globalMesh.vertices()){ 
+            mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry->vertexDualAreas[v];
+        }
+        std::cout << "positive mass at site " << i << " = " << mass << std::endl;
+    }
+    
 
     //negative sites 
     VoronoiOptions negOptions = defaultVoronoiOptions;
@@ -178,20 +198,63 @@ void computeBucketSingularities(powerCellOptions& options, VertexData<double>& c
     negOptions.computeDistributions = true;
     negOptions.seed = 42;
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, *globalGeometry, negOptions, negMeasure, *psMesh);
-    std::vector<std::vector<VertexData<double>>> negStepSiteDistribution = negVoronoiCenters.stepSiteDistribution;
-    std::vector<std::vector<SurfacePoint>> negSteps = negVoronoiCenters.steps;
-    std::vector<SurfacePoint> negInitialSites = negVoronoiCenters.initialSites;
-
-    std::vector<Vector3> positiveCenters;
-    for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
-       positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry->vertexPositions));
+    std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
+    for (size_t i = 0; i < negSiteDistributions.size(); i++){
+        double mass = 0;
+        for (Vertex v : globalMesh.vertices()){ 
+            mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry->vertexDualAreas[v];
+        }
+        std::cout << "negative mass at site " << i << " = " << mass << std::endl;
     }
-    polyscope::registerPointCloud("Voronoi sites unaligned from PC file(+)", positiveCenters)->setEnabled(true);
     
+    //render surface points and pair up time functions
+    std::vector<Vector3> positiveCenters;
+    std::vector<std::pair<SurfacePoint, double>> posSiteTimeFunctions;
+    std::vector<std::pair<SurfacePoint, double>> negSiteTimeFunctions;
+    for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
+       auto sp = posVoronoiCenters.siteLocations[i];
+       positiveCenters.push_back(sp.interpolate(globalGeometry->vertexPositions));
+       posSiteTimeFunctions.emplace_back(std::make_pair(sp, sp.interpolate(timeFunction)));
+    }
     std::vector<Vector3> negativeCenters;
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
-       negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry->vertexPositions));
+       auto sp = negVoronoiCenters.siteLocations[i];
+       negativeCenters.push_back(sp.interpolate(globalGeometry->vertexPositions));
+       negSiteTimeFunctions.emplace_back(std::make_pair(sp, sp.interpolate(timeFunction)));
     }
-    polyscope::registerPointCloud("Voronoi sites unaligned from PC file (-)", negativeCenters)->setEnabled(false);
-    //polyscope::show();
+
+    // sort by time function value ascending
+    auto cmp = [](const std::pair<SurfacePoint,double>& a,
+              const std::pair<SurfacePoint,double>& b) {
+        return a.second < b.second;
+    };
+
+    std::sort(posSiteTimeFunctions.begin(), posSiteTimeFunctions.end(), cmp);
+    std::sort(negSiteTimeFunctions.begin(), negSiteTimeFunctions.end(), cmp);
+
+    // ensure sizes match
+    int n = std::min(posSiteTimeFunctions.size(), negSiteTimeFunctions.size());
+
+    // pair positive and negative sites by sorted time
+    std::vector<std::pair<SurfacePoint, SurfacePoint>> matchedPairs;
+    matchedPairs.reserve(n);
+
+    for (int i = 0; i < n; i++) {
+        matchedPairs.emplace_back(
+        posSiteTimeFunctions[i].first,
+        negSiteTimeFunctions[i].first
+        );
+    }
+
+    //specify options for alignment
+    alignOptions alignmentOptions;
+    alignmentOptions.timeFunction = timeFunction;
+    std::vector<std::pair<SurfacePoint, SurfacePoint>> matchedSurfacePoints;
+    
+
+    alignmentOptions.pairedSites = matchedPairs;
+    alignPointsOnIsolineFast(globalMesh, *globalGeometry, alignmentOptions, *psMesh);
+    matchedPairs = alignmentOptions.pairedSites;
+
+    return matchedPairs;
 }
