@@ -1,4 +1,15 @@
 #include "powerCells.h"
+
+double geodesicDistanceHeat(VertexPositionGeometry& geom,
+                            const SurfacePoint& p,
+                            const SurfacePoint& q) {
+    HeatMethodDistanceSolver solver(geom);
+    // 1) distances to all vertices from source p
+    VertexData<double> dist = solver.computeDistance(p);  // returns per-vertex field
+    // 2) interpolate that field at q (works for vertex/edge/face SurfacePoints)
+    return q.interpolate(dist);
+}
+
 void computeCourseSingularities(powerCellOptions& options){
 
     EdgeLengthGeometry* gluedGeometry = options.gluedGeometry;
@@ -8,10 +19,14 @@ void computeCourseSingularities(powerCellOptions& options){
     polyscope::SurfaceMesh* psMesh = options.psMesh;
     auto saddleLoops = options.saddleLoops;
     double period = options.period;
+
+
     // Create the Heat Method solver
     HeatMethodDistanceSolver heatSolver(*gluedGeometry);
     //first compute the measure in the course direction 
     VertexData<double> courseMeasure = computeCourseCurlMeasure(options); 
+    //all distance from the heat vertices
+    VertexData<double> allDist;
 
     //if we want to mask the saddle 
     if (options.maskSaddle && saddleLoops.size() != 0){
@@ -26,8 +41,9 @@ void computeCourseSingularities(powerCellOptions& options){
                 }
             }
         }
+        options.heatSourceVerts = heatSourceVerts;
         //mask the saddle 
-        VertexData<double> allDist = heatSolver.computeDistance(heatSourceVerts);
+        allDist = heatSolver.computeDistance(heatSourceVerts);
         VertexData<double> courseWeighting(globalMesh);
         double maxVal = std::numeric_limits<double>::min();
         double maxSourceVal = std::numeric_limits<double>::min();
@@ -88,7 +104,7 @@ void computeCourseSingularities(powerCellOptions& options){
         for (Vertex v : bucket){
             bucketCurl[v] = courseMeasure[v];
         }
-        auto matchedPairs = computeBucketSingularities(options, bucketCurl);
+        auto matchedPairs = computeBucketSingularities(options, bucketCurl, allDist);
         std::vector<Vector3> positiveCenters;
         for (int i = 0; i < matchedPairs.size(); i++){
             auto sp = matchedPairs[i].first;
@@ -141,7 +157,7 @@ VertexData<double> computeCourseCurlMeasure(powerCellOptions& options){
     return curlGlued;
 }
 
-std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(powerCellOptions& options, VertexData<double>& curlMeasure){
+std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(powerCellOptions& options, VertexData<double>& curlMeasure, VertexData<double>& allDist){
     
     EdgeLengthGeometry* gluedGeometry = options.gluedGeometry;
     SurfaceMesh& gluedMesh = gluedGeometry->mesh;
@@ -256,5 +272,32 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(po
     alignPointsOnIsolineFast(globalMesh, *globalGeometry, alignmentOptions, *psMesh);
     matchedPairs = alignmentOptions.pairedSites;
 
+    // Lambda: geodesic distance via heat method (in glued domain)
+    auto geodesicDistanceHeat = [&](const SurfacePoint& p, const SurfacePoint& q) {
+        HeatMethodDistanceSolver solver(*gluedGeometry);
+        VertexData<double> dist = solver.computeDistance(p);
+        return q.interpolate(dist);
+    };
+
+    // Remove pairs whose endpoints are within cutoff distance of any saddle heat source
+    double cutoff = 1.5 * period;
+
+    std::vector<std::pair<SurfacePoint, SurfacePoint>> filteredPairs;
+    filteredPairs.reserve(matchedPairs.size());
+
+    for (auto& pr : matchedPairs) {
+        const SurfacePoint& spPos = pr.first;
+        const SurfacePoint& spNeg = pr.second;
+
+        double dPos = spPos.interpolate(allDist);
+        double dNeg = spNeg.interpolate(allDist);
+
+        // Keep only if BOTH ends are far enough from saddle set
+        if (dPos >= cutoff && dNeg >= cutoff) {
+            filteredPairs.push_back(pr);
+        }
+    }
+
+    matchedPairs = std::move(filteredPairs);
     return matchedPairs;
 }
