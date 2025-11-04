@@ -22,7 +22,7 @@ struct VoronoiResult {
 struct VoronoiOptions {
   size_t nSites = 1;                      // number of sites to place
   std::vector<SurfacePoint> initialSites; // desired locations for sites. If blank, locations are chosen randomly
-  size_t iterations = 300;                 // number of iterations to run for
+  size_t iterations = 50;                 // number of iterations to run for
   size_t descIter = 10;                   // number of steps of gradient descent for weights update 
   double stepSize = 0.8;                  // step size for steps towards cell centers
   bool useDelaunay = true;                // solve on an intrinsic Delaunay triangulation of the input
