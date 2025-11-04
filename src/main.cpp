@@ -283,6 +283,7 @@ void showStripePatterns(){
     pcOptions.gluedOneRingMap  = gluedOneRingMap;
     pcOptions.saddleLoops      = allSaddleLoops;
     pcOptions.psMesh           = globalPSMesh;
+    pcOptions.period           = coursePeriod;
     computeCourseSingularities(pcOptions);
   
     globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);

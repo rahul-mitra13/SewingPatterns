@@ -28,3 +28,6 @@ void computeCourseSingularities(powerCellOptions& options);
 
 //compute the course curl measure in the glued setting 
 VertexData<double> computeCourseCurlMeasure(powerCellOptions& options);
+
+//compute the singularity positions per bucket
+void computeBucketSingularities(powerCellOptions& options, VertexData<double>& bucketCurl);
