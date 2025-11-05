@@ -273,18 +273,18 @@ void showStripePatterns(){
     
     
     // options for the fuzzy power cells
-    // powerCellOptions pcOptions{};         
-    // pcOptions.gluedGeometry    = gluedELG.get();  
-    // pcOptions.globalGeometry   = globalGeometry.get();
-    // pcOptions.vertexMap        = vertexMap;     
-    // pcOptions.edgeMap          = edgeMap;
-    // pcOptions.normalizedTFGrad = timeFunctionGradientGlobalNormalized;
-    // pcOptions.timeFunction     = timeFunctionGlued;
-    // pcOptions.gluedOneRingMap  = gluedOneRingMap;
-    // pcOptions.saddleLoops      = allSaddleLoops;
-    // pcOptions.psMesh           = globalPSMesh;
-    // pcOptions.period           = coursePeriod;
-    // computeCourseSingularities(pcOptions);
+    powerCellOptions pcOptions{};         
+    pcOptions.gluedGeometry    = gluedELG.get();  
+    pcOptions.globalGeometry   = globalGeometry.get();
+    pcOptions.vertexMap        = vertexMap;     
+    pcOptions.edgeMap          = edgeMap;
+    pcOptions.normalizedTFGrad = timeFunctionGradientGlobalNormalized;
+    pcOptions.timeFunction     = timeFunctionGlued;
+    pcOptions.gluedOneRingMap  = gluedOneRingMap;
+    pcOptions.saddleLoops      = allSaddleLoops;
+    pcOptions.psMesh           = globalPSMesh;
+    pcOptions.period           = coursePeriod;
+    computeCourseSingularities(pcOptions);
   
     globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
     // Store course singular edges for rendering later

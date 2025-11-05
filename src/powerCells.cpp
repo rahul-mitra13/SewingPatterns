@@ -26,7 +26,7 @@ void computeCourseSingularities(powerCellOptions& options){
     //first compute the measure in the course direction 
     VertexData<double> courseMeasure = computeCourseCurlMeasure(options); 
     //all distance from the heat vertices
-    VertexData<double> allDist;
+    VertexData<double> allDist(gluedMesh, DBL_MAX);//need to handle this in a better way
 
     //if we want to mask the saddle 
     if (options.maskSaddle && saddleLoops.size() != 0){

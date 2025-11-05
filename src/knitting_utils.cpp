@@ -1975,7 +1975,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     }
     */
 
-    //-------------------------TESTING (WALE) ----------------------//
+    //-------------------------OT Quantization----------------------//
 
 
     //Attempting to find the center of distributions using Vector Heat Method
@@ -3743,7 +3743,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         }
     }
 
-    //---------------------Testing-------------------------//
+    //---------------------OT Quantization-------------------------//
     //ONLY IMPLEMENTED IN THE GLOBAL SETTING FOR NOW
 
     //this is in the glued setting 
