@@ -260,7 +260,7 @@ void showStripePatterns(){
     waleStripeValues = richData.getCornerProperty<double>("waleStripeValues");
     waleSingularEdgesGlobal = richData.getEdgeProperty<double>("waleSingularEdges");
   } else {
-    std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
+    std::tie(courseStripeValues, courseSingularEdgesGlobal) = computeCourseStripeInfo(*globalGeometry, *gluedELG, timeFunctionGlobal,
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
                                                                     globalBdyConditions, coursePeriod, V, F, G, courseOneFormGrad, gluedOneRingMap, 
                                                                     allSaddleLoops, homologyGenerators, opts);
@@ -271,21 +271,20 @@ void showStripePatterns(){
                                                                       courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
                                                                       homologyGenerators);
     
-    // globalPSMesh->addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
-    // globalPSMesh->addEdgeScalarQuantity("wale singular edges", waleSingularEdgesGlobal);
+    
     // options for the fuzzy power cells
-    powerCellOptions pcOptions{};         
-    pcOptions.gluedGeometry    = gluedELG.get();  
-    pcOptions.globalGeometry   = globalGeometry.get();
-    pcOptions.vertexMap        = vertexMap;     
-    pcOptions.edgeMap          = edgeMap;
-    pcOptions.normalizedTFGrad = timeFunctionGradientGlobalNormalized;
-    pcOptions.timeFunction     = timeFunctionGlued;
-    pcOptions.gluedOneRingMap  = gluedOneRingMap;
-    pcOptions.saddleLoops      = allSaddleLoops;
-    pcOptions.psMesh           = globalPSMesh;
-    pcOptions.period           = coursePeriod;
-    computeCourseSingularities(pcOptions);
+    // powerCellOptions pcOptions{};         
+    // pcOptions.gluedGeometry    = gluedELG.get();  
+    // pcOptions.globalGeometry   = globalGeometry.get();
+    // pcOptions.vertexMap        = vertexMap;     
+    // pcOptions.edgeMap          = edgeMap;
+    // pcOptions.normalizedTFGrad = timeFunctionGradientGlobalNormalized;
+    // pcOptions.timeFunction     = timeFunctionGlued;
+    // pcOptions.gluedOneRingMap  = gluedOneRingMap;
+    // pcOptions.saddleLoops      = allSaddleLoops;
+    // pcOptions.psMesh           = globalPSMesh;
+    // pcOptions.period           = coursePeriod;
+    // computeCourseSingularities(pcOptions);
   
     globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
     // Store course singular edges for rendering later
@@ -369,16 +368,6 @@ void showStripePatterns(){
   }
   polyscope::registerCurveNetwork("wale singular edges (+1)", waleSingularEdgePointsPos, waleSingularEdgesPos)->setRadius(0.001)->setColor({1,0,0})->setEnabled(false);
   polyscope::registerCurveNetwork("wale singular edges (-1)", waleSingularEdgePointsNeg, waleSingularEdgesNeg)->setRadius(0.001)->setColor({0,0,1})->setEnabled(false);
-
-
-  // generate the knit graph
-  // graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
-  //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
-  //                     edgeMap);
-  // graph.buildGraph();
-
-  // graph.writeKnitGraphLineElement();
-  // graph.writeKnitGraphToTxtFile("model.obj");
 
   //transfer the stripe texturing coordinates to the glued setting 
   CornerData<double> courseStripeValuesGlued(gluedELG->mesh);

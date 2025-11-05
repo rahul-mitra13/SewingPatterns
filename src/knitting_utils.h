@@ -259,7 +259,7 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Eige
 //@clean 
 //the below two functions use the energy min ||\del sigma - \nabla \sigma_{i - 1} / ||\nabla \sigma_{i - 1}|| ||^2
 //@out  courseOneFormGrad - gradient of the final course 1-form
-std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
                                                                     VertexData<double>& globalTimeFunction, FaceData<Vector3>& globalTimeFunctionGradientsNormalized,
                                                                     std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
                                                                     globalBoundaryConditions& boundaryConditions, double period,

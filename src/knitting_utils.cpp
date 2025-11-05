@@ -3585,9 +3585,7 @@ bool isValidEdgePair(VertexPositionGeometry& globalGeometry, EdgeData<double>& e
 }
 
 //@clean 
-//the below two functions use the energy min ||\del sigma_i - \nabla \sigma_{i - 1} / ||\nabla \sigma_{i - 1}|| ||^2
-//if i = 1, use \nabla h / ||\nabla h||
-std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
                                                                     VertexData<double>& globalTimeFunction, FaceData<Vector3>& globalTimeFunctionGradientsNormalized,
                                                                     std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
                                                                     globalBoundaryConditions& boundaryConditions, double period,
