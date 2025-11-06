@@ -1,3 +1,4 @@
+#pragma once
 #include "knitting_utils.h"
 
 using namespace geometrycentral;
@@ -26,10 +27,12 @@ struct powerCellResults {
   EdgeData<double> waleOneForm;//final wale stripes
 };
 
-void computeCourseSingularities(powerCellOptions& options);
+std::vector<std::pair<SurfacePoint, SurfacePoint>>  computeCourseSingularities(powerCellOptions& options);
 
 //compute the course curl measure in the glued setting 
 VertexData<double> computeCourseCurlMeasure(powerCellOptions& options);
 
 //compute the singularity positions per bucket
 std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(powerCellOptions& options, VertexData<double>& curlMeasure, VertexData<double>& allDistance);
+
+//compute course stripes

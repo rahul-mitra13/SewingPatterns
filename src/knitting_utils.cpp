@@ -4082,6 +4082,19 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         //map singular edges to their corresponding isovals
         std::map<Edge, double> edgeToIsoVal;
 
+        powerCellOptions pcOptions{};         
+        pcOptions.gluedGeometry    = &gluedGeometry;  
+        pcOptions.globalGeometry   = &globalGeometry;
+        pcOptions.vertexMap        = vertexMap;     
+        pcOptions.edgeMap          = edgeMap;
+        pcOptions.normalizedTFGrad = globalTimeFunctionGradientsNormalized;
+        pcOptions.timeFunction     = globalTimeFunction;
+        pcOptions.gluedOneRingMap  = gluedOneRingMap;
+        pcOptions.saddleLoops      = allSaddleLoops;
+        pcOptions.psMesh           = &psMesh;
+        pcOptions.period           = period;
+        alignmentOptions.pairedSites =  computeCourseSingularities(pcOptions);
+        
         //now appropriatately specify the singular edges
         //this relies on the assumption that 2 singular sites (surface points) don't end up on the same face 
         //Even if they end up on adjacent faces, we shouldn't select the same edges 

@@ -39,6 +39,7 @@
 //includes to solve the optimization problem
 #include "gurobi_c++.h"
 #include "model.h"
+#include "powerCells.h"
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;

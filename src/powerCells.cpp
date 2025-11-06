@@ -1,16 +1,6 @@
 #include "powerCells.h"
 
-double geodesicDistanceHeat(VertexPositionGeometry& geom,
-                            const SurfacePoint& p,
-                            const SurfacePoint& q) {
-    HeatMethodDistanceSolver solver(geom);
-    // 1) distances to all vertices from source p
-    VertexData<double> dist = solver.computeDistance(p);  // returns per-vertex field
-    // 2) interpolate that field at q (works for vertex/edge/face SurfacePoints)
-    return q.interpolate(dist);
-}
-
-void computeCourseSingularities(powerCellOptions& options){
+std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(powerCellOptions& options){
 
     EdgeLengthGeometry* gluedGeometry = options.gluedGeometry;
     SurfaceMesh& gluedMesh = gluedGeometry->mesh;
@@ -96,6 +86,9 @@ void computeCourseSingularities(powerCellOptions& options){
         }
     }
 
+    std::vector<std::pair<SurfacePoint, SurfacePoint>> allMatchedPairs;
+
+
     //solve the problem per bucket of vertices
     for (int i = 0; i < buckets.size(); i++){
         VertexData<double> bucketCurl(gluedMesh, 0.);
@@ -115,12 +108,15 @@ void computeCourseSingularities(powerCellOptions& options){
             auto sp = matchedPairs[i].second;
             negativeCenters.push_back(sp.interpolate(globalGeometry->vertexPositions));
         }
+        allMatchedPairs.insert(allMatchedPairs.end(), matchedPairs.begin(), matchedPairs.end());
         psMesh->addVertexScalarQuantity("Curl for bucket " + std::to_string(i), bucketCurl);
         polyscope::registerPointCloud("(+) Aligned Pts for bucket " + std::to_string(i), positiveCenters);
         polyscope::registerPointCloud("(-) Aligned Pts for bucket " + std::to_string(i), negativeCenters);
 
         polyscope::show();
     }
+
+    return allMatchedPairs;
 }
 
 //compute the course curl measure in the glued setting 
@@ -271,13 +267,6 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(po
     alignmentOptions.pairedSites = matchedPairs;
     alignPointsOnIsolineFast(globalMesh, *globalGeometry, alignmentOptions, *psMesh);
     matchedPairs = alignmentOptions.pairedSites;
-
-    // Lambda: geodesic distance via heat method (in glued domain)
-    auto geodesicDistanceHeat = [&](const SurfacePoint& p, const SurfacePoint& q) {
-        HeatMethodDistanceSolver solver(*gluedGeometry);
-        VertexData<double> dist = solver.computeDistance(p);
-        return q.interpolate(dist);
-    };
 
     // Remove pairs whose endpoints are within cutoff distance of any saddle heat source
     double cutoff = 1.5 * period;
