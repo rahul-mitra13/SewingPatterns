@@ -195,9 +195,9 @@ target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/de
 # add python 
 #target_include_directories(SewingPatterns PRIVATE ${PYTHON_LIBRARIES})
 # add CLI11
-target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/polyscope/deps/CLI11/include/")
+target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/CLI11/include/")
 
-#add Gmsh
+# add Gmsh
 target_include_directories(SewingPatterns PRIVATE ${GMSH_INCLUDE_DIR})
 
 if(CXX)
