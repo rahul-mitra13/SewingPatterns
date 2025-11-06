@@ -12,3 +12,7 @@
 [submodule "deps/LBFGSpp"]
 	path = deps/LBFGSpp
 	url = https://github.com/yixuan/LBFGSpp.git
+
+[submodule "deps/CLI11"]
+	path = deps/CLI11
+	url = https://github.com/CLIUtils/CLI11.git
