@@ -186,14 +186,17 @@ add_executable(
 
 # Include settings
 target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/libigl/include")
-#add LBFGS
+# add LBFGS
 target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/LBFGSpp/include")
-#add args
+# add args
 target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/polyscope/deps/args")
-#add json
+# add json
 target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/polyscope/deps/json/include/")
-#add python 
+# add python 
 #target_include_directories(SewingPatterns PRIVATE ${PYTHON_LIBRARIES})
+# add CLI11
+target_include_directories(SewingPatterns PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/polyscope/deps/CLI11/include/")
+
 #add Gmsh
 target_include_directories(SewingPatterns PRIVATE ${GMSH_INCLUDE_DIR})
 
