@@ -31,6 +31,10 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
                 }
             }
         }
+        //also run the diffusion from boundary vertices
+        for (Vertex v : gluedMesh.vertices()){
+            if (v.isBoundary()) heatSourceVerts.push_back(v);
+        }
         options.heatSourceVerts = heatSourceVerts;
         //mask the saddle 
         allDist = heatSolver.computeDistance(heatSourceVerts);
