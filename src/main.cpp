@@ -237,7 +237,7 @@ void showStripePatterns(){
   // polyscope::show();
 
   // Old .ply files, keeping those for reference
-  // richDataFile = "info.ply";
+  // richDataFile = "heart_info_0.35.ply";
   // richDataFile = "bunny_info_3.5.ply";
   // richDataFile = "sock_info_0.0035.ply";
   // richDataFile = "misc_cactus_info_0.1.ply";
@@ -423,6 +423,7 @@ int main(int argc, char **argv) {
   try {
     app.parse(argc, argv);
   } catch (const CLI::ParseError &e) {
+    std::cout << "argument error" << std::endl;
     return app.exit(e);
   }
 
