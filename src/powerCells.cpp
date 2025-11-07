@@ -263,7 +263,7 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(po
     alignmentOptions.timeFunction = timeFunction;
     std::vector<std::pair<SurfacePoint, SurfacePoint>> matchedSurfacePoints;
     
-
+    //align the points on the same isoline
     alignmentOptions.pairedSites = matchedPairs;
     alignPointsOnIsolineFast(globalMesh, *globalGeometry, alignmentOptions, *psMesh);
     matchedPairs = alignmentOptions.pairedSites;
