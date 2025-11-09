@@ -458,18 +458,18 @@ void KG::intrinsicMerge(){
     for (auto& up : allVertices) {
         KGVertex* v = up.get();
         if (v->isAlphaVirtual || v->isBetaVirtual) continue;
-        ensure(v->row_in_vertex != nullptr && "intial real vertex doesn't have row_in set");
-        ensure(v->row_out_vertex != nullptr && "initial real vertex doesn't have row_out set");
-        ensure(v->col_in_vertex[0] != nullptr && "initial real vertex doesn't have col_in[0] set");
-        ensure(v->col_out_vertex[0] != nullptr && "initial real vertex doesn't have col_out[0] set");
-        // if(v->row_in_vertex == nullptr) problemVertex.emplace_back(getKGPosition(v));
-        // if(v->row_out_vertex == nullptr) problemVertex.emplace_back(getKGPosition(v));
-        // if(v->col_in_vertex[0] == nullptr) problemVertex.emplace_back(getKGPosition(v));
-        // if(v->col_out_vertex[0] == nullptr) problemVertex.emplace_back(getKGPosition(v));
+        // ensure(v->row_in_vertex != nullptr && "intial real vertex doesn't have row_in set");
+        // ensure(v->row_out_vertex != nullptr && "initial real vertex doesn't have row_out set");
+        // ensure(v->col_in_vertex[0] != nullptr && "initial real vertex doesn't have col_in[0] set");
+        // ensure(v->col_out_vertex[0] != nullptr && "initial real vertex doesn't have col_out[0] set");
+        if(v->row_in_vertex == nullptr) problemVertex.emplace_back(getKGPosition(v));
+        if(v->row_out_vertex == nullptr) problemVertex.emplace_back(getKGPosition(v));
+        if(v->col_in_vertex[0] == nullptr) problemVertex.emplace_back(getKGPosition(v));
+        if(v->col_out_vertex[0] == nullptr) problemVertex.emplace_back(getKGPosition(v));
     }
 
-    // polyscope::registerPointCloud("problem vertices", problemVertex);
-    // polyscope::show();
+    polyscope::registerPointCloud("problem vertices", problemVertex);
+    polyscope::show();
 
     //also ensure all the ordering is correct
     for (Face f : gluedGeometry->mesh.faces()) {
