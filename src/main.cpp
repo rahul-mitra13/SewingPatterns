@@ -242,7 +242,7 @@ void showStripePatterns(){
   // richDataFile = "sock_info_0.0035.ply";
   // richDataFile = "misc_cactus_info_0.1.ply";
   //richDataFile = "ducK_info_0.02.ply";
-  //richDataFile = "split_fine_masking_both_directions.ply";
+  // richDataFile = "info.ply";
   // richDataFile = "tube.ply";
 
   //-------iteratively find course stripes and course singularities----------//
