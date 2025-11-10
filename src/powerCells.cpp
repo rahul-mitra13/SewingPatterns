@@ -65,7 +65,7 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
     }//GENERAL TO-DO: \sigma should integrate to 0 around saddle loops
 
     psMesh -> addVertexScalarQuantity("Curl measure from PC file", courseMeasure);
-    polyscope::show();
+    //polyscope::show();
 
     //find the decompositions per face 
     FaceData<int> faceComponentsGlued =  componentsCutByLoops(*gluedGeometry, saddleLoops);
@@ -117,7 +117,7 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
         polyscope::registerPointCloud("(+) Aligned Pts for bucket " + std::to_string(i), positiveCenters);
         polyscope::registerPointCloud("(-) Aligned Pts for bucket " + std::to_string(i), negativeCenters);
 
-        polyscope::show();
+        //polyscope::show();
     }
 
     return allMatchedPairs;
