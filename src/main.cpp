@@ -236,14 +236,7 @@ void showStripePatterns(){
   // P("revealCurl done");
   // polyscope::show();
 
-  // Old .ply files, keeping those for reference
-  // richDataFile = "heart_info_0.35.ply";
-  // richDataFile = "bunny_info_3.5.ply";
-  // richDataFile = "sock_info_0.0035.ply";
-  // richDataFile = "misc_cactus_info_0.1.ply";
-  // richDataFile = "ducK_info_0.02.ply";
   // richDataFile = "info.ply";
-  // richDataFile = "tube.ply";
 
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);

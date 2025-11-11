@@ -3860,21 +3860,24 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
         step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution[iSite].size() - 1));
         //need setEnabled(true) otherwise we run into OpenGL errors? weird
-        psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
-        polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+        // psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
+        //polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
 
         //should do this outside the ImGUI
-        // std::vector<Vector3> currentSites; 
-        // for (int i = 0; i < posOptions.nSites; i++){
-        //     currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
-        // }
-        // polyscope::registerPointCloud("all pos sites", currentSites);
+        std::vector<Vector3> currentSites; 
+        for (int i = 0; i < posOptions.nSites; i++){
+            currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
+        }
+        auto pc = polyscope::registerPointCloud("all pos sites", currentSites);
+        // --- Uniform color: just fill all points with one RGB value
+        std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
+        pc->addColorQuantity("uniform color", colors)->setEnabled(true);
 
         if (ImGui::Button("Done"))
             polyscope::popContext();
         ImGui::SameLine();
     };
-    // polyscope::pushContext(positivePopUpUI);  
+    //polyscope::pushContext(positivePopUpUI);  
 
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
