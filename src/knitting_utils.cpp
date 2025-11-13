@@ -1709,7 +1709,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                                                                 waleEdgeCurl, topPairs);
         
         std::cout << "size of waleSingularityEdges = " << waleSingularityEdges.size() << std::endl;
-        
+        if (waleSingularityEdges.size() == 0) break;
+
         //DEBUG
         //print out the candidate edges
         EdgeData<int> candidateEdges(globalGeometry.mesh, 0);
@@ -1722,7 +1723,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         polyscope::registerPointCloud("top edges after " + std::to_string(numWaleSingularities) + "wale singularities", pointCloud)->setEnabled(false);
         psMesh.addEdgeScalarQuantity("candidate edges after " + std::to_string(numWaleSingularities) + "wale singularities", candidateEdges);
         int numSkips = 0;
-        int maxSkips = topPairs;
+        int maxSkips = std::min(topPairs, (int)waleSingularityEdges.size());
         for (auto s : waleSingularityEdges){
             if (s.second > 0){
                 numPos++;
@@ -1862,41 +1863,44 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
     std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
 
-    // Compute (integer) sum of indices
-    int sumIndices = 0;
-    for (int i = 0; i < gluedGeometry.mesh.nEdges(); i++)
-        sumIndices += edgeIndices[i]; // I think the sign convention in edgeIndices is wrong, which is why we have to put a negative here
+    // Skip the integer stuff, it's not working properly
+    // Should be merged from dist_centers but we're lazy
 
-    // Compute (non-integer) number of stripes on boundaries
-    std::vector<double> boundaryStripes;
-    for (std::vector<double> path : globalBdyConditions.waleBdyPathConstraints) {
-        double integral = 0;
-        for (int i = 0; i < path.size(); i++) if (path[i] != 0) {
-            Edge e = gluedGeometry.mesh.edge(i);
-            integral += sigmaWaleGlued[e.halfedge()] * path[i];
-        }
-        boundaryStripes.push_back(integral / period);
-    }
+    // // Compute (integer) sum of indices
+    // int sumIndices = 0;
+    // for (int i = 0; i < gluedGeometry.mesh.nEdges(); i++)
+    //     sumIndices += edgeIndices[i]; // I think the sign convention in edgeIndices is wrong, which is why we have to put a negative here
+    // std::cout << "boundary sum = " << sumIndices << std::endl;
 
-    // Round it up
-    std::vector<int> boundaryStripesInt = roundWithSum(boundaryStripes, sumIndices);
+    // // Compute (non-integer) number of stripes on boundaries
+    // std::vector<double> boundaryStripes;
+    // for (std::vector<double> path : globalBdyConditions.waleBdyPathConstraints) {
+    //     double integral = 0;
+    //     for (int i = 0; i < path.size(); i++) if (path[i] != 0) {
+    //         Edge e = gluedGeometry.mesh.edge(i);
+    //         integral += sigmaWaleGlued[e.halfedge()] * path[i];
+    //     }
+    //     boundaryStripes.push_back(integral / period);
+    // }
 
-    // Set up the edge path constraints 
-    std::vector<std::pair<std::vector<double>, double>> waleEdgePathConstraints;
-    for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
-        std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
-        waleEdgePathConstraints.push_back(std::make_pair(path, -boundaryStripesInt[i]));
-    }
+    // // Round it up
+    // std::vector<int> boundaryStripesInt = roundWithSum(boundaryStripes, sumIndices);
 
-    // solve the model with all the path constraints and boundary constraints 
-    //modelWale.setBdyEdges(waleBdyEdges);
-    modelWale.setEdgePathConstraints(waleEdgePathConstraints);
-    modelWale.setHomologyGenerators(homologyGenerators);
-    std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
-    std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
+    // // Set up the edge path constraints 
+    // std::vector<std::pair<std::vector<double>, double>> waleEdgePathConstraints;
+    // for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
+    //     std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
+    //     waleEdgePathConstraints.push_back(std::make_pair(path, -boundaryStripesInt[i]));
+    // }
+
+    // // solve the model with all the path constraints and boundary constraints 
+    // //modelWale.setBdyEdges(waleBdyEdges);
+    // modelWale.setEdgePathConstraints(waleEdgePathConstraints);
+    // modelWale.setHomologyGenerators(homologyGenerators);
+    // std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
+    // std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
 
     
-    std::cout << "boundary sum = " << sumIndices << std::endl;
     std::cout << "Number of positive edges sampled = " << numPos << std::endl;
     std::cout << "Number of negative edges sampled = " << numNeg << std::endl;
     return std::tie(stripeValuesOneFormGlued, waleSingularEdgesGlobal);
@@ -3483,9 +3487,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         // singEdgePairs = findEdgeSingularityPairFromStripeIsoVals(globalGeometry, gluedGeometry, 
         //                                                         edgeCurl, edgeMap, components, topPairs);
         int numSkips = 0;
-        int maxSkips = topPairs;
-
-        
+        int maxSkips = std::min(topPairs, (int)singEdgePairs.size()); // we can't skip more pairs
         for (auto s : singEdgePairs){
             
             //if the return type is not a tuple
@@ -3712,6 +3714,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
         //reformulate the problem in terms of halfedges 
         // Create an environment
         GRBEnv env = GRBEnv(true);
+        env.set(GRB_IntParam_OutputFlag, 0); // make Gurobi shut up
         env.set("LogFile", "1-form computation.log");
         env.start();
 

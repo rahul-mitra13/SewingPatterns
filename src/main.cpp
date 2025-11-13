@@ -26,10 +26,14 @@
 //#include "experiments.h"
 #include "KnitGraph.h"
 
+#include <chrono>
+#include <filesystem>
+
 #include "homology_generators.h"
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
+namespace fs = std::filesystem;
 
 //vertex mappings from txt file (between panels)
 std::vector<std::pair<int, int>> vertexMappingsPairs;
@@ -83,6 +87,8 @@ KnitGraph graph;
 //here we will do as much processing as possible directly on the glued together mesh 
 void showStripePatterns(){
   
+  std::chrono::steady_clock::time_point timeStart = std::chrono::steady_clock::now();
+
   //set the wale period 
   //walePeriod = ((1.0/1.6) * coursePeriod);
   walePeriod = coursePeriod;
@@ -226,7 +232,7 @@ void showStripePatterns(){
   // // waleStripes -> setEnabled(false);
 
 
-  // generate the knit graph
+  // // generate the knit graph
   // graph = KnitGraph(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
   //                     courseStripeValues, courseSingularEdgesGlobal, waleStripeValues, waleSingularEdgesGlobal,
   //                     edgeMap);
@@ -234,7 +240,11 @@ void showStripePatterns(){
 
   // graph.writeKnitGraphToTxtFile("model.obj");
 
+  std::chrono::steady_clock::time_point timeEnd = std::chrono::steady_clock::now();
 
+  int durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(timeEnd - timeStart).count();
+  double durationS = (double)durationMs/1000;
+  H(durationS);
 }
 
 //repair a knit graph vertex that's missing connections
@@ -309,8 +319,24 @@ int main(int argc, char **argv) {
   std::ifstream jsonFile(argv[1]);
   nlohmann::json data = nlohmann::json::parse(jsonFile);
 
+
+  // Resolve model and vertex mappings path s
+  fs::path jsonPath = argv[1];
+  fs::path modelPath = data["model_path"].get<std::string>();
+  if (!fs::exists(modelPath)) modelPath = jsonPath.parent_path() / modelPath;
+  if (!fs::exists(modelPath)) {
+    std::cerr << "Model path does not exist (checked relative to here and to JSON file)!" << std::endl;
+    exit(1);
+  }
+  fs::path vertexMappingsPath = data["vertex_mappings"].get<std::string>();
+  if (!fs::exists(vertexMappingsPath)) vertexMappingsPath = jsonPath.parent_path() / vertexMappingsPath;
+  if (!fs::exists(vertexMappingsPath)) {
+    std::cerr << "Vertex mappings path does not exist (checked relative to here and to JSON file)!" << std::endl;
+    exit(1);
+  }
+
   //run sanity checks
-  std::tie(globalMeshPre, globalGeometryPre) = readManifoldSurfaceMesh(data["model_path"]);
+  std::tie(globalMeshPre, globalGeometryPre) = readManifoldSurfaceMesh(modelPath);
 
 
   //make the mesh Delaunay 
@@ -361,7 +387,7 @@ int main(int argc, char **argv) {
     throw std::exception();
   }
 
-  globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(data["model_path"]), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
+  globalPSMesh = polyscope::registerSurfaceMesh(polyscope::guessNiceNameFromPath(modelPath), globalGeometry->inputVertexPositions, globalMesh -> getFaceVertexList());
 
   
   // Internally, Polyscope numbers the edges by looping over faces.
@@ -377,7 +403,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(data["vertex_mappings"]);
+  vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(vertexMappingsPath);
   edgeMappingsPairs = buildPairOfStitchedEdges(*globalGeometry, vertexMappingsPairs);
   //set up the orientations for the 1-form viz while we're here
   for (Edge e : globalMesh->edges()){

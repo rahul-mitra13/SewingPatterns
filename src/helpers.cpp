@@ -896,6 +896,7 @@ std::vector<int> roundWithSum(std::vector<double> y, int sum) {
     
     try {
         GRBEnv env = GRBEnv(true);
+        env.set(GRB_IntParam_OutputFlag, 0); // make Gurobi shut up
         env.start();
         GRBModel model = GRBModel(env);
 
