@@ -1993,32 +1993,96 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     VertexData<double> waleBoostedDistance = heatSolver.computeDistance(waleBoostedVertices);
     psMesh.addVertexScalarQuantity("Wale Boosted Distance", waleBoostedDistance);
     
+    //Attempts at locally modifying the curl signal
 
-    //perform a convex combination to boost the curl measure in the wale dirction
-    double boostedVerticesCurl = 0.0;
-    for (Vertex v : waleBoostedVertices){
-        boostedVerticesCurl += curlMeasure[v];
-    }
-    double totalCurlMeasure = 0.0;
-    for (Vertex v : gluedMesh.vertices()){
-        totalCurlMeasure += curlMeasure[v];
-    }
-    double alpha = totalCurlMeasure/boostedVerticesCurl;
-    double c = 0.8;
-    //update curl for non-seam vertices 
-    for (Vertex v : gluedMesh.vertices()){
-        if (std::find(waleBoostedVertices.begin(), waleBoostedVertices.end(), v) != waleBoostedVertices.end()){
-            curlMeasure[v] = c * alpha * curlMeasure[v];
-        }
-        else{
-            curlMeasure[v] = (1.0 - c) * curlMeasure[v];
-        }
-    }
-    //this is a simple linear scaling
+    // 1. perform a convex combination to boost the curl measure (not really preserving the total measure)
+    // double boostedVerticesCurl = 0.0;
+    // for (Vertex v : waleBoostedVertices){
+    //     boostedVerticesCurl += curlMeasure[v];
+    // }
+    // double totalCurlMeasure = 0.0;
+    // for (Vertex v : gluedMesh.vertices()){
+    //     totalCurlMeasure += curlMeasure[v];
+    // }
+    // double alpha = totalCurlMeasure/boostedVerticesCurl;
+    // double c = 0.8;
+    // //update curl for non-seam vertices 
+    // for (Vertex v : gluedMesh.vertices()){
+    //     if (std::find(waleBoostedVertices.begin(), waleBoostedVertices.end(), v) != waleBoostedVertices.end()){
+    //         curlMeasure[v] = c * alpha * curlMeasure[v];
+    //     }
+    //     else{
+    //         curlMeasure[v] = (1.0 - c) * curlMeasure[v];
+    //     }
+    // }
+    
+    //2. perform a simple linear scaling (doesn't preserve anything but gives decent results)
     // double boostFactor = 1e5;
     // for (Vertex v : waleBoostedVertices){
     //     curlMeasure[v] =  boostFactor * curlMeasure[v];
     // }
+
+    // 3. Convex combination boost of curl measure in the wale direction 
+    // Conserves total integrated curl: sum(A_v * curl[v]) stays constant.
+    // With constrast factor kappa 
+
+    double c = 1.0;                 // blend strength in [0,1]
+    double kappa = 20.0;             // contrast factor >= 1 (tune this)
+
+    // Areas
+    double totalArea = 0.0, seamArea = 0.0;
+    for (Vertex v : gluedMesh.vertices()) {
+        totalArea += globalGeometry.vertexDualAreas[v];
+    }
+    for (Vertex v : waleBoostedVertices) {
+        seamArea += globalGeometry.vertexDualAreas[v];
+    }
+    double nonSeamArea = std::max(1e-16, totalArea - seamArea);
+
+    // Compute scaled beta pieces
+    double betaSeam    = (nonSeamArea / totalArea);   // = A_non / A_tot
+    double betaNonSeam = (seamArea    / totalArea);   // = A_seam / A_tot
+
+    // Clamp c*kappa to keep non-seam multiplier >= 0
+    double maxCk = (nonSeamArea > 0.0) ? (totalArea / std::max(1e-16, seamArea)) : 0.0;
+    // If seamArea==0, nothing to boost anyway; factors will do nothing.
+    double cEff = c;
+    double kEff = kappa;
+    if (seamArea > 0.0) {
+        double ck = c * kappa;
+        double ckSafe = std::max(0.0, maxCk - 1e-8);
+        if (ck > ckSafe) {
+            double scale = ckSafe / std::max(1e-16, ck);
+            kEff *= scale; // reduce kappa to keep factors non-negative
+        }
+    }
+
+    // Final multipliers
+    double seamMult    = 1.0 + cEff * kEff * betaSeam;    // 1 + c*k*A_non/A_tot
+    double nonSeamMult = 1.0 - cEff * kEff * betaNonSeam; // 1 - c*k*A_seam/A_tot
+
+    VertexData<double> outCurl(gluedMesh, 0.0);
+    for (Vertex v : gluedMesh.vertices()) {
+        bool isSeam = (std::find(waleBoostedVertices.begin(), waleBoostedVertices.end(), v)
+                   != waleBoostedVertices.end());
+        outCurl[v] = curlMeasure[v] * (isSeam ? seamMult : nonSeamMult);
+    }
+
+    // Optional: one-line renormalization to kill FP drift
+    double totBefore = 0.0, totAfter = 0.0;
+    for (Vertex v : gluedMesh.vertices()) {
+        double A = globalGeometry.vertexDualAreas[v];
+        totBefore += A * curlMeasure[v];
+        totAfter  += A * outCurl[v];
+    }
+    if (totAfter != 0.0) {
+        double corr = totBefore / totAfter;   // usually ~1.0
+        for (Vertex v : gluedMesh.vertices()) outCurl[v] *= corr;
+    }
+
+    curlMeasure = outCurl;
+
+
 
     psMesh.addVertexScalarQuantity("initial curl measure without masking (wale)", curlMeasure);
     polyscope::show();
