@@ -35,6 +35,8 @@ using namespace std;
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
 
+namespace fs = std::filesystem;
+
 //vertex mappings from txt file (between panels)
 std::vector<std::pair<int, int>> vertexMappingsPairs;
 //edge mappings from txt file (between panels)
@@ -432,14 +434,22 @@ int main(int argc, char **argv) {
 
   polyscope::init();
 
-  std::filesystem::path inFilePath(inFileName);
+
+  fs::path inFilePath(inFileName);
   nlohmann::json data;
-  string modelPath;
+  fs::path modelPath, vertexMappingsPath;
   if (inFilePath.extension() == ".json") {
 
     std::ifstream inFileStream(inFilePath);
     data = nlohmann::json::parse(inFileStream);
+
+    // Resolve model and vertex mappings paths
     modelPath = data["model_path"].get<std::string>();
+    if (!fs::exists(modelPath)) modelPath = inFilePath.parent_path() / modelPath; // also try path relative to JSON file
+    ensure(fs::exists(modelPath));
+    vertexMappingsPath = data["vertex_mappings"].get<std::string>();
+    if (!fs::exists(vertexMappingsPath)) vertexMappingsPath = inFilePath.parent_path() / vertexMappingsPath; // also try path relative to JSON file
+    ensure(fs::exists(vertexMappingsPath));
 
     //run sanity checks
     std::tie(globalMeshPre, globalGeometryPre) = readManifoldSurfaceMesh(modelPath);
@@ -462,7 +472,7 @@ int main(int argc, char **argv) {
     }
 
     // Parse and setup vertex and edge mappings for glued meshes
-    vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(data["vertex_mappings"]);
+    vertexMappingsPairs = buildPairOfStitchedVerticesFromFile(vertexMappingsPath);
     edgeMappingsPairs = buildPairOfStitchedEdges(*globalGeometry, vertexMappingsPairs);  
 
   } else if (inFilePath.extension() == ".msh") {
