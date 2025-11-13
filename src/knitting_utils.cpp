@@ -2087,7 +2087,13 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     //posOptions.iterations = 500;
+    // Start timer
+    auto start = std::chrono::high_resolution_clock::now();
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
+    // Stop timer
+    auto end = std::chrono::high_resolution_clock::now();
+    // Compute duration in seconds
+    std::chrono::duration<double> elapsed = end - start;
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
        positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
@@ -2128,7 +2134,14 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     // negOptions.iterations = 500;
     std::cout << "# positive sites " << posOptions.nSites << std::endl;
     std::cout << "# negative sites " << negOptions.nSites << std::endl;
+    //Start timer
+    start = std::chrono::high_resolution_clock::now();
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
+    // Stop timer
+    end = std::chrono::high_resolution_clock::now();
+    // Compute duration in seconds
+    elapsed += end - start;
+    std::cout << "Total wale time = " << elapsed.count() << "seconds \n " << std::endl;
     std::vector<Vector3> negativeCenters;
     for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
        negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
@@ -4105,7 +4118,13 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         pcOptions.saddleLoops      = allSaddleLoops;
         pcOptions.psMesh           = &psMesh;
         pcOptions.period           = period;
+        auto start = std::chrono::high_resolution_clock::now();
         alignmentOptions.pairedSites =  computeCourseSingularities(pcOptions);
+        auto end = std::chrono::high_resolution_clock::now();
+        // Compute duration in seconds
+        std::chrono::duration<double> elapsed = end - start;
+        std::cout << "Elapsed time for course: " << elapsed.count() << " seconds\n";
+        polyscope::show();
         
         //now appropriatately specify the singular edges
         //this relies on the assumption that 2 singular sites (surface points) don't end up on the same face 
