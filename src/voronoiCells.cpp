@@ -152,21 +152,14 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
   }
   meanEdgeLength /= mesh.nEdges();
   shortTime = options.tCoef * meanEdgeLength * meanEdgeLength;
-  H(meanEdgeLength);
-  std::cout << "shortTime outside function = " << shortTime << std::endl;
-
 
   //compute mass per cell 
   double desiredMass = 0.; 
   for (Vertex v : mesh.vertices()){
-    //std::cout << "dual area at vertex " << v << " " << geom.vertexDualAreas[v] << std::endl;
     desiredMass += geom.vertexDualAreas[v] * measure[v];
   }
   desiredMass /= nSites;
-  std::cout << "desiredMass per cell = " << desiredMass << std::endl;
-
-  // H(SUITESPARSE_USE_OPENMP);
-
+  
   // == Iterations
   bool stop = false; // flag if stopping criterion on sumUpdateNorm is reached
   double sumUpdateNorm = 1; // just a starting point to determine a tolerance on weights grad norm
