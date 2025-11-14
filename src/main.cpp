@@ -240,11 +240,27 @@ void showStripePatterns(){
 
   // graph.writeKnitGraphToTxtFile("model.obj");
 
-  std::chrono::steady_clock::time_point timeEnd = std::chrono::steady_clock::now();
 
+  // Measure time
+  std::chrono::steady_clock::time_point timeEnd = std::chrono::steady_clock::now();
   int durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(timeEnd - timeStart).count();
   double durationS = (double)durationMs/1000;
+
+  // Write some stats about runtime and singularities
   H(durationS);
+
+  // Count singularities
+  int nCoursePosSing = 0, nCourseNegSing = 0, nWalePosSing = 0, nWaleNegSing = 0;
+  for (Edge e : globalGeometry->mesh.edges()) {
+    if (courseSingularEdgesGlobal[e] > 0) nCoursePosSing += +courseSingularEdgesGlobal[e];
+    if (courseSingularEdgesGlobal[e] < 0) nCourseNegSing += -courseSingularEdgesGlobal[e];
+    if (waleSingularEdgesGlobal[e] > 0) nWalePosSing += +waleSingularEdgesGlobal[e];
+    if (waleSingularEdgesGlobal[e] < 0) nWaleNegSing += -waleSingularEdgesGlobal[e];
+  }
+  H(nCoursePosSing);
+  H(nCourseNegSing);
+  H(nWalePosSing);
+  H(nWaleNegSing);
 }
 
 //repair a knit graph vertex that's missing connections
