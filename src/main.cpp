@@ -165,6 +165,43 @@ void showStripePatterns(){
   knoppelStripes->setRadius(0.001);
   knoppelStripes->setEnabled(false);
 
+  //write the vertex vector field/mesh to a .ply file for Giovanni/Vincent's stripes approach 
+  //normalize the vertex vector field 
+  VertexData<Vector3> vertexVectorFieldNormalize(globalGeometry->mesh);
+  for (Vertex v : globalMesh->vertices()){
+    vertexVectorFieldNormalize[v] = vertexVectorField[v].normalize();
+  }
+  globalPSMesh->addVertexVectorQuantity("vertexVectorField normalized", vertexVectorFieldNormalize);
+  std::ofstream plyFile("misc_cactus.ply");
+  plyFile << "ply\nformat ascii 1.0\nelement vertex " << globalMesh->nVertices() << "\n"
+          << "property float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\n"
+          << "element face " << globalMesh->nFaces() << "\nproperty list uchar uint vertex_indices\n"
+          << "end_header\n";
+  // for (size_t i = 0; i < vertsCount; ++i){
+  //   auto color = colorFunc(i, vertex);
+  //   uint8_t r = 255*(dir.x*0.5f+0.5f);
+  //   uint8_t g = 255*(dir.y*0.5f+0.5f);
+  //   uint8_t b = 255*(dir.z*0.5f+0.5f);
+  //   std::array<uint8_t, 3> color = std::array<uint8_t, 3>{r, g, b};
+  //   plyFile << vertex[i].position.x << " " << vertex[i].position.y << " " << vertex[i].position.z << " " << uint32_t(color[0]) << " " << uint32_t(color[1]) << " " << uint32_t(color[2]) << std::endl;
+  // }
+  for (Vertex v : globalMesh -> vertices()){
+    Vector3 dir = vertexVectorFieldNormalize[v];
+    Vector3 pos = globalGeometry->vertexPositions[v];
+    uint8_t r = 255*(dir.x*0.5f+0.5f);
+    uint8_t g = 255*(dir.y*0.5f+0.5f);
+    uint8_t b = 255*(dir.z*0.5f+0.5f);
+    std::array<uint8_t, 3> color = std::array<uint8_t, 3>{r, g, b};
+    plyFile << pos.x << " " << pos.y << " " << pos.z << " " << uint32_t(color[0]) << " " << uint32_t(color[1]) << " " << uint32_t(color[2]) << std::endl;
+  }
+  auto faces = globalMesh -> getFaceVertexList();
+  for (size_t i = 0; i < faces.size(); ++i) {
+    auto face = faces[i];
+    plyFile << "3 " << face[0] << " " << face[1] << " " << face[2] << std::endl;
+  }
+  
+  polyscope::show();
+
   //loops from the saddle vertex for meshes with genus 
   std::vector<std::vector<double>> allSaddleLoops;
   //all the homology generators 

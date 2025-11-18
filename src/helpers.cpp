@@ -1027,7 +1027,6 @@ std::vector<int> roundWithSum(std::vector<double> y, int sum) {
 
 
     return res;
-
 }
 
 polyscope::CurveNetwork* showEdges(std::string name, std::vector<Edge> edges, VertexPositionGeometry& geometry) {

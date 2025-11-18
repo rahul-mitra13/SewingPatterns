@@ -1995,76 +1995,76 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     
     //Attempts at locally modifying the curl signal
     // 1. Compute totals (pos & neg) and boosted totals
-    double c = 0.;
-    double Bp = 0.0, Up = 0.0;
-    double Bn = 0.0, Un = 0.0;
+    // double c = 0.9;
+    // double Bp = 0.0, Up = 0.0;
+    // double Bn = 0.0, Un = 0.0;
 
-    for (Vertex v : gluedMesh.vertices()) {
-        double cv = curlMeasure[v];
-        bool boosted = std::find(waleBoostedVertices.begin(),
-                             waleBoostedVertices.end(), v)
-                   != waleBoostedVertices.end();
+    // for (Vertex v : gluedMesh.vertices()) {
+    //     double cv = curlMeasure[v];
+    //     bool boosted = std::find(waleBoostedVertices.begin(),
+    //                          waleBoostedVertices.end(), v)
+    //                != waleBoostedVertices.end();
 
-        if (cv > 0) {
-            if (boosted) Bp += cv;
-            else         Up += cv;
-        } else if (cv < 0) {
-            double mag = -cv;
-            if (boosted) Bn += mag;
-            else         Un += mag;
-        }
-    }
+    //     if (cv > 0) {
+    //         if (boosted) Bp += cv;
+    //         else         Up += cv;
+    //     } else if (cv < 0) {
+    //         double mag = -cv;
+    //         if (boosted) Bn += mag;
+    //         else         Un += mag;
+    //     }
+    // }
 
-    double Tp = Bp + Up;   // total positive
-    double Tn = Bn + Un;   // total negative
+    // double Tp = Bp + Up;   // total positive
+    // double Tn = Bn + Un;   // total negative
 
-    if (c == 0) c = 1e-12;
+    // if (c == 0) c = 1e-12;
    
-    // alpha = (B + cU) / (cB)
-    double alphaPos = (Bp > 0 ? (Bp + c * Up) / (c * Bp) : 1.0);
-    double alphaNeg = (Bn > 0 ? (Bn + c * Un) / (c * Bn) : 1.0);
+    // // alpha = (B + cU) / (cB)
+    // double alphaPos = (Bp > 0 ? (Bp + c * Up) / (c * Bp) : 1.0);
+    // double alphaNeg = (Bn > 0 ? (Bn + c * Un) / (c * Bn) : 1.0);
 
 
   
-    //  Apply redistribution
-    double posAfter = 0.0, negAfter = 0.0;
+    // //  Apply redistribution
+    // double posAfter = 0.0, negAfter = 0.0;
 
-    for (Vertex v : gluedMesh.vertices()) {
+    // for (Vertex v : gluedMesh.vertices()) {
 
-        double cv = curlMeasure[v];
-        bool boosted = std::find(waleBoostedVertices.begin(),
-                             waleBoostedVertices.end(), v)
-                   != waleBoostedVertices.end();
+    //     double cv = curlMeasure[v];
+    //     bool boosted = std::find(waleBoostedVertices.begin(),
+    //                          waleBoostedVertices.end(), v)
+    //                != waleBoostedVertices.end();
 
-        if (cv > 0) {
+    //     if (cv > 0) {
 
-            double updated = boosted ? c * alphaPos * cv
-                                 : (1 - c) * cv;
+    //         double updated = boosted ? c * alphaPos * cv
+    //                              : (1 - c) * cv;
 
-            posAfter += updated;
-            curlMeasure[v] = updated;
-        }
-        else if (cv < 0) {
+    //         posAfter += updated;
+    //         curlMeasure[v] = updated;
+    //     }
+    //     else if (cv < 0) {
 
-            double mag = -cv;
-            double newMag = boosted ? c * alphaNeg * mag
-                                : (1 - c) * mag;
+    //         double mag = -cv;
+    //         double newMag = boosted ? c * alphaNeg * mag
+    //                             : (1 - c) * mag;
 
-            negAfter += newMag;
-            curlMeasure[v] = -newMag;
-        }
-    }
+    //         negAfter += newMag;
+    //         curlMeasure[v] = -newMag;
+    //     }
+    // }
 
-    std::cout << "Pos before = " << Tp 
-          << " Pos after = " << posAfter << "\n";
-    std::cout << "Neg before = " << Tn 
-          << " Neg after = " << negAfter << "\n";
+    // std::cout << "Pos before = " << Tp 
+    //       << " Pos after = " << posAfter << "\n";
+    // std::cout << "Neg before = " << Tn 
+    //       << " Neg after = " << negAfter << "\n";
     
     //2. perform a simple linear scaling (doesn't preserve anything but gives decent results)
-    // double boostFactor = 1e5;
-    // for (Vertex v : waleBoostedVertices){
-    //     curlMeasure[v] =  boostFactor * curlMeasure[v];
-    // }
+    double boostFactor = 1e5;
+    for (Vertex v : waleBoostedVertices){
+        curlMeasure[v] =  boostFactor * curlMeasure[v];
+    }
 
     // 3. Convex combination boost of curl measure in the wale direction 
     // Conserves total integrated curl: sum(A_v * curl[v]) stays constant.
