@@ -465,7 +465,7 @@ int main(int argc, char **argv) {
     globalGeometry = std::make_unique<VertexPositionGeometry>(*globalMesh, V);
 
     // For each boundary loop, print one of its vertices
-    // (this is to populate the json file).
+    // (this is to populate the json file)
     for (auto bl : globalMesh -> boundaryLoops()){
       Face f = bl.asFace();
       std::cout << "boundary vertex = " << f.halfedge().tailVertex() << std::endl;
