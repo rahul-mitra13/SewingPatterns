@@ -414,6 +414,8 @@ int main(int argc, char **argv) {
   app.add_option("inFileName", inFileName, "Input mesh and metadata as .json, .obj or .msh.")->required()->check(CLI::ExistingFile);
   app.add_option("-p,--period", period, "Period for the stripe pattern; default is 2*mesh_size.");
   app.add_option("--ply", richDataFile, "Rich data file (.ply) containing precomputed stripe values.")->check(CLI::ExistingFile);
+  app.add_option("--in-course-sing", opts.inputCourseSingPath, "File (.txt) containing course singularity positions.")->check(CLI::ExistingFile);
+  app.add_option("--out-course-sing", opts.outputCourseSingPath, "File (.txt) to write course singularity positions.");
 
   try {
     app.parse(argc, argv);
@@ -597,7 +599,7 @@ int main(int argc, char **argv) {
   // Set the callback function
   polyscope::state::userCallback = callBacks;
 
-  if (argc > 2) // period was provided
+  if (period) // period was provided
     showStripePatterns();
 
   //for rendering figures

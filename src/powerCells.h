@@ -27,6 +27,8 @@ struct powerCellResults {
   EdgeData<double> waleOneForm;//final wale stripes
 };
 
+// Note: surface points are on edges, not faces!
+// This is a result of how projectOnIsoline() works.
 std::vector<std::pair<SurfacePoint, SurfacePoint>>  computeCourseSingularities(powerCellOptions& options);
 
 //compute the course curl measure in the glued setting 

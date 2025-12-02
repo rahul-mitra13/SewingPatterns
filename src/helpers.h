@@ -74,6 +74,9 @@ struct Options {
 
   // Use input V coordinate for wale guidance. Default will just rotate the time function gradient 90 degrees
   bool useVCoordForWale = false;
+
+  // Paths to input and output files for course singularity positions
+  std::filesystem::path inputCourseSingPath, outputCourseSingPath;
 };
 
 //boundary conditions on the GLUED MESH

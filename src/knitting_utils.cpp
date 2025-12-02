@@ -2129,7 +2129,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
 
     psMesh.addVertexScalarQuantity("initial curl measure without masking (wale)", curlMeasure);
-    polyscope::show();
+    // polyscope::show();
 
     if (heatSourceVerts.size() != 0){
         //mask the saddle 
@@ -3881,7 +3881,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     //this is in the glued setting 
     FaceData<int> faceComponentsGlued =  componentsCutByLoops(gluedGeometry, allSaddleLoops);
     psMesh.addFaceScalarQuantity("face components", faceComponentsGlued);
-    polyscope::show();
+    // polyscope::show();
 
     //Attempting to find the center of distributions using Vector Heat Method
     VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
@@ -3959,264 +3959,260 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
    
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
-    int numSings = 0.;
+
+    int nSites = std::round(avgTotalMeasure / period);
+
+    // Old code for visualization
+
+    // // POSITIVE COURSE
+
+    // VoronoiOptions posOptions = defaultVoronoiOptions;
+    // posOptions.nSites = std::round(avgTotalMeasure / period);
+    // std::cout << "number of sings = " << posOptions.nSites << std::endl;
+    // posOptions.useDelaunay = false;
+    // posOptions.computeDistributions = true;
+    // posOptions.seed = 42;
+
+    // VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
+    // std::vector<std::vector<VertexData<double>>> posStepSiteDistribution = posVoronoiCenters.stepSiteDistribution;
+    // std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
+    // std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
+
+    // //write a nested callback to debug the evolution of our method for the positive sites
+    // //Register the callback which creates the UI and does the hard work
+    // int step = 0;
+    // int iSite = 0;
+    // auto positivePopUpUI = [&](){
+    //     static bool showWindow = true;
+    //     ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
+    //     ImGui::Begin("Positive sites", &showWindow);
+    //     ImGui::PushItemWidth(400);
+    //     ImGui::Separator();
+    //     ImGui::InputInt("Site", &iSite);
+    //     ImGui::InputInt("Time Step", &step);
+    //     // Clamp to bounds after user input
+    //     iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
+    //     step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution[iSite].size() - 1));
+    //     //need setEnabled(true) otherwise we run into OpenGL errors? weird
+    //     // psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
+    //     //polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+
+    //     //should do this outside the ImGUI
+    //     std::vector<Vector3> currentSites; 
+    //     for (int i = 0; i < posOptions.nSites; i++){
+    //         currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
+    //     }
+    //     auto pc = polyscope::registerPointCloud("all pos sites", currentSites);
+    //     // --- Uniform color: just fill all points with one RGB value
+    //     std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
+    //     pc->addColorQuantity("uniform color", colors)->setEnabled(true);
+
+    //     if (ImGui::Button("Done"))
+    //         polyscope::popContext();
+    //     ImGui::SameLine();
+    // };
+    // //polyscope::pushContext(positivePopUpUI);  
+
+    // std::vector<Vector3> positiveCenters;
+    // for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
+    // positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+    // }
 
 
-    // POSITIVE COURSE
+    // polyscope::registerPointCloud("Voronoi sites unaligned (+)", positiveCenters)->setEnabled(false);
+    // std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
 
-    VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = std::round(avgTotalMeasure / period);
-    std::cout << "number of sings = " << posOptions.nSites << std::endl;
-    posOptions.useDelaunay = false;
-    posOptions.computeDistributions = true;
-    posOptions.seed = 42;
-  
-    VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
-    std::vector<std::vector<VertexData<double>>> posStepSiteDistribution = posVoronoiCenters.stepSiteDistribution;
-    std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
-    std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
+    // // Compute max curl for normalization
+    // double maxPosCurl = 0;
+    // for (Vertex v : globalMesh.vertices())
+    //     maxPosCurl = std::max(maxPosCurl, posMeasure[v]);
 
-    //write a nested callback to debug the evolution of our method for the positive sites
-    //Register the callback which creates the UI and does the hard work
-    int step = 0;
-    int iSite = 0;
-    auto positivePopUpUI = [&](){
-        static bool showWindow = true;
-        ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
-        ImGui::Begin("Positive sites", &showWindow);
-        ImGui::PushItemWidth(400);
-        ImGui::Separator();
-        ImGui::InputInt("Site", &iSite);
-        ImGui::InputInt("Time Step", &step);
-        // Clamp to bounds after user input
-        iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
-        step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution[iSite].size() - 1));
-        //need setEnabled(true) otherwise we run into OpenGL errors? weird
-        // psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
-        //polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+    // //print the positive masses
+    // //render the fuzzy cells
+    // std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
+    // std::vector<Vector3> posSiteColors(posSiteDistributions.size());
+    // for (size_t i = 0; i < posSiteDistributions.size(); i++){
+    //     double r,g,b;
+    //     hsv_to_rgb((double)i/posSiteDistributions.size() * 360, 0.75, 1., r, g, b);
+    //     posSiteColors[i] = {r,g,b};
+    // }
+    // std::random_device rd;              // non-deterministic seed
+    // std::mt19937 g(rd());               // Mersenne Twister engine
+    // std::shuffle(posSiteColors.begin(), posSiteColors.end(), g);
 
-        //should do this outside the ImGUI
-        std::vector<Vector3> currentSites; 
-        for (int i = 0; i < posOptions.nSites; i++){
-            currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
-        }
-        auto pc = polyscope::registerPointCloud("all pos sites", currentSites);
-        // --- Uniform color: just fill all points with one RGB value
-        std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
-        pc->addColorQuantity("uniform color", colors)->setEnabled(true);
-
-        if (ImGui::Button("Done"))
-            polyscope::popContext();
-        ImGui::SameLine();
-    };
-    //polyscope::pushContext(positivePopUpUI);  
-
-    std::vector<Vector3> positiveCenters;
-    for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
-       positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-    }
-
-
-    polyscope::registerPointCloud("Voronoi sites unaligned (+)", positiveCenters)->setEnabled(false);
-    std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
-
-    // Compute max curl for normalization
-    double maxPosCurl = 0;
-    for (Vertex v : globalMesh.vertices())
-        maxPosCurl = std::max(maxPosCurl, posMeasure[v]);
-
-    //print the positive masses
-    //render the fuzzy cells
-    std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
-    std::vector<Vector3> posSiteColors(posSiteDistributions.size());
-    for (size_t i = 0; i < posSiteDistributions.size(); i++){
-        double r,g,b;
-        hsv_to_rgb((double)i/posSiteDistributions.size() * 360, 0.75, 1., r, g, b);
-        posSiteColors[i] = {r,g,b};
-    }
-    std::random_device rd;              // non-deterministic seed
-    std::mt19937 g(rd());               // Mersenne Twister engine
-    std::shuffle(posSiteColors.begin(), posSiteColors.end(), g);
-
-    for (size_t i = 0; i < posSiteDistributions.size(); i++){
-        double mass = 0;
-        for (Vertex v : globalMesh.vertices()){ 
-            mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
-        }
-        std::cout << "positive mass at site " << i << " = " << mass << std::endl;
+    // for (size_t i = 0; i < posSiteDistributions.size(); i++){
+    //     double mass = 0;
+    //     for (Vertex v : globalMesh.vertices()){ 
+    //         mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
+    //     }
+    //     std::cout << "positive mass at site " << i << " = " << mass << std::endl;
     
-        for (Vertex v : globalMesh.vertices()) {
-            posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
-        }
-    }
-    psMesh.addVertexColorQuantity("pos site dist blend (course)", posSiteDistributionColor)->setEnabled(false);
+    //     for (Vertex v : globalMesh.vertices()) {
+    //         posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
+    //     }
+    // }
+    // psMesh.addVertexColorQuantity("pos site dist blend (course)", posSiteDistributionColor)->setEnabled(false);
     
 
-    // NEGATIVE COURSE
+    // // NEGATIVE COURSE
 
-    VoronoiOptions negOptions = defaultVoronoiOptions;
-    negOptions.nSites = posOptions.nSites;
-    negOptions.useDelaunay = false;
-    negOptions.computeDistributions = true;
-    negOptions.seed = 42;
-    std::cout << "# positive sites " << posOptions.nSites << std::endl;
-    std::cout << "# negative sites " << negOptions.nSites << std::endl;
-    VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
-    std::vector<std::vector<VertexData<double>>> negStepSiteDistribution = negVoronoiCenters.stepSiteDistribution;
-    std::vector<std::vector<SurfacePoint>> negSteps = negVoronoiCenters.steps;
-    std::vector<SurfacePoint> negInitialSites = negVoronoiCenters.initialSites;
+    // VoronoiOptions negOptions = defaultVoronoiOptions;
+    // negOptions.nSites = posOptions.nSites;
+    // negOptions.useDelaunay = false;
+    // negOptions.computeDistributions = true;
+    // negOptions.seed = 42;
+    // std::cout << "# positive sites " << posOptions.nSites << std::endl;
+    // std::cout << "# negative sites " << negOptions.nSites << std::endl;
+    // VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
+    // std::vector<std::vector<VertexData<double>>> negStepSiteDistribution = negVoronoiCenters.stepSiteDistribution;
+    // std::vector<std::vector<SurfacePoint>> negSteps = negVoronoiCenters.steps;
+    // std::vector<SurfacePoint> negInitialSites = negVoronoiCenters.initialSites;
 
 
-    //write a nested callback to debug the evolution of our method for the negative sites
-    //Register the callback which creates the UI and does the hard work
-    step = 0;
-    iSite = 0;
-    auto negativePopUpUI = [&](){
-        static bool showWindow = true;
-        ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
-        ImGui::Begin("Negative sites", &showWindow);
-        ImGui::PushItemWidth(400);
-        ImGui::Separator();
-        ImGui::InputInt("Site", &iSite);
-        ImGui::InputInt("Time Step", &step);
-        // Clamp to bounds after user input
-        iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
-        step = std::clamp(step, 0, static_cast<int>(negStepSiteDistribution[iSite].size() - 1));
-        //need setEnabled(true) otherwise we run into OpenGL errors? weird
-        psMesh.addVertexScalarQuantity("distribution", negStepSiteDistribution[iSite][step])->setEnabled(true);
-        polyscope::registerPointCloud("site ", std::vector<Vector3>{negSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
-        //should do this outside the ImGUI
-        // std::vector<Vector3> currentSites; 
-        // for (int i = 0; i < posOptions.nSites; i++){
-        //     currentSites.push_back(negSteps[i][step].interpolate(globalGeometry.vertexPositions));
-        // }
-        // polyscope::registerPointCloud("all negative sites", currentSites);
+    // //write a nested callback to debug the evolution of our method for the negative sites
+    // //Register the callback which creates the UI and does the hard work
+    // step = 0;
+    // iSite = 0;
+    // auto negativePopUpUI = [&](){
+    //     static bool showWindow = true;
+    //     ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
+    //     ImGui::Begin("Negative sites", &showWindow);
+    //     ImGui::PushItemWidth(400);
+    //     ImGui::Separator();
+    //     ImGui::InputInt("Site", &iSite);
+    //     ImGui::InputInt("Time Step", &step);
+    //     // Clamp to bounds after user input
+    //     iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
+    //     step = std::clamp(step, 0, static_cast<int>(negStepSiteDistribution[iSite].size() - 1));
+    //     //need setEnabled(true) otherwise we run into OpenGL errors? weird
+    //     psMesh.addVertexScalarQuantity("distribution", negStepSiteDistribution[iSite][step])->setEnabled(true);
+    //     polyscope::registerPointCloud("site ", std::vector<Vector3>{negSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+    //     //should do this outside the ImGUI
+    //     // std::vector<Vector3> currentSites; 
+    //     // for (int i = 0; i < posOptions.nSites; i++){
+    //     //     currentSites.push_back(negSteps[i][step].interpolate(globalGeometry.vertexPositions));
+    //     // }
+    //     // polyscope::registerPointCloud("all negative sites", currentSites);
 
-        if (ImGui::Button("Done"))
-            polyscope::popContext();
-        ImGui::SameLine();
-    };
-    //polyscope::pushContext(negativePopUpUI);  
+    //     if (ImGui::Button("Done"))
+    //         polyscope::popContext();
+    //     ImGui::SameLine();
+    // };
+    // //polyscope::pushContext(negativePopUpUI);  
 
-    std::vector<Vector3> negativeCenters;
-    for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
-       negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-    }
-    polyscope::registerPointCloud("Voronoi sites unaligned (-)", negativeCenters)->setEnabled(false);
-    std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
+    // std::vector<Vector3> negativeCenters;
+    // for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
+    // negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+    // }
+    // polyscope::registerPointCloud("Voronoi sites unaligned (-)", negativeCenters)->setEnabled(false);
+    // std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
 
-    //print the negative masses
-    //render the fuzzy cells
-    std::vector<Vector3> negSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
-    std::vector<Vector3> negSiteColors(posSiteDistributions.size());
-    for (size_t i = 0; i < negSiteDistributions.size(); i++){
-        double r,g,b;
-        hsv_to_rgb((double)i/negSiteDistributions.size() * 360, 0.75, 1., r, g, b);
-        posSiteColors[i] = {r,g,b};
-    }
-    std::shuffle(negSiteColors.begin(), negSiteColors.end(), g);
+    // //print the negative masses
+    // //render the fuzzy cells
+    // std::vector<Vector3> negSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
+    // std::vector<Vector3> negSiteColors(posSiteDistributions.size());
+    // for (size_t i = 0; i < negSiteDistributions.size(); i++){
+    //     double r,g,b;
+    //     hsv_to_rgb((double)i/negSiteDistributions.size() * 360, 0.75, 1., r, g, b);
+    //     posSiteColors[i] = {r,g,b};
+    // }
+    // std::shuffle(negSiteColors.begin(), negSiteColors.end(), g);
 
-    for (size_t i = 0; i < negSiteDistributions.size(); i++){
-        double mass = 0;
-        for (Vertex v : globalMesh.vertices()){ 
-            mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
-        }
-        std::cout << "negative mass at site " << i << " = " << mass << std::endl;
+    // for (size_t i = 0; i < negSiteDistributions.size(); i++){
+    //     double mass = 0;
+    //     for (Vertex v : globalMesh.vertices()){ 
+    //         mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
+    //     }
+    //     std::cout << "negative mass at site " << i << " = " << mass << std::endl;
         
-        for (Vertex v : globalMesh.vertices()) {
-            negSiteDistributionColor[v.getIndex()] += posSiteColors[i] * negSiteDistributions[i][v];
-        }
-    }
-    psMesh.addVertexColorQuantity("neg site dist blend (course)", negSiteDistributionColor)->setEnabled(false);
+    //     for (Vertex v : globalMesh.vertices()) {
+    //         negSiteDistributionColor[v.getIndex()] += posSiteColors[i] * negSiteDistributions[i][v];
+    //     }
+    // }
+    // psMesh.addVertexColorQuantity("neg site dist blend (course)", negSiteDistributionColor)->setEnabled(false);
     
-    //perform optimal matching after projecting surface points to vertices
-    //store a vector of vertex ids and singularity indices (for optimal matching)
-    std::vector<std::pair<Vertex, int>> singularities;
+    // //perform optimal matching after projecting surface points to vertices
+    // //store a vector of vertex ids and singularity indices (for optimal matching)
+    // std::vector<std::pair<Vertex, int>> singularities;
 
-    //map vertices to surface points 
-    std::map<Vertex, SurfacePoint> vertexToSurfacePointMap;
-    for (SurfacePoint s : posVoronoiCenters.siteLocations){
-        Vertex v = s.nearestVertex();
-        singularities.push_back(std::make_pair(v, 1));
-        vertexToSurfacePointMap[v] = s;    
-    }
-    for (SurfacePoint s : negVoronoiCenters.siteLocations){
-        Vertex v = s.nearestVertex();
-        singularities.push_back(std::make_pair(v, -1));
-        vertexToSurfacePointMap[v] = s;
-    }
+    // //map vertices to surface points 
+    // std::map<Vertex, SurfacePoint> vertexToSurfacePointMap;
+    // for (SurfacePoint s : posVoronoiCenters.siteLocations){
+    //     Vertex v = s.nearestVertex();
+    //     singularities.push_back(std::make_pair(v, 1));
+    //     vertexToSurfacePointMap[v] = s;    
+    // }
+    // for (SurfacePoint s : negVoronoiCenters.siteLocations){
+    //     Vertex v = s.nearestVertex();
+    //     singularities.push_back(std::make_pair(v, -1));
+    //     vertexToSurfacePointMap[v] = s;
+    // }
+    // if (!opts.alignCourseSingularities) {
+    //     // NO SHORT ROW ALIGNMENT
+    //     for (auto &[v, idx] : singularities) {
+    //         // The approach to find a good singular edge is similar to the one below
+    //         SurfacePoint facePoint = vertexToSurfacePointMap[v].inSomeFace();
+    //         Face face = facePoint.face;
+    //         Edge singularEdge;
+    //         double maxDotProd = -DBL_MAX;
+    //         for (Halfedge he : face.adjacentHalfedges()){
+    //             Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
+    //                                 globalGeometry.vertexPositions[he.tailVertex()]).normalize();
+    //             if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[face])) > maxDotProd){
+    //                 maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
+    //                 singularEdge = he.edge();
+    //             }
+    //         }
+    //         edgeIndices[singularEdge.getIndex()] = idx;
+    //         edgeSingularities[singularEdge] = 1; // usually we would want to put the ordering here,
+    //         // but if there's no short row alignment we don't really care. So it's just a flag.
+    //     }
+    // } else {
+    //     // SHORT ROW ALIGNMENT
 
-    if (!opts.alignCourseSingularities) {
+    //     HalfedgeData<double> heWeights = gluedHeWeights;
+    //     //psMesh.addHalfedgeScalarQuantity("matching weights", prepareHalfedgeData(heWeights));
+    //     std::vector<std::pair<Vertex, Vertex>> matchedVertices = performOptimalMatching(globalGeometry, heWeights, singularities, globalTimeFunction);
 
-        // NO SHORT ROW ALIGNMENT
+    //     //specify options for alignment
+    //     alignOptions alignmentOptions;
+    //     alignmentOptions.timeFunction = globalTimeFunction;
+    //     std::vector<std::pair<SurfacePoint, SurfacePoint>> matchedSurfacePoints;
+    //     for (int i = 0; i < matchedVertices.size(); i++){
+    //         auto p = matchedVertices[i];
+    //         matchedSurfacePoints.push_back(std::make_pair(vertexToSurfacePointMap[p.first], vertexToSurfacePointMap[p.second]));
+    //     }
 
-        for (auto &[v, idx] : singularities) {
-            // The approach to find a good singular edge is similar to the one below
-            SurfacePoint facePoint = vertexToSurfacePointMap[v].inSomeFace();
-            Face face = facePoint.face;
-            Edge singularEdge;
-            double maxDotProd = -DBL_MAX;
-            for (Halfedge he : face.adjacentHalfedges()){
-                Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
-                                    globalGeometry.vertexPositions[he.tailVertex()]).normalize();
-                if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[face])) > maxDotProd){
-                    maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
-                    singularEdge = he.edge();
-                }
-            }
-            edgeIndices[singularEdge.getIndex()] = idx;
-            edgeSingularities[singularEdge] = 1; // usually we would want to put the ordering here,
-            // but if there's no short row alignment we don't really care. So it's just a flag.
-        }
+    //     //render the matched surface points 
+    //     for (int i = 0; i <  matchedSurfacePoints.size(); i++){
+    //         auto p = matchedSurfacePoints[i];
+    //         std::vector<Vector3> matchedSP;
+    //         matchedSP.push_back(p.first.interpolate(globalGeometry.vertexPositions));
+    //         matchedSP.push_back(p.second.interpolate(globalGeometry.vertexPositions));
+    //         // polyscope::registerPointCloud("matched SPs " + std::to_string(i), matchedSP)->setEnabled(false);
+    //     }
+    //     alignmentOptions.pairedSites = matchedSurfacePoints;
+    //     alignmentOptions.usingPosCurl = true;
+    //     alignmentOptions.iterations = 2500;
+    //     alignmentOptions.lambda = 1.0;
+    //     alignPointsOnIsolineFast(globalMesh, globalGeometry, alignmentOptions, psMesh);
+    //     //alignPointsOnIsolineEdges(globalMesh, globalGeometry, alignmentOptions);
 
-    } else {
+    //     // Plot aligned singularities
+    //     std::vector<Vector3> alignedPosCenters, alignedNegCenters;
+    //     for (auto &[s1,s2] : alignmentOptions.pairedSites) {
+    //         alignedPosCenters.push_back(s1.interpolate(globalGeometry.vertexPositions));
+    //         alignedNegCenters.push_back(s2.interpolate(globalGeometry.vertexPositions));
+    //     }
+    //     polyscope::registerPointCloud("Voronoi sites aligned (+)", alignedPosCenters)->setEnabled(false);
+    //     polyscope::registerPointCloud("Voronoi sites aligned (-)", alignedNegCenters)->setEnabled(false);
 
-        // SHORT ROW ALIGNMENT
+    //     pairedSites = alignmentOptions.pairedSites;
+    // }
 
-        HalfedgeData<double> heWeights = gluedHeWeights;
-        //psMesh.addHalfedgeScalarQuantity("matching weights", prepareHalfedgeData(heWeights));
-        std::vector<std::pair<Vertex, Vertex>> matchedVertices = performOptimalMatching(globalGeometry, heWeights, singularities, globalTimeFunction);
+    std::vector<std::pair<SurfacePoint, SurfacePoint>> pairedSites;
 
-        //specify options for alignment
-        alignOptions alignmentOptions;
-        alignmentOptions.timeFunction = globalTimeFunction;
-        std::vector<std::pair<SurfacePoint, SurfacePoint>> matchedSurfacePoints;
-        for (int i = 0; i < matchedVertices.size(); i++){
-            auto p = matchedVertices[i];
-            matchedSurfacePoints.push_back(std::make_pair(vertexToSurfacePointMap[p.first], vertexToSurfacePointMap[p.second]));
-        }
-
-        //render the matched surface points 
-        for (int i = 0; i <  matchedSurfacePoints.size(); i++){
-            auto p = matchedSurfacePoints[i];
-            std::vector<Vector3> matchedSP;
-            matchedSP.push_back(p.first.interpolate(globalGeometry.vertexPositions));
-            matchedSP.push_back(p.second.interpolate(globalGeometry.vertexPositions));
-            // polyscope::registerPointCloud("matched SPs " + std::to_string(i), matchedSP)->setEnabled(false);
-        }
-        alignmentOptions.pairedSites = matchedSurfacePoints;
-        alignmentOptions.usingPosCurl = true;
-        alignmentOptions.iterations = 2500;
-        alignmentOptions.lambda = 1.0;
-        alignPointsOnIsolineFast(globalMesh, globalGeometry, alignmentOptions, psMesh);
-        //alignPointsOnIsolineEdges(globalMesh, globalGeometry, alignmentOptions);
-
-        // Plot aligned singularities
-        std::vector<Vector3> alignedPosCenters, alignedNegCenters;
-        for (auto &[s1,s2] : alignmentOptions.pairedSites) {
-            alignedPosCenters.push_back(s1.interpolate(globalGeometry.vertexPositions));
-            alignedNegCenters.push_back(s2.interpolate(globalGeometry.vertexPositions));
-        }
-        polyscope::registerPointCloud("Voronoi sites aligned (+)", alignedPosCenters)->setEnabled(false);
-        polyscope::registerPointCloud("Voronoi sites aligned (-)", alignedNegCenters)->setEnabled(false);
-
-        //store the paired time functions
-        std::vector<std::pair<double, double>> pairedTimeFunctions;
-        //paired halfedges
-        std::vector<std::pair<Halfedge, Halfedge>> pairedHalfedges;
-        //map singular edges to their corresponding isovals
-        std::map<Edge, double> edgeToIsoVal;
-
+    if (opts.inputCourseSingPath.empty()) {
         powerCellOptions pcOptions{};         
         pcOptions.gluedGeometry    = &gluedGeometry;  
         pcOptions.globalGeometry   = &globalGeometry;
@@ -4229,234 +4225,269 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         pcOptions.psMesh           = &psMesh;
         pcOptions.period           = period;
         auto start = std::chrono::high_resolution_clock::now();
-        alignmentOptions.pairedSites =  computeCourseSingularities(pcOptions);
+        pairedSites = computeCourseSingularities(pcOptions);
         auto end = std::chrono::high_resolution_clock::now();
         // Compute duration in seconds
         std::chrono::duration<double> elapsed = end - start;
         std::cout << "Elapsed time for course: " << elapsed.count() << " seconds\n";
-        polyscope::show();
+    } else {
+        P("Reading course singularity positions from file");
+        std::ifstream in(opts.inputCourseSingPath);
+        std::string line;
+        while (std::getline(in, line)) {
+            std::stringstream ss(line);
+            int iEdgePos, iEdgeNeg; double tEdgePos, tEdgeNeg;
+            if (!(ss >> iEdgePos >> tEdgePos >> iEdgeNeg >> tEdgeNeg))
+                throw std::runtime_error("Parse error in line: " + line);
+            Edge edgePos = globalMesh.edge(iEdgePos), edgeNeg = globalMesh.edge(iEdgeNeg);
+            pairedSites.push_back({SurfacePoint(edgePos, tEdgePos), SurfacePoint(edgeNeg, tEdgeNeg)});
+        }
+    }
+
+    // Write paired singularities to file
+    // Not that surface points are on edges, not faces
+    // Format is: edge+, tEdge+, edge-, tEdge-
+    if (!opts.outputCourseSingPath.empty()) {
+        std::ofstream out(opts.outputCourseSingPath);
+        for (const auto &[posSP, negSP] : pairedSites) {
+            out << posSP.edge.getIndex() << " " << posSP.tEdge << " ";
+            out << negSP.edge.getIndex() << " " << negSP.tEdge << std::endl;
+        }
+    }
+    
+    //store the paired time functions
+    std::vector<std::pair<double, double>> pairedTimeFunctions;
+    //paired halfedges
+    std::vector<std::pair<Halfedge, Halfedge>> pairedHalfedges;
+    //map singular edges to their corresponding isovals
+    std::map<Edge, double> edgeToIsoVal;
+
+    //now appropriatately specify the singular edges
+    //this relies on the assumption that 2 singular sites (surface points) don't end up on the same face 
+    //Even if they end up on adjacent faces, we shouldn't select the same edges 
+    //If the algorithm runs to convergence, we shouldn't be getting singularities so close together
+    //But we clearly run into issues where the above happens 
+    for (auto &[posSite,negSite] : pairedSites) { 
+        //handle positive case 
+        SurfacePoint posFacePoint = posSite.inSomeFace();
+        double posVal = posSite.interpolate(globalTimeFunction);
+        Halfedge posHe;
+        Face f = posFacePoint.face;
+        Edge posSingularEdge;
+        double maxDotProd = -DBL_MAX;
+        for (Halfedge he : f.adjacentHalfedges()){
+            Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
+                                globalGeometry.vertexPositions[he.tailVertex()]).normalize();
+            if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
+                maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
+                posSingularEdge = he.edge();
+                posHe = he;
+            }
+        }
         
-        //now appropriatately specify the singular edges
-        //this relies on the assumption that 2 singular sites (surface points) don't end up on the same face 
-        //Even if they end up on adjacent faces, we shouldn't select the same edges 
-        //If the algorithm runs to convergence, we shouldn't be getting singularities so close together
-        //But we clearly run into issues where the above happens 
-        for (auto &[posSite,negSite] : alignmentOptions.pairedSites) { 
-            //handle positive case 
-            SurfacePoint posFacePoint = posSite.inSomeFace();
-            double posVal = posSite.interpolate(globalTimeFunction);
-            Halfedge posHe;
-            Face f = posFacePoint.face;
-            Edge posSingularEdge;
-            double maxDotProd = -DBL_MAX;
-            for (Halfedge he : f.adjacentHalfedges()){
-                Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
-                                    globalGeometry.vertexPositions[he.tailVertex()]).normalize();
-                if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
+        edgeIndices[posSingularEdge.getIndex()] = -1.0;
+        edgeSingularities[posSingularEdge] = 1.0;
+        
+
+        //handle negative case
+        SurfacePoint negFacePoint = negSite.inSomeFace();
+        double negVal = negSite.interpolate(globalTimeFunction);
+        Halfedge negHe;
+        f = negFacePoint.face;
+        Edge negSingularEdge;
+        maxDotProd = -DBL_MAX;
+        for (Halfedge he : f.adjacentHalfedges()){
+            Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
+                                globalGeometry.vertexPositions[he.tailVertex()]).normalize();
+            if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
                     maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
-                    posSingularEdge = he.edge();
-                    posHe = he;
-                }
-            }
-            
-            edgeIndices[posSingularEdge.getIndex()] = -1.0;
-            edgeSingularities[posSingularEdge] = 1.0;
-            
-
-            //handle negative case
-            SurfacePoint negFacePoint = negSite.inSomeFace();
-            double negVal = negSite.interpolate(globalTimeFunction);
-            Halfedge negHe;
-            f = negFacePoint.face;
-            Edge negSingularEdge;
-            maxDotProd = -DBL_MAX;
-            for (Halfedge he : f.adjacentHalfedges()){
-                Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
-                                    globalGeometry.vertexPositions[he.tailVertex()]).normalize();
-                if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
-                        maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
-                        negSingularEdge = he.edge();
-                        negHe = he;
-                }
-            }
-            
-            edgeIndices[negSingularEdge.getIndex()] = 1.0;
-            edgeSingularities[negSingularEdge] = -1.0;
-            
-            singularEdges.push_back(std::make_pair(posSingularEdge.getIndex(), negSingularEdge.getIndex()));
-            pairedTimeFunctions.push_back(std::make_pair(posVal, negVal));
-            pairedHalfedges.push_back(std::make_pair(posHe, negHe));
-            edgeToIsoVal[posSingularEdge] = 0.5 * (posVal + negVal);
-            edgeToIsoVal[negSingularEdge] = 0.5 * (posVal + negVal);
-        }
-
-        //bool connectSaddles = true;
-
-        //don't consider indices where no valid triangle strip exists 
-        //should eventually fix this 
-        //TO-DO: * ensure edge singularities lie in the same cylindrical compononent
-        //       * ensure the average isovalue passes through both faces
-        std::vector<int> indicesToUse; 
-        int problemCount = 0;
-        for (int i = 0; i < singularEdges.size(); i++){
-            auto p = singularEdges[i];
-            auto timeFuncPair = pairedTimeFunctions[i];
-            auto HePair = pairedHalfedges[i];
-            Edge posEdge = globalMesh.edge(p.first);
-            Edge negEdge = globalMesh.edge(p.second);
-            double isoVal = 0.5 * (timeFuncPair.first + timeFuncPair.second);
-            //testing triangle stripe code 
-            std::vector<Face> faces;
-            int code; 
-            std::tie(faces, code) = traceIsolineFaces(globalGeometry, globalTimeFunction, globalTimeFunctionGradientsNormalized, rotatedFaceGradients, isoVal, 
-                                                    HePair.first, HePair.second);
-            //a face path exists and we got to the end face
-            if (faces.size() != 0 && code != -1){
-                indicesToUse.push_back(i);
-            }
-            else{//remove these entry from edgeIndices and edgeSingularities
-
-                showEdges("dropped pair "+std::to_string(problemCount), {posEdge, negEdge}, globalGeometry);
-                std::vector<Vector3> problemSPs;
-                Eigen::MatrixXd iV;
-                Eigen::MatrixXd iE;
-                std::vector<int> f;
-                std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, isoVal);
-                polyscope::registerCurveNetwork("problem isoline " + std::to_string(problemCount), iV, iE)->setRadius(0.001)->setEnabled(false);
-                problemSPs.push_back(alignmentOptions.pairedSites[i].first.interpolate(globalGeometry.vertexPositions));
-                problemSPs.push_back(alignmentOptions.pairedSites[i].second.interpolate(globalGeometry.vertexPositions));
-                polyscope::registerPointCloud("problem sites " + std::to_string(problemCount), problemSPs);
-                problemCount++;
-                edgeIndices[p.first] = 0.0;
-                edgeIndices[p.second] = 0.0;
-                edgeSingularities[posEdge] = 0.0;
-                edgeSingularities[negEdge] = 0.0;
+                    negSingularEdge = he.edge();
+                    negHe = he;
             }
         }
-
-        std::cout << "Number of singularity pairs missing = " << posOptions.nSites - indicesToUse.size() << std::endl;
-        if (problemCount > 0) {
-            P("Stopping because some singularity pairs were dropped");
-            polyscope::show();
-        }
-
-        //set the singular edges where path exists
-        std::vector<std::pair<int, int>> singularEdgesToUse;
-        std::vector<std::pair<Halfedge, Halfedge>> singularHalfedgesToUse;
-        for (int i : indicesToUse){
-            singularEdgesToUse.push_back(singularEdges[i]);
-            singularHalfedgesToUse.push_back(pairedHalfedges[i]);
-        }
-        model.setSingularEdges(singularEdgesToUse);
-
-        // Set edgeSingularities[e] = ±i, where i is the ordering of the pair in time.
-        // Having the ordering will be useful for constructing the knit graph,
-        // and for the ordering constraints.
-        std::map<double, std::pair<Halfedge,Halfedge>> singularPairsByTime;
-        for (auto &[he1, he2] : singularHalfedgesToUse)
-            singularPairsByTime[edgeToIsoVal[he1.edge()]] = {he1, he2};
         
-        std::vector<std::pair<Halfedge, Halfedge>> singularHalfedgesOrdered; // list of halfedge pairs, nicely pruned and ordered
-        int pairIndex = 1;
-        for (auto &[t, p] : singularPairsByTime) {
-            edgeSingularities[p.first.edge()] = +pairIndex;
-            edgeSingularities[p.second.edge()] = -pairIndex;
-            pairIndex++;
-            singularHalfedgesOrdered.push_back(p);
-        }
-
-        std::cout << "Set singular edges as constraints " << std::endl;
-
-        std::vector<std::pair<std::vector<double>, double>> halfedgePathConstraints;
+        edgeIndices[negSingularEdge.getIndex()] = 1.0;
+        edgeSingularities[negSingularEdge] = -1.0;
         
-        //construct edge paths between singular edges
-        for (int i : indicesToUse){
-            auto p = singularEdges[i];
-            auto timeFuncPair = pairedTimeFunctions[i];
-            auto HePair = pairedHalfedges[i];
-            Edge posEdge = globalMesh.edge(p.first);
-            Edge negEdge = globalMesh.edge(p.second);
+        ensure(abs(posVal - negVal) < 1e-8); // not sure why we can't make this bound tighter..
+        
+        singularEdges.push_back(std::make_pair(posSingularEdge.getIndex(), negSingularEdge.getIndex()));
+        pairedTimeFunctions.push_back(std::make_pair(posVal, negVal));
+        pairedHalfedges.push_back(std::make_pair(posHe, negHe));
+        edgeToIsoVal[posSingularEdge] = 0.5 * (posVal + negVal);
+        edgeToIsoVal[negSingularEdge] = 0.5 * (posVal + negVal);
+    }
 
-            //draw a curve network to debug the face paths
-            std::vector<Vector3> courseSingularEdgePoints;
-            std::vector<std::array<int,2>> courseSingularEdges;
-            courseSingularEdgePoints.push_back(globalGeometry.vertexPositions[posEdge.firstVertex()]);
-            courseSingularEdgePoints.push_back(globalGeometry.vertexPositions[posEdge.secondVertex()]);
-            courseSingularEdges.push_back({(int)courseSingularEdgePoints.size()-2, (int)courseSingularEdgePoints.size()-1});
-            courseSingularEdgePoints.push_back(globalGeometry.vertexPositions[negEdge.firstVertex()]);
-            courseSingularEdgePoints.push_back(globalGeometry.vertexPositions[negEdge.secondVertex()]);
-            courseSingularEdges.push_back({(int)courseSingularEdgePoints.size()-2, (int)courseSingularEdgePoints.size()-1});
-            //polyscope::registerCurveNetwork("course singular edge pair " + std::to_string(i), courseSingularEdgePoints, courseSingularEdges)->setEnabled(false);
-            double isoVal = 0.5 * (timeFuncPair.first + timeFuncPair.second);
-            
-            //testing triangle stripe code 
-            std::vector<Face> faces;
-            int code; 
-            std::tie(faces, code) = traceIsolineFaces(globalGeometry, globalTimeFunction, globalTimeFunctionGradientsNormalized, rotatedFaceGradients, isoVal, HePair.first, HePair.second);
+    // HERE
 
-            //error checking
-            if (faces.size() == 0){
-                std::cout << "The size of the face strip is 0 " << std::endl;
-                polyscope::show();
-                exit(1);
-            }
-            
-            //we assume we're going to construct paths from the tips of the singular edges (actually halfedges)
-            Face firstFace = faces.front();
-            Face lastFace = faces.back();
-            Vertex vStart = globalTimeFunction[posEdge.halfedge().tipVertex()] > globalTimeFunction[posEdge.halfedge().tailVertex()] ? posEdge.halfedge().tipVertex() : posEdge.halfedge().tailVertex();
-            Vertex vEnd = globalTimeFunction[negEdge.halfedge().tipVertex()] > globalTimeFunction[negEdge.halfedge().tailVertex()] ? negEdge.halfedge().tipVertex() : negEdge.halfedge().tailVertex();
-            
-            //ensure that we have the correct start/end face in the strip
-            if (std::find(firstFace.adjacentVertices().begin(), firstFace.adjacentVertices().end(), vStart) == firstFace.adjacentVertices().end())//the tip startVertex we want is not in the set
-                faces.insert(faces.begin(), HePair.first.face());
-            if (std::find(lastFace.adjacentVertices().begin(), lastFace.adjacentVertices().end(), vEnd) == lastFace.adjacentVertices().end())//the tip endVertex we want is not in the set
-                faces.push_back(HePair.second.face());
-            
-            std::vector<double> stripHalfedgePath = findEdgePathFromStrip(globalGeometry,  faces, 
-                                                                globalTimeFunction, isoVal, edgeSingularities, edgeToIsoVal,
-                                                                p);
+    //bool connectSaddles = true;
 
-            FaceData<int> facePath(globalGeometry.mesh, 0);
-            for (Face f : faces) facePath[f] = 1;
-            psMesh.addFaceScalarQuantity("faces for pair " + std::to_string(i), facePath);
-            //psMesh.addHalfedgeScalarQuantity("halfedge strip path " + std::to_string(i), stripHalfedgePath);
-            std::vector<double> edgePath(globalMesh.nEdges(), 0.0);
-            halfedgePathConstraints.push_back(std::make_pair(stripHalfedgePath, 0.0));
+    //don't consider indices where no valid triangle strip exists 
+    //should eventually fix this 
+    //TO-DO: * ensure edge singularities lie in the same cylindrical compononent
+    //       * ensure the average isovalue passes through both faces
+    std::vector<int> indicesToUse; 
+    int problemCount = 0;
+    for (int i = 0; i < singularEdges.size(); i++){
+        auto p = singularEdges[i];
+        auto timeFuncPair = pairedTimeFunctions[i];
+        auto HePair = pairedHalfedges[i];
+        Edge posEdge = globalMesh.edge(p.first);
+        Edge negEdge = globalMesh.edge(p.second);
+        double isoVal = 0.5 * (timeFuncPair.first + timeFuncPair.second);
+        //testing triangle stripe code 
+        std::vector<Face> faces;
+        int code; 
+        std::tie(faces, code) = traceIsolineFaces(globalGeometry, globalTimeFunction, globalTimeFunctionGradientsNormalized, rotatedFaceGradients, isoVal, 
+                                                HePair.first, HePair.second);
+        //a face path exists and we got to the end face
+        if (faces.size() != 0 && code != -1){
+            indicesToUse.push_back(i);
+        }
+        else{//remove these entry from edgeIndices and edgeSingularities
+
+            showEdges("dropped pair "+std::to_string(problemCount), {posEdge, negEdge}, globalGeometry);
+            std::vector<Vector3> problemSPs;
             Eigen::MatrixXd iV;
             Eigen::MatrixXd iE;
             std::vector<int> f;
             std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, isoVal);
-            //polyscope::registerCurveNetwork("isoval for pair " + std::to_string(i), iV, iE)->setRadius(0.001)->setEnabled(false);
-
-            //error checking
-            if (code == -1){
-                std::cout << "face path didn't get to the end face " << std::endl;
-                polyscope::show();
-                exit(1);
-            }
+            polyscope::registerCurveNetwork("problem isoline " + std::to_string(problemCount), iV, iE)->setRadius(0.001)->setEnabled(false);
+            problemSPs.push_back(pairedSites[i].first.interpolate(globalGeometry.vertexPositions));
+            problemSPs.push_back(pairedSites[i].second.interpolate(globalGeometry.vertexPositions));
+            polyscope::registerPointCloud("problem sites " + std::to_string(problemCount), problemSPs);
+            problemCount++;
+            edgeIndices[p.first] = 0.0;
+            edgeIndices[p.second] = 0.0;
+            edgeSingularities[posEdge] = 0.0;
+            edgeSingularities[negEdge] = 0.0;
         }
-
-        psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
-        model.setHalfedgePathConstraints(halfedgePathConstraints);
-
-        // Short row ordering constraints
-        for (int iPair = 1; iPair < singularHalfedgesOrdered.size(); iPair++) {
-            Halfedge he1 = singularHalfedgesOrdered[iPair-1].first;
-            Halfedge he2 = singularHalfedgesOrdered[iPair].first;
-            std::vector<Halfedge> path = surface::shortestEdgePath(globalGeometry, he1.tailVertex(), he2.tipVertex());
-            std::vector<Edge> edgePath(path.size()); // just for viz
-            std::vector<double> heWeights(globalMesh.nHalfedges(), 0.0);
-            for (int i = 0; i < path.size(); i++) {
-                edgePath[i] = path[i].edge();
-                heWeights[path[i].getIndex()] = 1.0;
-            }
-            auto constraint = make_pair(heWeights, 0.);
-            // model.addHalfedgePathInequalityConstraint(constraint);
-            // showEdges("ordering path "+std::to_string(iPair), edgePath, globalGeometry)->setEnabled(false);
-        }
-
     }
+
+    std::cout << "Number of singularity pairs missing = " << nSites - indicesToUse.size() << std::endl;
+    if (problemCount > 0) {
+        P("Stopping because some singularity pairs were dropped");
+        polyscope::show();
+    }
+
+    //set the singular edges where path exists
+    std::vector<std::pair<int, int>> singularEdgesToUse;
+    std::vector<std::pair<Halfedge, Halfedge>> singularHalfedgesToUse;
+    for (int i : indicesToUse){
+        singularEdgesToUse.push_back(singularEdges[i]);
+        singularHalfedgesToUse.push_back(pairedHalfedges[i]);
+    }
+    model.setSingularEdges(singularEdgesToUse);
+
+    // Set edgeSingularities[e] = ±i, where i is the ordering of the pair in time.
+    // Having the ordering will be useful for constructing the knit graph,
+    // and for the ordering constraints.
+    std::map<double, std::pair<Halfedge,Halfedge>> singularPairsByTime;
+    for (auto &[he1, he2] : singularHalfedgesToUse)
+        singularPairsByTime[edgeToIsoVal[he1.edge()]] = {he1, he2};
+    
+    std::vector<std::pair<Halfedge, Halfedge>> singularHalfedgesOrdered; // list of halfedge pairs, nicely pruned and ordered
+    int pairIndex = 1;
+    for (auto &[t, p] : singularPairsByTime) {
+        edgeSingularities[p.first.edge()] = +pairIndex;
+        edgeSingularities[p.second.edge()] = -pairIndex;
+        pairIndex++;
+        singularHalfedgesOrdered.push_back(p);
+    }
+
+    std::cout << "Set singular edges as constraints " << std::endl;
+
+    
+
+    std::vector<std::pair<std::vector<double>, double>> halfedgePathConstraints;
+    
+    //construct edge paths between singular edges
+    for (int i : indicesToUse){
+        auto p = singularEdges[i];
+        auto timeFuncPair = pairedTimeFunctions[i];
+        auto HePair = pairedHalfedges[i];
+        Edge posEdge = globalMesh.edge(p.first);
+        Edge negEdge = globalMesh.edge(p.second);
+
+        //draw a curve network to debug the face paths
+        std::vector<Vector3> courseSingularEdgePoints;
+        std::vector<std::array<int,2>> courseSingularEdges;
+        courseSingularEdgePoints.push_back(globalGeometry.vertexPositions[posEdge.firstVertex()]);
+        courseSingularEdgePoints.push_back(globalGeometry.vertexPositions[posEdge.secondVertex()]);
+        courseSingularEdges.push_back({(int)courseSingularEdgePoints.size()-2, (int)courseSingularEdgePoints.size()-1});
+        courseSingularEdgePoints.push_back(globalGeometry.vertexPositions[negEdge.firstVertex()]);
+        courseSingularEdgePoints.push_back(globalGeometry.vertexPositions[negEdge.secondVertex()]);
+        courseSingularEdges.push_back({(int)courseSingularEdgePoints.size()-2, (int)courseSingularEdgePoints.size()-1});
+        //polyscope::registerCurveNetwork("course singular edge pair " + std::to_string(i), courseSingularEdgePoints, courseSingularEdges)->setEnabled(false);
+        double isoVal = 0.5 * (timeFuncPair.first + timeFuncPair.second);
+        
+        //testing triangle stripe code 
+        std::vector<Face> faces;
+        int code; 
+        std::tie(faces, code) = traceIsolineFaces(globalGeometry, globalTimeFunction, globalTimeFunctionGradientsNormalized, rotatedFaceGradients, isoVal, HePair.first, HePair.second);
+
+        //error checking
+        if (faces.size() == 0){
+            std::cout << "The size of the face strip is 0 " << std::endl;
+            polyscope::show();
+            exit(1);
+        }
+        
+        //we assume we're going to construct paths from the tips of the singular edges (actually halfedges)
+        Face firstFace = faces.front();
+        Face lastFace = faces.back();
+        Vertex vStart = globalTimeFunction[posEdge.halfedge().tipVertex()] > globalTimeFunction[posEdge.halfedge().tailVertex()] ? posEdge.halfedge().tipVertex() : posEdge.halfedge().tailVertex();
+        Vertex vEnd = globalTimeFunction[negEdge.halfedge().tipVertex()] > globalTimeFunction[negEdge.halfedge().tailVertex()] ? negEdge.halfedge().tipVertex() : negEdge.halfedge().tailVertex();
+        
+        //ensure that we have the correct start/end face in the strip
+        if (std::find(firstFace.adjacentVertices().begin(), firstFace.adjacentVertices().end(), vStart) == firstFace.adjacentVertices().end())//the tip startVertex we want is not in the set
+            faces.insert(faces.begin(), HePair.first.face());
+        if (std::find(lastFace.adjacentVertices().begin(), lastFace.adjacentVertices().end(), vEnd) == lastFace.adjacentVertices().end())//the tip endVertex we want is not in the set
+            faces.push_back(HePair.second.face());
+        
+        std::vector<double> stripHalfedgePath = findEdgePathFromStrip(globalGeometry,  faces, 
+                                                            globalTimeFunction, isoVal, edgeSingularities, edgeToIsoVal,
+                                                            p);
+
+        FaceData<int> facePath(globalGeometry.mesh, 0);
+        for (Face f : faces) facePath[f] = 1;
+        psMesh.addFaceScalarQuantity("faces for pair " + std::to_string(i), facePath);
+        //psMesh.addHalfedgeScalarQuantity("halfedge strip path " + std::to_string(i), stripHalfedgePath);
+        std::vector<double> edgePath(globalMesh.nEdges(), 0.0);
+        halfedgePathConstraints.push_back(std::make_pair(stripHalfedgePath, 0.0));
+        Eigen::MatrixXd iV;
+        Eigen::MatrixXd iE;
+        std::vector<int> f;
+        std::tie(iV, iE, f) = getIsoLine(V, F, globalTimeFunction, isoVal);
+        //polyscope::registerCurveNetwork("isoval for pair " + std::to_string(i), iV, iE)->setRadius(0.001)->setEnabled(false);
+
+        //error checking
+        if (code == -1){
+            std::cout << "face path didn't get to the end face " << std::endl;
+            polyscope::show();
+            exit(1);
+        }
+    }
+
+    psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
+    model.setHalfedgePathConstraints(halfedgePathConstraints);
+
+    // Short row ordering constraints
+    for (int iPair = 1; iPair < singularHalfedgesOrdered.size(); iPair++) {
+        Halfedge he1 = singularHalfedgesOrdered[iPair-1].first;
+        Halfedge he2 = singularHalfedgesOrdered[iPair].first;
+        std::vector<Halfedge> path = surface::shortestEdgePath(globalGeometry, he1.tailVertex(), he2.tipVertex());
+        std::vector<Edge> edgePath(path.size()); // just for viz
+        std::vector<double> heWeights(globalMesh.nHalfedges(), 0.0);
+        for (int i = 0; i < path.size(); i++) {
+            edgePath[i] = path[i].edge();
+            heWeights[path[i].getIndex()] = 1.0;
+        }
+        auto constraint = make_pair(heWeights, 0.);
+        // model.addHalfedgePathInequalityConstraint(constraint);
+        // showEdges("ordering path "+std::to_string(iPair), edgePath, globalGeometry)->setEnabled(false);
+    }
+
     
     model.setEdgeIndices(edgeIndices);
     model.setHomologyGenerators(homologyGenerators);
