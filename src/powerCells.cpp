@@ -114,8 +114,8 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
         }
         allMatchedPairs.insert(allMatchedPairs.end(), matchedPairs.begin(), matchedPairs.end());
         psMesh->addVertexScalarQuantity("Curl for bucket " + std::to_string(i), bucketCurl);
-        polyscope::registerPointCloud("(+) Aligned Pts for bucket " + std::to_string(i), positiveCenters);
-        polyscope::registerPointCloud("(-) Aligned Pts for bucket " + std::to_string(i), negativeCenters);
+        polyscope::registerPointCloud("(+) Aligned Pts for bucket " + std::to_string(i), positiveCenters)->setEnabled(false);
+        polyscope::registerPointCloud("(-) Aligned Pts for bucket " + std::to_string(i), negativeCenters)->setEnabled(false);
 
         //polyscope::show();
     }
