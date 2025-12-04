@@ -77,6 +77,9 @@ void KG::buildGraph(){
     buildFinalVerticesFromAdjusted();
     renderFinalGraph();
     writeKnitGraphToTxtFile();
+
+    //trace the short-rows
+    traceShortRows();
 }
 
 //Makes virtual vertices in the course direction
@@ -1673,8 +1676,8 @@ void KG::tagIncreasesAndDecreases(){
 
         //handle decreases
         if (v -> col_out_vertex[0] == nullptr){
-            // if (v->row_out_vertex->col_out_vertex[0] == nullptr) problemDecrease.emplace_back(getKGPosition(v));
-            // if (v->row_in_vertex->col_out_vertex[0] == nullptr) problemDecrease.emplace_back(getKGPosition(v));
+            if (v->row_out_vertex->col_out_vertex[0] == nullptr) problemDecrease.emplace_back(getKGPosition(v));
+            if (v->row_in_vertex->col_out_vertex[0] == nullptr) problemDecrease.emplace_back(getKGPosition(v));
             standardDecreases.emplace_back(getKGPosition(v));
             if (v -> row_out_vertex == nullptr){//handle decreases at short rows (row_out short rows)
                 v -> col_out_vertex[0] = v -> row_in_vertex -> col_out_vertex[0];
@@ -1729,8 +1732,8 @@ void KG::tagIncreasesAndDecreases(){
         }
         //handle increases 
         if (v -> col_in_vertex[0] == nullptr){
-            // if (v->row_out_vertex->col_in_vertex[0] == nullptr) problemIncrease.emplace_back(getKGPosition(v));
-            // if (v->row_in_vertex->col_in_vertex[0] == nullptr) problemIncrease.emplace_back(getKGPosition(v));
+            if (v->row_out_vertex->col_in_vertex[0] == nullptr) problemIncrease.emplace_back(getKGPosition(v));
+            if (v->row_in_vertex->col_in_vertex[0] == nullptr) problemIncrease.emplace_back(getKGPosition(v));
             standardIncreases.emplace_back(getKGPosition(v));
             if (v -> row_out_vertex == nullptr){//handle increases at short-row (row_out short_row)
                 v -> col_in_vertex[0] =  v -> row_in_vertex -> col_in_vertex[0];
@@ -1898,4 +1901,26 @@ void KG::writeKnitGraphToTxtFile(){
 
     // file.close();
     std::cout << "wrote knit graph to txt file " << std::endl;
+}
+
+//trace the short rows in the graph to view helices
+void KG::traceShortRows(){   
+    int ctr = 0;
+    for (auto &up : finalVertices){
+        KGVertex* v = up.get();
+        if (v->row_in_vertex == nullptr){
+            std::vector<Vector3> pos;
+            std::vector<std::array<int, 2>> edges;
+            KGVertex* walker = v;
+            while(walker->row_out_vertex != nullptr){
+                pos.push_back(getKGPosition(walker));
+                walker = walker->row_out_vertex;
+            }
+            for (int i = 0; i < (int)pos.size() - 1; i++){
+                edges.push_back(std::array{i, i + 1});
+            }
+            polyscope::registerCurveNetwork("traced short row " + std::to_string(ctr), pos, edges)->setRadius(0.00125);
+            ctr++;
+        }
+    }
 }

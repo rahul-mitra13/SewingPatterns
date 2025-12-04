@@ -228,8 +228,13 @@ class KG{
             //render the final graph 
             void renderFinalGraph();
 
+            //trace short-rows in the graph
+            void traceShortRows();
+
             //write knit graph to txt file
             void writeKnitGraphToTxtFile();
+
+            
             
 
             

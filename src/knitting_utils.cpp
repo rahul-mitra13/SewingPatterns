@@ -4575,7 +4575,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         for (int i = 1; i < halfedgeSequence.size(); i++) {
             hePath[halfedgeSequence[i]] = +1;
         }
-        psMesh.addHalfedgeScalarQuantity("ordering path " + std::to_string(iPair), hePath);
+        // psMesh.addHalfedgeScalarQuantity("ordering path " + std::to_string(iPair), hePath);
 
         std::vector<double> heWeights(globalMesh.nHalfedges(), 0.0);
         for (Halfedge he : globalMesh.halfedges())
