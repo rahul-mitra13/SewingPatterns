@@ -584,7 +584,7 @@ int main(int argc, char **argv) {
   for (Face f : gluedELG->mesh.faces())
     for (Halfedge he : f.adjacentHalfedges())
       halfedgePerm.push_back(he.getIndex());  
-  globalPSMesh->setHalfedgePermutation(halfedgePerm);
+  globalPSMesh->setHalfedgePermutation(halfedgePerm, globalMesh->nHalfedges()); // not sure about the second arg in the glued setting tho
 
   //process boundary conditions in the glued mesh setting
   if (inFilePath.extension() == ".json") {
