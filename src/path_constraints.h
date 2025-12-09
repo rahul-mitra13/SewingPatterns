@@ -32,7 +32,7 @@ using namespace geometrycentral::surface;
 double maximumDotProduct(VertexPositionGeometry& globalGeometry, FaceData<Vector3>& globalFaceGradients);
 
 //rotate the face gradients clockwise 
-FaceData<Vector3> clockWiseRotatedGradients(VertexPositionGeometry& globalGeometry, FaceData<Vector3>& globalFaceGradients);
+FaceData<Vector3> clockWiseRotatedGradients(VertexPositionGeometry& globalGeometry, FaceData<Vector3>& globalFaceGradients, double angle=-PI/2);
 
 //construct glued halfedge weights 
 HalfedgeData<double> constructGluedHalfedgeWeights(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, FaceData<Vector3>& rotatedFaceGradients,
