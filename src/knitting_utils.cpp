@@ -4962,52 +4962,137 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
 //TO-DO:
 // * go "under" singular edges that lie completely on the path whose isoval is less than the current isoval
 // * go "over" singular edges that lie completely on the path whose isoval is greater than the current isoval
-std::vector<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry,  std::vector<Face> faces, 
-                                     VertexData<double>& timeFunction, double isoVal, EdgeData<double>& edgeSingularities,
-                                     std::map<Edge, double>& edgeToIsoVal, std::pair<int, int>& singEdgePair){
+// std::vector<double> findEdgePathFromStrip(VertexPositionGeometry& globalGeometry,  std::vector<Face> faces, 
+//                                      VertexData<double>& timeFunction, double isoVal, EdgeData<double>& edgeSingularities,
+//                                      std::map<Edge, double>& edgeToIsoVal, std::pair<int, int>& singEdgePair){
     
     
-    SurfaceMesh& globalMesh = globalGeometry.mesh;
-    std::vector<double> result(globalMesh.nHalfedges(), 0.0);
-    //path of halfedges
-    std::vector<Halfedge> hePath;
+//     SurfaceMesh& globalMesh = globalGeometry.mesh;
+//     std::vector<double> result(globalMesh.nHalfedges(), 0.0);
+//     //path of halfedges
+//     std::vector<Halfedge> hePath;
 
-    //vector of halfedge weights on the lens complex
+//     //vector of halfedge weights on the lens complex
+//     std::vector<double> lensHePath(globalMesh.nHalfedges(), 0.0);
+
+//     Edge posEdge = globalMesh.edge(singEdgePair.first);
+//     Edge negEdge = globalMesh.edge(singEdgePair.second);
+
+//     //TO-DO: Going to hit singular edge twice in adjacent faces
+//     for (Face f : faces){
+//         for (Halfedge he : f.adjacentHalfedges()) {
+//             //To-do: Need another check here
+//             //What if face contains a singular edge but the isoline is completely underneath it
+//             //See pair 6 back path constraints from file sent from Matteo
+//             //Right now, this code is assuming if the face has a singular edge, then the edge path constraint we come up with must cross it - clearly wrong assumption 
+//             if (edgeSingularities[he.edge()] 
+//                 && he.edge() != posEdge
+//                 && he.edge() != negEdge){//we have hit a singular edge and it's not the edge you're currently tracing
+//                 Edge singularEdge = he.edge();
+//                 double hitIsoVal = edgeToIsoVal[singularEdge];
+//                 if (hitIsoVal > isoVal){//if the current singularity isovalue is lesser than the hit isovalue, route "below" the edge
+//                     lensHePath[he.getIndex()] = -1.0;
+//                     lensHePath[he.twin().getIndex()] = -1.0;
+//                 }
+//             }
+
+//             Vertex v0 = he.vertex();
+//             Vertex v1 = he.next().vertex();
+
+//             double f0 = timeFunction[v0];
+//             double f1 = timeFunction[v1];
+            
+//             if (f0 > isoVal && f1 > isoVal) {
+//                 hePath.push_back(he.twin());//add the halfedges in the correct direction (TODO: handle case when singular edge is at the top or bottom of the strip)
+//                 lensHePath[he.getIndex()] = -1.0;
+//                 Edge e = he.edge();
+//             }
+
+//         }
+//     }
+//     return lensHePath;
+// }
+
+
+// Find an edge-path from a triangle strip.
+// TO-DO:
+// * go "under" singular edges whose isovalue is greater than isoVal
+// * go "over" singular edges whose isovalue is less than isoVal
+std::vector<double> findEdgePathFromStrip(
+        VertexPositionGeometry& globalGeometry,
+        std::vector<Face> faces,
+        VertexData<double>& timeFunction,
+        double isoVal,
+        EdgeData<double>& edgeSingularities,
+        std::map<Edge, double>& edgeToIsoVal,
+        std::pair<int,int>& singEdgePair) 
+{
+    SurfaceMesh& globalMesh = globalGeometry.mesh;
+
+    // output: a scalar weight for each halfedge
     std::vector<double> lensHePath(globalMesh.nHalfedges(), 0.0);
 
     Edge posEdge = globalMesh.edge(singEdgePair.first);
     Edge negEdge = globalMesh.edge(singEdgePair.second);
 
-    //TO-DO: Going to hit singular edge twice in adjacent faces
-    for (Face f : faces){
+    // ---------------------------------------------------------
+    // iterate over the triangle strip
+    // ---------------------------------------------------------
+    for (Face f : faces) {
         for (Halfedge he : f.adjacentHalfedges()) {
-            if (edgeSingularities[he.edge()] && he.edge() != posEdge
-                && he.edge() != negEdge){//we have hit a singular edge and it's not the edge you're currently tracing
-                Edge singularEdge = he.edge();
-                double hitIsoVal = edgeToIsoVal[singularEdge];
-                if (hitIsoVal > isoVal){//if the current singularity isovalue is lesser than the hit isovalue, route "below" the edge
-                    lensHePath[he.getIndex()] = -1.0;
-                    lensHePath[he.twin().getIndex()] = -1.0;
+
+            Edge e = he.edge();
+
+            // ----------------------------------------
+            // 1. Check whether this edge is singular AND not the one we are tracing
+            // ----------------------------------------
+            if (edgeSingularities[e] && e != posEdge && e != negEdge) {
+
+                // endpoint values
+                Vertex v0 = he.vertex();
+                Vertex v1 = he.next().vertex();
+                double f0 = timeFunction[v0];
+                double f1 = timeFunction[v1];
+
+                // ----------------------------------------
+                // 2. Check if isoVal actually lies on this edge
+                // ----------------------------------------
+                bool isoHitsEdge =
+                    ((f0 <= isoVal && f1 >= isoVal) ||
+                     (f1 <= isoVal && f0 >= isoVal));
+
+                // avoid the degenerate case where the entire edge lies on the isoline
+                if (f0 == f1 && f0 == isoVal) {
+                    isoHitsEdge = false;
+                }
+
+                // ----------------------------------------
+                // 3. If isoline intersects the singular edge, choose routing
+                // ----------------------------------------
+                if (isoHitsEdge) {
+                    double hitIsoVal = edgeToIsoVal[e];
+
+                    // If singularity's isovalue > current slice, route "below" (lensHePath = -1)
+                    if (hitIsoVal > isoVal) {
+                        lensHePath[he.getIndex()]       = -1.0;
+                        lensHePath[he.twin().getIndex()] = -1.0;
+                    }
                 }
             }
+            Vertex a = he.vertex();
+            Vertex b = he.next().vertex();
+            double fa = timeFunction[a];
+            double fb = timeFunction[b];
 
-            Vertex v0 = he.vertex();
-            Vertex v1 = he.next().vertex();
-
-            double f0 = timeFunction[v0];
-            double f1 = timeFunction[v1];
-            
-            if (f0 > isoVal && f1 > isoVal) {
-                hePath.push_back(he.twin());//add the halfedges in the correct direction (TODO: handle case when singular edge is at the top or bottom of the strip)
+            if (fa > isoVal && fb > isoVal) {
+                // add halfedge in its twin direction
                 lensHePath[he.getIndex()] = -1.0;
-                Edge e = he.edge();
             }
-
         }
     }
+
     return lensHePath;
 }
-
 
 std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, Model& gbModel, 
                                                         std::map<int, int>& vertexMap, Eigen::SparseMatrix<double, Eigen::RowMajor>& G, polyscope::SurfaceMesh& psMesh){
