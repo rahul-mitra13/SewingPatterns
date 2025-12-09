@@ -2,14 +2,14 @@
 #include "path_constraints.h"
 
 //rotate the face gradients clockwise 
-FaceData<Vector3> clockWiseRotatedGradients(VertexPositionGeometry& globalGeometry, FaceData<Vector3>& globalFaceGradients){
+FaceData<Vector3> clockWiseRotatedGradients(VertexPositionGeometry& globalGeometry, FaceData<Vector3>& globalFaceGradients, double angle){
 
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     FaceData<Vector3> rotatedFaceGradients(globalMesh);
     globalGeometry.requireFaceNormals();
     //rotate the first gradient by 90 degrees wrt to the face normal
     for (Face f : globalMesh.faces()){
-        rotatedFaceGradients[f] = globalFaceGradients[f].rotateAround(globalGeometry.faceNormals[f], -PI/2.);
+        rotatedFaceGradients[f] = globalFaceGradients[f].rotateAround(globalGeometry.faceNormals[f], angle);
         //rotatedFaceGradients[f] = globalFaceGradients[f].rotateAround(globalGeometry.faceNormals[f], PI/2.);//debug
         rotatedFaceGradients[f] = rotatedFaceGradients[f].normalize();
     }
