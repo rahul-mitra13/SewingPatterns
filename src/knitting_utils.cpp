@@ -5134,7 +5134,6 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                 if ((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2Vector, gradientVector2) > dot(he2TwinVector, gradientVector2))){
                     
                     std::cout << "In case 1 " << std::endl; 
-
                     //ensure the saddle is in the bigon for the positive edge
                     model.addConstr(sigma[he1.getIndex()] >= 0);
                     model.addConstr(sigma[he1.twin().getIndex()] <= 0);
@@ -5149,8 +5148,8 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
 
                 }
                 else if ((dot(he1Vector, gradientVector1) > dot(he1TwinVector, gradientVector1)) && (dot(he2TwinVector, gradientVector2) > dot(he2Vector, gradientVector2))){
+                    
                     std::cout << "In case 2 " << std::endl;
-
                     //ensure the saddle is in the bigon for the positive edge
                     model.addConstr(sigma[he1.getIndex()] >= 0);
                     model.addConstr(sigma[he1.twin().getIndex()] <= 0);
@@ -5164,8 +5163,8 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
 
                 }
                 else if((dot(he1TwinVector, gradientVector1) > dot(he1Vector, gradientVector1)) && (dot(he2Vector, gradientVector2) > dot(he2TwinVector, gradientVector2))){
+                    
                     std::cout << "In case 3 " << std::endl;
-
                     //ensure the saddle is in the bigon for the positive edge
                     model.addConstr(sigma[he1.twin().getIndex()] >= 0);
                     model.addConstr(sigma[he1.getIndex()] <= 0);
