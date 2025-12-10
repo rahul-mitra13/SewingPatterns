@@ -4503,36 +4503,19 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
     model.setHalfedgePathConstraints(halfedgePathConstraints);
 
-    polyscope::show();
-
-    // // Short row ordering constraints (Old version based on shortest paths)
-    // for (int iPair = 1; iPair < singularHalfedgesOrdered.size(); iPair++) {
-    //     Halfedge he1 = singularHalfedgesOrdered[iPair-1].first;
-    //     Halfedge he2 = singularHalfedgesOrdered[iPair].first;
-    //     std::vector<Halfedge> path = surface::shortestEdgePath(globalGeometry, he1.tailVertex(), he2.tipVertex());
-    //     std::vector<Edge> edgePath(path.size()); // just for viz
-    //     std::vector<double> heWeights(globalMesh.nHalfedges(), 0.0);
-    //     for (int i = 0; i < path.size(); i++) {
-    //         edgePath[i] = path[i].edge();
-    //         heWeights[path[i].getIndex()] = 1.0;
-    //     }
-    //     auto constraint = make_pair(heWeights, 0.);
-    //     // model.addHalfedgePathInequalityConstraint(constraint);
-    //     // showEdges("ordering path "+std::to_string(iPair), edgePath, globalGeometry)->setEnabled(false);
-    // }
-
     // New short row ordering constraints
     std::vector<Edge> verticalPathEdges;
     for (int iPair = 0; iPair < singularHalfedgesOrdered.size()-1; iPair++) {
         double targetTimeValue = timeValuesOrdered[iPair+1];
 
-        // Positive part
-        Halfedge he = singularHalfedgesOrdered[iPair].first;
-        if (globalTimeFunction[he.tipVertex()] < globalTimeFunction[he.tailVertex()])
-            he = he.twin();
+        // Get lower half-edge, and orient it such that it points upwards
+        Halfedge startHe = singularHalfedgesOrdered[iPair].first;
+        if (globalTimeFunction[startHe.tipVertex()] < globalTimeFunction[startHe.tailVertex()])
+            startHe = startHe.twin();
 
-        std::vector<Halfedge> halfedgeSequence {he}; // we always include the bottom singular half-edge, altough we don't want it in the end
-        verticalPathEdges.push_back(he.edge());
+        std::vector<Halfedge> halfedgeSequence {startHe}; // we always include the bottom singular half-edge, altough we don't want it in the end
+        verticalPathEdges.push_back(startHe.edge());
+        Halfedge he = startHe;
         while (globalTimeFunction[he.tipVertex()] < targetTimeValue) {
             double maxTimeValue = -1;
             Halfedge bestNextHe;
@@ -4549,7 +4532,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
 
         // Trace horizontal triangle strip
         Halfedge endHe = singularHalfedgesOrdered[iPair+1].first;
-        if (globalTimeFunction[endHe.tipVertex()] < globalTimeFunction[endHe.tailVertex()]) // flip so that endHe.face() is to the left
+        if (globalTimeFunction[endHe.tipVertex()] < globalTimeFunction[endHe.tailVertex()]) // flip so that endHe.face() is to the left (endHe points upwards)
             endHe = endHe.twin();
 
         std::vector<Face> faces; int code; 
@@ -4590,10 +4573,15 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
             }
         }
 
-        // Finally add the vertical sequence to hePath. Skip first which is the bottom pos edge
+        // Add the vertical sequence to hePath. Skip first which is the bottom pos edge
         for (int i = 1; i < halfedgeSequence.size(); i++) {
             hePath[halfedgeSequence[i]] = +1;
         }
+
+        // Finally, add half of the "back-window" of both sings: b/2 = (a-P)/2
+        hePath[startHe] += 0.5;
+        hePath[endHe] += 0.5;
+        
         psMesh.addHalfedgeScalarQuantity("ordering path +" + std::to_string(iPair), hePath)->setEnabled(false);
 
         std::vector<double> heWeights(globalMesh.nHalfedges(), 0.0);
