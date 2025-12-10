@@ -4497,6 +4497,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         psMesh.addFaceScalarQuantity("faces (back) for pair " + std::to_string(i), faceBackPath);
         stripHalfedgePath = findEdgePathFromStrip(globalGeometry, faces, globalTimeFunction, isoVal, edgeSingularities, edgeToIsoVal, p);
         psMesh.addHalfedgeScalarQuantity("halfedge strip path (back) " + std::to_string(i), stripHalfedgePath);
+        halfedgePathConstraints.push_back(std::make_pair(stripHalfedgePath, 0.0));
     }
 
     psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
@@ -4569,7 +4570,9 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         HalfedgeData<double> hePath(globalMesh);
         for (Face f : faces) { 
             for (Halfedge he : f.adjacentHalfedges()) {
-                if (edgeSingularities[he.edge()]) {
+                double f0 = globalTimeFunction[he.tailVertex()], f1 = globalTimeFunction[he.tipVertex()];
+                bool isoHitsEdge = (fmin(f0,f1) <= targetTimeValue && targetTimeValue <= fmax(f0,f1));
+                if (edgeSingularities[he.edge()] && isoHitsEdge) {
                     int order = edgeSingularities[he.edge()];
                     if (order > 0) {
                         if (order <= iPair+1) continue; // positive edge we started from, or lower edge: go above
@@ -4581,7 +4584,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
                     }
                 }
                 // check if this half-edge lies above the target time value
-                if (globalTimeFunction[he.tipVertex()] > targetTimeValue && globalTimeFunction[he.tailVertex()] > targetTimeValue) {
+                if (f1 > targetTimeValue && f0 > targetTimeValue) {
                     hePath[he] = -1;
                 }
             }
