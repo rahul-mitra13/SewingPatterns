@@ -4329,8 +4329,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         edgeToIsoVal[negSingularEdge] = 0.5 * (posVal + negVal);
     }
 
-    // HERE
-
     //bool connectSaddles = true;
 
     //don't consider indices where no valid triangle strip exists 
@@ -4500,99 +4498,100 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         halfedgePathConstraints.push_back(std::make_pair(stripHalfedgePath, 0.0));
     }
 
-    psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
-    model.setHalfedgePathConstraints(halfedgePathConstraints);
+    // psMesh.addEdgeScalarQuantity("singular edges after all path constraints ", edgeIndices);
+    // model.setHalfedgePathConstraints(halfedgePathConstraints);
 
+    //Don't need this for models of disk topology
     // New short row ordering constraints
-    std::vector<Edge> verticalPathEdges;
-    for (int iPair = 0; iPair < singularHalfedgesOrdered.size()-1; iPair++) {
-        double targetTimeValue = timeValuesOrdered[iPair+1];
+    // std::vector<Edge> verticalPathEdges;
+    // for (int iPair = 0; iPair < singularHalfedgesOrdered.size()-1; iPair++) {
+    //     double targetTimeValue = timeValuesOrdered[iPair+1];
 
-        // Get lower half-edge, and orient it such that it points upwards
-        Halfedge startHe = singularHalfedgesOrdered[iPair].first;
-        if (globalTimeFunction[startHe.tipVertex()] < globalTimeFunction[startHe.tailVertex()])
-            startHe = startHe.twin();
+    //     // Get lower half-edge, and orient it such that it points upwards
+    //     Halfedge startHe = singularHalfedgesOrdered[iPair].first;
+    //     if (globalTimeFunction[startHe.tipVertex()] < globalTimeFunction[startHe.tailVertex()])
+    //         startHe = startHe.twin();
 
-        std::vector<Halfedge> halfedgeSequence {startHe}; // we always include the bottom singular half-edge, altough we don't want it in the end
-        verticalPathEdges.push_back(startHe.edge());
-        Halfedge he = startHe;
-        while (globalTimeFunction[he.tipVertex()] < targetTimeValue) {
-            double maxTimeValue = -1;
-            Halfedge bestNextHe;
-            for (Halfedge nextHe : he.tipVertex().outgoingHalfedges()) {
-                if (globalTimeFunction[nextHe.tipVertex()] > maxTimeValue) {
-                    maxTimeValue = globalTimeFunction[nextHe.tipVertex()];
-                    bestNextHe = nextHe;
-                }
-            }
-            he = bestNextHe;
-            halfedgeSequence.push_back(he);
-            verticalPathEdges.push_back(he.edge());
-        }
+    //     std::vector<Halfedge> halfedgeSequence {startHe}; // we always include the bottom singular half-edge, altough we don't want it in the end
+    //     verticalPathEdges.push_back(startHe.edge());
+    //     Halfedge he = startHe;
+    //     while (globalTimeFunction[he.tipVertex()] < targetTimeValue) {
+    //         double maxTimeValue = -1;
+    //         Halfedge bestNextHe;
+    //         for (Halfedge nextHe : he.tipVertex().outgoingHalfedges()) {
+    //             if (globalTimeFunction[nextHe.tipVertex()] > maxTimeValue) {
+    //                 maxTimeValue = globalTimeFunction[nextHe.tipVertex()];
+    //                 bestNextHe = nextHe;
+    //             }
+    //         }
+    //         he = bestNextHe;
+    //         halfedgeSequence.push_back(he);
+    //         verticalPathEdges.push_back(he.edge());
+    //     }
 
-        // Trace horizontal triangle strip
-        Halfedge endHe = singularHalfedgesOrdered[iPair+1].first;
-        if (globalTimeFunction[endHe.tipVertex()] < globalTimeFunction[endHe.tailVertex()]) // flip so that endHe.face() is to the left (endHe points upwards)
-            endHe = endHe.twin();
+    //     // Trace horizontal triangle strip
+    //     Halfedge endHe = singularHalfedgesOrdered[iPair+1].first;
+    //     if (globalTimeFunction[endHe.tipVertex()] < globalTimeFunction[endHe.tailVertex()]) // flip so that endHe.face() is to the left (endHe points upwards)
+    //         endHe = endHe.twin();
 
-        std::vector<Face> faces; int code; 
-        std::tie(faces, code) = traceIsolineFaces(globalGeometry, globalTimeFunction, globalTimeFunctionGradientsNormalized, rotatedFaceGradients, targetTimeValue, halfedgeSequence.back(), endHe);
-        if (code == -1) {
-            P("endFace couldn't be reached for pair " + std::to_string(iPair) + "; could be in different CC's. Skipping.");
-            continue;
-        }
-        faces.push_back(endHe.face()); // for some reason traceIsolineFaces() doesn't add the last one
+    //     std::vector<Face> faces; int code; 
+    //     std::tie(faces, code) = traceIsolineFaces(globalGeometry, globalTimeFunction, globalTimeFunctionGradientsNormalized, rotatedFaceGradients, targetTimeValue, halfedgeSequence.back(), endHe);
+    //     if (code == -1) {
+    //         P("endFace couldn't be reached for pair " + std::to_string(iPair) + "; could be in different CC's. Skipping.");
+    //         continue;
+    //     }
+    //     faces.push_back(endHe.face()); // for some reason traceIsolineFaces() doesn't add the last one
 
-        // // Visualize triangle strip
-        // FaceData<double> horizontalStripVisu(globalMesh);
-        // for (Face f : faces)
-        //     horizontalStripVisu[f] = 1;
-        // psMesh.addFaceScalarQuantity("horizontal paths" + std::to_string(iPair), horizontalStripVisu);
+    //     // // Visualize triangle strip
+    //     // FaceData<double> horizontalStripVisu(globalMesh);
+    //     // for (Face f : faces)
+    //     //     horizontalStripVisu[f] = 1;
+    //     // psMesh.addFaceScalarQuantity("horizontal paths" + std::to_string(iPair), horizontalStripVisu);
 
-        // Find an edge path from this triangle strip. Inspired by findEdgePathFromStrip()
-        HalfedgeData<double> hePath(globalMesh);
-        for (Face f : faces) { 
-            for (Halfedge he : f.adjacentHalfedges()) {
-                double f0 = globalTimeFunction[he.tailVertex()], f1 = globalTimeFunction[he.tipVertex()];
-                bool isoHitsEdge = (fmin(f0,f1) <= targetTimeValue && targetTimeValue <= fmax(f0,f1));
-                if (edgeSingularities[he.edge()] && isoHitsEdge) {
-                    int order = edgeSingularities[he.edge()];
-                    if (order > 0) {
-                        if (order <= iPair+1) continue; // positive edge we started from, or lower edge: go above
-                        if (order == iPair+2) hePath[he] = -1; // positive upper edge: we're done, just go down to reach bottom end
-                        if (order  > iPair+2) hePath[he] = hePath[he.twin()] = -1; // higher edge, go below
-                    } else {
-                        if (-order <= iPair+1) continue; // negative bottom edge: we go above
-                        if (-order >= iPair+2) hePath[he] = hePath[he.twin()] = -1; // negative upper edge: we go below
-                    }
-                }
-                // check if this half-edge lies above the target time value
-                if (f1 > targetTimeValue && f0 > targetTimeValue) {
-                    hePath[he] = -1;
-                }
-            }
-        }
+    //     // Find an edge path from this triangle strip. Inspired by findEdgePathFromStrip()
+    //     HalfedgeData<double> hePath(globalMesh);
+    //     for (Face f : faces) { 
+    //         for (Halfedge he : f.adjacentHalfedges()) {
+    //             double f0 = globalTimeFunction[he.tailVertex()], f1 = globalTimeFunction[he.tipVertex()];
+    //             bool isoHitsEdge = (fmin(f0,f1) <= targetTimeValue && targetTimeValue <= fmax(f0,f1));
+    //             if (edgeSingularities[he.edge()] && isoHitsEdge) {
+    //                 int order = edgeSingularities[he.edge()];
+    //                 if (order > 0) {
+    //                     if (order <= iPair+1) continue; // positive edge we started from, or lower edge: go above
+    //                     if (order == iPair+2) hePath[he] = -1; // positive upper edge: we're done, just go down to reach bottom end
+    //                     if (order  > iPair+2) hePath[he] = hePath[he.twin()] = -1; // higher edge, go below
+    //                 } else {
+    //                     if (-order <= iPair+1) continue; // negative bottom edge: we go above
+    //                     if (-order >= iPair+2) hePath[he] = hePath[he.twin()] = -1; // negative upper edge: we go below
+    //                 }
+    //             }
+    //             // check if this half-edge lies above the target time value
+    //             if (f1 > targetTimeValue && f0 > targetTimeValue) {
+    //                 hePath[he] = -1;
+    //             }
+    //         }
+    //     }
 
-        // Add the vertical sequence to hePath. Skip first which is the bottom pos edge
-        for (int i = 1; i < halfedgeSequence.size(); i++) {
-            hePath[halfedgeSequence[i]] = +1;
-        }
+    //     // Add the vertical sequence to hePath. Skip first which is the bottom pos edge
+    //     for (int i = 1; i < halfedgeSequence.size(); i++) {
+    //         hePath[halfedgeSequence[i]] = +1;
+    //     }
 
-        // Finally, add half of the "back-window" of both sings: b/2 = (a-P)/2
-        hePath[startHe] += 0.5;
-        hePath[endHe] += 0.5;
+    //     // Finally, add half of the "back-window" of both sings: b/2 = (a-P)/2
+    //     hePath[startHe] += 0.5;
+    //     hePath[endHe] += 0.5;
         
-        psMesh.addHalfedgeScalarQuantity("ordering path +" + std::to_string(iPair), hePath)->setEnabled(false);
+    //     psMesh.addHalfedgeScalarQuantity("ordering path +" + std::to_string(iPair), hePath)->setEnabled(false);
 
-        std::vector<double> heWeights(globalMesh.nHalfedges(), 0.0);
-        for (Halfedge he : globalMesh.halfedges())
-            heWeights[he.getIndex()] = hePath[he];
-        auto constraint = make_pair(heWeights, 0.);
-        model.addHalfedgePathInequalityConstraint(constraint);
-        // showEdges("ordering path "+std::to_string(iPair), edgePath, globalGeometry)->setEnabled(false);
-    }
+    //     std::vector<double> heWeights(globalMesh.nHalfedges(), 0.0);
+    //     for (Halfedge he : globalMesh.halfedges())
+    //         heWeights[he.getIndex()] = hePath[he];
+    //     auto constraint = make_pair(heWeights, 0.);
+    //     //model.addHalfedgePathInequalityConstraint(constraint);
+    //     // showEdges("ordering path "+std::to_string(iPair), edgePath, globalGeometry)->setEnabled(false);
+    // }
 
-    showEdges("vertical paths", verticalPathEdges, globalGeometry)->setEnabled(false);
+    // showEdges("vertical paths", verticalPathEdges, globalGeometry)->setEnabled(false);
 
     model.setEdgeIndices(edgeIndices);
     model.setHomologyGenerators(homologyGenerators);
