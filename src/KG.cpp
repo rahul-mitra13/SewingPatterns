@@ -79,7 +79,7 @@ void KG::buildGraph(){
     writeKnitGraphToTxtFile();
 
     //trace the short-rows
-    traceShortRows();
+    //traceShortRows();
 }
 
 //Makes virtual vertices in the course direction
