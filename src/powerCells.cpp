@@ -192,7 +192,7 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(po
     
     //positive sites
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = std::round(avgTotalMeasure / period);
+    posOptions.nSites = 0; //std::round(avgTotalMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     posOptions.seed = 42;
