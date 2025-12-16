@@ -1725,18 +1725,18 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
 
     //add wale alignment constraints 
-    // EdgeData<double> constrainedEdges(globalGeometry.mesh, 0.0);
-    // double alignment = 0.6;
-    // std::vector<int> waleBdyEdges;
-    // for (Edge e : globalGeometry.mesh.edges()){
-    //     if (!e.isBoundary()) continue;
-    //     Vector3 edgeVector = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
-    //     edgeVector = edgeVector.normalize();
-    //     if (std::fabs(dot(edgeVector, waleCurlFunctionGrad[e.halfedge().face()])) < alignment){
-    //         waleBdyEdges.push_back(edgeMap[e.getIndex()]);
-    //         constrainedEdges[e] = 1;
-    //     }
-    // }
+    EdgeData<double> constrainedEdges(globalGeometry.mesh, 0.0);
+    double alignment = 0.6;
+    std::vector<int> waleBdyEdges;
+    for (Edge e : globalGeometry.mesh.edges()){
+        if (!e.isBoundary()) continue;
+        Vector3 edgeVector = globalGeometry.vertexPositions[e.halfedge().tipVertex()] - globalGeometry.vertexPositions[e.halfedge().tailVertex()];
+        edgeVector = edgeVector.normalize();
+        if (std::fabs(dot(edgeVector, waleCurlFunctionGrad[e.halfedge().face()])) < alignment){
+            waleBdyEdges.push_back(edgeMap[e.getIndex()]);
+            constrainedEdges[e] = 1;
+        }
+    }
     // psMesh.addEdgeScalarQuantity("constrained edges", constrainedEdges);
 
     // VertexData<double> waleVertexCurl = computeCourseVertexCurl(globalGeometry, gluedGeometry, waleCurlFunctionGrad, gluedOneRingMap,
@@ -2419,7 +2419,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
 
     // solve the model with all the path constraints and boundary constraints 
-    //modelWale.setBdyEdges(waleBdyEdges);
+    modelWale.setBdyEdges(waleBdyEdges);
     modelWale.setEdgeIndices(edgeIndices);
     modelWale.setEdgePathConstraints(waleEdgePathConstraints);
     // modelWale.setHomologyGenerators(homologyGenerators); // No integer variables for homology generators anymore!
