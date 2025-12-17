@@ -1737,7 +1737,45 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             constrainedEdges[e] = 1;
         }
     }
-    // psMesh.addEdgeScalarQuantity("constrained edges", constrainedEdges);
+    psMesh.addEdgeScalarQuantity("wale constrained edges", constrainedEdges);
+
+
+    // We can also mask the curl signal with our method to allow for color work or texturing or placing a logo
+    // we do a BFS from some source vertex to find the masked vertices
+    auto bfsWithDepth = [&](Vertex start, int maxDepth) {
+        std::vector<Vertex> result;
+        std::queue<std::pair<Vertex, int>> q;
+        std::unordered_set<size_t> visited;
+
+        q.push({start, 0});
+        visited.insert(start.getIndex());
+
+        while (!q.empty()) {
+            auto [v, depth] = q.front();
+            q.pop();
+
+            result.push_back(v);
+
+            if (depth == maxDepth) continue;
+
+            for (Vertex nbr : v.adjacentVertices()) {
+                size_t nid = nbr.getIndex();
+                if (visited.count(nid)) continue;
+
+                visited.insert(nid);
+                q.push({nbr, depth + 1});
+            }
+        }
+
+        return result;
+    };
+    Vertex maskingSource = globalGeometry.mesh.vertex(580);
+    int maskingDepth = 10;//adjust this based on how much masking you want
+    std::vector<Vertex> maskedVertices = bfsWithDepth(maskingSource, 8);
+    //add these vertices to the masking 
+    for (Vertex v : maskedVertices){
+        heatSourceVerts.push_back(v);
+    }
 
     // VertexData<double> waleVertexCurl = computeCourseVertexCurl(globalGeometry, gluedGeometry, waleCurlFunctionGrad, gluedOneRingMap,
     //                                                      gluedEdgeSingularities, heatSolver, vertexMap);
@@ -2419,7 +2457,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
 
     // solve the model with all the path constraints and boundary constraints 
-    modelWale.setBdyEdges(waleBdyEdges);
+    modelWale.setBdyEdges(waleBdyEdges);//set these constraints on disk models
     modelWale.setEdgeIndices(edgeIndices);
     modelWale.setEdgePathConstraints(waleEdgePathConstraints);
     // modelWale.setHomologyGenerators(homologyGenerators); // No integer variables for homology generators anymore!
