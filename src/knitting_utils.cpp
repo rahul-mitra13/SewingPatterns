@@ -4488,7 +4488,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
             polyscope::show();
             exit(1);
         }
-
         // Now do the same with the back separatrices
         faces.clear();
         tie(faces, code) = traceIsolineFaces(globalGeometry, globalTimeFunction, globalTimeFunctionGradientsNormalized, ccwRotatedFaceGradients, isoVal, HePair.first.twin(), HePair.second.twin());
