@@ -1995,7 +1995,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     
     //Attempts at locally modifying the curl signal
     // 1. Compute totals (pos & neg) and boosted totals
-    double c = 0.;
+    double c = 0.0;
     double Bp = 0.0, Up = 0.0;
     double Bn = 0.0, Un = 0.0;
 
