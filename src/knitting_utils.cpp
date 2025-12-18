@@ -2030,73 +2030,151 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     polyscope::registerPointCloud("wale boosted vertices", waleBoostedVerticesPc);
     VertexData<double> waleBoostedDistance = heatSolver.computeDistance(waleBoostedVertices);
     psMesh.addVertexScalarQuantity("Wale Boosted Distance", waleBoostedDistance);
-    
-    //Attempts at locally modifying the curl signal
-    // 1. Compute totals (pos & neg) and boosted totals
-    double c = 0.;
+
+    psMesh.addVertexScalarQuantity("INITIAL WALE CURL MEASURE", curlMeasure);
+
+    double Tp_before = 0.0;
+    double Tn_before = 0.0;
+    double Tp_after = 0.0;
+    double Tn_after = 0.0;
+    for (Vertex v : globalMesh.vertices()){
+        double cv = curlMeasure[v];
+        if (cv > 0.0){
+            Tp_before += cv;
+        }
+        else{
+            Tn_before += cv;
+        }
+
+    }
+
+    //perform boosting with simple scaling 
+    double c = 1.0;
     double Bp = 0.0, Up = 0.0;
     double Bn = 0.0, Un = 0.0;
 
-    for (Vertex v : gluedMesh.vertices()) {
+    for (Vertex v : globalMesh.vertices()) {
         double cv = curlMeasure[v];
         bool boosted = std::find(waleBoostedVertices.begin(),
                              waleBoostedVertices.end(), v)
                    != waleBoostedVertices.end();
 
-        if (cv > 0) {
+        if (cv > 0.0) {
             if (boosted) Bp += cv;
             else         Up += cv;
-        } else if (cv < 0) {
+        } else if (cv < 0.0) {
             double mag = -cv;
             if (boosted) Bn += mag;
             else         Un += mag;
         }
     }
 
-    double Tp = Bp + Up;   // total positive
-    double Tn = Bn + Un;   // total negative
-
-    if (c == 0) c = 1e-12;
-   
-    // alpha = (B + cU) / (cB)
-    double alphaPos = (Bp > 0 ? (Bp + c * Up) / (c * Bp) : 1.0);
-    double alphaNeg = (Bn > 0 ? (Bn + c * Un) / (c * Bn) : 1.0);
-
-
-  
-    //  Apply redistribution
-    double posAfter = 0.0, negAfter = 0.0;
-
-    for (Vertex v : gluedMesh.vertices()) {
+ 
+    for (Vertex v : globalMesh.vertices()) {
 
         double cv = curlMeasure[v];
-        bool boosted = std::find(waleBoostedVertices.begin(),
-                             waleBoostedVertices.end(), v)
-                   != waleBoostedVertices.end();
 
-        if (cv > 0) {
-
-            double updated = boosted ? c * alphaPos * cv
-                                 : (1 - c) * cv;
-
-            posAfter += updated;
+        if (cv > 0.0) {
+            
+            double BFactor = Up / Bp;
+            //std::cout << "Positve boosting factor = " << BFactor << std::endl;
+            double updated = c * BFactor * cv
+                                 + (1 - c) * cv;
             curlMeasure[v] = updated;
         }
-        else if (cv < 0) {
+        else if (cv < 0.0) {
 
+            double BFactor = Un / Bn;
+            //std::cout << "Negative boosting factor = " << BFactor << std::endl;
             double mag = -cv;
-            double newMag = boosted ? c * alphaNeg * mag
-                                : (1 - c) * mag;
-
-            negAfter += newMag;
+            double newMag = c * BFactor * mag
+                                + (1 - c) * mag;
             curlMeasure[v] = -newMag;
         }
     }
 
-    std::cout << "Pos before = " << Tp 
-          << " Pos after = " << posAfter << "\n";
-    std::cout << "Neg before = " << Tn 
-          << " Neg after = " << negAfter << "\n";
+    for (Vertex v : globalMesh.vertices()){
+        double cv = curlMeasure[v];
+        if (cv > 0.0){
+            Tp_after += cv;
+        }
+        else{
+            Tn_after += cv;
+        }
+    }
+
+    std::cout << "Total pos curl before = " << Tp_before << std::endl;
+    std::cout << "Total pos curl after  = " << Tp_after << std::endl;
+    std::cout << "Total neg curl before = " << Tn_before << std::endl;
+    std::cout << "Total neg curl after  = " << Tn_after << std::endl;
+
+    
+    //Attempts at locally modifying the curl signal
+    // 1. Compute totals (pos & neg) and boosted totals
+    // double c = 1.0;
+    // double Bp = 0.0, Up = 0.0;
+    // double Bn = 0.0, Un = 0.0;
+
+    // for (Vertex v : gluedMesh.vertices()) {
+    //     double cv = curlMeasure[v];
+    //     bool boosted = std::find(waleBoostedVertices.begin(),
+    //                          waleBoostedVertices.end(), v)
+    //                != waleBoostedVertices.end();
+
+    //     if (cv > 0) {
+    //         if (boosted) Bp += cv;
+    //         else         Up += cv;
+    //     } else if (cv < 0) {
+    //         double mag = -cv;
+    //         if (boosted) Bn += mag;
+    //         else         Un += mag;
+    //     }
+    // }
+
+    // double Tp = Bp + Up;   // total positive
+    // double Tn = Bn + Un;   // total negative
+
+    // if (c == 0) c = 1e-12;
+   
+    // // alpha = (B + cU) / (cB)
+    // double alphaPos = (Bp > 0 ? (Bp + c * Up) / (c * Bp) : 1.0);
+    // double alphaNeg = (Bn > 0 ? (Bn + c * Un) / (c * Bn) : 1.0);
+
+
+  
+    // //  Apply redistribution
+    // double posAfter = 0.0, negAfter = 0.0;
+
+    // for (Vertex v : gluedMesh.vertices()) {
+
+    //     double cv = curlMeasure[v];
+    //     bool boosted = std::find(waleBoostedVertices.begin(),
+    //                          waleBoostedVertices.end(), v)
+    //                != waleBoostedVertices.end();
+
+    //     if (cv > 0) {
+
+    //         double updated = boosted ? c * alphaPos * cv
+    //                              : (1 - c) * cv;
+
+    //         posAfter += updated;
+    //         curlMeasure[v] = updated;
+    //     }
+    //     else if (cv < 0) {
+
+    //         double mag = -cv;
+    //         double newMag = boosted ? c * alphaNeg * mag
+    //                             : (1 - c) * mag;
+
+    //         negAfter += newMag;
+    //         curlMeasure[v] = -newMag;
+    //     }
+    // }
+
+    // std::cout << "Pos before = " << Tp 
+    //       << " Pos after = " << posAfter << "\n";
+    // std::cout << "Neg before = " << Tn 
+    //       << " Neg after = " << negAfter << "\n";
     
     //2. perform a simple linear scaling (doesn't preserve anything but gives decent results)
     // double boostFactor = 1e5;
@@ -2167,48 +2245,51 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
 
     psMesh.addVertexScalarQuantity("initial curl measure without masking (wale)", curlMeasure);
-    // polyscope::show();
 
-    if (heatSourceVerts.size() != 0){
-        //mask the saddle 
-        //not sure if this is the correct way to go
-        VertexData<double> allDist = heatSolver.computeDistance(heatSourceVerts);
-        VertexData<double> waleWeighting(globalMesh);
-        double maxVal = std::numeric_limits<double>::min();
-        double maxSourceVal = std::numeric_limits<double>::min();
-        //for all the source vertices, find the max value 
-        for (Vertex v : heatSourceVerts){
-            maxSourceVal = std::max(maxSourceVal, allDist[v]);
-        }
-        //find the max val over all distances
-        for (Vertex v : gluedMesh.vertices()){
-            maxVal = std::max(maxVal, allDist[v]);
-        }
-        //shift down all the source vertex values
-        for (Vertex v : heatSourceVerts){
-            allDist[v] -= maxSourceVal;
-        }
-        //clip all values to 0 
-        for (Vertex v : gluedMesh.vertices()){
-            allDist[v] = std::max(allDist[v], 0.0);
-        }
-        //have a hard mask in the course direction
-        for (Vertex v : globalMesh.vertices()){
-            waleWeighting[v] = (allDist[v] > 4.0 * period);
-            curlMeasure[v] = waleWeighting[v] * curlMeasure[v];
-        }
-    }
-    psMesh.addVertexScalarQuantity("initial curl measure with masking (wale)", curlMeasure);
+    //commenting masking out for now 
+    // for models with no singularities in the coarse direction
+    // if (heatSourceVerts.size() != 0){
+    //     //mask the saddle 
+    //     //not sure if this is the correct way to go
+    //     VertexData<double> allDist = heatSolver.computeDistance(heatSourceVerts);
+    //     VertexData<double> waleWeighting(globalMesh);
+    //     double maxVal = std::numeric_limits<double>::min();
+    //     double maxSourceVal = std::numeric_limits<double>::min();
+    //     //for all the source vertices, find the max value 
+    //     for (Vertex v : heatSourceVerts){
+    //         maxSourceVal = std::max(maxSourceVal, allDist[v]);
+    //     }
+    //     //find the max val over all distances
+    //     for (Vertex v : gluedMesh.vertices()){
+    //         maxVal = std::max(maxVal, allDist[v]);
+    //     }
+    //     //shift down all the source vertex values
+    //     for (Vertex v : heatSourceVerts){
+    //         allDist[v] -= maxSourceVal;
+    //     }
+    //     //clip all values to 0 
+    //     for (Vertex v : gluedMesh.vertices()){
+    //         allDist[v] = std::max(allDist[v], 0.0);
+    //     }
+    //     //have a hard mask in the course direction
+    //     for (Vertex v : globalMesh.vertices()){
+    //         waleWeighting[v] = (allDist[v] > 4.0 * period);
+    //         curlMeasure[v] = waleWeighting[v] * curlMeasure[v];
+    //     }
+    // }
+    // psMesh.addVertexScalarQuantity("initial curl measure with masking (wale)", curlMeasure);
 
 
     // Cap curl measure to avoid high concentration of singularities
     // Don't do capping if you're doing user editing with boosting, doesn't really make sense
-    for (Vertex v : globalMesh.vertices()) {
-        curlMeasure[v] = fmin(curlMeasure[v], period / (3*globalGeometry.vertexDualAreas[v]));
-        curlMeasure[v] = fmax(curlMeasure[v], -period / (3*globalGeometry.vertexDualAreas[v]));
-    }
+    // for (Vertex v : globalMesh.vertices()) {
+    //     curlMeasure[v] = fmin(curlMeasure[v], period / (3*globalGeometry.vertexDualAreas[v]));
+    //     curlMeasure[v] = fmax(curlMeasure[v], -period / (3*globalGeometry.vertexDualAreas[v]));
+    // }
 
-    psMesh.addVertexScalarQuantity("initial curl measure (capped)", curlMeasure);
+    polyscope::show();
+
+    psMesh.addVertexScalarQuantity("initial curl measure capped (wale)", curlMeasure);
     //now divide the measure into positive and negative 
     VertexData<double> posMeasure(globalMesh, 0.0);
     VertexData<double> negMeasure(globalMesh, 0.0);
