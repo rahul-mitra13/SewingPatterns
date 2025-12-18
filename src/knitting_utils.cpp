@@ -4588,7 +4588,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
             heWeights[he.getIndex()] = hePath[he];
         auto constraint = make_pair(heWeights, 0.);
         model.addHalfedgePathInequalityConstraint(constraint);
-        // showEdges("ordering path "+std::to_string(iPair), edgePath, globalGeometry)->setEnabled(false);
+        //showEdges("ordering path "+std::to_string(iPair), edgePath, globalGeometry)->setEnabled(false);
     }
 
     showEdges("vertical paths", verticalPathEdges, globalGeometry)->setEnabled(false);
@@ -5295,8 +5295,8 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                 pathIntegral += hePath[k] * sigma[k];
             }
             //add the constraints for the homology generators
-            //model.addConstr(pathIntegral == period * generatorIntegers[i]);
-            model.addConstr(pathIntegral == period * 0.0);//this should use some integer rounding
+            model.addConstr(pathIntegral == period * generatorIntegers[i]);
+            //model.addConstr(pathIntegral == period * 0.0);//this should use some integer rounding
         }
         
         //constraint: add bdy-bdy path constraint 
