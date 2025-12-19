@@ -5448,6 +5448,11 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                 gluedOneForm[he] = sigma[he.getIndex()].get(GRB_DoubleAttr_X);
             }
         }
+
+        //comment this out if you don't need to print the values of the homology generators
+        for (int i = 0; i < generatorIntegers.size(); i++){
+            std::cout << "Generator integers = " << generatorIntegers[i].get(GRB_DoubleAttr_X) << std::endl;
+        }
     }
     catch(GRBException e) {
         std::cout << "Error code = " << e.getErrorCode() << std::endl;
