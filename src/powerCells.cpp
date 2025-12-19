@@ -92,7 +92,6 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
 
     std::vector<std::pair<SurfacePoint, SurfacePoint>> allMatchedPairs;
 
-
     //solve the problem per bucket of vertices
     for (int i = 0; i < buckets.size(); i++){
         VertexData<double> bucketCurl(gluedMesh, 0.);
@@ -116,8 +115,6 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
         psMesh->addVertexScalarQuantity("Curl for bucket " + std::to_string(i), bucketCurl);
         polyscope::registerPointCloud("(+) Aligned Pts for bucket " + std::to_string(i), positiveCenters)->setEnabled(false);
         polyscope::registerPointCloud("(-) Aligned Pts for bucket " + std::to_string(i), negativeCenters)->setEnabled(false);
-
-        //polyscope::show();
     }
 
     return allMatchedPairs;
