@@ -365,12 +365,13 @@ void projectOnIsoline(SurfacePoint& point, double target, SurfaceMesh& mesh, Int
   for (Edge e : mesh.edges()) {
     Vertex v1 = e.firstVertex(), v2 = e.secondVertex();
     double t1 = options.timeFunction[v1], t2 = options.timeFunction[v2];
+    //should also ask edge to be vertical
     if (fmin(t1, t2) < target && target < fmax(t1, t2)) { // edge is a candidate as it crosses the target isoline
       double eDist = (dist[v1] + dist[v2]) / 2;
       if (eDist < bestDist) {
         bestDist = eDist;
         double t = (target - t1) / (t2 - t1); // exact location along the edge
-        point = SurfacePoint(e, t); // pick the middle of the edge
+        point = SurfacePoint(e, t);
       }
     }
   }

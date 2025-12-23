@@ -4274,7 +4274,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         // Halfedge posHe = posSingularEdge.halfedge();
         // double posVal = posSite.interpolate(globalTimeFunction);
 
-        // //handle positive case 
+        // handle positive case (TO-DO: probably don't need this if we pick edges correctly)
         SurfacePoint posFacePoint = posSite.inSomeFace();
         double posVal = posSite.interpolate(globalTimeFunction);
         Halfedge posHe;
