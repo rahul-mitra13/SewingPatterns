@@ -356,32 +356,46 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
 // `point` is modified in place.
 // Note that this is not exact as the geodesic might not be orthogonal to the time function isolines,
 // but it should be a pretty good guess.
-void projectOnIsoline(SurfacePoint& point, double target, SurfaceMesh& mesh, IntrinsicGeometryInterface& geom, alignOptions& options, FaceData<Vector2>& timeFunctionGrad) {
+void projectOnIsoline(SurfacePoint& point, double target, SurfaceMesh& mesh, VertexPositionGeometry& geom, alignOptions& options, FaceData<Vector3>& timeFunctionGrad) {
 
   HeatMethodDistanceSolver heatSolver(geom);
   VertexData<double> dist = heatSolver.computeDistance(point);
-
+  double bestAlignment = -DBL_MAX;
   double bestDist = DBL_MAX;
   for (Edge e : mesh.edges()) {
     Vertex v1 = e.firstVertex(), v2 = e.secondVertex();
     double t1 = options.timeFunction[v1], t2 = options.timeFunction[v2];
+    
+    Vector3 vec1 = (geom.vertexPositions[v1] - 
+                                 geom.vertexPositions[v2]).normalize();
+    Vector3 vec2 = -vec1;
+    Vector3 avgGrad = 0.5 * (timeFunctionGrad[e.halfedge().face()] + timeFunctionGrad[e.halfedge().twin().face()]);
+    Vector3 vec = dot(vec1, avgGrad) > dot(vec2, avgGrad) ? vec1 : vec2;
+  
     //should also ask edge to be vertical
     if (fmin(t1, t2) < target && target < fmax(t1, t2)) { // edge is a candidate as it crosses the target isoline
-      double eDist = (dist[v1] + dist[v2]) / 2;
-      if (eDist < bestDist) {
-        bestDist = eDist;
-        double t = (target - t1) / (t2 - t1); // exact location along the edge
-        point = SurfacePoint(e, t);
+      if (dot(vec, avgGrad) > bestAlignment){
+        double eDist = (dist[v1] + dist[v2]) / 2;
+        if (eDist < bestDist) {
+          bestDist = eDist;
+          double t = (target - t1) / (t2 - t1); // exact location along the edge
+          point = SurfacePoint(e, t);
+          bestAlignment = dot(vec, avgGrad);
+        }
       }
     }
   }
 }
 
 
-void alignPointsOnIsolineFast(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom, alignOptions& options, polyscope::SurfaceMesh &psMesh) {
+void alignPointsOnIsolineFast(SurfaceMesh& mesh, VertexPositionGeometry& geom, alignOptions& options, polyscope::SurfaceMesh &psMesh) {
 
-  // Compute the gradient of the time function in the tangent plane of faces
-  FaceData<Vector2> timeFunctionGrad = computeTimeFunctionFaceGradIntrinsic(geom, options.timeFunction);
+  // Compute the gradient of the time function 
+  FaceData<Vector3> timeFunctionGrad = computeTimeFunctionFaceGrad(geom, options.timeFunction);
+  //normalize before passing to the function 
+  for (Face f : mesh.faces()){
+    timeFunctionGrad[f] = timeFunctionGrad[f].normalize();
+  }
 
   // For each pair of sings, project both to the midpoint of their time values
   for (auto &[s1,s2] : options.pairedSites) {  

@@ -4270,53 +4270,53 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     //But we clearly run into issues where the above happens 
     for (auto &[posSite,negSite] : pairedSites) { 
 
-        //Edge posSingularEdge = posSite.edge;
-        // Halfedge posHe = posSingularEdge.halfedge();
-        // double posVal = posSite.interpolate(globalTimeFunction);
+        Edge posSingularEdge = posSite.edge;
+        Halfedge posHe = posSingularEdge.halfedge();
+        double posVal = posSite.interpolate(globalTimeFunction);
 
         // handle positive case (TO-DO: probably don't need this if we pick edges correctly)
-        SurfacePoint posFacePoint = posSite.inSomeFace();
-        double posVal = posSite.interpolate(globalTimeFunction);
-        Halfedge posHe;
-        Face f = posFacePoint.face;
-        Edge posSingularEdge;
-        H(posFacePoint.face);
-        double maxDotProd = -DBL_MAX;
-        for (Halfedge he : f.adjacentHalfedges()){
-            Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
-                                globalGeometry.vertexPositions[he.tailVertex()]).normalize();
-            if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
-                maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
-                posSingularEdge = he.edge();
-                posHe = he;
-            }
-        }
+        // SurfacePoint posFacePoint = posSite.inSomeFace();
+        // double posVal = posSite.interpolate(globalTimeFunction);
+        // Halfedge posHe;
+        // Face f = posFacePoint.face;
+        // Edge posSingularEdge;
+        // H(posFacePoint.face);
+        // double maxDotProd = -DBL_MAX;
+        // for (Halfedge he : f.adjacentHalfedges()){
+        //     Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
+        //                         globalGeometry.vertexPositions[he.tailVertex()]).normalize();
+        //     if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
+        //         maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
+        //         posSingularEdge = he.edge();
+        //         posHe = he;
+        //     }
+        // }
         // WE CAN'T JUST CHOOSE ANY HALFEDGE ON THE FACE! BUT USE THE EDGE FOUND BY THE PROJECTION OPERATOR!
         
         edgeIndices[posSingularEdge.getIndex()] = -1.0;
         edgeSingularities[posSingularEdge] = 1.0;
         
-        // Edge negSingularEdge = negSite.edge;
-        // Halfedge negHe = negSingularEdge.halfedge();
-        // double negVal = negSite.interpolate(globalTimeFunction);
+        Edge negSingularEdge = negSite.edge;
+        Halfedge negHe = negSingularEdge.halfedge();
+        double negVal = negSite.interpolate(globalTimeFunction);
 
         // //handle negative case
-        SurfacePoint negFacePoint = negSite.inSomeFace();
-        double negVal = negSite.interpolate(globalTimeFunction);
-        Halfedge negHe;
-        f = negFacePoint.face;
-        H(negFacePoint.face);
-        Edge negSingularEdge;
-        maxDotProd = -DBL_MAX;
-        for (Halfedge he : f.adjacentHalfedges()){
-            Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
-                                globalGeometry.vertexPositions[he.tailVertex()]).normalize();
-            if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
-                    maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
-                    negSingularEdge = he.edge();
-                    negHe = he;
-            }
-        }
+        // SurfacePoint negFacePoint = negSite.inSomeFace();
+        // double negVal = negSite.interpolate(globalTimeFunction);
+        // Halfedge negHe;
+        // f = negFacePoint.face;
+        // H(negFacePoint.face);
+        // Edge negSingularEdge;
+        // maxDotProd = -DBL_MAX;
+        // for (Halfedge he : f.adjacentHalfedges()){
+        //     Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
+        //                         globalGeometry.vertexPositions[he.tailVertex()]).normalize();
+        //     if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
+        //             maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
+        //             negSingularEdge = he.edge();
+        //             negHe = he;
+        //     }
+        // }
         
         edgeIndices[negSingularEdge.getIndex()] = 1.0;
         edgeSingularities[negSingularEdge] = -1.0;
