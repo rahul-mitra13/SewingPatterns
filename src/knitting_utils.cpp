@@ -2282,8 +2282,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     }
     psMesh.addVertexColorQuantity("neg site dist blend (wale)", negSiteDistributionColor)->setEnabled(false);
 
-    // polyscope::show();
-
     //store a vector of vertex ids and singularity indices (for optimal matching)
     std::vector<std::pair<Vertex, int>> singularities;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
