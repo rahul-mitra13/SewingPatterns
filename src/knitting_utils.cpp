@@ -2150,6 +2150,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
+    //set this to 0 at very high res on beanie models since there shouldn't be any positive site
     posOptions.nSites = std::round(totalPosMeasure / period);
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
