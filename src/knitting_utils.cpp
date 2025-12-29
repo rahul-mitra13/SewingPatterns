@@ -2023,13 +2023,22 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
         return result;
     };
+
+    //perform masking on either side of the shoe! 
     Vertex maskingSource = globalGeometry.mesh.vertex(580);//put vertex ID to start BFS here! 
-    int maskingDepth = 10;//adjust this based on how much masking you want
-    std::vector<Vertex> maskedVertices = bfsWithDepth(maskingSource, 8);
+    int maskingDepth = 8;//adjust this based on how much masking you want
+    std::vector<Vertex> maskedVertices = bfsWithDepth(maskingSource, maskingDepth);
     //add these vertices to the masking 
     for (Vertex v : maskedVertices){
         heatSourceVerts.push_back(v);
     }
+    maskingSource = globalGeometry.mesh.vertex(1010);//put vertex ID to start BFS here! 
+    maskedVertices = bfsWithDepth(maskingSource, maskingDepth);
+    //add these vertices to the masking 
+    for (Vertex v : maskedVertices){
+        heatSourceVerts.push_back(v);
+    }
+
 
     //Attempts at locally modifying the curl signal
     // 1. Compute totals (pos & neg) and boosted totals
