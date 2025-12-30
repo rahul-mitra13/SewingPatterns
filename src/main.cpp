@@ -72,6 +72,8 @@ double walePeriod;//the ratio of width to height should be 1:1.6 (Kui)
 double threshold = 0.6;
 //knoppel frequency in the stripe patterns
 double knoppelFrequency = 0.0;
+//interpolant parameter for boosting 
+double interpolantParameter = 0.0;
 
 //set the permutation of edges and orientations for 1-form viz
 std::vector<size_t> perm;
@@ -264,7 +266,7 @@ void showStripePatterns(){
                                                                       edgeMappingsPairs, edgeMap, vertexMap, waleTimeFunctionGradient,
                                                                       courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
                                                                       courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
-                                                                      homologyGenerators);
+                                                                      homologyGenerators, interpolantParameter);
     
     
     // options for the fuzzy power cells
@@ -392,6 +394,10 @@ void callBacks() {
   ImGui::InputDouble("Course 1-form period", &coursePeriod);
   //frequency for knoppel stripes
   ImGui::InputDouble("Knoppel frequency", &knoppelFrequency);
+
+  //interpolant parameter
+  ImGui::InputDouble("c", &interpolantParameter);
+
 
   if (ImGui::Button("Show Stripe Patterns")){
     showStripePatterns();
