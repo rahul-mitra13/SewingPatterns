@@ -2005,11 +2005,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             curveEdges
         );
     }
-
-    for (int v : globalBdyConditions.courseEndBoundaryVertices){
-        curlMeasure[v] = -7.23;
-    }
-    
+        
     // Comment this out if you don't need any masking in the wale direction
     // We can also mask the curl signal with our method to allow for color work or texturing or placing a logo
     // we do a BFS from some source vertex to find the masked vertices
