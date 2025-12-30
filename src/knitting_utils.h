@@ -183,7 +183,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                                                                     std::map<int, int>& vertexMap, FaceData<Vector3>& guidingField, FaceData<Vector3>& courseOneFormGrad, 
                                                                     Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions,
                                                                     EdgeData<double>& courseSingularEdgesGlobal, std::map<int, std::vector<Halfedge>> gluedOneRingMap, polyscope::SurfaceMesh& psMesh, 
-                                                                    std::vector<std::vector<double>>& allSaddleLoops, std::vector<std::vector<double>>& homologyGenerators);
+                                                                    std::vector<std::vector<double>>& allSaddleLoops, std::vector<std::vector<double>>& homologyGenerators,
+                                                                    double interpolantParameter);
 
 //find singular edges in the wale direction in the global setting
 std::vector<std::pair<int, int>> findWaleSingularityEdges(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry,

@@ -661,9 +661,12 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
             Vertex endVertex = gluedMesh.vertex(b);
             std::vector<Vertex> verticesInPath;
             std::tie(verticesInPath, std::ignore, std::ignore) = getVerticesAndEdgesInShortestEdgePath(gluedGeometry, startVertex, endVertex);
+            std::vector<int> currPath;
             for (Vertex v : verticesInPath){
-                toReturn.waleBoostedVertices.push_back(v.getIndex());
+                //toReturn.waleBoostedVertices.push_back(v.getIndex());
+                currPath.emplace_back(v.getIndex());
             }
+            toReturn.waleBoostedVertices.emplace_back(currPath);
         }
     }
     //course way points
@@ -675,9 +678,12 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
             Vertex endVertex = gluedMesh.vertex(b);
             std::vector<Vertex> verticesInPath;
             std::tie(verticesInPath, std::ignore, std::ignore) = getVerticesAndEdgesInShortestEdgePath(gluedGeometry, startVertex, endVertex);
+            std::vector<int> currPath;
             for (Vertex v : verticesInPath){
-                toReturn.courseBoostedVertices.push_back(v.getIndex());
+                //toReturn.courseBoostedVertices.push_back(v.getIndex());
+                currPath.emplace_back(v.getIndex());
             }
+            toReturn.courseBoostedVertices.emplace_back(currPath);
         }
     }
     return toReturn;

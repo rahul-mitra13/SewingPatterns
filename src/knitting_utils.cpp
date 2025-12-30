@@ -1528,7 +1528,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                                                                     std::map<int, int>& vertexMap, FaceData<Vector3> &guidingField, FaceData<Vector3>& courseOneFormGrad, 
                                                                     Eigen::SparseMatrix<double, Eigen::RowMajor>& G, double period, double knoppelFrequency, globalBoundaryConditions& globalBdyConditions,
                                                                     EdgeData<double>& courseSingularEdgesGlobal, std::map<int, std::vector<Halfedge>> gluedOneRingMap, polyscope::SurfaceMesh& psMesh, 
-                                                                    std::vector<std::vector<double>>& allSaddleLoops, std::vector<std::vector<double>>& homologyGenerators){
+                                                                    std::vector<std::vector<double>>& allSaddleLoops, std::vector<std::vector<double>>& homologyGenerators,
+                                                                    double interpolantParameter){
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     SurfaceMesh& globalMesh = globalGeometry.mesh;
 
@@ -1984,15 +1985,31 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     
     //handle the boosting of wale vertices
     std::vector<Vertex> waleBoostedVertices;
-    std::vector<Vector3> waleBoostedVerticesPc;
-    for (int v : globalBdyConditions.waleBoostedVertices){
-        waleBoostedVertices.push_back(globalGeometry.mesh.vertex(v));
-        waleBoostedVerticesPc.push_back(globalGeometry.vertexPositions[v]);
+    
+    for (int i = 0; i < globalBdyConditions.waleBoostedVertices.size(); i++){
+        auto p = globalBdyConditions.waleBoostedVertices[i];
+        std::vector<Vector3> waleBoostedVerticesPc;
+        std::vector<std::array<size_t, 2>> curveEdges;
+        for (int j = 0; j < p.size(); j++){
+            int vId = p[j];
+            Vertex v = globalGeometry.mesh.vertex(vId);
+            waleBoostedVertices.emplace_back(v);
+            waleBoostedVerticesPc.push_back(globalGeometry.vertexPositions[v]);
+        }
+        for (size_t k = 0; k + 1 < waleBoostedVerticesPc.size(); ++k){
+            curveEdges.push_back({k, k + 1});
+        }
+        auto* psCurve = polyscope::registerCurveNetwork(
+            "Wale Boosted Curve" + std::to_string(i),
+            waleBoostedVerticesPc,
+            curveEdges
+        );
     }
-    polyscope::registerPointCloud("wale boosted vertices", waleBoostedVerticesPc);
-    VertexData<double> waleBoostedDistance = heatSolver.computeDistance(waleBoostedVertices);
-    psMesh.addVertexScalarQuantity("Wale Boosted Distance", waleBoostedDistance);
 
+    for (int v : globalBdyConditions.courseEndBoundaryVertices){
+        curlMeasure[v] = -7.23;
+    }
+    
     // Comment this out if you don't need any masking in the wale direction
     // We can also mask the curl signal with our method to allow for color work or texturing or placing a logo
     // we do a BFS from some source vertex to find the masked vertices
@@ -2025,24 +2042,25 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     };
 
     //perform masking on either side of the shoe! 
-    Vertex maskingSource = globalGeometry.mesh.vertex(580);//put vertex ID to start BFS here! 
-    int maskingDepth = 8;//adjust this based on how much masking you want
-    std::vector<Vertex> maskedVertices = bfsWithDepth(maskingSource, maskingDepth);
-    //add these vertices to the masking 
-    for (Vertex v : maskedVertices){
-        heatSourceVerts.push_back(v);
-    }
-    maskingSource = globalGeometry.mesh.vertex(1010);//put vertex ID to start BFS here! 
-    maskedVertices = bfsWithDepth(maskingSource, maskingDepth);
-    //add these vertices to the masking 
-    for (Vertex v : maskedVertices){
-        heatSourceVerts.push_back(v);
-    }
+    // comment this out if you don't need any masking
+    // Vertex maskingSource = globalGeometry.mesh.vertex(580);//put vertex ID to start BFS here! 
+    // int maskingDepth = 8;//adjust this based on how much masking you want
+    // std::vector<Vertex> maskedVertices = bfsWithDepth(maskingSource, maskingDepth);
+    // //add these vertices to the masking 
+    // for (Vertex v : maskedVertices){
+    //     heatSourceVerts.push_back(v);
+    // }
+    // maskingSource = globalGeometry.mesh.vertex(1010);//put vertex ID to start BFS here! 
+    // maskedVertices = bfsWithDepth(maskingSource, maskingDepth);
+    // //add these vertices to the masking 
+    // for (Vertex v : maskedVertices){
+    //     heatSourceVerts.push_back(v);
+    // }
 
 
     //Attempts at locally modifying the curl signal
     // 1. Compute totals (pos & neg) and boosted totals
-    double c = 0.0;
+    double c = interpolantParameter;
     double Bp = 0.0, Up = 0.0;
     double Bn = 0.0, Un = 0.0;
 
@@ -2129,10 +2147,10 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
 
     //Comment this out if you're going to edit the curl signal via boosting!!
-    for (Vertex v : globalMesh.vertices()) {
-        curlMeasure[v] = fmin(curlMeasure[v], period / (3*globalGeometry.vertexDualAreas[v]));
-        curlMeasure[v] = fmax(curlMeasure[v], -period / (3*globalGeometry.vertexDualAreas[v]));
-    }
+    // for (Vertex v : globalMesh.vertices()) {
+    //     curlMeasure[v] = fmin(curlMeasure[v], period / (3*globalGeometry.vertexDualAreas[v]));
+    //     curlMeasure[v] = fmax(curlMeasure[v], -period / (3*globalGeometry.vertexDualAreas[v]));
+    // }
 
     polyscope::show();
 
@@ -2267,9 +2285,10 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             }
         }
         
-        //increment the indices really close so indices cancel out
-        edgeIndices[singularEdge.getIndex()] = -1.0;
-        waleSingularEdgesGlobal[singularEdge] = 1.0;
+        if (!globalGeometry.mesh.edge(singularEdge.getIndex()).isBoundary()){
+            edgeIndices[singularEdge.getIndex()] = 1.0;
+            waleSingularEdgesGlobal[singularEdge] = -1.0;
+        }
         
     }
 
@@ -2295,10 +2314,11 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
                 singularEdge = he.edge();
             }
         }
-        
-        //increment the indices really close so indices cancel out
-        edgeIndices[singularEdge.getIndex()] = 1.0;
-        waleSingularEdgesGlobal[singularEdge] = -1.0;
+
+        if (!globalGeometry.mesh.edge(singularEdge.getIndex()).isBoundary()){
+            edgeIndices[singularEdge.getIndex()] = 1.0;
+            waleSingularEdgesGlobal[singularEdge] = -1.0;
+        }
         
     }
 
@@ -2387,7 +2407,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     //Comment this out if you don't need any alignment to wale boundary edges
     // solve the model with all the path constraints and boundary constraints 
-    modelWale.setBdyEdges(waleBdyEdges);//set these constraints on disk models
+    // modelWale.setBdyEdges(waleBdyEdges);//set these constraints on disk models
     
     modelWale.setEdgeIndices(edgeIndices);
     modelWale.setEdgePathConstraints(waleEdgePathConstraints);
