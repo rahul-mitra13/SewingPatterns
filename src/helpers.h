@@ -20,6 +20,8 @@
 #include "geometrycentral/surface/mesh_graph_algorithms.h"
 #include "geometrycentral/surface/direction_fields.h"
 #include "geometrycentral/utilities/disjoint_sets.h"
+#include "geometrycentral/surface/heat_method_distance.h"
+#include "geometrycentral/surface/flip_geodesics.h"
 
 //json include
 #include "nlohmann/json.hpp"
@@ -88,9 +90,6 @@ struct globalBoundaryConditions{
     std::vector<std::vector<double>> waleBdyPathConstraints;//vector of vectors (each of size nEdges()) where each entry stores the weight of the edge in the integration with \sigma (path around a boundary)
 
     std::vector<std::vector<double>> bdyBdyPathConstraints;//vector of vectors (each of size nEdges()) where each entry stores the weight of the edge in the integration with \sigma (boundary-boundary path)
-
-    // std::vector<int> courseBoostedVertices;// vertices where the curl signal is boosted in the course direction 
-    // std::vector<int> waleBoostedVertices;// vertices where the curl signal is boosted in the wale direction 
 
     std::vector<std::vector<int>> courseBoostedVertices;// vertices where the curl signal is boosted in the course direction 
     std::vector<std::vector<int>> waleBoostedVertices;//vertices where the curl signal is boosted in the wale direction

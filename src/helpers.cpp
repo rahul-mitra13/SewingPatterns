@@ -489,6 +489,7 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
 
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
     globalBoundaryConditions toReturn;
+    ManifoldSurfaceMesh manMesh = ManifoldSurfaceMesh(gluedMesh.getFaceVertexList());
 
     std::vector<int> knittingStartVertices;
     std::vector<int> knittingEndVertices;
@@ -660,10 +661,16 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
             Vertex startVertex = gluedMesh.vertex(a);
             Vertex endVertex = gluedMesh.vertex(b);
             std::vector<Vertex> verticesInPath;
+            // Create a path network as a Dijkstra path between endpoints
+            std::unique_ptr<FlipEdgeNetwork> edgeNetwork;
+            edgeNetwork = FlipEdgeNetwork::constructFromDijkstraPath(manMesh, gluedGeometry, startVertex, endVertex);
+            edgeNetwork->supportRewinding = true;
+            // Make the path a geodesic (this remeshes the underlying geometry)
+            edgeNetwork->iterativeShorten();
             std::tie(verticesInPath, std::ignore, std::ignore) = getVerticesAndEdgesInShortestEdgePath(gluedGeometry, startVertex, endVertex);
+            edgeNetwork->rewind();
             std::vector<int> currPath;
             for (Vertex v : verticesInPath){
-                //toReturn.waleBoostedVertices.push_back(v.getIndex());
                 currPath.emplace_back(v.getIndex());
             }
             toReturn.waleBoostedVertices.emplace_back(currPath);
@@ -677,10 +684,16 @@ globalBoundaryConditions parseJson(IntrinsicGeometryInterface& gluedGeometry, nl
             Vertex startVertex = gluedMesh.vertex(a);
             Vertex endVertex = gluedMesh.vertex(b);
             std::vector<Vertex> verticesInPath;
+            // Create a path network as a Dijkstra path between endpoints
+            std::unique_ptr<FlipEdgeNetwork> edgeNetwork;
+            edgeNetwork = FlipEdgeNetwork::constructFromDijkstraPath(manMesh, gluedGeometry, startVertex, endVertex);
+            edgeNetwork->supportRewinding = true;
+            // Make the path a geodesic (this remeshes the underlying geometry)
+            edgeNetwork->iterativeShorten();
             std::tie(verticesInPath, std::ignore, std::ignore) = getVerticesAndEdgesInShortestEdgePath(gluedGeometry, startVertex, endVertex);
+            edgeNetwork->rewind();
             std::vector<int> currPath;
             for (Vertex v : verticesInPath){
-                //toReturn.courseBoostedVertices.push_back(v.getIndex());
                 currPath.emplace_back(v.getIndex());
             }
             toReturn.courseBoostedVertices.emplace_back(currPath);
