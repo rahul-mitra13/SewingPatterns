@@ -10,7 +10,6 @@
 #include "geometrycentral/utilities/utilities.h"
 #include "geometrycentral/surface/stripe_patterns.h"
 #include "geometrycentral/surface/barycentric_vector.h"
-#include "geometrycentral/surface/heat_method_distance.h"
 #include "geometrycentral/surface/surface_centers.h"
 //#include "geometrycentral/surface/geodesic_centroidal_voronoi_tessellation.h"
 
