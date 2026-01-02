@@ -9,6 +9,8 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
     polyscope::SurfaceMesh* psMesh = options.psMesh;
     auto saddleLoops = options.saddleLoops;
     double period = options.period;
+    //cut edges
+    std::unordered_set<Edge> cutEdges;
 
 
     // Create the Heat Method solver
@@ -26,6 +28,7 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
             for (int j = 0; j < path.size(); j++){
                 if (std::fabs(path[j]) > 0){
                     Edge e = gluedGeometry->mesh.edge(j);
+                    cutEdges.insert(e);
                     heatSourceVerts.push_back(e.halfedge().tailVertex());
                     heatSourceVerts.push_back(e.halfedge().tipVertex());
                 }
@@ -69,6 +72,56 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
 
     //find the decompositions per face 
     FaceData<int> faceComponentsGlued =  componentsCutByLoops(*gluedGeometry, saddleLoops);
+
+    //--------------------------------------------------------------------------//
+    //Build component meshes 
+    std::unordered_map<int, std::vector<Face>> facesByComponent;
+    for (Face f : gluedGeometry->mesh.faces()) {
+        int cid = faceComponentsGlued[f];
+        facesByComponent[cid].push_back(f);
+    }
+    std::vector<ComponentMesh> componentMeshes;
+
+    for (auto& [cid, faces] : facesByComponent) {
+        componentMeshes.push_back(
+            extractComponent(
+                globalMesh,
+                *globalGeometry,
+                faces
+            )
+        );
+    }
+    for (size_t i = 0; i < componentMeshes.size(); ++i) {
+        auto& cm = componentMeshes[i];
+
+        // --- Register the surface mesh ---
+        auto* psMesh = polyscope::registerSurfaceMesh(
+            "Component " + std::to_string(i),
+            cm.geom->vertexPositions,
+            cm.mesh->getFaceVertexList()
+        );
+
+        // --- Collect boundary vertices ---
+        std::vector<Vector3> boundaryPositions;
+        boundaryPositions.reserve(cm.mesh->nVertices());
+
+        for (Vertex v : cm.mesh->vertices()) {
+            if (v.isBoundary()) {
+                boundaryPositions.push_back(cm.geom->vertexPositions[v]);
+            }
+        }
+
+        // --- Register boundary vertices as a point cloud ---
+        if (!boundaryPositions.empty()) {
+            auto* psBoundary = polyscope::registerPointCloud(
+                "Component " + std::to_string(i) + " boundaries",
+                boundaryPositions
+            );
+        }
+    }
+    polyscope::show();
+
+    //---------------------------------------------------------------------------//
 
     // find k = #components
     int maxID = 0;
@@ -290,4 +343,92 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(po
 
     matchedPairs = std::move(filteredPairs);
     return matchedPairs;
+}
+
+//extract components without preserving boundaries between cylindrical components
+//in particular, nBoundaryLoops for each cylindrical component = 0
+ComponentMesh extractComponent(SurfaceMesh& srcMesh, VertexPositionGeometry& srcGeom, const std::vector<Face>& faces){
+    // --- assign new indices to used vertices ---
+    std::unordered_map<Vertex, size_t> oldToIndex;
+    std::vector<Vertex> indexToOld;
+
+    for (Face f : faces) {
+        for (Vertex v : f.adjacentVertices()) {
+            if (oldToIndex.count(v) == 0) {
+                size_t idx = indexToOld.size();
+                oldToIndex[v] = idx;
+                indexToOld.push_back(v);
+            }
+        }
+    }
+
+    // --- build polygon list ---
+    std::vector<std::vector<size_t>> polygons;
+    polygons.reserve(faces.size());
+
+    for (Face f : faces) {
+        std::vector<size_t> poly;
+        for (Vertex v : f.adjacentVertices()) {
+            poly.push_back(oldToIndex[v]);
+        }
+        polygons.push_back(poly);
+    }
+
+    // --- create new mesh ---
+    auto newMesh = std::make_unique<SurfaceMesh>(polygons);
+
+    // --- transfer vertex positions ---
+    VertexData<Vector3> newPositions(*newMesh);
+
+    for (size_t i = 0; i < indexToOld.size(); ++i) {
+        Vertex oldV = indexToOld[i];
+        Vertex newV = newMesh->vertex(i);
+        newPositions[newV] = srcGeom.vertexPositions[oldV];
+    }
+
+    auto newGeom = std::make_unique<VertexPositionGeometry>(*newMesh, newPositions);
+
+    // --- vertex build maps ---
+    ComponentMesh result;
+    result.mesh = std::move(newMesh);
+    result.geom = std::move(newGeom);
+
+    result.newToOldV.resize(indexToOld.size());
+    for (size_t i = 0; i < indexToOld.size(); ++i) {
+        Vertex newV = result.mesh->vertex(i);
+        Vertex oldV = indexToOld[i];
+        result.oldToNewV[oldV] = newV;
+        result.newToOldV[i] = oldV;
+    }
+
+    // --- build edge maps ---
+    result.newToOldE.resize(result.mesh->nEdges());
+
+    for (Edge newE : result.mesh->edges()) {
+        // endpoints in new mesh
+        Vertex newA = newE.firstVertex();
+        Vertex newB = newE.secondVertex();
+
+        // corresponding old vertices
+        Vertex oldA = result.newToOldV[newA.getIndex()];
+        Vertex oldB = result.newToOldV[newB.getIndex()];
+
+        // check if old mesh had this edge
+        Edge oldE;
+        for (Halfedge he : oldA.outgoingHalfedges()) {
+            if (he.tipVertex() == oldB) {
+                oldE = he.edge();
+                break;
+            }
+        }
+        if (oldE != Edge()) {
+            result.oldToNewE[oldE] = newE;
+            result.newToOldE[newE.getIndex()] = oldE;
+        } else {
+            // This can happen on boundaries or cut edges
+            result.newToOldE[newE.getIndex()] = Edge();
+        }
+    }
+
+    return result;
 }

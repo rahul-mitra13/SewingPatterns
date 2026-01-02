@@ -20,11 +20,15 @@ struct powerCellOptions {
 
 };
 
-struct powerCellResults {
-  EdgeData<double> courseSingularities;//accepted couse singularities on the glued mesh
-  CornerData<double> courseOneForm;//final course stripes 
-  EdgeData<double> waleSingularities;//accepted wale singularities on the glued mesh 
-  EdgeData<double> waleOneForm;//final wale stripes
+struct ComponentMesh {
+    std::unique_ptr<SurfaceMesh> mesh;
+    std::unique_ptr<VertexPositionGeometry> geom;
+
+    std::unordered_map<Vertex, Vertex> oldToNewV;
+    std::vector<Vertex> newToOldV;
+
+    std::unordered_map<Edge, Edge> oldToNewE;
+    std::vector<Edge> newToOldE;
 };
 
 // Note: surface points are on edges, not faces!
@@ -37,4 +41,6 @@ VertexData<double> computeCourseCurlMeasure(powerCellOptions& options);
 //compute the singularity positions per bucket
 std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(powerCellOptions& options, VertexData<double>& curlMeasure, VertexData<double>& allDistance);
 
-//compute course stripes
+//Create a submesh without preserving boundaries i.e., nBoundaryLoops in each submesh = 0
+ComponentMesh extractComponent(SurfaceMesh& mesh, VertexPositionGeometry& geom, const std::vector<Face>& faces);
+
