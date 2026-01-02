@@ -93,7 +93,10 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
     }
     for (size_t i = 0; i < componentMeshes.size(); ++i) {
         auto& cm = componentMeshes[i];
-
+        std::cout << "Does component " << i << " have boundary? " << cm.mesh->hasBoundary() << std::endl;
+        std::cout << "Is component " << i << " manifold? " << cm.mesh->isManifold() << std::endl;
+        std::cout << "Number of boundary loops in component " << i << " " << cm.mesh->nBoundaryLoops() << std::endl;
+        cm.geom->requireDECOperators();
         // --- Register the surface mesh ---
         auto* psMesh = polyscope::registerSurfaceMesh(
             "Component " + std::to_string(i),
