@@ -2420,7 +2420,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     //modelWale.setBdyEdges(waleBdyEdges);
     modelWale.setEdgeIndices(edgeIndices);
     modelWale.setEdgePathConstraints(waleEdgePathConstraints);
-    // modelWale.setHomologyGenerators(homologyGenerators); // No integer variables for homology generators anymore!
+    // Have to re-add this for models with genus (Not sure why, the code above should do the rounding appropriately but we get infeasability issues)
+    modelWale.setHomologyGenerators(homologyGenerators);
     
     std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
 
@@ -5104,7 +5105,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
     std::vector<int> edgeIndices = gbModel.getEdgeIndices();
     std::vector<std::array<double, 3>> comparisonGrad = gbModel.getFaceGradients();
     std::vector<std::vector<double>> homologyGenerators = gbModel.getHomologyGenerators();
-
+    
     //require the face areas
     gluedGeometry.requireFaceAreas();
     //require edge lengths 
