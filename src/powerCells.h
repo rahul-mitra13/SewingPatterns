@@ -39,7 +39,8 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>>  computeCourseSingularities(p
 VertexData<double> computeCourseCurlMeasure(powerCellOptions& options);
 
 //compute the singularity positions per bucket
-std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(powerCellOptions& options, VertexData<double>& curlMeasure, VertexData<double>& allDistance);
+std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(powerCellOptions& options, VertexData<double>& curlMeasure, VertexData<double>& allDistance, 
+                                                                              bool cylindricalParameterization);
 
 //Create a submesh without preserving boundaries i.e., nBoundaryLoops in each submesh = 0
 ComponentMesh extractComponent(SurfaceMesh& mesh, VertexPositionGeometry& geom, const std::vector<Face>& faces);

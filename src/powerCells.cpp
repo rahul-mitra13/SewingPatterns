@@ -132,6 +132,10 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
         maxID = std::max(maxID, faceComponentsGlued[f]);
     }
     int k = maxID + 1;
+    bool cylindricalParameterization = false;
+    if (k == 1){
+        cylindricalParameterization = true;//first test cylindrical parameterization on cylinders only
+    }
     //prepare buckets and assign vertex buckets
     std::vector<std::vector<Vertex>> buckets(k);
     //assign vertices (multi-membership)
@@ -156,7 +160,7 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
         for (Vertex v : bucket){
             bucketCurl[v] = courseMeasure[v];
         }
-        auto matchedPairs = computeBucketSingularities(options, bucketCurl, allDist);
+        auto matchedPairs = computeBucketSingularities(options, bucketCurl, allDist, cylindricalParameterization);
         std::vector<Vector3> positiveCenters;
         for (int i = 0; i < matchedPairs.size(); i++){
             auto sp = matchedPairs[i].first;
@@ -210,7 +214,8 @@ VertexData<double> computeCourseCurlMeasure(powerCellOptions& options){
     return curlGlued;
 }
 
-std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(powerCellOptions& options, VertexData<double>& curlMeasure, VertexData<double>& allDist){
+std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(powerCellOptions& options, VertexData<double>& curlMeasure, VertexData<double>& allDist,
+                                                                            bool cylindricalParameterization){
     
     EdgeLengthGeometry* gluedGeometry = options.gluedGeometry;
     SurfaceMesh& gluedMesh = gluedGeometry->mesh;
