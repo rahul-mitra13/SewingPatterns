@@ -297,6 +297,9 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(po
        negSiteTimeFunctions.emplace_back(std::make_pair(sp, sp.interpolate(timeFunction)));
     }
 
+    //match pairs via an OT problem where the cost is ||\Delta h||^2 + ||Path Cost||^2
+    // timeFuncAndDistOTMatching(options, posVoronoiCenters.siteLocations, negVoronoiCenters.siteLocations);
+
     // sort by time function value ascending
     auto cmp = [](const std::pair<SurfacePoint,double>& a,
               const std::pair<SurfacePoint,double>& b) {
@@ -454,4 +457,44 @@ ComponentMesh extractComponent(SurfaceMesh& srcMesh, VertexPositionGeometry& src
     }
 
     return result;
+}
+
+
+std::vector<std::pair<SurfacePoint, SurfacePoint>> timeFuncAndDistOTMatching(powerCellOptions& options, std::vector<SurfacePoint>& posVoronoiCenters, 
+                                                                            std::vector<SurfacePoint>& negVoronoiCenters){
+
+    EdgeLengthGeometry* gluedGeometry = options.gluedGeometry;
+    SurfaceMesh& gluedMesh = gluedGeometry->mesh;
+    VertexPositionGeometry* globalGeometry = options.globalGeometry;
+    SurfaceMesh& globalMesh = globalGeometry->mesh;
+    polyscope::SurfaceMesh* psMesh = options.psMesh;
+    double period = options.period;
+    VertexData<double> timeFunction = options.timeFunction;
+    HalfedgeData<double> heWeights = options.heWeights;
+    
+    //make a big vector of sites
+    std::vector<std::pair<SurfacePoint, int>> sites;
+
+    
+    for (auto sp : posVoronoiCenters){
+        std::cout << "pos center " << sp << std::endl;
+        sites.emplace_back(std::make_pair(sp, 1));
+    }
+
+    for (auto sp : negVoronoiCenters){
+        std::cout << "neg center " << sp << std::endl;
+        sites.emplace_back(std::make_pair(sp, -1));
+    }
+
+    for (auto sp : sites){
+        std::cout << "site = " << sp << std::endl;
+    }
+
+    int numSites = sites.size();
+    //compute the cost matrix 
+    Eigen::MatrixXd C(numSites, numSites);
+    C.setZero();
+
+    //useful when coming up with path costs
+    //Vertex v = s.nearestVertex();
 }

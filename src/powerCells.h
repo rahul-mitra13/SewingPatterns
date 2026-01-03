@@ -17,7 +17,7 @@ struct powerCellOptions {
   polyscope::SurfaceMesh* psMesh;//the polyscope mesh
   double period;//period of the stripe patterns
   VertexData<double> timeFunction;//time function over the mesh 
-
+  HalfedgeData<double> heWeights;//halfedge weights used during the optimal matching
 };
 
 struct ComponentMesh {
@@ -44,4 +44,7 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(po
 
 //Create a submesh without preserving boundaries i.e., nBoundaryLoops in each submesh = 0
 ComponentMesh extractComponent(SurfaceMesh& mesh, VertexPositionGeometry& geom, const std::vector<Face>& faces);
+
+std::vector<std::pair<SurfacePoint, SurfacePoint>> timeFuncAndDistOTMatching(powerCellOptions& options, std::vector<SurfacePoint>& posVoronoiCenters, 
+                                                                            std::vector<SurfacePoint>& negVoronoiCenters);
 

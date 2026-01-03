@@ -4223,6 +4223,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         pcOptions.saddleLoops      = allSaddleLoops;
         pcOptions.psMesh           = &psMesh;
         pcOptions.period           = period;
+        pcOptions.heWeights        = gluedHeWeights;
         auto start = std::chrono::high_resolution_clock::now();
         pairedSites = computeCourseSingularities(pcOptions);
         auto end = std::chrono::high_resolution_clock::now();
@@ -4273,18 +4274,12 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         double posVal = posSite.interpolate(globalTimeFunction);
         edgeIndices[posSingularEdge.getIndex()] = -1.0;
         edgeSingularities[posSingularEdge] = 1.0;
-        std::cout << "posVal = " << posVal << std::endl;
-        std::cout << "posHe = " << posHe << std::endl;
         
         Edge negSingularEdge = negSite.edge;
         Halfedge negHe = negSingularEdge.halfedge();
         double negVal = negSite.interpolate(globalTimeFunction);
         edgeIndices[negSingularEdge.getIndex()] = 1.0;
         edgeSingularities[negSingularEdge] = -1.0;
-        std::cout << "negVal = " << negVal << std::endl;
-        std::cout << "negHe = " << negHe << std::endl;
-        std::cout << std::endl;
-        
         ensure(abs(posVal - negVal) < 1e-7); // not sure why we can't make this bound tighter..
         
         singularEdges.push_back(std::make_pair(posSingularEdge.getIndex(), negSingularEdge.getIndex()));
@@ -4309,7 +4304,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         Edge posEdge = globalMesh.edge(p.first);
         Edge negEdge = globalMesh.edge(p.second);
         double isoVal = 0.5 * (timeFuncPair.first + timeFuncPair.second);
-        std::cout << "isoVal = " << isoVal << std::endl;
         std::vector<Face> faces;
         int code; 
         std::tie(faces, code) = traceIsolineFaces(globalGeometry, globalTimeFunction, globalTimeFunctionGradientsNormalized, rotatedFaceGradients, isoVal, 
