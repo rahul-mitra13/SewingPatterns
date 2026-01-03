@@ -91,38 +91,38 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
             )
         );
     }
-    for (size_t i = 0; i < componentMeshes.size(); ++i) {
-        auto& cm = componentMeshes[i];
-        std::cout << "Does component " << i << " have boundary? " << cm.mesh->hasBoundary() << std::endl;
-        std::cout << "Is component " << i << " manifold? " << cm.mesh->isManifold() << std::endl;
-        std::cout << "Number of boundary loops in component " << i << " " << cm.mesh->nBoundaryLoops() << std::endl;
-        cm.geom->requireDECOperators();
-        // --- Register the surface mesh ---
-        auto* psMesh = polyscope::registerSurfaceMesh(
-            "Component " + std::to_string(i),
-            cm.geom->vertexPositions,
-            cm.mesh->getFaceVertexList()
-        );
+    // for (size_t i = 0; i < componentMeshes.size(); ++i) {
+    //     auto& cm = componentMeshes[i];
+    //     std::cout << "Does component " << i << " have boundary? " << cm.mesh->hasBoundary() << std::endl;
+    //     std::cout << "Is component " << i << " manifold? " << cm.mesh->isManifold() << std::endl;
+    //     std::cout << "Number of boundary loops in component " << i << " " << cm.mesh->nBoundaryLoops() << std::endl;
+    //     cm.geom->requireDECOperators();
+    //     // --- Register the surface mesh ---
+    //     auto* psMesh = polyscope::registerSurfaceMesh(
+    //         "Component " + std::to_string(i),
+    //         cm.geom->vertexPositions,
+    //         cm.mesh->getFaceVertexList()
+    //     );
 
-        // --- Collect boundary vertices ---
-        std::vector<Vector3> boundaryPositions;
-        boundaryPositions.reserve(cm.mesh->nVertices());
+    //     // --- Collect boundary vertices ---
+    //     std::vector<Vector3> boundaryPositions;
+    //     boundaryPositions.reserve(cm.mesh->nVertices());
 
-        for (Vertex v : cm.mesh->vertices()) {
-            if (v.isBoundary()) {
-                boundaryPositions.push_back(cm.geom->vertexPositions[v]);
-            }
-        }
+    //     for (Vertex v : cm.mesh->vertices()) {
+    //         if (v.isBoundary()) {
+    //             boundaryPositions.push_back(cm.geom->vertexPositions[v]);
+    //         }
+    //     }
 
-        // --- Register boundary vertices as a point cloud ---
-        if (!boundaryPositions.empty()) {
-            auto* psBoundary = polyscope::registerPointCloud(
-                "Component " + std::to_string(i) + " boundaries",
-                boundaryPositions
-            );
-        }
-    }
-    polyscope::show();
+    //     // --- Register boundary vertices as a point cloud ---
+    //     if (!boundaryPositions.empty()) {
+    //         auto* psBoundary = polyscope::registerPointCloud(
+    //             "Component " + std::to_string(i) + " boundaries",
+    //             boundaryPositions
+    //         );
+    //     }
+    // }
+    // polyscope::show();
 
     //---------------------------------------------------------------------------//
 

@@ -360,7 +360,7 @@ void projectOnIsoline(SurfacePoint& point, double target, SurfaceMesh& mesh, Ver
 
   HeatMethodDistanceSolver heatSolver(geom);
   VertexData<double> dist = heatSolver.computeDistance(point);
-  double bestAlignment = -DBL_MAX;
+  double bestAlignment = 0.5;//need to relax this threshold
   double bestDist = DBL_MAX;
   for (Edge e : mesh.edges()) {
     Vertex v1 = e.firstVertex(), v2 = e.secondVertex();
@@ -370,17 +370,17 @@ void projectOnIsoline(SurfacePoint& point, double target, SurfaceMesh& mesh, Ver
                                  geom.vertexPositions[v2]).normalize();
     Vector3 vec2 = -vec1;
     Vector3 avgGrad = 0.5 * (timeFunctionGrad[e.halfedge().face()] + timeFunctionGrad[e.halfedge().twin().face()]);
+    avgGrad = avgGrad.normalize();
     Vector3 vec = dot(vec1, avgGrad) > dot(vec2, avgGrad) ? vec1 : vec2;
   
-    //should also ask edge to be vertical
     if (fmin(t1, t2) < target && target < fmax(t1, t2)) { // edge is a candidate as it crosses the target isoline
-      if (dot(vec, avgGrad) > bestAlignment){
+      if (dot(vec, avgGrad) > bestAlignment){//attempts to find some notion of a vertical edge
         double eDist = (dist[v1] + dist[v2]) / 2;
         if (eDist < bestDist) {
           bestDist = eDist;
           double t = (target - t1) / (t2 - t1); // exact location along the edge
           point = SurfacePoint(e, t);
-          bestAlignment = dot(vec, avgGrad);
+          //bestAlignment = dot(vec, avgGrad);
         }
       }
     }

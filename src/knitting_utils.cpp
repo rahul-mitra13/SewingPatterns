@@ -4272,53 +4272,19 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         Edge posSingularEdge = posSite.edge;
         Halfedge posHe = posSingularEdge.halfedge();
         double posVal = posSite.interpolate(globalTimeFunction);
-
-        // handle positive case (TO-DO: probably don't need this if we pick edges correctly)
-        // SurfacePoint posFacePoint = posSite.inSomeFace();
-        // double posVal = posSite.interpolate(globalTimeFunction);
-        // Halfedge posHe;
-        // Face f = posFacePoint.face;
-        // Edge posSingularEdge;
-        // H(posFacePoint.face);
-        // double maxDotProd = -DBL_MAX;
-        // for (Halfedge he : f.adjacentHalfedges()){
-        //     Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
-        //                         globalGeometry.vertexPositions[he.tailVertex()]).normalize();
-        //     if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
-        //         maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
-        //         posSingularEdge = he.edge();
-        //         posHe = he;
-        //     }
-        // }
-        // WE CAN'T JUST CHOOSE ANY HALFEDGE ON THE FACE! BUT USE THE EDGE FOUND BY THE PROJECTION OPERATOR!
-        
         edgeIndices[posSingularEdge.getIndex()] = -1.0;
         edgeSingularities[posSingularEdge] = 1.0;
+        std::cout << "posVal = " << posVal << std::endl;
+        std::cout << "posHe = " << posHe << std::endl;
         
         Edge negSingularEdge = negSite.edge;
         Halfedge negHe = negSingularEdge.halfedge();
         double negVal = negSite.interpolate(globalTimeFunction);
-
-        // //handle negative case
-        // SurfacePoint negFacePoint = negSite.inSomeFace();
-        // double negVal = negSite.interpolate(globalTimeFunction);
-        // Halfedge negHe;
-        // f = negFacePoint.face;
-        // H(negFacePoint.face);
-        // Edge negSingularEdge;
-        // maxDotProd = -DBL_MAX;
-        // for (Halfedge he : f.adjacentHalfedges()){
-        //     Vector3 heVec = (globalGeometry.vertexPositions[he.tipVertex()] - 
-        //                         globalGeometry.vertexPositions[he.tailVertex()]).normalize();
-        //     if (std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[f])) > maxDotProd){
-        //             maxDotProd = std::fabs(dot(heVec, globalTimeFunctionGradientsNormalized[he.face()]));
-        //             negSingularEdge = he.edge();
-        //             negHe = he;
-        //     }
-        // }
-        
         edgeIndices[negSingularEdge.getIndex()] = 1.0;
         edgeSingularities[negSingularEdge] = -1.0;
+        std::cout << "negVal = " << negVal << std::endl;
+        std::cout << "negHe = " << negHe << std::endl;
+        std::cout << std::endl;
         
         ensure(abs(posVal - negVal) < 1e-7); // not sure why we can't make this bound tighter..
         
@@ -4328,8 +4294,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         edgeToIsoVal[posSingularEdge] = 0.5 * (posVal + negVal);
         edgeToIsoVal[negSingularEdge] = 0.5 * (posVal + negVal);
     }
-
-    // HERE
 
     //bool connectSaddles = true;
 
@@ -4346,7 +4310,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         Edge posEdge = globalMesh.edge(p.first);
         Edge negEdge = globalMesh.edge(p.second);
         double isoVal = 0.5 * (timeFuncPair.first + timeFuncPair.second);
-        //testing triangle stripe code 
+        std::cout << "isoVal = " << isoVal << std::endl;
         std::vector<Face> faces;
         int code; 
         std::tie(faces, code) = traceIsolineFaces(globalGeometry, globalTimeFunction, globalTimeFunctionGradientsNormalized, rotatedFaceGradients, isoVal, 
@@ -4356,7 +4320,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
             indicesToUse.push_back(i);
         }
         else{//remove these entry from edgeIndices and edgeSingularities
-
             showEdges("dropped pair "+std::to_string(problemCount), {posEdge, negEdge}, globalGeometry);
             std::vector<Vector3> problemSPs;
             Eigen::MatrixXd iV;
