@@ -336,15 +336,30 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(po
     std::vector<std::pair<SurfacePoint, SurfacePoint>> filteredPairs;
     filteredPairs.reserve(matchedPairs.size());
 
+    auto sameFace = [&](const SurfacePoint& spPos, const SurfacePoint& spNeg){
+        Face fPos1 = spPos.edge.halfedge().face();
+        Face fPos2 = spPos.edge.halfedge().twin().face();
+
+        Face fNeg1 = spNeg.edge.halfedge().face();
+        Face fNeg2 = spNeg.edge.halfedge().twin().face();
+
+        
+        if (fPos1 == fNeg1) return true;
+        if (fPos1 == fNeg2) return true;
+        if (fPos2 == fNeg1) return true;
+        if (fPos2 == fNeg2) return true;
+        return false;
+    };
+
+    //do some filtering of the matched pairs
     for (auto& pr : matchedPairs) {
         const SurfacePoint& spPos = pr.first;
         const SurfacePoint& spNeg = pr.second;
 
         double dPos = spPos.interpolate(allDist);
         double dNeg = spNeg.interpolate(allDist);
-
-        // Keep only if BOTH ends are far enough from saddle set
-        if (dPos >= cutoff && dNeg >= cutoff) {
+        // Keep only if BOTH ends are far enough from saddle set and if they're not from the same face! 
+        if (dPos >= cutoff && dNeg >= cutoff && !sameFace(spPos, spNeg)) {
             filteredPairs.push_back(pr);
         }
     }

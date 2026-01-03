@@ -380,7 +380,6 @@ void projectOnIsoline(SurfacePoint& point, double target, SurfaceMesh& mesh, Ver
           bestDist = eDist;
           double t = (target - t1) / (t2 - t1); // exact location along the edge
           point = SurfacePoint(e, t);
-          //bestAlignment = dot(vec, avgGrad);
         }
       }
     }

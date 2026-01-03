@@ -1287,7 +1287,6 @@ std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeomet
             Halfedge hki = hjk.next();
             lhs = sigma[hij.getIndex()] + sigma[hjk.getIndex()] + sigma[hki.getIndex()];
             nP[f.getIndex()] = sigma[hij.getIndex()] + sigma[hjk.getIndex()] + sigma[hki.getIndex()];
-            //model.addConstr(lhs == period * faceIndices[f.getIndex()]);
             model.addConstr(lhs == 0);
         }
 
@@ -4317,6 +4316,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
                                                 HePair.first, HePair.second);
         //a face path exists and we got to the end face
         if (faces.size() != 0 && code != -1){
+            std::cout << "pushing back " << i << std::endl;
             indicesToUse.push_back(i);
         }
         else{//remove these entry from edgeIndices and edgeSingularities
@@ -4338,7 +4338,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         }
     }
 
-    std::cout << "Number of singularity pairs missing = " << nSites - indicesToUse.size() << std::endl;
+    std::cout << "Number of singularity pairs missing = " << singularEdges.size() - indicesToUse.size() << std::endl;
     if (problemCount > 0) {
         P("Stopping because some singularity pairs were dropped");
         polyscope::show();
