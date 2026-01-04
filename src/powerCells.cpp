@@ -297,30 +297,34 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(po
        negSiteTimeFunctions.emplace_back(std::make_pair(sp, sp.interpolate(timeFunction)));
     }
 
-    //match pairs via an OT problem where the cost is ||\Delta h||^2 + ||Path Cost||^2
-    // timeFuncAndDistOTMatching(options, posVoronoiCenters.siteLocations, negVoronoiCenters.siteLocations);
-
-    // sort by time function value ascending
-    auto cmp = [](const std::pair<SurfacePoint,double>& a,
-              const std::pair<SurfacePoint,double>& b) {
-        return a.second < b.second;
-    };
-
-    std::sort(posSiteTimeFunctions.begin(), posSiteTimeFunctions.end(), cmp);
-    std::sort(negSiteTimeFunctions.begin(), negSiteTimeFunctions.end(), cmp);
-
-    // ensure sizes match
-    int n = std::min(posSiteTimeFunctions.size(), negSiteTimeFunctions.size());
-
     // pair positive and negative sites by sorted time
     std::vector<std::pair<SurfacePoint, SurfacePoint>> matchedPairs;
-    matchedPairs.reserve(n);
 
-    for (int i = 0; i < n; i++) {
-        matchedPairs.emplace_back(
-        posSiteTimeFunctions[i].first,
-        negSiteTimeFunctions[i].first
-        );
+    if (options.usePathCost){
+        //match pairs via an OT problem where the cost is ||\Delta h||^2 + ||Path Cost||^2
+        matchedPairs = timeFuncAndDistOTMatching(options, posVoronoiCenters.siteLocations, negVoronoiCenters.siteLocations);
+    }
+    else{
+        // sort by time function value ascending
+        auto cmp = [](const std::pair<SurfacePoint,double>& a,
+              const std::pair<SurfacePoint,double>& b) {
+            return a.second < b.second;
+        };
+
+        std::sort(posSiteTimeFunctions.begin(), posSiteTimeFunctions.end(), cmp);
+        std::sort(negSiteTimeFunctions.begin(), negSiteTimeFunctions.end(), cmp);
+
+        // ensure sizes match
+        int n = std::min(posSiteTimeFunctions.size(), negSiteTimeFunctions.size());
+
+        matchedPairs.reserve(n);
+
+        for (int i = 0; i < n; i++) {
+            matchedPairs.emplace_back(
+            posSiteTimeFunctions[i].first,
+            negSiteTimeFunctions[i].first
+            );
+        }
     }
 
     //specify options for alignment
@@ -471,52 +475,168 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> timeFuncAndDistOTMatching(pow
     double period = options.period;
     VertexData<double> timeFunction = options.timeFunction;
     HalfedgeData<double> heWeights = options.heWeights;
-    
-    //make a big vector of sites
+
+    // --------------------------------------------
+    // Build site list (+1 = pos, -1 = neg)
+    // --------------------------------------------
     std::vector<std::pair<SurfacePoint, int>> sites;
+    std::vector<std::pair<SurfacePoint, SurfacePoint>> toReturn;
 
-    
-    for (auto sp : posVoronoiCenters){
-        std::cout << "pos center " << sp << std::endl;
-        sites.emplace_back(std::make_pair(sp, 1));
-    }
+    for (const auto& sp : posVoronoiCenters)
+        sites.emplace_back(sp, +1);
 
-    for (auto sp : negVoronoiCenters){
-        std::cout << "neg center " << sp << std::endl;
-        sites.emplace_back(std::make_pair(sp, -1));
-    }
+    for (const auto& sp : negVoronoiCenters)
+        sites.emplace_back(sp, -1);
 
-    for (auto sp : sites){
-        std::cout << "site = " << sp.first << std::endl;
-    }
+    int numSites = (int)sites.size();
 
-    int numSites = sites.size();
-    //compute the cost matrix 
+    // --------------------------------------------
+    // Cost matrix + raw path cost storage
+    // --------------------------------------------
     Eigen::MatrixXd C(numSites, numSites);
-    C.setZero();
+    C.setConstant(1e7); // default high cost
 
-    //check indices 
-    for (int i = 0; i < numSites; i++){
+    Eigen::MatrixXd rawPathCost(numSites, numSites);
+    rawPathCost.setZero();
+
+    double minPathCost = std::numeric_limits<double>::infinity();
+    double maxPathCost = -std::numeric_limits<double>::infinity();
+
+    // --------------------------------------------
+    // First pass: compute raw costs
+    // --------------------------------------------
+    for (int i = 0; i < numSites; ++i) {
         int singValI = sites[i].second;
-        for (int j = 0; j < numSites; j++){
+
+        for (int j = 0; j < numSites; ++j) {
             int singValJ = sites[j].second;
-            std::cout << "i = " << i << std::endl;
-            std::cout << "j = " << j << std::endl;
-            if (singValI < 0 && singValJ > 0){
-                C(i, j) = 1e7;//put high costs on paths from negative singularities to positive singularities
-            }
-            else if (singValI == singValJ) C(i, j) = 1e7; //put large weights on singularities of the same sign
-            else{//bug is somehwere here, I think?
-                std::cout << "i = " << i << std::endl;
-                std::cout << "site[i] " << sites[i] << std::endl;
-                std::cout << "site[j] " << sites[j] << std::endl;
-                double timeFuncI = sites[i].first.interpolate(timeFunction);
-                double timeFuncJ = sites[j].first.interpolate(timeFunction);
-                C(i, j) = std::fabs(timeFuncI - timeFuncJ);//match vertices on the same time function isoline
-            }
+
+            // Only allow + → -
+            if (singValI < 0 && singValJ > 0) continue;
+            if (singValI == singValJ) continue;
+
+            // --- time function term ---
+            double timeFuncI = sites[i].first.interpolate(timeFunction);
+            double timeFuncJ = sites[j].first.interpolate(timeFunction);
+            double deltaH = std::abs(timeFuncI - timeFuncJ);
+
+            // --- path cost term ---
+            Vertex vStart = sites[i].first.nearestVertex();
+            Vertex vEnd   = sites[j].first.nearestVertex();
+
+            double pathCost =
+                computePathCost(*globalGeometry, heWeights, vStart, vEnd);
+
+            rawPathCost(i, j) = pathCost;
+
+            minPathCost = std::min(minPathCost, pathCost);
+            maxPathCost = std::max(maxPathCost, pathCost);
         }
     }
 
-    //useful when coming up with path costs
-    //Vertex v = s.nearestVertex();
+    // --------------------------------------------
+    // Second pass: normalize + fill C
+    // --------------------------------------------
+    double denom = maxPathCost - minPathCost;
+    if (denom < 1e-12) denom = 1.0; // safety
+
+    for (int i = 0; i < numSites; ++i) {
+        int singValI = sites[i].second;
+
+        for (int j = 0; j < numSites; ++j) {
+            int singValJ = sites[j].second;
+
+            if (singValI < 0 && singValJ > 0) continue;
+            if (singValI == singValJ) continue;
+
+            // normalized path cost in [0,1]
+            double normPathCost =
+                (rawPathCost(i, j) - minPathCost) / denom;
+
+            // time function term (already in reasonable scale)
+            double timeFuncI = sites[i].first.interpolate(timeFunction);
+            double timeFuncJ = sites[j].first.interpolate(timeFunction);
+            double deltaH = std::abs(timeFuncI - timeFuncJ);
+
+            // combine (weights optional)
+            double alpha = 1.0; // path importance
+            double beta  = 1.0; // isoline importance
+
+            C(i, j) = alpha * normPathCost + beta * deltaH;
+        }
+    }
+
+    //solve the bipartite matching model
+    using namespace std;
+    try {
+        
+        // Create an environment
+        GRBEnv env = GRBEnv(true);
+        env.set("LogFile", "1-form computation.log");
+        env.start();
+
+        // Create an empty model
+        GRBModel model = GRBModel(env);
+
+        //add a matrix of Gurobi variables that signify the matching
+        std::vector<std::vector<GRBVar>> T;
+    
+        for (int i = 0; i < numSites; i++){
+            std::vector<GRBVar> currRow;
+            for (int j = 0; j < numSites; j++){
+                GRBVar t = model.addVar(0.0, 1.0, 1.0, GRB_BINARY);
+                currRow.push_back(t);
+            }
+            T.push_back(currRow);
+        }
+
+        //first constraint (T\mathbb{1} = \mathbb{1})
+        for (int i = 0; i < numSites; i++){
+            GRBLinExpr lhs = 0;
+            for (int j = 0; j < numSites; j++){
+                lhs += T[i][j];
+            }
+            model.addConstr(lhs == 1.0);
+        }
+
+        //second constraint (\mathbb{1}^T T = \mathbb{1})
+        for (int i = 0; i < numSites; i++){
+            GRBLinExpr lhs = 0;
+            for (int j = 0; j < numSites; j++){
+                lhs += T[j][i];
+            }
+            model.addConstr(lhs == 1.0);
+        }
+
+        //add the objective
+        GRBLinExpr matProd = 0;
+        for (int i = 0; i < numSites; i++){
+            for (int j = 0; j < numSites; j++){
+                matProd += C(i, j) * T[i][j];
+            }
+        }
+
+        GRBLinExpr obj = matProd;
+
+        model.setObjective(obj, GRB_MINIMIZE);
+        model.optimize();
+        
+        for (int i = 0; i < numSites; i++){
+            for (int j = 0; j < numSites; j++){
+                if (T[i][j].get(GRB_DoubleAttr_X) > 0 && (sites[i].second > 0 && sites[j].second < 0)){
+                    std::cout << "match surface point " << sites[i].first << " to surface point " << sites[j].first << std::endl;
+                    toReturn.push_back(std::make_pair(sites[i].first, sites[j].first));//always return pairs in (posSite, negSite) order
+                }
+            }
+        }
+
+    } catch(GRBException e) {
+        cout << "Error code = " << e.getErrorCode() << endl;
+        cout << e.getMessage() << endl;
+    } catch(...) {
+        cout << "Exception during optimization" << endl;
+    }
+
+    return toReturn;
+
 }

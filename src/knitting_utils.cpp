@@ -4224,6 +4224,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         pcOptions.psMesh           = &psMesh;
         pcOptions.period           = period;
         pcOptions.heWeights        = gluedHeWeights;
+        pcOptions.usePathCost      = true;
         auto start = std::chrono::high_resolution_clock::now();
         pairedSites = computeCourseSingularities(pcOptions);
         auto end = std::chrono::high_resolution_clock::now();
