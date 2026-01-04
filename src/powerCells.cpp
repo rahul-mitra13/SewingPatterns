@@ -487,13 +487,35 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> timeFuncAndDistOTMatching(pow
     }
 
     for (auto sp : sites){
-        std::cout << "site = " << sp << std::endl;
+        std::cout << "site = " << sp.first << std::endl;
     }
 
     int numSites = sites.size();
     //compute the cost matrix 
     Eigen::MatrixXd C(numSites, numSites);
     C.setZero();
+
+    //check indices 
+    for (int i = 0; i < numSites; i++){
+        int singValI = sites[i].second;
+        for (int j = 0; j < numSites; j++){
+            int singValJ = sites[j].second;
+            std::cout << "i = " << i << std::endl;
+            std::cout << "j = " << j << std::endl;
+            if (singValI < 0 && singValJ > 0){
+                C(i, j) = 1e7;//put high costs on paths from negative singularities to positive singularities
+            }
+            else if (singValI == singValJ) C(i, j) = 1e7; //put large weights on singularities of the same sign
+            else{//bug is somehwere here, I think?
+                std::cout << "i = " << i << std::endl;
+                std::cout << "site[i] " << sites[i] << std::endl;
+                std::cout << "site[j] " << sites[j] << std::endl;
+                double timeFuncI = sites[i].first.interpolate(timeFunction);
+                double timeFuncJ = sites[j].first.interpolate(timeFunction);
+                C(i, j) = std::fabs(timeFuncI - timeFuncJ);//match vertices on the same time function isoline
+            }
+        }
+    }
 
     //useful when coming up with path costs
     //Vertex v = s.nearestVertex();
