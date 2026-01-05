@@ -1639,8 +1639,6 @@ void KG::tagIncreasesAndDecreases(){
 
     std::vector<Vector3> standardIncreases;
     std::vector<Vector3> standardDecreases;
-    std::vector<Vector3> problemIncrease;
-    std::vector<Vector3> problemDecrease;
 
     //remove lingering connections from real vertices to virtual vertices 
     for (auto& up : adjustedVertices) {
@@ -1676,8 +1674,6 @@ void KG::tagIncreasesAndDecreases(){
 
         //handle decreases
         if (v -> col_out_vertex[0] == nullptr){
-            if (v->row_out_vertex->col_out_vertex[0] == nullptr) problemDecrease.emplace_back(getKGPosition(v));
-            if (v->row_in_vertex->col_out_vertex[0] == nullptr) problemDecrease.emplace_back(getKGPosition(v));
             standardDecreases.emplace_back(getKGPosition(v));
             if (v -> row_out_vertex == nullptr){//handle decreases at short rows (row_out short rows)
                 v -> col_out_vertex[0] = v -> row_in_vertex -> col_out_vertex[0];
@@ -1688,9 +1684,16 @@ void KG::tagIncreasesAndDecreases(){
                 v -> row_out_vertex -> col_out_vertex[0] -> col_in_vertex[1] = v;
             }
             else{//standard decrease
-                ensure(v->row_out_vertex->col_out_vertex[0] != nullptr);
-                ensure(v->row_in_vertex->col_out_vertex[0] != nullptr);
-                if (v->row_out_vertex->col_out_vertex[0] -> row_in_vertex == nullptr){//this is a short-row, no choice but to connect it to the other candidate
+                if (v->row_out_vertex -> col_out_vertex[0] == nullptr){//two decreases next to each other
+                    v -> col_out_vertex[0] = v -> row_in_vertex -> col_out_vertex[0];
+                    v -> row_in_vertex -> col_out_vertex[0] -> col_in_vertex[1] = v; 
+                }
+                else if (v -> row_in_vertex -> col_out_vertex[0] == nullptr){//two decreases next to each other
+                    v -> col_out_vertex[0] = v -> row_out_vertex -> col_out_vertex[0];
+                    v -> row_out_vertex -> col_out_vertex[0] -> col_in_vertex[1] = v;
+
+                }
+                else if (v->row_out_vertex->col_out_vertex[0] -> row_in_vertex == nullptr){//this is a short-row, no choice but to connect it to the other candidate
                     v -> col_out_vertex[0] = v -> row_in_vertex -> col_out_vertex[0];
                     v -> row_in_vertex -> col_out_vertex[0] -> col_in_vertex[1] = v;
                 }
@@ -1699,16 +1702,28 @@ void KG::tagIncreasesAndDecreases(){
                     v -> row_out_vertex -> col_out_vertex[0] -> col_in_vertex[1] = v;
                 }
                 else{//connect by Euclidean distance
+                    ensure(v->row_out_vertex->col_out_vertex[0] != nullptr); 
+                    ensure(v->row_in_vertex->col_out_vertex[0] != nullptr);
                     Vector3 p1 = getKGPosition(v->row_out_vertex->col_out_vertex[0]);
                     Vector3 p2 = getKGPosition(v->row_in_vertex->col_out_vertex[0]);
                     Vector3 currPos = getKGPosition(v->row_in_vertex->col_out_vertex[0]);
-                    if (norm(currPos - p1) < norm(currPos - p2)){
+                    if (v->row_out_vertex->col_out_vertex[0]->col_in_vertex[1] != nullptr){//this has already been set so pick the other
+                        v -> col_out_vertex[0] = v -> row_in_vertex -> col_out_vertex[0];
+                        v -> row_in_vertex -> col_out_vertex[0] -> col_in_vertex[1] = v;
+                    }
+                    else if (v->row_in_vertex->col_out_vertex[0]->col_in_vertex[1] != nullptr){//this has already been set so pick the other
                         v -> col_out_vertex[0] = v -> row_out_vertex -> col_out_vertex[0];
                         v -> row_out_vertex -> col_out_vertex[0] -> col_in_vertex[1] = v;
                     }
                     else{
-                        v -> col_out_vertex[0] = v -> row_in_vertex -> col_out_vertex[0];
-                        v -> row_in_vertex -> col_out_vertex[0] -> col_in_vertex[1] = v;
+                        if (norm(currPos - p1) < norm(currPos - p2)){
+                            v -> col_out_vertex[0] = v -> row_out_vertex -> col_out_vertex[0];
+                            v -> row_out_vertex -> col_out_vertex[0] -> col_in_vertex[1] = v;
+                        }
+                        else{
+                            v -> col_out_vertex[0] = v -> row_in_vertex -> col_out_vertex[0];
+                            v -> row_in_vertex -> col_out_vertex[0] -> col_in_vertex[1] = v;
+                        }
                     }
                 }
             }
@@ -1732,8 +1747,6 @@ void KG::tagIncreasesAndDecreases(){
         }
         //handle increases 
         if (v -> col_in_vertex[0] == nullptr){
-            if (v->row_out_vertex->col_in_vertex[0] == nullptr) problemIncrease.emplace_back(getKGPosition(v));
-            if (v->row_in_vertex->col_in_vertex[0] == nullptr) problemIncrease.emplace_back(getKGPosition(v));
             standardIncreases.emplace_back(getKGPosition(v));
             if (v -> row_out_vertex == nullptr){//handle increases at short-row (row_out short_row)
                 v -> col_in_vertex[0] =  v -> row_in_vertex -> col_in_vertex[0];
@@ -1744,9 +1757,15 @@ void KG::tagIncreasesAndDecreases(){
                 v -> row_out_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v;
             }
             else{//standard increase
-                ensure(v->row_out_vertex->col_in_vertex[0] != nullptr);
-                ensure(v->row_in_vertex->col_in_vertex[0] != nullptr);
-                if (v -> row_out_vertex -> col_in_vertex[0] -> row_in_vertex == nullptr){//this is a short row, no choice but to connect it to another candidate
+                if (v -> row_out_vertex -> col_in_vertex[0] == nullptr){//two increases next to each other
+                    v -> col_in_vertex[0] = v->row_in_vertex -> col_in_vertex[0];
+                    v -> row_in_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v;
+                }
+                else if (v -> row_in_vertex -> col_in_vertex[0] == nullptr){//two increases next to each other
+                    v -> col_in_vertex[0] = v -> row_out_vertex -> col_in_vertex[0];
+                    v -> row_out_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v;
+                }
+                else if (v -> row_out_vertex -> col_in_vertex[0] -> row_in_vertex == nullptr){//this is a short row, no choice but to connect it to another candidate
                     v -> col_in_vertex[0] = v -> row_in_vertex -> col_in_vertex[0];
                     v -> row_in_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v;
                 }
@@ -1755,17 +1774,29 @@ void KG::tagIncreasesAndDecreases(){
                     v -> row_out_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v;
                 }
                 else{
-                    standardIncreases.emplace_back(getKGPosition(v));
+                    ensure(v->row_out_vertex->col_in_vertex[0] != nullptr);
+                    ensure(v->row_in_vertex->col_in_vertex[0] != nullptr);
                     Vector3 p1 = getKGPosition(v->row_out_vertex->col_in_vertex[0]);
                     Vector3 p2 = getKGPosition(v->row_in_vertex->col_in_vertex[0]);
                     Vector3 currPos = getKGPosition(v->row_in_vertex->col_out_vertex[0]);
-                    if (norm(currPos - p1) < norm(currPos - p2)){
+
+                    if (v->row_out_vertex->col_in_vertex[0]->col_out_vertex[1] != nullptr){//this has already been set, pick the other 
+                        v -> col_in_vertex[0] = v -> row_in_vertex -> col_in_vertex[0];
+                        v -> row_in_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v;
+                    }
+                    else if (v->row_in_vertex->col_in_vertex[0]->col_out_vertex[1] != nullptr){//this already been set, pick the other
                         v -> col_in_vertex[0] = v -> row_out_vertex -> col_in_vertex[0];
                         v -> row_out_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v;
                     }
                     else{
-                        v -> col_in_vertex[0] = v -> row_in_vertex -> col_in_vertex[0];
-                        v -> row_in_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v;
+                        if (norm(currPos - p1) < norm(currPos - p2)){
+                            v -> col_in_vertex[0] = v -> row_out_vertex -> col_in_vertex[0];
+                            v -> row_out_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v;
+                        }
+                        else{
+                            v -> col_in_vertex[0] = v -> row_in_vertex -> col_in_vertex[0];
+                            v -> row_in_vertex -> col_in_vertex[0] -> col_out_vertex[1] = v;
+                        }
                     }
                 }
 
@@ -1791,8 +1822,6 @@ void KG::tagIncreasesAndDecreases(){
 
     polyscope::registerPointCloud("standardDecreases", standardDecreases);
     polyscope::registerPointCloud("standardIncreases", standardIncreases);
-    // polyscope::registerPointCloud("problemIncrease", problemIncrease);
-    // polyscope::registerPointCloud("problemDecrease", problemDecrease);
 }
 
 void KG::buildFinalVerticesFromAdjusted() {
