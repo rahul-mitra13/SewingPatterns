@@ -174,6 +174,17 @@ void showStripePatterns(){
   if (globalGeometry->mesh.nConnectedComponents() == 1){
       //call it on the global setting if you want to visualize the saddle loops
       std::vector<Vertex> saddleVertices = getSaddleVertices(*globalGeometry, timeFunctionGlobal);
+
+      int saddleLoopCtr = 0;
+      for (Vertex v : saddleVertices){
+        double saddleVal = timeFunctionGlobal[v];
+        Eigen::MatrixXd iV;
+        Eigen::MatrixXd iE;
+        std::vector<int> f;
+        std::tie(iV, iE, f) = getIsoLine(V, F, timeFunctionGlobal, saddleVal);
+        polyscope::registerCurveNetwork("Saddle isoval " + std::to_string(saddleLoopCtr), iV, iE);
+        saddleLoopCtr += 1;
+      }
       //visualize the saddle vertices 
       std::vector<Vector3> saddleVertexPos; 
       for (Vertex v : saddleVertices){
