@@ -2039,19 +2039,19 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     //perform masking on either side of the shoe! 
     // comment this out if you don't need any masking
-    // Vertex maskingSource = globalGeometry.mesh.vertex(580);//put vertex ID to start BFS here! 
-    // int maskingDepth = 8;//adjust this based on how much masking you want
-    // std::vector<Vertex> maskedVertices = bfsWithDepth(maskingSource, maskingDepth);
-    // //add these vertices to the masking 
-    // for (Vertex v : maskedVertices){
-    //     heatSourceVerts.push_back(v);
-    // }
-    // maskingSource = globalGeometry.mesh.vertex(1010);//put vertex ID to start BFS here! 
-    // maskedVertices = bfsWithDepth(maskingSource, maskingDepth);
-    // //add these vertices to the masking 
-    // for (Vertex v : maskedVertices){
-    //     heatSourceVerts.push_back(v);
-    // }
+    Vertex maskingSource = globalGeometry.mesh.vertex(580);//put vertex ID to start BFS here! 
+    int maskingDepth = 8;//adjust this based on how much masking you want
+    std::vector<Vertex> maskedVertices = bfsWithDepth(maskingSource, maskingDepth);
+    //add these vertices to the masking 
+    for (Vertex v : maskedVertices){
+        heatSourceVerts.push_back(v);
+    }
+    maskingSource = globalGeometry.mesh.vertex(1010);//put vertex ID to start BFS here! 
+    maskedVertices = bfsWithDepth(maskingSource, maskingDepth);
+    //add these vertices to the masking 
+    for (Vertex v : maskedVertices){
+        heatSourceVerts.push_back(v);
+    }
 
 
     //Attempts at locally modifying the curl signal
@@ -2175,6 +2175,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     VoronoiOptions posOptions = defaultVoronoiOptions;
     //set this to 0 at very high res on beanie models since there shouldn't be any positive site
     posOptions.nSites = std::round(totalPosMeasure / period);
+    std::cout << "positive sites = " << posOptions.nSites << std::endl;
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
     //posOptions.iterations = 500;
@@ -2220,6 +2221,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
    
     VoronoiOptions negOptions = defaultVoronoiOptions;
     negOptions.nSites = std::round(totalNegMeasure / period); // we don't care if this is different that posOptions.nSites
+    std::cout << "Negative sites = " << negOptions.nSites << std::endl;
     negOptions.useDelaunay = false;
     negOptions.computeDistributions = true;
     // negOptions.iterations = 500;
@@ -2282,8 +2284,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         }
         
         if (!globalGeometry.mesh.edge(singularEdge.getIndex()).isBoundary()){
-            edgeIndices[singularEdge.getIndex()] = 1.0;
-            waleSingularEdgesGlobal[singularEdge] = -1.0;
+            edgeIndices[singularEdge.getIndex()] = -1.0;
+            waleSingularEdgesGlobal[singularEdge] = 1.0;
         }
         
     }
@@ -2403,7 +2405,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     //Comment this out if you don't need any alignment to wale boundary edges
     // solve the model with all the path constraints and boundary constraints 
-    // modelWale.setBdyEdges(waleBdyEdges);//set these constraints on disk models
+    modelWale.setBdyEdges(waleBdyEdges);//set these constraints on disk models
     
     modelWale.setEdgeIndices(edgeIndices);
     modelWale.setEdgePathConstraints(waleEdgePathConstraints);
