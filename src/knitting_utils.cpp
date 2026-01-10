@@ -3959,15 +3959,15 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     //Gaussian curl measure for figure 
     // Single Gaussian 
     // debugging on a simple square: set curlMeasure to a Gaussian centered at origin
-    // double sigma = 0.35;   // controls spread (try 0.25–0.6)
-    // double A     = 1.0;    // amplitude
+    double sigma = 0.35;   // controls spread (try 0.25–0.6)
+    double A     = 1.0;    // amplitude
 
-    // for (Vertex v : globalMesh.vertices()) {
-    //     Vector3 p = globalGeometry.vertexPositions[v];
+    for (Vertex v : globalMesh.vertices()) {
+        Vector3 p = globalGeometry.vertexPositions[v];
 
-    //     double r2 = p.x * p.x + p.z * p.z;              // distance^2 in x–z plane
-    //     posMeasure[v] = A * std::exp(-r2 / (2.0 * sigma * sigma));
-    // }
+        double r2 = p.x * p.x + p.z * p.z;              // distance^2 in x–z plane
+        posMeasure[v] = A * std::exp(-r2 / (2.0 * sigma * sigma));
+    }
 
     //Multiple Guassians 
     // Define a few Gaussians in the x–z plane.
@@ -4006,95 +4006,116 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
 
     // Old code for visualization
 
-    //  POSITIVE COURSE
+    // POSITIVE COURSE
 
-    // VoronoiOptions posOptions = defaultVoronoiOptions;
-    // posOptions.nSites = std::round(avgTotalMeasure / period); //40 used for square figs
-    // std::cout << "number of sings = " << posOptions.nSites << std::endl;
-    // posOptions.useDelaunay = false;
-    // posOptions.computeDistributions = true;
-    // posOptions.seed = 42;
+    VoronoiOptions posOptions = defaultVoronoiOptions;
+    posOptions.nSites = 60; // std::round(avgTotalMeasure / period); //40 used for square figs
+    std::cout << "number of sings = " << posOptions.nSites << std::endl;
+    posOptions.useDelaunay = false;
+    posOptions.computeDistributions = true;
+    posOptions.seed = 42;
 
-    // VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
-    // std::vector<std::vector<VertexData<double>>> posStepSiteDistribution = posVoronoiCenters.stepSiteDistribution;
-    // std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
-    // std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
+    VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
+    std::vector<std::vector<VertexData<double>>> posStepSiteDistribution = posVoronoiCenters.stepSiteDistribution;
+    std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
+    std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
 
-    // // //write a nested callback to debug the evolution of our method for the positive sites
-    // // //Register the callback which creates the UI and does the hard work
-    // // int step = 0;
-    // // int iSite = 0;
-    // // auto positivePopUpUI = [&](){
-    // //     static bool showWindow = true;
-    // //     ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
-    // //     ImGui::Begin("Positive sites", &showWindow);
-    // //     ImGui::PushItemWidth(400);
-    // //     ImGui::Separator();
-    // //     ImGui::InputInt("Site", &iSite);
-    // //     ImGui::InputInt("Time Step", &step);
-    // //     // Clamp to bounds after user input
-    // //     iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
-    // //     step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution[iSite].size() - 1));
-    // //     //need setEnabled(true) otherwise we run into OpenGL errors? weird
-    // //     // psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
-    // //     //polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+    // //write a nested callback to debug the evolution of our method for the positive sites
+    // //Register the callback which creates the UI and does the hard work
+    // int step = 0;
+    // int iSite = 0;
+    // auto positivePopUpUI = [&](){
+    //     static bool showWindow = true;
+    //     ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
+    //     ImGui::Begin("Positive sites", &showWindow);
+    //     ImGui::PushItemWidth(400);
+    //     ImGui::Separator();
+    //     ImGui::InputInt("Site", &iSite);
+    //     ImGui::InputInt("Time Step", &step);
+    //     // Clamp to bounds after user input
+    //     iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
+    //     step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution[iSite].size() - 1));
+    //     //need setEnabled(true) otherwise we run into OpenGL errors? weird
+    //     // psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
+    //     //polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
 
-    // //     //should do this outside the ImGUI
-    // //     std::vector<Vector3> currentSites; 
-    // //     for (int i = 0; i < posOptions.nSites; i++){
-    // //         currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
-    // //     }
-    // //     auto pc = polyscope::registerPointCloud("all pos sites", currentSites);
-    // //     // --- Uniform color: just fill all points with one RGB value
-    // //     std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
-    // //     pc->addColorQuantity("uniform color", colors)->setEnabled(true);
-
-    // //     if (ImGui::Button("Done"))
-    // //         polyscope::popContext();
-    // //     ImGui::SameLine();
-    // // };
-    // // //polyscope::pushContext(positivePopUpUI);  
-
-    // std::vector<Vector3> positiveCenters;
-    // for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
-    // positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-    // }
-
-
-    // polyscope::registerPointCloud("Voronoi sites unaligned (+)", positiveCenters)->setEnabled(false);
-    // std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
-
-    // //Compute max curl for normalization
-    // double maxPosCurl = 0;
-    // for (Vertex v : globalMesh.vertices())
-    //     maxPosCurl = std::max(maxPosCurl, posMeasure[v]);
-
-    // //print the positive masses
-    // //render the fuzzy cells
-    // std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
-    // std::vector<Vector3> posSiteColors(posSiteDistributions.size());
-    // for (size_t i = 0; i < posSiteDistributions.size(); i++){
-    //     double r,g,b;
-    //     hsv_to_rgb((double)i/posSiteDistributions.size() * 360, 0.75, 1., r, g, b);
-    //     posSiteColors[i] = {r,g,b};
-    // }
-    // std::random_device rd;              // non-deterministic seed
-    // std::mt19937 g(rd());               // Mersenne Twister engine
-    // std::shuffle(posSiteColors.begin(), posSiteColors.end(), g);
-
-    // for (size_t i = 0; i < posSiteDistributions.size(); i++){
-    //     double mass = 0;
-    //     for (Vertex v : globalMesh.vertices()){ 
-    //         mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
+    //     //should do this outside the ImGUI
+    //     std::vector<Vector3> currentSites; 
+    //     for (int i = 0; i < posOptions.nSites; i++){
+    //         currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
     //     }
-    //     std::cout << "positive mass at site " << i << " = " << mass << std::endl;
+    //     auto pc = polyscope::registerPointCloud("all pos sites", currentSites);
+    //     // --- Uniform color: just fill all points with one RGB value
+    //     std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
+    //     pc->addColorQuantity("uniform color", colors)->setEnabled(true);
+
+    //     if (ImGui::Button("Done"))
+    //         polyscope::popContext();
+    //     ImGui::SameLine();
+    // };
+    // //polyscope::pushContext(positivePopUpUI);  
+
+    std::vector<Vector3> positiveCenters;
+    for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
+    positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+    }
+
+
+    polyscope::registerPointCloud("Voronoi sites unaligned (+)", positiveCenters)->setEnabled(false);
+    std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
+
+    //Compute max curl for normalization
+    double maxPosCurl = 0;
+    for (Vertex v : globalMesh.vertices())
+        maxPosCurl = std::max(maxPosCurl, posMeasure[v]);
+
+    //print the positive masses
+    //render the fuzzy cells
+    std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
+    std::vector<Vector3> posSiteColors(posSiteDistributions.size());
+    for (size_t i = 0; i < posSiteDistributions.size(); i++){
+        double r,g,b;
+        hsv_to_rgb((double)i/posSiteDistributions.size() * 360, 0.75, 1., r, g, b);
+        posSiteColors[i] = {r,g,b};
+    }
+    std::random_device rd;              // non-deterministic seed
+    std::mt19937 g(rd());               // Mersenne Twister engine
+    std::shuffle(posSiteColors.begin(), posSiteColors.end(), g);
+
+    for (size_t i = 0; i < posSiteDistributions.size(); i++){
+        double mass = 0;
+        for (Vertex v : globalMesh.vertices()){ 
+            mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
+        }
+        std::cout << "positive mass at site " << i << " = " << mass << std::endl;
     
-    //     for (Vertex v : globalMesh.vertices()) {
-    //         posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
-    //     }
-    // }
-    // psMesh.addVertexColorQuantity("pos site dist blend (course)", posSiteDistributionColor)->setEnabled(false);
-    // polyscope::show();
+        for (Vertex v : globalMesh.vertices()) {
+            posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
+        }
+    }
+    psMesh.addVertexColorQuantity("pos site dist blend (course)", posSiteDistributionColor)->setEnabled(false);
+
+    // ------------------------------------------------------------
+    // 1) Hard label per vertex = argmax over fuzzy weights
+    // ------------------------------------------------------------
+    std::vector<int> vLabel(globalMesh.nVertices(), -1);
+    std::vector<double> vMaxW(globalMesh.nVertices(), -1.0); // optional
+
+    for (Vertex v : globalMesh.vertices()) {
+        double bestW = -1.0;
+        int bestI = -1;
+        for (size_t i = 0; i < posSiteDistributions.size(); ++i) {
+            double w = posSiteDistributions[i][v];
+            if (w > bestW) { bestW = w; bestI = (int)i; }
+        }
+        vLabel[v.getIndex()] = bestI;
+        vMaxW[v.getIndex()] = bestW;
+    }
+
+    // after computing hard labels + colors
+    drawStraightCellBorders2D(globalMesh, globalGeometry, vLabel, vMaxW, posSiteColors, /*minConf=*/0.05);
+
+    polyscope::show();
     
 
     // // NEGATIVE COURSE
@@ -6402,3 +6423,165 @@ std::vector<std::vector<double>> findAllSaddleLoops(IntrinsicGeometryInterface& 
     return allSaddleLoops;
 }
 
+
+// Call this after you compute vLabel[] (argmax) and have posSiteColors[].
+void drawStraightCellBorders2D(
+    SurfaceMesh& mesh,
+    VertexPositionGeometry& geom,
+    const std::vector<int>& vLabel,                 // size = nVertices
+    const std::vector<double>& vMaxW,               // size = nVertices (optional confidence)
+    const std::vector<Vector3>& siteColors,         // size = nSites
+    double minConf = 0.0                            // e.g. 0.05 to suppress noisy boundaries
+) {
+  // ------------------------------------------------------------
+  // 1) Collect boundary edges by label-pair (i,j)
+  // ------------------------------------------------------------
+  // For each pair (i,j), store list of boundary edges (as vertex indices)
+  std::unordered_map<std::pair<int,int>, std::vector<std::pair<size_t,size_t>>, PairHashInt> edgesByPair;
+
+  for (Edge e : mesh.edges()) {
+    Vertex a = e.firstVertex();
+    Vertex b = e.secondVertex();
+    size_t ia = a.getIndex();
+    size_t ib = b.getIndex();
+
+    int la = vLabel[ia];
+    int lb = vLabel[ib];
+    if (la < 0 || lb < 0 || la == lb) continue;
+
+    if (vMaxW.size() == mesh.nVertices()) {
+      if (vMaxW[ia] < minConf || vMaxW[ib] < minConf) continue;
+    }
+
+    // canonicalize pair ordering
+    int i = std::min(la, lb);
+    int j = std::max(la, lb);
+    edgesByPair[{i, j}].push_back({ia, ib});
+  }
+
+  // ------------------------------------------------------------
+  // 2) For each label-pair, split into connected components (by shared vertices)
+  // ------------------------------------------------------------
+  std::vector<Vector3> segPts;                 // endpoints for all segments (2 per segment)
+  std::vector<std::array<size_t,2>> segEdges;  // each segment is one edge between endpoints
+  std::vector<Vector3> segColors;              // per-segment color (same length as segEdges)
+
+  auto get2D = [&](const Vector3& p) -> Eigen::Vector2d {
+    // Use x-z plane for 2D rendering
+    return Eigen::Vector2d(p.x, p.z);
+  };
+
+  for (auto& kv : edgesByPair) {
+    auto pairIJ = kv.first;
+    auto& bedges = kv.second; // vector of (va,vb)
+
+    // Build adjacency of boundary edges via vertex sharing
+    // Map vertex -> incident boundary edge indices
+    std::unordered_map<size_t, std::vector<int>> incident;
+    incident.reserve(bedges.size() * 2);
+
+    for (int ei = 0; ei < (int)bedges.size(); ++ei) {
+      incident[bedges[ei].first].push_back(ei);
+      incident[bedges[ei].second].push_back(ei);
+    }
+
+    std::vector<char> usedEdge(bedges.size(), false);
+
+    for (int seed = 0; seed < (int)bedges.size(); ++seed) {
+      if (usedEdge[seed]) continue;
+
+      // BFS over edges via shared vertices to get one connected component
+      std::queue<int> q;
+      q.push(seed);
+      usedEdge[seed] = true;
+
+      std::vector<int> compEdges;
+      compEdges.reserve(256);
+
+      while (!q.empty()) {
+        int ei = q.front(); q.pop();
+        compEdges.push_back(ei);
+
+        size_t va = bedges[ei].first;
+        size_t vb = bedges[ei].second;
+
+        for (int nei : incident[va]) if (!usedEdge[nei]) { usedEdge[nei] = true; q.push(nei); }
+        for (int nei : incident[vb]) if (!usedEdge[nei]) { usedEdge[nei] = true; q.push(nei); }
+      }
+
+      // ------------------------------------------------------------
+      // 3) Fit ONE straight segment to this component (PCA on midpoints)
+      // ------------------------------------------------------------
+      if (compEdges.size() < 2) continue;
+
+      std::vector<Eigen::Vector2d> pts2;
+      pts2.reserve(compEdges.size());
+
+      double meanY = 0.0; // keep segment in the same plane as your mesh
+      for (int ei : compEdges) {
+        size_t ia = bedges[ei].first;
+        size_t ib = bedges[ei].second;
+
+        Vector3 pa = geom.vertexPositions[mesh.vertex(ia)];
+        Vector3 pb = geom.vertexPositions[mesh.vertex(ib)];
+        Vector3 pm = 0.5 * (pa + pb);
+
+        meanY += pm.y;
+        pts2.push_back(get2D(pm));
+      }
+      meanY /= (double)pts2.size();
+
+      // mean
+      Eigen::Vector2d mu(0,0);
+      for (auto& p : pts2) mu += p;
+      mu /= (double)pts2.size();
+
+      // covariance
+      Eigen::Matrix2d C = Eigen::Matrix2d::Zero();
+      for (auto& p : pts2) {
+        Eigen::Vector2d d = p - mu;
+        C += d * d.transpose();
+      }
+
+      // principal direction
+      Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> es(C);
+      Eigen::Vector2d dir = es.eigenvectors().col(1); // largest eigenvalue (col(1) in 2D)
+      dir.normalize();
+
+      // extent along dir
+      double tMin =  1e300;
+      double tMax = -1e300;
+      for (auto& p : pts2) {
+        double t = dir.dot(p - mu);
+        tMin = std::min(tMin, t);
+        tMax = std::max(tMax, t);
+      }
+
+      Eigen::Vector2d a2 = mu + tMin * dir;
+      Eigen::Vector2d b2 = mu + tMax * dir;
+
+      // back to 3D (x,z plane, keep meanY)
+      Vector3 A{(double)a2.x(), meanY, (double)a2.y()};
+      Vector3 B{(double)b2.x(), meanY, (double)b2.y()};
+
+      size_t i0 = segPts.size();
+      segPts.push_back(A);
+      segPts.push_back(B);
+      segEdges.push_back({i0, i0+1});
+
+      // color = average of the two sites
+      Vector3 col = 0.5 * (siteColors[(size_t)pairIJ.first] + siteColors[(size_t)pairIJ.second]);
+      segColors.push_back(col);
+    }
+  }
+
+  // ------------------------------------------------------------
+  // 4) Register in Polyscope
+  // ------------------------------------------------------------
+  auto* cn = polyscope::registerCurveNetwork("fuzzy cell borders (straight)", segPts, segEdges);
+  cn->setRadius(0.001);
+  cn->setEnabled(true);
+
+  // If your polyscope supports it:
+  cn->addEdgeColorQuantity("border colors", segColors)->setEnabled(true);
+}

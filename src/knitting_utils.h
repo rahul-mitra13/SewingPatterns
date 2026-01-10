@@ -326,5 +326,35 @@ std::vector<std::vector<double>> findAllSaddleLoops(IntrinsicGeometryInterface& 
 //repair a knit graph vertex that's missing a connection
 std::vector<int> repairKnitGraphVertex();
 
+
+// ---- helper: hash for pair<size_t,size_t> ----
+struct PairHashSizeT {
+  size_t operator()(const std::pair<size_t,size_t>& p) const noexcept {
+    return (static_cast<size_t>(p.first) << 32) ^ static_cast<size_t>(p.second);
+  }
+};
+// Hash for undirected edge key (a,b) with a<b
+static inline uint64_t edgeKey(size_t a, size_t b) {
+  if (a > b) std::swap(a, b);
+  return (uint64_t)a << 32 | (uint64_t)b;
+}
+// Hash for pair<int,int>
+struct PairHashInt {
+  size_t operator()(const std::pair<int,int>& p) const noexcept {
+    return (static_cast<uint64_t>(static_cast<uint32_t>(p.first)) << 32) ^
+           static_cast<uint32_t>(p.second);
+  }
+};
+
+
+void drawStraightCellBorders2D(
+    SurfaceMesh& mesh,
+    VertexPositionGeometry& geom,
+    const std::vector<int>& vLabel,
+    const std::vector<double>& vMaxW,
+    const std::vector<Vector3>& siteColors,
+    double minConf
+);
+
 #endif
 
