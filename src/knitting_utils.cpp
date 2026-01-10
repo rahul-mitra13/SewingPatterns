@@ -3946,7 +3946,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     }
     double avgTotalMeasure = (totalPosMeasure + totalNegMeasure) / 2;
 
-    //debugging on a simple square
+    //--------------------------------------//
+    // Stuff for square model
     // for (Vertex v : globalMesh.vertices()){
     //     //if (globalGeometry.vertexPositions[v].z < 0 && globalGeometry.vertexPositions[v].x < 0) posMeasure[v] = 1.0;
     //     // posMeasure[v] = std::fabs(globalGeometry.vertexPositions[v].x);
@@ -3955,7 +3956,49 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     //     // posMeasure[v] = std::exp(globalGeometry.vertexPositions[v].x);
     // }
 
-   
+    //Gaussian curl measure for figure 
+    // Single Gaussian 
+    // debugging on a simple square: set curlMeasure to a Gaussian centered at origin
+    // double sigma = 0.35;   // controls spread (try 0.25–0.6)
+    // double A     = 1.0;    // amplitude
+
+    // for (Vertex v : globalMesh.vertices()) {
+    //     Vector3 p = globalGeometry.vertexPositions[v];
+
+    //     double r2 = p.x * p.x + p.z * p.z;              // distance^2 in x–z plane
+    //     posMeasure[v] = A * std::exp(-r2 / (2.0 * sigma * sigma));
+    // }
+
+    //Multiple Guassians 
+    // Define a few Gaussians in the x–z plane.
+    // Each entry: {cx, cz, sigma, amplitude}
+    // struct Gauss2D {
+    //     double cx, cz;
+    //     double sigma;
+    //     double A;
+    // };
+
+    // std::vector<Gauss2D> gaussians = {
+    //     { 0.0,  0.0, 0.30, 1.0},   // center
+    //     {-0.5,  0.4, 0.25, 0.8},   // upper-left-ish (x,z)
+    //     { 0.6, -0.3, 0.35, 0.7}    // lower-right-ish
+    // };
+
+    // for (Vertex v : globalMesh.vertices()) {
+    //     Vector3 p = globalGeometry.vertexPositions[v];
+
+    //     double val = 0.0;
+    //     for (const auto& g : gaussians) {
+    //         double dx = p.x - g.cx;
+    //         double dz = p.z - g.cz;
+    //         double r2 = dx*dx + dz*dz;
+    //         double s2 = g.sigma * g.sigma;
+    //         val += g.A * std::exp(-r2 / (2.0 * s2));
+    //     }
+
+    //     posMeasure[v] = val;
+    // }
+    
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
 
@@ -3963,10 +4006,10 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
 
     // Old code for visualization
 
-    // // POSITIVE COURSE
+    //  POSITIVE COURSE
 
     // VoronoiOptions posOptions = defaultVoronoiOptions;
-    // posOptions.nSites = std::round(avgTotalMeasure / period);
+    // posOptions.nSites = std::round(avgTotalMeasure / period); //40 used for square figs
     // std::cout << "number of sings = " << posOptions.nSites << std::endl;
     // posOptions.useDelaunay = false;
     // posOptions.computeDistributions = true;
@@ -3977,40 +4020,40 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     // std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
     // std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
 
-    // //write a nested callback to debug the evolution of our method for the positive sites
-    // //Register the callback which creates the UI and does the hard work
-    // int step = 0;
-    // int iSite = 0;
-    // auto positivePopUpUI = [&](){
-    //     static bool showWindow = true;
-    //     ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
-    //     ImGui::Begin("Positive sites", &showWindow);
-    //     ImGui::PushItemWidth(400);
-    //     ImGui::Separator();
-    //     ImGui::InputInt("Site", &iSite);
-    //     ImGui::InputInt("Time Step", &step);
-    //     // Clamp to bounds after user input
-    //     iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
-    //     step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution[iSite].size() - 1));
-    //     //need setEnabled(true) otherwise we run into OpenGL errors? weird
-    //     // psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
-    //     //polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+    // // //write a nested callback to debug the evolution of our method for the positive sites
+    // // //Register the callback which creates the UI and does the hard work
+    // // int step = 0;
+    // // int iSite = 0;
+    // // auto positivePopUpUI = [&](){
+    // //     static bool showWindow = true;
+    // //     ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
+    // //     ImGui::Begin("Positive sites", &showWindow);
+    // //     ImGui::PushItemWidth(400);
+    // //     ImGui::Separator();
+    // //     ImGui::InputInt("Site", &iSite);
+    // //     ImGui::InputInt("Time Step", &step);
+    // //     // Clamp to bounds after user input
+    // //     iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
+    // //     step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution[iSite].size() - 1));
+    // //     //need setEnabled(true) otherwise we run into OpenGL errors? weird
+    // //     // psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
+    // //     //polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
 
-    //     //should do this outside the ImGUI
-    //     std::vector<Vector3> currentSites; 
-    //     for (int i = 0; i < posOptions.nSites; i++){
-    //         currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
-    //     }
-    //     auto pc = polyscope::registerPointCloud("all pos sites", currentSites);
-    //     // --- Uniform color: just fill all points with one RGB value
-    //     std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
-    //     pc->addColorQuantity("uniform color", colors)->setEnabled(true);
+    // //     //should do this outside the ImGUI
+    // //     std::vector<Vector3> currentSites; 
+    // //     for (int i = 0; i < posOptions.nSites; i++){
+    // //         currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
+    // //     }
+    // //     auto pc = polyscope::registerPointCloud("all pos sites", currentSites);
+    // //     // --- Uniform color: just fill all points with one RGB value
+    // //     std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
+    // //     pc->addColorQuantity("uniform color", colors)->setEnabled(true);
 
-    //     if (ImGui::Button("Done"))
-    //         polyscope::popContext();
-    //     ImGui::SameLine();
-    // };
-    // //polyscope::pushContext(positivePopUpUI);  
+    // //     if (ImGui::Button("Done"))
+    // //         polyscope::popContext();
+    // //     ImGui::SameLine();
+    // // };
+    // // //polyscope::pushContext(positivePopUpUI);  
 
     // std::vector<Vector3> positiveCenters;
     // for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
@@ -4021,7 +4064,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     // polyscope::registerPointCloud("Voronoi sites unaligned (+)", positiveCenters)->setEnabled(false);
     // std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
 
-    // // Compute max curl for normalization
+    // //Compute max curl for normalization
     // double maxPosCurl = 0;
     // for (Vertex v : globalMesh.vertices())
     //     maxPosCurl = std::max(maxPosCurl, posMeasure[v]);
@@ -4051,6 +4094,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     //     }
     // }
     // psMesh.addVertexColorQuantity("pos site dist blend (course)", posSiteDistributionColor)->setEnabled(false);
+    // polyscope::show();
     
 
     // // NEGATIVE COURSE

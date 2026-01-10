@@ -182,7 +182,7 @@ void showStripePatterns(){
         Eigen::MatrixXd iE;
         std::vector<int> f;
         std::tie(iV, iE, f) = getIsoLine(V, F, timeFunctionGlobal, saddleVal);
-        polyscope::registerCurveNetwork("Saddle isoval " + std::to_string(saddleLoopCtr), iV, iE);
+        //polyscope::registerCurveNetwork("Saddle isoval " + std::to_string(saddleLoopCtr), iV, iE);
         saddleLoopCtr += 1;
       }
       //visualize the saddle vertices 
