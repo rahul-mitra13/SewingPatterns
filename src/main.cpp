@@ -447,7 +447,6 @@ int main(int argc, char **argv) {
 
   polyscope::init();
 
-
   fs::path inFilePath(inFileName);
   nlohmann::json data;
   fs::path modelPath, vertexMappingsPath;
@@ -501,7 +500,6 @@ int main(int argc, char **argv) {
     std::cout << "Unrecognized file format." << std::endl;
     throw std::exception();
   }
-
 
   
   //find the gradient operator (want to do this just once)
@@ -615,17 +613,14 @@ int main(int argc, char **argv) {
 
   //for rendering figures
   //has to go before the show() call
-  // std::string viewerString = R"({"farClipRatio":20.0,
-  //                               "fov":45.0,
-  //                               "nearClipRatio":0.005,
-  //                               "projectionMode":
-  //                               "Perspective",
-  //                               "viewMat":[0.0205091927200556,-1.87355908565223e-10,-0.999801218509674,
-  //                               -0.399929404258728,-0.0461873635649681,0.998910784721375,
-  //                               -0.000946979271247983,-0.528441607952118,0.99871826171875,
-  //                               0.0461944416165352,0.0204852763563395,-3.25812482833862,0.0,0.0,0.0,1.0],
-  //                               "windowHeight":1440,"windowWidth":2560})";
-  // polyscope::view::setViewFromJson(viewerString, false);
+  std::string viewerString = R"({"farClipRatio":20.0,
+                              "fov":45.0,
+                              "nearClipRatio":0.005,
+                              "projectionMode":"Perspective",
+                              "viewMat":[1.0,0.0,0.0,0.0,0.0,0.0,-0.999999940395355,0.0,0.0,0.999999940395355,0.0,-3.19612336158752,0.0,0.0,0.0,1.0],
+                              "windowHeight":1084,
+                              "windowWidth":1728})";
+  polyscope::view::setViewFromJson(viewerString, false);
   
   polyscope::show();
 

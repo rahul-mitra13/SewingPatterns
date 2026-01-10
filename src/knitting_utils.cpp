@@ -4009,7 +4009,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     // POSITIVE COURSE
 
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 40; // std::round(avgTotalMeasure / period); //40 used for square figs
+    posOptions.nSites = 60; // std::round(avgTotalMeasure / period); //40 used for square figs
     std::cout << "number of sings = " << posOptions.nSites << std::endl;
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
@@ -4020,48 +4020,99 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
     std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
 
-    // //write a nested callback to debug the evolution of our method for the positive sites
-    // //Register the callback which creates the UI and does the hard work
-    // int step = 0;
-    // int iSite = 0;
-    // auto positivePopUpUI = [&](){
-    //     static bool showWindow = true;
-    //     ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
-    //     ImGui::Begin("Positive sites", &showWindow);
-    //     ImGui::PushItemWidth(400);
-    //     ImGui::Separator();
-    //     ImGui::InputInt("Site", &iSite);
-    //     ImGui::InputInt("Time Step", &step);
-    //     // Clamp to bounds after user input
-    //     iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
-    //     step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution[iSite].size() - 1));
-    //     //need setEnabled(true) otherwise we run into OpenGL errors? weird
-    //     // psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
-    //     //polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+    //write a nested callback to debug the evolution of our method for the positive sites
+    //Register the callback which creates the UI and does the hard work
+    int step = 0;
+    int iSite = 0;
+    auto positivePopUpUI = [&](){
+        static bool showWindow = true;
+        ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
+        ImGui::Begin("Positive sites", &showWindow);
+        ImGui::PushItemWidth(400);
+        ImGui::Separator();
+        ImGui::InputInt("Site", &iSite);
+        ImGui::InputInt("Time Step", &step);
+        // Clamp to bounds after user input
+        iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
+        step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution[iSite].size() - 1));
+        //need setEnabled(true) otherwise we run into OpenGL errors? weird
+        // psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
+        //polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
 
-    //     //should do this outside the ImGUI
-    //     std::vector<Vector3> currentSites; 
-    //     for (int i = 0; i < posOptions.nSites; i++){
-    //         currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
-    //     }
-    //     auto pc = polyscope::registerPointCloud("all pos sites", currentSites);
-    //     // --- Uniform color: just fill all points with one RGB value
-    //     std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
-    //     pc->addColorQuantity("uniform color", colors)->setEnabled(true);
+        //should do this outside the ImGUI
+        std::vector<Vector3> currentSites; 
+        for (int i = 0; i < posOptions.nSites; i++){
+            currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
+        }
+        auto pc = polyscope::registerPointCloud("all pos sites", currentSites);
 
-    //     if (ImGui::Button("Done"))
-    //         polyscope::popContext();
-    //     ImGui::SameLine();
-    // };
-    // //polyscope::pushContext(positivePopUpUI);  
+        // --- Movement direction vectors---
+        // --- "Direction to move" vectors: pNext - pNow ---
+        std::vector<glm::vec3> moveDirs(currentSites.size(), glm::vec3(0.f, 0.f, 0.f));
+
+        int maxStep = (int)posSteps[0].size() - 1; // assumes all sites have same #steps
+        if (step < maxStep) {
+            for (int i = 0; i < posOptions.nSites; i++) {
+
+                Vector3 pNow  = posSteps[i][step].interpolate(globalGeometry.vertexPositions);
+                Vector3 pNext = posSteps[i][step + 1].interpolate(globalGeometry.vertexPositions);
+
+                Vector3 d = pNext - pNow;
+            
+                moveDirs[i] = glm::vec3((float)d.x, (float)d.y, (float)d.z);
+
+                double n = std::sqrt(d.x*d.x + d.y*d.y + d.z*d.z);
+                moveDirs[i] = glm::vec3((float)d.x, (float)d.y, (float)d.z);
+                // if (n > 1e-14) {
+                //     d.x /= n; d.y /= n; d.z /= n;
+                //     moveDirs[i] = glm::vec3((float)d.x, (float)d.y, (float)d.z);
+                // }
+            }
+        }
+        // Add as a vector quantity (arrows)
+        auto* vq = pc->addVectorQuantity("direction to move", moveDirs);
+        vq->setEnabled(true);
+
+        // Optional tuning:
+        // vq->setVectorLengthScale(0.02);
+
+        // --- Uniform color: just fill all points with one RGB value
+        std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
+        pc->addColorQuantity("uniform color", colors)->setEnabled(true);
+
+        if (ImGui::Button("Done"))
+            polyscope::popContext();
+        ImGui::SameLine();
+    };
+    polyscope::pushContext(positivePopUpUI);  
 
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
     positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
     }
 
+    // final movement direction = p_last - p_prev (normalized)
+    std::vector<glm::vec3> moveDirFinal(posOptions.nSites, glm::vec3(0.f, 0.f, 0.f));
 
-    polyscope::registerPointCloud("Voronoi sites unaligned (+)", positiveCenters)->setEnabled(false);
+    for (int i = 0; i < posOptions.nSites; ++i) {
+        int T = (int)posSteps[i].size();
+        if (T < 2) continue;
+
+        Vector3 pPrev = posSteps[i][T - 2].interpolate(globalGeometry.vertexPositions);
+        Vector3 pLast = posSteps[i][T - 1].interpolate(globalGeometry.vertexPositions);
+
+        Vector3 d = pLast - pPrev; // last-step displacement
+
+        double n = std::sqrt(d.x*d.x + d.y*d.y + d.z*d.z);
+        // moveDirFinal[i] = glm::vec3((float)d.x, (float)d.y, (float)d.z);
+        if (n > 1e-14) {
+            d.x /= n; d.y /= n; d.z /= n;
+            moveDirFinal[i] = glm::vec3((float)d.x, (float)d.y, (float)d.z);
+        }
+    }
+    auto finalVoronoiPoints = polyscope::registerPointCloud("Voronoi sites unaligned (+)", positiveCenters);
+    auto* vq = finalVoronoiPoints->addVectorQuantity("direction to move", moveDirFinal);
+    vq->setEnabled(true);
     std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
 
     //Compute max curl for normalization
@@ -4094,29 +4145,11 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         }
     }
     psMesh.addVertexColorQuantity("pos site dist blend (course)", posSiteDistributionColor)->setEnabled(false);
-
-    // ------------------------------------------------------------
-    // 1) Hard label per vertex = argmax over fuzzy weights
-    // ------------------------------------------------------------
-    std::vector<int> vLabel(globalMesh.nVertices(), -1);
-    std::vector<double> vMaxW(globalMesh.nVertices(), -1.0); // optional
-
-    for (Vertex v : globalMesh.vertices()) {
-        double bestW = -1.0;
-        int bestI = -1;
-        for (size_t i = 0; i < posSiteDistributions.size(); ++i) {
-            double w = posSiteDistributions[i][v];
-            if (w > bestW) { bestW = w; bestI = (int)i; }
-        }
-        vLabel[v.getIndex()] = bestI;
-        vMaxW[v.getIndex()] = bestW;
-    }
-
     //voronoi cells
     drawStraightClosedBorders2D_fromSoftWeights(globalMesh, globalGeometry, posSiteDistributions, posSiteColors, 0.05);
     
-
     polyscope::show();//just exit out since we only need this figure
+    std::cout<< polyscope::view::getViewAsJson() << std::endl;
     exit(0);
     
 
