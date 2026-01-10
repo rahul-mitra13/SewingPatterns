@@ -347,13 +347,63 @@ struct PairHashInt {
 };
 
 
-void drawStraightCellBorders2D(
+//To see the voronoi cells on the sqaure
+// Hash for undirected edge between node indices
+static inline uint64_t undKey(size_t a, size_t b) {
+  if (a > b) std::swap(a, b);
+  return (uint64_t)a << 32 | (uint64_t)b;
+}
+
+// Key for "crossing node" = (meshEdgeIndex, labelPair)
+struct EdgePairKey {
+  size_t eIdx;
+  int i, j; // i<j
+  bool operator==(const EdgePairKey& o) const noexcept {
+    return eIdx == o.eIdx && i == o.i && j == o.j;
+  }
+};
+
+struct EdgePairKeyHash {
+  size_t operator()(const EdgePairKey& k) const noexcept {
+    // combine edge index + pair
+    uint64_t h = (uint64_t)k.eIdx;
+    h ^= (uint64_t)(uint32_t)k.i * 0x9e3779b97f4a7c15ULL;
+    h ^= (uint64_t)(uint32_t)k.j * 0xc2b2ae3d27d4eb4fULL;
+    return (size_t)h;
+  }
+};
+
+// Compute argmax label + max weight per vertex (from per-site weights)
+static void computeArgmaxLabels(
+    SurfaceMesh& mesh,
+    const std::vector<VertexData<double>>& siteW,
+    std::vector<int>& vLabel,
+    std::vector<double>& vMaxW
+) {
+  vLabel.assign(mesh.nVertices(), -1);
+  vMaxW.assign(mesh.nVertices(), 0.0);
+
+  for (Vertex v : mesh.vertices()) {
+    double best = -1e300;
+    int bestI = -1;
+    for (int i = 0; i < (int)siteW.size(); ++i) {
+      double w = siteW[i][v];
+      if (w > best) { best = w; bestI = i; }
+    }
+    vLabel[v.getIndex()] = bestI;
+    vMaxW[v.getIndex()] = best;
+  }
+}
+
+// Call this after you have posSiteDistributions[i][v] and siteColors[i].
+// Produces straight segments that CLOSE on interior junctions.
+// (Open on mesh boundary is allowed.)
+void drawStraightClosedBorders2D_fromSoftWeights(
     SurfaceMesh& mesh,
     VertexPositionGeometry& geom,
-    const std::vector<int>& vLabel,
-    const std::vector<double>& vMaxW,
-    const std::vector<Vector3>& siteColors,
-    double minConf
+    const std::vector<VertexData<double>>& siteW,   // size = nSites
+    const std::vector<Vector3>& siteColors,         // size = nSites
+    double minConf                         // suppress noisy verts (argmax weight)
 );
 
 #endif

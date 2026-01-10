@@ -4009,7 +4009,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     // POSITIVE COURSE
 
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 60; // std::round(avgTotalMeasure / period); //40 used for square figs
+    posOptions.nSites = 40; // std::round(avgTotalMeasure / period); //40 used for square figs
     std::cout << "number of sings = " << posOptions.nSites << std::endl;
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
@@ -4112,10 +4112,12 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         vMaxW[v.getIndex()] = bestW;
     }
 
-    // after computing hard labels + colors
-    drawStraightCellBorders2D(globalMesh, globalGeometry, vLabel, vMaxW, posSiteColors, /*minConf=*/0.05);
+    //voronoi cells
+    drawStraightClosedBorders2D_fromSoftWeights(globalMesh, globalGeometry, posSiteDistributions, posSiteColors, 0.05);
+    
 
-    polyscope::show();
+    polyscope::show();//just exit out since we only need this figure
+    exit(0);
     
 
     // // NEGATIVE COURSE
@@ -6424,164 +6426,340 @@ std::vector<std::vector<double>> findAllSaddleLoops(IntrinsicGeometryInterface& 
 }
 
 
-// Call this after you compute vLabel[] (argmax) and have posSiteColors[].
-void drawStraightCellBorders2D(
+// Call this after you have posSiteDistributions[i][v] and siteColors[i].
+// Produces straight segments that CLOSE on interior junctions.
+// (Open on mesh boundary is allowed.)
+void drawStraightClosedBorders2D_fromSoftWeights(
     SurfaceMesh& mesh,
     VertexPositionGeometry& geom,
-    const std::vector<int>& vLabel,                 // size = nVertices
-    const std::vector<double>& vMaxW,               // size = nVertices (optional confidence)
+    const std::vector<VertexData<double>>& siteW,   // size = nSites
     const std::vector<Vector3>& siteColors,         // size = nSites
-    double minConf = 0.0                            // e.g. 0.05 to suppress noisy boundaries
+    double minConf                          // suppress noisy verts (argmax weight)
 ) {
-  // ------------------------------------------------------------
-  // 1) Collect boundary edges by label-pair (i,j)
-  // ------------------------------------------------------------
-  // For each pair (i,j), store list of boundary edges (as vertex indices)
-  std::unordered_map<std::pair<int,int>, std::vector<std::pair<size_t,size_t>>, PairHashInt> edgesByPair;
+  if (siteW.empty()) throw std::runtime_error("siteW is empty");
+  if (siteColors.size() != siteW.size()) throw std::runtime_error("siteColors size mismatch");
 
-  for (Edge e : mesh.edges()) {
+  // 0) argmax labels + confidence
+  std::vector<int> vLabel;
+  std::vector<double> vMaxW;
+  computeArgmaxLabels(mesh, siteW, vLabel, vMaxW);
+
+  // ------------------------------------------------------------
+  // 1) Build crossing nodes on mesh edges where argmax labels differ
+  //    crossing is where w_i - w_j = 0 along that edge
+  // ------------------------------------------------------------
+  std::vector<Vector3> nodePos;      // positions of crossing nodes + triple nodes
+  std::vector<char> nodeIsBoundary;  // crossing lies on mesh boundary edge?
+  std::vector<char> nodeIsTriple;    // triple-junction inside a triangle?
+
+  nodePos.reserve(mesh.nEdges() / 2);
+  nodeIsBoundary.reserve(mesh.nEdges() / 2);
+  nodeIsTriple.reserve(mesh.nEdges() / 2);
+
+  std::unordered_map<EdgePairKey, size_t, EdgePairKeyHash> crossingNode;
+  crossingNode.reserve(mesh.nEdges() / 2);
+
+  auto getCrossingNode = [&](Edge e, int i, int j) -> size_t {
+    if (i > j) std::swap(i, j);
+    EdgePairKey key{(size_t)e.getIndex(), i, j};
+    auto it = crossingNode.find(key);
+    if (it != crossingNode.end()) return it->second;
+
     Vertex a = e.firstVertex();
     Vertex b = e.secondVertex();
-    size_t ia = a.getIndex();
-    size_t ib = b.getIndex();
 
-    int la = vLabel[ia];
-    int lb = vLabel[ib];
-    if (la < 0 || lb < 0 || la == lb) continue;
+    double sA = siteW[i][a] - siteW[j][a];
+    double sB = siteW[i][b] - siteW[j][b];
 
-    if (vMaxW.size() == mesh.nVertices()) {
-      if (vMaxW[ia] < minConf || vMaxW[ib] < minConf) continue;
+    // If no sign change (can happen with ties/noise), skip by creating a midpoint node
+    double denom = (sA - sB);
+    double t = 0.5;
+    if (std::abs(denom) > 1e-16) {
+      t = sA / denom; // solves sA + t*(sB-sA)=0 => t=sA/(sA-sB)
+    }
+    t = std::max(0.0, std::min(1.0, t));
+
+    Vector3 pa = geom.vertexPositions[a];
+    Vector3 pb = geom.vertexPositions[b];
+    Vector3 p = (1.0 - t) * pa + t * pb;
+
+    size_t idx = nodePos.size();
+    nodePos.push_back(p);
+    nodeIsBoundary.push_back((char)e.isBoundary());
+    nodeIsTriple.push_back(0);
+
+    crossingNode.emplace(key, idx);
+    return idx;
+  };
+
+  // ------------------------------------------------------------
+  // 2) Build per-label-pair border graph in terms of nodes
+  //    edgesByPair[(i,j)] = list of (nodeA,nodeB) edges
+  // ------------------------------------------------------------
+  std::unordered_map<std::pair<int,int>, std::vector<std::pair<size_t,size_t>>, PairHashInt> edgesByPair;
+  edgesByPair.reserve(siteW.size() * 2);
+
+  auto addPairEdge = [&](int i, int j, size_t na, size_t nb) {
+    if (i == j) return;
+    if (i > j) std::swap(i, j);
+    edgesByPair[{i,j}].push_back({na, nb});
+  };
+
+  // helper to get 3 vertex indices of a triangular face
+  auto faceVerts = [&](Face f) {
+    std::array<Vertex,3> vv;
+    int k = 0;
+    for (Vertex v : f.adjacentVertices()) {
+      if (k < 3) vv[k++] = v;
+    }
+    return vv;
+  };
+
+  // Solve triple point inside a triangle for labels (i,j,k):
+  // Find barycentric (a,b,c) with:
+  //   (w_i - w_j)(p)=0 and (w_i - w_k)(p)=0 and a+b+c=1
+  auto computeTriplePoint = [&](Vertex va, Vertex vb, Vertex vc, int i, int j, int k) -> Vector3 {
+    double d1a = siteW[i][va] - siteW[j][va];
+    double d1b = siteW[i][vb] - siteW[j][vb];
+    double d1c = siteW[i][vc] - siteW[j][vc];
+
+    double d2a = siteW[i][va] - siteW[k][va];
+    double d2b = siteW[i][vb] - siteW[k][vb];
+    double d2c = siteW[i][vc] - siteW[k][vc];
+
+    Eigen::Matrix3d A;
+    A << d1a, d1b, d1c,
+         d2a, d2b, d2c,
+         1.0, 1.0, 1.0;
+    Eigen::Vector3d rhs(0.0, 0.0, 1.0);
+
+    Eigen::Vector3d bc = A.fullPivLu().solve(rhs);
+
+    // clamp a bit for safety (numerical noise)
+    double a = bc[0], b = bc[1], c = bc[2];
+
+    Vector3 pa = geom.vertexPositions[va];
+    Vector3 pb = geom.vertexPositions[vb];
+    Vector3 pc = geom.vertexPositions[vc];
+    return a * pa + b * pb + c * pc;
+  };
+
+  for (Face f : mesh.faces()) {
+    // We assume triangles (your 2D mesh is typically triangulated)
+    auto vv = faceVerts(f);
+    Vertex va = vv[0], vb = vv[1], vc = vv[2];
+
+    int la = vLabel[va.getIndex()];
+    int lb = vLabel[vb.getIndex()];
+    int lc = vLabel[vc.getIndex()];
+    if (la < 0 || lb < 0 || lc < 0) continue;
+
+    // optional confidence gate
+    if (minConf > 0.0) {
+      if (vMaxW[va.getIndex()] < minConf &&
+          vMaxW[vb.getIndex()] < minConf &&
+          vMaxW[vc.getIndex()] < minConf) {
+        continue;
+      }
     }
 
-    // canonicalize pair ordering
-    int i = std::min(la, lb);
-    int j = std::max(la, lb);
-    edgesByPair[{i, j}].push_back({ia, ib});
+    // collect unique labels
+    std::array<int,3> L{la, lb, lc};
+    std::sort(L.begin(), L.end());
+    int nUnique = (L[0]!=L[1]) + (L[1]!=L[2]) + 1;
+
+    if (nUnique == 1) continue;
+
+    // get the 3 edges of the face
+    Halfedge ha = f.halfedge();
+    Halfedge hb = ha.next();
+    Halfedge hc = hb.next();
+
+    Edge eAB = ha.edge();
+    Edge eBC = hb.edge();
+    Edge eCA = hc.edge();
+
+    // Face has exactly 2 regions
+    if (nUnique == 2) {
+      // Find the pair (i,j)
+      int i = L[0], j = L[2];
+
+      // Find which face edges separate i and j, and compute crossings
+      std::vector<size_t> crossings;
+      crossings.reserve(2);
+
+      auto considerEdge = [&](Edge e, Vertex x, Vertex y) {
+        int lx = vLabel[x.getIndex()];
+        int ly = vLabel[y.getIndex()];
+        if (lx == ly) return;
+        // only keep edges that separate the two labels we care about
+        int a = std::min(lx, ly), b = std::max(lx, ly);
+        if (a != std::min(i,j) || b != std::max(i,j)) return;
+        crossings.push_back(getCrossingNode(e, i, j));
+      };
+
+      considerEdge(eAB, va, vb);
+      considerEdge(eBC, vb, vc);
+      considerEdge(eCA, vc, va);
+
+      if (crossings.size() == 2 && crossings[0] != crossings[1]) {
+        addPairEdge(i, j, crossings[0], crossings[1]);
+      }
+    }
+
+    // Face has 3 regions => add triple point and connect to 3 crossings
+    else if (nUnique == 3) {
+      int i = la, j = lb, k = lc;
+      // make sure they are distinct
+      if (i == j || j == k || i == k) continue;
+
+      // triple node is unique to this face
+      Vector3 tp = computeTriplePoint(va, vb, vc, i, j, k);
+      size_t tIdx = nodePos.size();
+      nodePos.push_back(tp);
+      nodeIsBoundary.push_back(0);
+      nodeIsTriple.push_back(1);
+
+      // crossings on the 3 edges with their corresponding label-pair
+      // AB: (la,lb)
+      if (la != lb) {
+        size_t cAB = getCrossingNode(eAB, la, lb);
+        addPairEdge(la, lb, tIdx, cAB);
+      }
+      // BC: (lb,lc)
+      if (lb != lc) {
+        size_t cBC = getCrossingNode(eBC, lb, lc);
+        addPairEdge(lb, lc, tIdx, cBC);
+      }
+      // CA: (lc,la)
+      if (lc != la) {
+        size_t cCA = getCrossingNode(eCA, lc, la);
+        addPairEdge(lc, la, tIdx, cCA);
+      }
+    }
   }
 
   // ------------------------------------------------------------
-  // 2) For each label-pair, split into connected components (by shared vertices)
+  // 3) For each label-pair, split into chains between endpoints
+  //    and replace each chain by ONE straight segment.
+  //    Endpoints are nodes with degree != 2, OR triple nodes, OR mesh-boundary nodes.
   // ------------------------------------------------------------
-  std::vector<Vector3> segPts;                 // endpoints for all segments (2 per segment)
-  std::vector<std::array<size_t,2>> segEdges;  // each segment is one edge between endpoints
-  std::vector<Vector3> segColors;              // per-segment color (same length as segEdges)
+  std::vector<Vector3> outPts;
+  std::vector<std::array<size_t,2>> outEdges;
+  std::vector<Vector3> outColors;
 
-  auto get2D = [&](const Vector3& p) -> Eigen::Vector2d {
-    // Use x-z plane for 2D rendering
-    return Eigen::Vector2d(p.x, p.z);
+  outPts.reserve(nodePos.size() / 2);
+  outEdges.reserve(nodePos.size() / 2);
+  outColors.reserve(nodePos.size() / 2);
+
+  // global node->curveVertex reuse (so junctions meet exactly)
+  std::unordered_map<size_t, size_t> nodeToOut;
+  nodeToOut.reserve(nodePos.size() / 2);
+
+  auto outVid = [&](size_t nodeIdx) -> size_t {
+    auto it = nodeToOut.find(nodeIdx);
+    if (it != nodeToOut.end()) return it->second;
+    size_t id = outPts.size();
+    nodeToOut[nodeIdx] = id;
+    outPts.push_back(nodePos[nodeIdx]);
+    return id;
   };
 
   for (auto& kv : edgesByPair) {
     auto pairIJ = kv.first;
-    auto& bedges = kv.second; // vector of (va,vb)
+    const int i = pairIJ.first;
+    const int j = pairIJ.second;
+    auto& E = kv.second;
+    if (E.empty()) continue;
 
-    // Build adjacency of boundary edges via vertex sharing
-    // Map vertex -> incident boundary edge indices
-    std::unordered_map<size_t, std::vector<int>> incident;
-    incident.reserve(bedges.size() * 2);
+    // adjacency
+    std::unordered_map<size_t, std::vector<size_t>> adj;
+    adj.reserve(E.size() * 2);
 
-    for (int ei = 0; ei < (int)bedges.size(); ++ei) {
-      incident[bedges[ei].first].push_back(ei);
-      incident[bedges[ei].second].push_back(ei);
+    std::unordered_set<uint64_t> allEdges;
+    allEdges.reserve(E.size() * 2);
+
+    for (auto [a,b] : E) {
+      adj[a].push_back(b);
+      adj[b].push_back(a);
+      allEdges.insert(undKey(a,b));
     }
 
-    std::vector<char> usedEdge(bedges.size(), false);
+    auto degree = [&](size_t v) -> int {
+      auto it = adj.find(v);
+      return (it == adj.end()) ? 0 : (int)it->second.size();
+    };
 
-    for (int seed = 0; seed < (int)bedges.size(); ++seed) {
-      if (usedEdge[seed]) continue;
+    auto isEndpoint = [&](size_t v) -> bool {
+      if (nodeIsTriple[v]) return true;
+      if (nodeIsBoundary[v]) return true;     // allow open on mesh boundary
+      return degree(v) != 2;
+    };
 
-      // BFS over edges via shared vertices to get one connected component
-      std::queue<int> q;
-      q.push(seed);
-      usedEdge[seed] = true;
+    std::unordered_set<uint64_t> used;
+    used.reserve(allEdges.size() * 2);
 
-      std::vector<int> compEdges;
-      compEdges.reserve(256);
-
-      while (!q.empty()) {
-        int ei = q.front(); q.pop();
-        compEdges.push_back(ei);
-
-        size_t va = bedges[ei].first;
-        size_t vb = bedges[ei].second;
-
-        for (int nei : incident[va]) if (!usedEdge[nei]) { usedEdge[nei] = true; q.push(nei); }
-        for (int nei : incident[vb]) if (!usedEdge[nei]) { usedEdge[nei] = true; q.push(nei); }
-      }
-
-      // ------------------------------------------------------------
-      // 3) Fit ONE straight segment to this component (PCA on midpoints)
-      // ------------------------------------------------------------
-      if (compEdges.size() < 2) continue;
-
-      std::vector<Eigen::Vector2d> pts2;
-      pts2.reserve(compEdges.size());
-
-      double meanY = 0.0; // keep segment in the same plane as your mesh
-      for (int ei : compEdges) {
-        size_t ia = bedges[ei].first;
-        size_t ib = bedges[ei].second;
-
-        Vector3 pa = geom.vertexPositions[mesh.vertex(ia)];
-        Vector3 pb = geom.vertexPositions[mesh.vertex(ib)];
-        Vector3 pm = 0.5 * (pa + pb);
-
-        meanY += pm.y;
-        pts2.push_back(get2D(pm));
-      }
-      meanY /= (double)pts2.size();
-
-      // mean
-      Eigen::Vector2d mu(0,0);
-      for (auto& p : pts2) mu += p;
-      mu /= (double)pts2.size();
-
-      // covariance
-      Eigen::Matrix2d C = Eigen::Matrix2d::Zero();
-      for (auto& p : pts2) {
-        Eigen::Vector2d d = p - mu;
-        C += d * d.transpose();
-      }
-
-      // principal direction
-      Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> es(C);
-      Eigen::Vector2d dir = es.eigenvectors().col(1); // largest eigenvalue (col(1) in 2D)
-      dir.normalize();
-
-      // extent along dir
-      double tMin =  1e300;
-      double tMax = -1e300;
-      for (auto& p : pts2) {
-        double t = dir.dot(p - mu);
-        tMin = std::min(tMin, t);
-        tMax = std::max(tMax, t);
-      }
-
-      Eigen::Vector2d a2 = mu + tMin * dir;
-      Eigen::Vector2d b2 = mu + tMax * dir;
-
-      // back to 3D (x,z plane, keep meanY)
-      Vector3 A{(double)a2.x(), meanY, (double)a2.y()};
-      Vector3 B{(double)b2.x(), meanY, (double)b2.y()};
-
-      size_t i0 = segPts.size();
-      segPts.push_back(A);
-      segPts.push_back(B);
-      segEdges.push_back({i0, i0+1});
-
-      // color = average of the two sites
-      Vector3 col = 0.5 * (siteColors[(size_t)pairIJ.first] + siteColors[(size_t)pairIJ.second]);
-      segColors.push_back(col);
+    // start nodes
+    std::vector<size_t> starts;
+    starts.reserve(adj.size());
+    for (auto& it : adj) {
+      if (isEndpoint(it.first)) starts.push_back(it.first);
     }
+
+    auto traceChain = [&](size_t start, size_t next) -> std::pair<size_t,size_t> {
+      size_t prev = start;
+      size_t cur  = next;
+
+      used.insert(undKey(start, next));
+
+      while (true) {
+        if (isEndpoint(cur)) break;
+
+        const auto& nb = adj[cur]; // should be 2
+        if (nb.size() < 2) break;
+        size_t cand0 = nb[0];
+        size_t cand1 = nb[1];
+        size_t nxt = (cand0 == prev) ? cand1 : cand0;
+
+        uint64_t k = undKey(cur, nxt);
+        if (!allEdges.count(k) || used.count(k)) break;
+
+        used.insert(k);
+        prev = cur;
+        cur = nxt;
+      }
+
+      return {start, cur};
+    };
+
+    // trace chains starting from endpoints
+    for (size_t s : starts) {
+      for (size_t t : adj[s]) {
+        uint64_t k = undKey(s, t);
+        if (used.count(k)) continue;
+
+        auto [aNode, bNode] = traceChain(s, t);
+        if (aNode == bNode) continue;
+
+        size_t A = outVid(aNode);
+        size_t B = outVid(bNode);
+
+        if (A == B) continue;
+
+        outEdges.push_back({A, B});
+        Vector3 col = 0.5 * (siteColors[(size_t)i] + siteColors[(size_t)j]);
+        outColors.push_back(col);
+      }
+    }
+
+    // leftover cycles: ignore (rare); they don’t affect closure of interior cells
   }
 
   // ------------------------------------------------------------
   // 4) Register in Polyscope
   // ------------------------------------------------------------
-  auto* cn = polyscope::registerCurveNetwork("fuzzy cell borders (straight)", segPts, segEdges);
+  auto* cn = polyscope::registerCurveNetwork("fuzzy cell borders (straight, closed)", outPts, outEdges);
   cn->setRadius(0.001);
   cn->setEnabled(true);
-
-  // If your polyscope supports it:
-  cn->addEdgeColorQuantity("border colors", segColors)->setEnabled(true);
+  cn->addEdgeColorQuantity("border colors", outColors)->setEnabled(true);
 }
