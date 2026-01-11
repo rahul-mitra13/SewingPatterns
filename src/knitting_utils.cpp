@@ -2155,6 +2155,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         }
         //have a hard mask in the course direction
         for (Vertex v : globalMesh.vertices()){
+            //maybe change the masking weight to be something less aggressive
             waleWeighting[v] = (allDist[v] > 4.0 * period);
             curlMeasure[v] = waleWeighting[v] * curlMeasure[v];
         }
@@ -2401,7 +2402,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     // polyscope::registerCurveNetwork("wale stripes (unconstr. HG)", uniquePos, uniqueEdges)->setRadius(0.001)->setEnabled(false);
 
     // Now we'll do the rounding for the homology generators
-    // Here we can do greedy rounding
+    // Here we can do greedy rounding (This seems to only work for certain instances, have to debug)
     std::vector<double> homologyStripes;
     for (std::vector<double> path : homologyGenerators){
         double integral = 0;
@@ -2420,7 +2421,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     modelWale.setEdgeIndices(edgeIndices);
     modelWale.setEdgePathConstraints(waleEdgePathConstraints);
     // Have to re-add this for models with genus (Not sure why, the code above should do the rounding appropriately but we get infeasability issues)
-    modelWale.setHomologyGenerators(homologyGenerators);
+    // modelWale.setHomologyGenerators(homologyGenerators);
     
     std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
 
@@ -5297,8 +5298,8 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
                 pathIntegral += hePath[k] * sigma[k];
             }
             //add the constraints for the homology generators
-            model.addConstr(pathIntegral == period * generatorIntegers[i]);
-            //model.addConstr(pathIntegral == period * 0.0);//this should use some integer rounding
+            //model.addConstr(pathIntegral == period * generatorIntegers[i]);
+            model.addConstr(pathIntegral == period * 0.0);//can set this to 0 on some symmetric models
         }
         
         //constraint: add bdy-bdy path constraint 
