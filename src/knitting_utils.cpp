@@ -4009,7 +4009,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     // POSITIVE COURSE
 
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 60; // std::round(avgTotalMeasure / period); //40 used for square figs
+    posOptions.nSites = 60; // std::round(avgTotalMeasure / period); //60 used for square figs
     std::cout << "number of sings = " << posOptions.nSites << std::endl;
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
