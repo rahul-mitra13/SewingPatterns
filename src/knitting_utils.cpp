@@ -4009,7 +4009,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     // POSITIVE COURSE
 
     VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = 60; // std::round(avgTotalMeasure / period); //60 used for square figs
+    posOptions.nSites = 40; // std::round(avgTotalMeasure / period); //60 used for square figs
     std::cout << "number of sings = " << posOptions.nSites << std::endl;
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
@@ -4044,7 +4044,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         for (int i = 0; i < posOptions.nSites; i++){
             currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
         }
-        auto pc = polyscope::registerPointCloud("all pos sites", currentSites);
+        // auto pc = polyscope::registerPointCloud("all pos sites", currentSites);
 
         // --- Movement direction vectors---
         // --- "Direction to move" vectors: pNext - pNow ---
@@ -4070,15 +4070,15 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
             }
         }
         // Add as a vector quantity (arrows)
-        auto* vq = pc->addVectorQuantity("direction to move", moveDirs);
-        vq->setEnabled(true);
+        // auto* vq = pc->addVectorQuantity("direction to move", moveDirs);
+        // vq->setEnabled(true);
 
         // Optional tuning:
         // vq->setVectorLengthScale(0.02);
 
         // --- Uniform color: just fill all points with one RGB value
         std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
-        pc->addColorQuantity("uniform color", colors)->setEnabled(true);
+        //pc->addColorQuantity("uniform color", colors)->setEnabled(true);
 
         if (ImGui::Button("Done"))
             polyscope::popContext();
@@ -4104,11 +4104,11 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         Vector3 d = pLast - pPrev; // last-step displacement
 
         double n = std::sqrt(d.x*d.x + d.y*d.y + d.z*d.z);
-        // moveDirFinal[i] = glm::vec3((float)d.x, (float)d.y, (float)d.z);
-        if (n > 1e-14) {
-            d.x /= n; d.y /= n; d.z /= n;
-            moveDirFinal[i] = glm::vec3((float)d.x, (float)d.y, (float)d.z);
-        }
+        moveDirFinal[i] = glm::vec3((float)d.x, (float)d.y, (float)d.z);
+        // if (n > 1e-14) {
+        //     d.x /= n; d.y /= n; d.z /= n;
+        //     moveDirFinal[i] = glm::vec3((float)d.x, (float)d.y, (float)d.z);
+        // }
     }
     auto finalVoronoiPoints = polyscope::registerPointCloud("Voronoi sites unaligned (+)", positiveCenters);
     auto* vq = finalVoronoiPoints->addVectorQuantity("direction to move", moveDirFinal);

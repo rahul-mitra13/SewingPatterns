@@ -613,13 +613,7 @@ int main(int argc, char **argv) {
 
   //for rendering figures
   //has to go before the show() call
-  std::string viewerString = R"({"farClipRatio":20.0,
-                              "fov":45.0,
-                              "nearClipRatio":0.005,
-                              "projectionMode":"Perspective",
-                              "viewMat":[1.0,0.0,0.0,0.0,0.0,0.0,-0.999999940395355,0.0,0.0,0.999999940395355,0.0,-3.19612336158752,0.0,0.0,0.0,1.0],
-                              "windowHeight":1084,
-                              "windowWidth":1728})";
+  std::string viewerString = R"({"farClipRatio":20.0,"fov":45.0,"nearClipRatio":0.005,"projectionMode":"Perspective","viewMat":[1.0,0.0,0.0,0.0,0.0,0.0,-0.999999940395355,0.0,0.0,0.999999940395355,0.0,-2.43244814872742,0.0,0.0,0.0,1.0],"windowHeight":975,"windowWidth":1728})";
   polyscope::view::setViewFromJson(viewerString, false);
   
   polyscope::show();
