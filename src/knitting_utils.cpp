@@ -3441,6 +3441,23 @@ std::vector<std::pair<int, int>> findEdgeSingularityPairs(VertexPositionGeometry
     return singEdgePairs;
 }
 
+void registerCurveNetworkFromEdges(VertexPositionGeometry& geometry, 
+        const std::vector<Edge> &edges, std::string &name) {
+    std::vector<Vector3> positions;
+    std::vector<std::array<size_t, 2>> edgeIndices;
+
+    size_t nodeCounter = 0;
+    for (const auto &e : edges) {
+        const auto p1 = geometry.vertexPositions[e.firstVertex()];
+        const auto p2 = geometry.vertexPositions[e.secondVertex()];
+        positions.push_back(p1);
+        positions.push_back(p2);
+        edgeIndices.push_back({nodeCounter, nodeCounter+1});
+        nodeCounter += 2;
+    }
+    polyscope::registerCurveNetwork(name, positions, edgeIndices)->setEnabled(false);
+}
+
 //get the vertices (of a curve network), edges (of a curve network) and faces that a particular isovalue of the time function passes through 
 //generate isolines for the time function given a specific isoVal
 std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, std::vector<int>> getIsoLine(Eigen::MatrixXd& V, Eigen::MatrixXi& F, VertexData<double>& timeFunction, double isoVal){
@@ -3728,6 +3745,18 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     
     SurfaceMesh& globalMesh = globalGeometry.mesh;
     SurfaceMesh& gluedMesh = gluedGeometry.mesh;
+
+    //render figure for level set constraint
+    // std::vector<Edge> bdyEdges;
+    // for (int e : boundaryConditions.courseBdyEdges){
+    //     if (globalGeometry.mesh.edge(e).isBoundary()) continue;
+    //     bdyEdges.emplace_back(globalGeometry.mesh.edge(e));
+    // }
+    // std::string s = "level set constraint";
+    // registerCurveNetworkFromEdges(globalGeometry, bdyEdges, s);
+    // polyscope::show();
+    // std::cout << polyscope::view::getViewAsJson() << std::endl;
+    // exit(0);
 
     //gluedGeometry.requireCotanLaplacian();
     //gluedGeometry.requireVertexGalerkinMassMatrix();
@@ -6186,22 +6215,6 @@ std::vector<Halfedge> chooseHalfEdgeLoop(const std::vector<Edge> &doubleLoop,
     return loopHalfedges;
 }
 
-void registerCurveNetworkFromEdges(VertexPositionGeometry& geometry, 
-        const std::vector<Edge> &edges, std::string &name) {
-    std::vector<Vector3> positions;
-    std::vector<std::array<size_t, 2>> edgeIndices;
-
-    size_t nodeCounter = 0;
-    for (const auto &e : edges) {
-        const auto p1 = geometry.vertexPositions[e.firstVertex()];
-        const auto p2 = geometry.vertexPositions[e.secondVertex()];
-        positions.push_back(p1);
-        positions.push_back(p2);
-        edgeIndices.push_back({nodeCounter, nodeCounter+1});
-        nodeCounter += 2;
-    }
-    polyscope::registerCurveNetwork(name, positions, edgeIndices)->setEnabled(false);
-}
 
 void visualizeAllEdgeLoops(VertexPositionGeometry& geometry, std::vector<Vertex> &saddleVertices, const VertexData<double> &timeFunc) {
     //const std::vector<Vertex> saddleVertices = extractSaddlePoints(geometry, saddleVerticesData);

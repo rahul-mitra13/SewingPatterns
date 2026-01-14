@@ -256,6 +256,7 @@ double findIsoValWithMaxAvgEdgeCurl(VertexPositionGeometry& globalGeometry, Eige
                                     EdgeData<double>& curl, std::map<int, int>& hashedUsedIsoVals, double stepSize);
 
 
+
 //@clean 
 //the below two functions use the energy min ||\del sigma - \nabla \sigma_{i - 1} / ||\nabla \sigma_{i - 1}|| ||^2
 //@out  courseOneFormGrad - gradient of the final course 1-form
