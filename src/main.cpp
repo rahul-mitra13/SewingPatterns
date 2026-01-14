@@ -615,14 +615,14 @@ int main(int argc, char **argv) {
 
   //for rendering figures
   //has to go before the show() call
-  std::string viewerString = R"({"farClipRatio":20.0,
-                              "fov":45.0,
-                              "nearClipRatio":0.005,
-                              "projectionMode":"Perspective",
-                              "viewMat":[-0.865285515785217,3.49245965480804e-09,0.501276850700378,1.82004308700562,0.171720013022423,0.939495205879211,0.296416997909546,-7.038161277771,-0.470946580171585,0.342565298080444,-0.812932431697845,-21.3318710327148,0.0,0.0,0.0,1.0],
-                              "windowHeight":975,
-                              "windowWidth":1728})";
-  polyscope::view::setViewFromJson(viewerString, false);
+  // std::string viewerString = R"({"farClipRatio":20.0,
+  //                             "fov":45.0,
+  //                             "nearClipRatio":0.005,
+  //                             "projectionMode":"Perspective",
+  //                             "viewMat":[-0.865285515785217,3.49245965480804e-09,0.501276850700378,1.82004308700562,0.171720013022423,0.939495205879211,0.296416997909546,-7.038161277771,-0.470946580171585,0.342565298080444,-0.812932431697845,-21.3318710327148,0.0,0.0,0.0,1.0],
+  //                             "windowHeight":975,
+  //                             "windowWidth":1728})";
+  // polyscope::view::setViewFromJson(viewerString, false);
   
   polyscope::show();
 
