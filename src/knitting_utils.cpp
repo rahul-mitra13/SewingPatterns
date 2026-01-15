@@ -1900,7 +1900,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
     std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Time taken for course: " << (duration.count() / 1e6) << " second" << std::endl;
+    std::cout << "Time taken for wale: " << (duration.count() / 1e6) << " second" << std::endl;
     std::cout << "Final wale obj = " << currObj << std::endl;
 
 
@@ -3472,9 +3472,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (after subtracting)", edgeCurl);
     int numSingularities = 0;
 
-    auto start = std::chrono::high_resolution_clock::now();
-
     polyscope::show();
+    auto start = std::chrono::high_resolution_clock::now();
 
     int numIters = 0;
     while(true){
