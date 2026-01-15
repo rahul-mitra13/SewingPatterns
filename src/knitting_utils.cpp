@@ -1703,6 +1703,9 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     EdgeData<double> checked(globalGeometry.mesh, 0.0);
 
+    auto start = std::chrono::high_resolution_clock::now();
+
+
     bool toBreak = false;
     while(true){
         std::vector<std::pair<int, int>> waleSingularityEdges = findWaleSingularityEdges(globalGeometry, gluedGeometry,
@@ -1858,6 +1861,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         if (toBreak) break;//we are no longer improving the distance to unit norm 
     }
 
+    auto end = std::chrono::high_resolution_clock::now();
+
     // Compute the final non-integer 1-form
     std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
     std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
@@ -1894,11 +1899,15 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     modelWale.setHomologyGenerators(homologyGenerators);
     std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
     std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    std::cout << "Time taken for course: " << (duration.count() / 1e6) << " second" << std::endl;
+    std::cout << "Final wale obj = " << currObj << std::endl;
+
 
     
-    std::cout << "boundary sum = " << sumIndices << std::endl;
-    std::cout << "Number of positive edges sampled = " << numPos << std::endl;
-    std::cout << "Number of negative edges sampled = " << numNeg << std::endl;
+    // std::cout << "boundary sum = " << sumIndices << std::endl;
+    // std::cout << "Number of positive edges sampled = " << numPos << std::endl;
+    // std::cout << "Number of negative edges sampled = " << numNeg << std::endl;
     return std::tie(stripeValuesOneFormGlued, waleSingularEdgesGlobal);
 }
 
@@ -3648,36 +3657,37 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
 
 
     //solve the final model with the singularities and homology generators 
-    std::cout << "solving final course stripes...." << std::endl;
+    //std::cout << "solving final course stripes...." << std::endl;
     model.setHomologyGenerators(homologyGenerators);
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
+    std::cout << "Final course objective = " << currObj << std::endl;
     std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
     std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
                                                 edgeMap, components);
 
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Time taken by process: " << (duration.count() / 1e6) << " second" << std::endl;
+    std::cout << "Time taken for course: " << (duration.count() / 1e6) << " second" << std::endl;
                                         
     //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
-    courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numSingularities) + 
-                                                    " singularity insertions", uniquePos, uniqueEdges);
-    courseStripes -> setRadius(0.001);
-    courseStripes -> setEnabled(false);
+    // courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numSingularities) + 
+    //                                                 " singularity insertions", uniquePos, uniqueEdges);
+    // courseStripes -> setRadius(0.001);
+    // courseStripes -> setEnabled(false);
 
 
     // Plot stripe values with offset (to debug knit graph)
-    CornerData<double> stripeValuesWithOffset = stripeValuesSigmaCourse;
-    for (Corner co : globalMesh.corners())
-        stripeValuesWithOffset[co] -= period/4;
-    std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesWithOffset, stripeIndicesSigmaCourse, period, edgeMap, components);
-    //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
-    courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes with offset", uniquePos, uniqueEdges);
-    courseStripes -> setRadius(0.001);
-    courseStripes -> setEnabled(false);
+    // CornerData<double> stripeValuesWithOffset = stripeValuesSigmaCourse;
+    // for (Corner co : globalMesh.corners())
+    //     stripeValuesWithOffset[co] -= period/4;
+    // std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesWithOffset, stripeIndicesSigmaCourse, period, edgeMap, components);
+    // //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
+    // courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes with offset", uniquePos, uniqueEdges);
+    // courseStripes -> setRadius(0.001);
+    // courseStripes -> setEnabled(false);
 
-    std::cout << "Number of iterations = " << numIters << std::endl;
-    std::cout << "Number of singularities inserted = " << numSingularities << std::endl;
+    // std::cout << "Number of iterations = " << numIters << std::endl;
+    // std::cout << "Number of singularities inserted = " << numSingularities << std::endl;
     return std::tie(stripeValuesSigmaCourse, edgeSingularities);
 
 }
