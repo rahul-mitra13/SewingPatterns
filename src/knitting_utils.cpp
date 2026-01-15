@@ -2425,6 +2425,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     
     std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
 
+    std::cout << "Final wale obj = " << currObj << std::endl;
+
     // // Sanity check: compute integrals and visualize paths
     // int pathCount = 0;
     // for (auto &[path, val] : waleEdgePathConstraints) {
@@ -4632,6 +4634,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     //plot the stripes
     std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
     std::tie(uniquePos, uniqueEdges, components) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, edgeMap);
+
+    std::cout << "Final course obj = " << currObj << std::endl;
    
 
     //visualize the saddle vertices
