@@ -2406,7 +2406,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     //Comment this out if you don't need any alignment to wale boundary edges
     // solve the model with all the path constraints and boundary constraints 
-    modelWale.setBdyEdges(waleBdyEdges);//set these constraints on disk models
+    //modelWale.setBdyEdges(waleBdyEdges);//set these constraints on disk models
     
     modelWale.setEdgeIndices(edgeIndices);
     modelWale.setEdgePathConstraints(waleEdgePathConstraints);
