@@ -160,6 +160,8 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
   }
   desiredMass /= nSites;
   
+  std::ofstream file("OT_cost.csv");
+
   // == Iterations
   bool stop = false; // flag if stopping criterion on sumUpdateNorm is reached
   double sumUpdateNorm = 1; // just a starting point to determine a tolerance on weights grad norm
@@ -183,7 +185,9 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
 
     // New L-BFGS stuff
     options.epsWeights = max(1e-8, 1e-4 * sumUpdateNorm); // we want the weights to be converged, but only relative to the sites
-    phiWeights = computePhiWeights(mesh, geom, phiWeights, vSolvers, options, measure, psMesh);
+    double fx = 0;//OT cost
+    std::tie(fx, phiWeights) = computePhiWeights(mesh, geom, phiWeights, vSolvers, options, measure, psMesh);
+    file << iIter << "," << fx << std::endl;
 
     cout << endl;
     // double minCellMass = *min_element(cellMasses.begin(), cellMasses.end());
@@ -406,7 +410,7 @@ void alignPointsOnIsolineFast(SurfaceMesh& mesh, VertexPositionGeometry& geom, a
 }
 
 //computing equal weights using LBFGS
-std::vector<double> computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom, std::vector<double>& initWeights, vector<VectorHeatMethodSolver>& vSolvers, VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh){
+std::tuple<double, std::vector<double>> computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom, std::vector<double>& initWeights, vector<VectorHeatMethodSolver>& vSolvers, VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh){
   
   //set the measure in Voronoi options (TO DO: specify this elsewhere) 
   options.measure = measure;
@@ -444,7 +448,7 @@ std::vector<double> computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterf
   double fx = 0;
   int niter = solver.minimize(fun, x, fx);
   std::cout << niter << " L-BFGS iterations" << std::endl;
-  return vector<double>(x.data(), x.data()+x.size());
+  return std::make_tuple(fx, vector<double>(x.data(), x.data()+x.size()));
 }
 
 } // namespace surface
