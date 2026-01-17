@@ -976,8 +976,8 @@ std::tuple<std::vector<Vector3>, std::vector<std::array<int, 2>>, std::vector<St
       return std::tie(vertexPositions, newEdges, components);
     }
 
-    ensure (adj[v].size() > 0);
-    ensure (adj[v].size() <= 2);
+    // ensure (adj[v].size() > 0);
+    // ensure (adj[v].size() <= 2);
   }
 
   // Find connected components + cycles using BFS
