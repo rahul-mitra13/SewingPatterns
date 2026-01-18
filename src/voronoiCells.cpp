@@ -162,6 +162,10 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
   
   std::ofstream file("OT_cost.csv");
 
+  double oldOTEnergy = DBL_MAX;
+  double newOTEnergy = 0;
+  double OTEps = 1.0e-4;
+
   // == Iterations
   bool stop = false; // flag if stopping criterion on sumUpdateNorm is reached
   double sumUpdateNorm = 1; // just a starting point to determine a tolerance on weights grad norm
@@ -185,9 +189,30 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
 
     // New L-BFGS stuff
     options.epsWeights = max(1e-8, 1e-4 * sumUpdateNorm); // we want the weights to be converged, but only relative to the sites
-    double fx = 0;//OT cost
-    std::tie(fx, phiWeights) = computePhiWeights(mesh, geom, phiWeights, vSolvers, options, measure, psMesh);
-    file << iIter << "," << fx << std::endl;
+    newOTEnergy = 0.0;
+    std::tie(newOTEnergy, phiWeights) =
+        computePhiWeights(mesh, geom, phiWeights, vSolvers,
+                          options, measure, psMesh);
+    
+    double relChange = 0.;
+    if (oldOTEnergy < DBL_MAX) {
+        relChange =
+            std::abs(newOTEnergy - oldOTEnergy)
+            / std::max(std::abs(oldOTEnergy), 1e-16);
+
+        if (relChange < OTEps) {
+            std::cout << "relChange = " << relChange << std::endl;
+            std::cout << "Converged after " << iIter
+                      << " Lloyd iterations\n";
+            stop = true;
+            break;
+        }
+    }
+
+    std::cout << "relChange = " << relChange << std::endl;
+    oldOTEnergy = newOTEnergy;
+
+    file << newOTEnergy << std::endl;
 
     cout << endl;
     // double minCellMass = *min_element(cellMasses.begin(), cellMasses.end());
