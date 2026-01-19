@@ -249,7 +249,7 @@ void showStripePatterns(){
   // P("revealCurl done");
   // polyscope::show();
 
-  // richDataFile = "info.ply";
+  richDataFile = "info.ply";
 
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
@@ -265,6 +265,13 @@ void showStripePatterns(){
     courseSingularEdgesGlobal = richData.getEdgeProperty<double>("courseSingularEdges");
     waleStripeValues = richData.getCornerProperty<double>("waleStripeValues");
     waleSingularEdgesGlobal = richData.getEdgeProperty<double>("waleSingularEdges");
+    // int ctr = 0;
+    // for (Edge e : globalMesh->edges()){
+    //   if (std::fabs(courseSingularEdgesGlobal[e] >= 1e-6)) ctr++;
+    //   if (std::fabs(waleSingularEdgesGlobal[e] >= 1e-6)) ctr++;
+    // }
+    // std::cout << "ctr = " << ctr << std::endl;
+    // polyscope::show();
   } else {
     std::tie(courseStripeValues, courseSingularEdgesGlobal) = computeCourseStripeInfo(*globalGeometry, *gluedELG, timeFunctionGlobal,
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
@@ -374,6 +381,8 @@ void showStripePatterns(){
   }
   polyscope::registerCurveNetwork("wale singular edges (+1)", waleSingularEdgePointsPos, waleSingularEdgesPos)->setRadius(0.001)->setColor({1,0,0})->setEnabled(false);
   polyscope::registerCurveNetwork("wale singular edges (-1)", waleSingularEdgePointsNeg, waleSingularEdgesNeg)->setRadius(0.001)->setColor({0,0,1})->setEnabled(false);
+
+  polyscope::show();
 
   //transfer the stripe texturing coordinates to the glued setting 
   CornerData<double> courseStripeValuesGlued(gluedELG->mesh);

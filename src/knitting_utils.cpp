@@ -4040,17 +4040,17 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
 
     //  POSITIVE COURSE
 
-    // VoronoiOptions posOptions = defaultVoronoiOptions;
-    // posOptions.nSites = std::round(avgTotalMeasure / period); //40 used for square figs
-    // std::cout << "number of sings = " << posOptions.nSites << std::endl;
-    // posOptions.useDelaunay = false;
-    // posOptions.computeDistributions = true;
-    // posOptions.seed = 42;
+    VoronoiOptions posOptions = defaultVoronoiOptions;
+    posOptions.nSites = std::round(avgTotalMeasure / period); //40 used for square figs
+    std::cout << "number of sings = " << posOptions.nSites << std::endl;
+    posOptions.useDelaunay = false;
+    posOptions.computeDistributions = true;
+    posOptions.seed = 42;
 
-    // VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
-    // std::vector<std::vector<VertexData<double>>> posStepSiteDistribution = posVoronoiCenters.stepSiteDistribution;
-    // std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
-    // std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
+    VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
+    std::vector<std::vector<VertexData<double>>> posStepSiteDistribution = posVoronoiCenters.stepSiteDistribution;
+    std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
+    std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
 
     // // //write a nested callback to debug the evolution of our method for the positive sites
     // // //Register the callback which creates the UI and does the hard work
@@ -4087,61 +4087,59 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     // // };
     // // //polyscope::pushContext(positivePopUpUI);  
 
-    // std::vector<Vector3> positiveCenters;
-    // for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
-    // positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-    // }
-
-
-    // polyscope::registerPointCloud("Voronoi sites unaligned (+)", positiveCenters)->setEnabled(false);
-    // std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
+    std::vector<Vector3> positiveCenters;
+    for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
+        positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+    }
+    polyscope::registerPointCloud("Voronoi sites unaligned (+)", positiveCenters)->setEnabled(false);
+    std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
 
     // //Compute max curl for normalization
     // double maxPosCurl = 0;
     // for (Vertex v : globalMesh.vertices())
     //     maxPosCurl = std::max(maxPosCurl, posMeasure[v]);
 
-    // //print the positive masses
-    // //render the fuzzy cells
-    // std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
-    // std::vector<Vector3> posSiteColors(posSiteDistributions.size());
-    // for (size_t i = 0; i < posSiteDistributions.size(); i++){
-    //     double r,g,b;
-    //     hsv_to_rgb((double)i/posSiteDistributions.size() * 360, 0.75, 1., r, g, b);
-    //     posSiteColors[i] = {r,g,b};
-    // }
-    // std::random_device rd;              // non-deterministic seed
-    // std::mt19937 g(rd());               // Mersenne Twister engine
-    // std::shuffle(posSiteColors.begin(), posSiteColors.end(), g);
+    //print the positive masses
+    //render the fuzzy cells
+    std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
+    std::vector<Vector3> posSiteColors(posSiteDistributions.size());
+    for (size_t i = 0; i < posSiteDistributions.size(); i++){
+        double r,g,b;
+        hsv_to_rgb((double)i/posSiteDistributions.size() * 360, 0.75, 1., r, g, b);
+        posSiteColors[i] = {r,g,b};
+    }
+    std::random_device rd;              // non-deterministic seed
+    std::mt19937 g(rd());               // Mersenne Twister engine
+    std::shuffle(posSiteColors.begin(), posSiteColors.end(), g);
 
-    // for (size_t i = 0; i < posSiteDistributions.size(); i++){
-    //     double mass = 0;
-    //     for (Vertex v : globalMesh.vertices()){ 
-    //         mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
-    //     }
-    //     std::cout << "positive mass at site " << i << " = " << mass << std::endl;
+    for (size_t i = 0; i < posSiteDistributions.size(); i++){
+        double mass = 0;
+        for (Vertex v : globalMesh.vertices()){ 
+            mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
+        }
+        std::cout << "positive mass at site " << i << " = " << mass << std::endl;
     
-    //     for (Vertex v : globalMesh.vertices()) {
-    //         posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
-    //     }
-    // }
-    // psMesh.addVertexColorQuantity("pos site dist blend (course)", posSiteDistributionColor)->setEnabled(false);
-    // polyscope::show();
+        for (Vertex v : globalMesh.vertices()) {
+            posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
+        }
+    }
+    psMesh.addVertexColorQuantity("pos site dist blend (course)", posSiteDistributionColor)->setEnabled(false);
+    //polyscope::show();
     
 
     // // NEGATIVE COURSE
 
-    // VoronoiOptions negOptions = defaultVoronoiOptions;
-    // negOptions.nSites = posOptions.nSites;
-    // negOptions.useDelaunay = false;
-    // negOptions.computeDistributions = true;
-    // negOptions.seed = 42;
-    // std::cout << "# positive sites " << posOptions.nSites << std::endl;
-    // std::cout << "# negative sites " << negOptions.nSites << std::endl;
-    // VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
-    // std::vector<std::vector<VertexData<double>>> negStepSiteDistribution = negVoronoiCenters.stepSiteDistribution;
-    // std::vector<std::vector<SurfacePoint>> negSteps = negVoronoiCenters.steps;
-    // std::vector<SurfacePoint> negInitialSites = negVoronoiCenters.initialSites;
+    VoronoiOptions negOptions = defaultVoronoiOptions;
+    negOptions.nSites = posOptions.nSites;
+    negOptions.useDelaunay = false;
+    negOptions.computeDistributions = true;
+    negOptions.seed = 42;
+    std::cout << "# positive sites " << posOptions.nSites << std::endl;
+    std::cout << "# negative sites " << negOptions.nSites << std::endl;
+    VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
+    std::vector<std::vector<VertexData<double>>> negStepSiteDistribution = negVoronoiCenters.stepSiteDistribution;
+    std::vector<std::vector<SurfacePoint>> negSteps = negVoronoiCenters.steps;
+    std::vector<SurfacePoint> negInitialSites = negVoronoiCenters.initialSites;
 
 
     // //write a nested callback to debug the evolution of our method for the negative sites
@@ -4175,36 +4173,38 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     // };
     // //polyscope::pushContext(negativePopUpUI);  
 
-    // std::vector<Vector3> negativeCenters;
-    // for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
-    // negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-    // }
-    // polyscope::registerPointCloud("Voronoi sites unaligned (-)", negativeCenters)->setEnabled(false);
-    // std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
+    std::vector<Vector3> negativeCenters;
+    for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
+    negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+    }
+    polyscope::registerPointCloud("Voronoi sites unaligned (-)", negativeCenters)->setEnabled(false);
+    std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
 
-    // //print the negative masses
-    // //render the fuzzy cells
-    // std::vector<Vector3> negSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
-    // std::vector<Vector3> negSiteColors(posSiteDistributions.size());
-    // for (size_t i = 0; i < negSiteDistributions.size(); i++){
-    //     double r,g,b;
-    //     hsv_to_rgb((double)i/negSiteDistributions.size() * 360, 0.75, 1., r, g, b);
-    //     posSiteColors[i] = {r,g,b};
-    // }
-    // std::shuffle(negSiteColors.begin(), negSiteColors.end(), g);
+    //print the negative masses
+    //render the fuzzy cells
+    std::vector<Vector3> negSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
+    std::vector<Vector3> negSiteColors(posSiteDistributions.size());
+    for (size_t i = 0; i < negSiteDistributions.size(); i++){
+        double r,g,b;
+        hsv_to_rgb((double)i/negSiteDistributions.size() * 360, 0.75, 1., r, g, b);
+        posSiteColors[i] = {r,g,b};
+    }
+    std::shuffle(negSiteColors.begin(), negSiteColors.end(), g);
 
-    // for (size_t i = 0; i < negSiteDistributions.size(); i++){
-    //     double mass = 0;
-    //     for (Vertex v : globalMesh.vertices()){ 
-    //         mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
-    //     }
-    //     std::cout << "negative mass at site " << i << " = " << mass << std::endl;
+    for (size_t i = 0; i < negSiteDistributions.size(); i++){
+        double mass = 0;
+        for (Vertex v : globalMesh.vertices()){ 
+            mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
+        }
+        std::cout << "negative mass at site " << i << " = " << mass << std::endl;
         
-    //     for (Vertex v : globalMesh.vertices()) {
-    //         negSiteDistributionColor[v.getIndex()] += posSiteColors[i] * negSiteDistributions[i][v];
-    //     }
-    // }
-    // psMesh.addVertexColorQuantity("neg site dist blend (course)", negSiteDistributionColor)->setEnabled(false);
+        for (Vertex v : globalMesh.vertices()) {
+            negSiteDistributionColor[v.getIndex()] += posSiteColors[i] * negSiteDistributions[i][v];
+        }
+    }
+    psMesh.addVertexColorQuantity("neg site dist blend (course)", negSiteDistributionColor)->setEnabled(false);
+
+    polyscope::show();
     
     // //perform optimal matching after projecting surface points to vertices
     // //store a vector of vertex ids and singularity indices (for optimal matching)
