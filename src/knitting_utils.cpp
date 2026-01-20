@@ -4508,6 +4508,43 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         for (Face f : faces) facePath[f] = 1;
         psMesh.addFaceScalarQuantity("faces for pair " + std::to_string(i), facePath);
         psMesh.addHalfedgeScalarQuantity("halfedge strip path " + std::to_string(i), stripHalfedgePath);
+        //visualize the halfedge path as a curve network 
+        std::vector<Vector3> nodes;
+        std::vector<std::array<size_t, 2>> edges;
+
+        // map mesh vertex index → curve node index
+        std::unordered_map<size_t, size_t> vtxToNode;
+
+        auto getNode = [&](Vertex v) {
+            size_t vid = v.getIndex();
+            auto it = vtxToNode.find(vid);
+            if (it != vtxToNode.end()) return it->second;
+
+            size_t newIdx = nodes.size();
+            nodes.push_back(globalGeometry.vertexPositions[v]);
+            vtxToNode[vid] = newIdx;
+            return newIdx;
+        };
+
+        for (Halfedge he : globalGeometry.mesh.halfedges()) {
+            if (std::fabs(stripHalfedgePath[he.getIndex()]) > 0.1) {
+                Vertex v0 = he.tailVertex();
+                Vertex v1 = he.tipVertex();
+
+                size_t i0 = getNode(v0);
+                size_t i1 = getNode(v1);
+
+                edges.push_back({i0, i1});
+            }
+        }
+        polyscope::CurveNetwork* psCurve =
+        polyscope::registerCurveNetwork(
+            "halfedge strip path (curve network)" + std::to_string(i),
+                nodes, edges
+        );
+        psCurve->setRadius(0.002);   // tweak for visibility
+        psCurve->setColor({1.0, 0.2, 0.2}); // red
+
         std::vector<double> edgePath(globalMesh.nEdges(), 0.0);
         halfedgePathConstraints.push_back(std::make_pair(stripHalfedgePath, 0.0));
         Eigen::MatrixXd iV;
@@ -4614,8 +4651,48 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         // Finally, add half of the "back-window" of both sings: b/2 = (a-P)/2
         hePath[startHe] += 0.5;
         hePath[endHe] += 0.5;
-        
-        psMesh.addHalfedgeScalarQuantity("ordering path +" + std::to_string(iPair), hePath)->setEnabled(false);
+
+
+        //--------------------------------------------------------------------//
+        // Hacky way to visualize ordering path constraints for paper 
+        // Not what is actually happening
+        // std::vector<Vertex> pathVs;
+        // std::vector<Edge> pathEs;
+        // std::vector<double> eWeights;
+        // std::tie(pathVs, pathEs, eWeights) = getVerticesAndEdgesInShortestEdgePath(gluedGeometry, startHe.tipVertex(), endHe.tailVertex());
+        // std::vector<Vector3> nodes;
+        // std::vector<std::array<size_t,2>> edges;
+        // nodes.reserve(pathVs.size());
+        // edges.reserve(pathEs.size());
+
+        // std::unordered_map<size_t, size_t> vtxToNode;
+
+        // for (Vertex v : pathVs) {
+        //     size_t vid = v.getIndex();
+        //     size_t idx = nodes.size();
+        //     vtxToNode[vid] = idx;
+        //     nodes.push_back(globalGeometry.vertexPositions[v]);
+        // }
+
+        // for (Edge e : pathEs) {
+        //     Vertex v0 = e.halfedge().tailVertex();
+        //     Vertex v1 = e.halfedge().tipVertex();
+
+        //     edges.push_back({
+        //         vtxToNode[v0.getIndex()],
+        //         vtxToNode[v1.getIndex()]
+        //     });
+        // }
+
+        // polyscope::CurveNetwork* psCurve =
+        // polyscope::registerCurveNetwork(
+        //     "ordering path " + std::to_string(iPair),
+        //     nodes,
+        //     edges
+        // );
+        // psCurve->setRadius(0.002);
+        // psCurve->setColor({0.2, 0.8, 0.2});
+        //-----------------------------------------------------------//
 
         std::vector<double> heWeights(globalMesh.nHalfedges(), 0.0);
         for (Halfedge he : globalMesh.halfedges())

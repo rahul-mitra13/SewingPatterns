@@ -249,7 +249,7 @@ void showStripePatterns(){
   // P("revealCurl done");
   // polyscope::show();
 
-  richDataFile = "info.ply";
+  // richDataFile = "info.ply";
 
   //-------iteratively find course stripes and course singularities----------//
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
