@@ -197,6 +197,21 @@ void showStripePatterns(){
       for (auto p : allSaddleLoops){
         globalPSMesh->addEdgeScalarQuantity("saddle loop " + std::to_string(k++), p);
       }
+
+      //viz for balanced pair
+      Eigen::MatrixXd iV1;
+      Eigen::MatrixXd iE1;
+      std::vector<int> f1;
+      std::tie(iV1, iE1, f1) = getIsoLine(V, F, timeFunctionGlobal, 0.2);
+
+      //viz for balanced pair
+      Eigen::MatrixXd iV2;
+      Eigen::MatrixXd iE2;
+      std::vector<int> f2;
+      std::tie(iV2, iE2, f2) = getIsoLine(V, F, timeFunctionGlobal, 0.23);
+      polyscope::registerCurveNetwork("isoval 0.3" + std::to_string(saddleLoopCtr), iV1, iE1);
+      polyscope::registerCurveNetwork("isoval 0.33" + std::to_string(saddleLoopCtr), iV2, iE2);
+      polyscope::show();
   }
   else{
     //in this intrinsic setting, can't visualize saddle loops
