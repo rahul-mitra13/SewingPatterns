@@ -1982,6 +1982,11 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     //Attempting to find the center of distributions using Vector Heat Method
     VertexData<double> curlMeasure = computeCourseVertexCurl(globalGeometry, gluedGeometry, 
                                     waleCurlFunctionGrad, gluedOneRingMap, edgeIndices, heatSolver, vertexMap);
+
+    
+    // for (int v : globalBdyConditions.courseEndBoundaryVertices){//for beanie figure
+    //     curlMeasure[v] = -2.73;
+    // }
     
     //handle the boosting of wale vertices
     std::vector<Vertex> waleBoostedVertices;
