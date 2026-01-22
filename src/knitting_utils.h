@@ -327,5 +327,27 @@ std::vector<std::vector<double>> findAllSaddleLoops(IntrinsicGeometryInterface& 
 //repair a knit graph vertex that's missing a connection
 std::vector<int> repairKnitGraphVertex();
 
+
+// glm::vec3 convertHSVtoRGB(float h, float s, float v) {
+//     float r = 0, g = 0, b = 0;
+
+//     int i = int(h * 6.0f);
+//     float f = h * 6.0f - i;
+//     float p = v * (1.0f - s);
+//     float q = v * (1.0f - f * s);
+//     float t = v * (1.0f - (1.0f - f) * s);
+
+//     switch (i % 6) {
+//         case 0: r = v; g = t; b = p; break;
+//         case 1: r = q; g = v; b = p; break;
+//         case 2: r = p; g = v; b = t; break;
+//         case 3: r = p; g = q; b = v; break;
+//         case 4: r = t; g = p; b = v; break;
+//         case 5: r = v; g = p; b = q; break;
+//     }
+
+//     return glm::vec3(r, g, b);
+// }
+
 #endif
 

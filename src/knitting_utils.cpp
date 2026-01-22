@@ -4045,12 +4045,54 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     std::cout << "number of sings = " << posOptions.nSites << std::endl;
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
-    posOptions.seed = 42;
+    posOptions.seed = 27;
 
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
     std::vector<std::vector<VertexData<double>>> posStepSiteDistribution = posVoronoiCenters.stepSiteDistribution;
     std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
     std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
+
+    std::vector<std::vector<glm::vec3>> polylines;
+
+    for (size_t i = 0; i < posSteps.size(); ++i) {
+
+        const std::vector<SurfacePoint>& step = posSteps[i];
+        if (step.size() < 2) continue;
+
+        std::vector<glm::vec3> nodes;
+        std::vector<std::array<size_t, 2>> edges;
+
+        nodes.reserve(step.size());
+        edges.reserve(step.size() - 1);
+
+        // ---- Convert SurfacePoints to nodes ----
+        for (const SurfacePoint& p : step) {
+            Vector3 pos = p.interpolate(globalGeometry.vertexPositions);
+            nodes.emplace_back(pos.x, pos.y, pos.z);
+        }
+
+        // ---- Connect consecutive nodes ----
+        for (size_t j = 0; j + 1 < nodes.size(); ++j) {
+            edges.push_back({j, j + 1});
+        }
+
+        // ---- Register curve network ----
+        polyscope::CurveNetwork* psCurve =
+            polyscope::registerCurveNetwork(
+                "Positive Lloyd path " + std::to_string(i),
+                nodes,
+                edges
+            );
+
+        // ---- Color by index (HSV → RGB) ----
+        float hue = float(i) / float(posSteps.size()); // [0,1]
+        //glm::vec3 color = convertHSVtoRGB(hue, 0.8f, 0.9f);
+        glm::vec3 color = glm::vec3(0.4f, hue, 0.5f);
+
+        psCurve->setColor({color.x, color.y, color.z});
+        psCurve->setRadius(0.002);
+    }
+    polyscope::show();
 
     // // //write a nested callback to debug the evolution of our method for the positive sites
     // // //Register the callback which creates the UI and does the hard work
@@ -4133,7 +4175,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     negOptions.nSites = posOptions.nSites;
     negOptions.useDelaunay = false;
     negOptions.computeDistributions = true;
-    negOptions.seed = 42;
+    negOptions.seed = 27;
     std::cout << "# positive sites " << posOptions.nSites << std::endl;
     std::cout << "# negative sites " << negOptions.nSites << std::endl;
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
@@ -4575,7 +4617,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
 
     // New short row ordering constraints
     std::vector<Edge> verticalPathEdges;
-    for (int iPair = 0; iPair < singularHalfedgesOrdered.size()-1; iPair++) {
+    for (int iPair = 0; iPair + 1 < singularHalfedgesOrdered.size(); iPair++) {
         double targetTimeValue = timeValuesOrdered[iPair+1];
 
         // Get lower half-edge, and orient it such that it points upwards

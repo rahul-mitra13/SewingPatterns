@@ -104,16 +104,18 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
   }
   std::vector<SurfacePoint> siteLocations = options.initialSites;
 
-  //debug on the square 
-  //f2592 and f6688 are next to each other 
-  // siteLocations.push_back(SurfacePoint(mesh.face(2592), Vector3{0.25, 0.25, 0.5}));
-  // siteLocations.push_back(SurfacePoint(mesh.face(6688), Vector3{1./3., 1./3., 1./3.}));
 
   size_t nSites = siteLocations.size();
   VoronoiResult result;
   result.steps.resize(nSites);
   result.stepSiteDistribution.resize(nSites);
   result.initialSites = siteLocations;
+
+  //add the inital step 
+  for (int i = 0; i < nSites; i++){
+    result.steps[i].push_back(siteLocations[i]);
+  
+  }
 
   // Handle case where there's no sites at all
   if (siteLocations.empty()) {
@@ -195,33 +197,27 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
                           options, measure, psMesh);
     
     double relChange = 0.;
-    if (oldOTEnergy < DBL_MAX) {
-        relChange =
-            std::abs(newOTEnergy - oldOTEnergy)
-            / std::max(std::abs(oldOTEnergy), 1e-16);
+    // if (oldOTEnergy < DBL_MAX) {
+    //     relChange =
+    //         std::abs(newOTEnergy - oldOTEnergy)
+    //         / std::max(std::abs(oldOTEnergy), 1e-16);
 
-        if (relChange < OTEps) {
-            std::cout << "relChange = " << relChange << std::endl;
-            std::cout << "Converged after " << iIter
-                      << " Lloyd iterations\n";
-            stop = true;
-            break;
-        }
-    }
+    //     if (relChange < OTEps) {
+    //         std::cout << "relChange = " << relChange << std::endl;
+    //         std::cout << "Converged after " << iIter
+    //                   << " Lloyd iterations\n";
+    //         stop = true;
+    //         break;
+    //     }
+    // }
 
-    std::cout << "relChange = " << relChange << std::endl;
+    // std::cout << "relChange = " << relChange << std::endl;
     oldOTEnergy = newOTEnergy;
 
     file << newOTEnergy << std::endl;
 
     cout << endl;
-    // double minCellMass = *min_element(cellMasses.begin(), cellMasses.end());
-    // double maxCellMass = *max_element(cellMasses.begin(), cellMasses.end());
-    // cout << "Cell mass bounds: " << minCellMass << ", " << maxCellMass << endl;
-
-    // if (iIter == 1)
-    //   break;
-
+   
     // UPDATE SITES WITH FIXED WEIGHTS (using Karcher mean)
     double energy = 0;
 
