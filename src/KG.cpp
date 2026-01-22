@@ -71,7 +71,7 @@ void KG::buildGraph(){
     makeAdjustedRealVertices();
     makeAdjustedFaceConnections();
     adjustedIntrinsicMerge();
-    tagIncreasesAndDecreases();
+    //tagIncreasesAndDecreases();
 
     //final graph stuff 
     buildFinalVerticesFromAdjusted();

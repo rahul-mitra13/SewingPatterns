@@ -2045,7 +2045,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     //perform masking on either side of the shoe! 
     // comment this out if you don't need any masking
     // Vertex maskingSource = globalGeometry.mesh.vertex(580);//put vertex ID to start BFS here! 
-    // int maskingDepth = 8;//adjust this based on how much masking you want
+    // int maskingDepth = 4;//adjust this based on how much masking you want
     // std::vector<Vertex> maskedVertices = bfsWithDepth(maskingSource, maskingDepth);
     // //add these vertices to the masking 
     // for (Vertex v : maskedVertices){
@@ -2179,8 +2179,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     int numSings = 0.;
     VoronoiOptions posOptions = defaultVoronoiOptions;
     //set this to 0 at very high res on beanie models since there shouldn't be any positive site
-    // posOptions.nSites = std::round(totalPosMeasure / period);
-    posOptions.nSites = 0;
+    posOptions.nSites = std::round(totalPosMeasure / period);
+    //posOptions.nSites = 0;
     std::cout << "positive sites = " << posOptions.nSites << std::endl;
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
@@ -2411,7 +2411,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     //Comment this out if you don't need any alignment to wale boundary edges
     // solve the model with all the path constraints and boundary constraints 
-    //modelWale.setBdyEdges(waleBdyEdges);//set these constraints on disk models
+    modelWale.setBdyEdges(waleBdyEdges);//set these constraints on disk models
     
     modelWale.setEdgeIndices(edgeIndices);
     modelWale.setEdgePathConstraints(waleEdgePathConstraints);
