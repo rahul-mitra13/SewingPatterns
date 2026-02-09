@@ -132,6 +132,34 @@ void showStripePatterns(){
   }
   globalPSMesh -> addVertexScalarQuantity("time function", timeFunctionGlobal);
 
+  // Visualize isolines of the time function at intervals of 0.1
+  double minTime = std::numeric_limits<double>::max();
+  double maxTime = std::numeric_limits<double>::lowest();
+  for (Vertex v : globalMesh->vertices()) {
+    minTime = std::min(minTime, timeFunctionGlobal[v]);
+    maxTime = std::max(maxTime, timeFunctionGlobal[v]);
+  }
+
+  double isolineInterval = 0.05;
+  int isolineIdx = 0;
+  for (double isovalue = std::ceil(minTime / isolineInterval) * isolineInterval;
+       isovalue <= maxTime;
+       isovalue += isolineInterval) {
+    Eigen::MatrixXd isoV;
+    Eigen::MatrixXd isoE;
+    std::vector<int> isoF;
+    std::tie(isoV, isoE, isoF) = getIsoLine(V, F, timeFunctionGlobal, isovalue);
+
+    if (isoV.rows() > 0) {
+      auto isolineCurve = polyscope::registerCurveNetwork(
+        "time isoline " + std::to_string(isovalue), isoV, isoE);
+      isolineCurve->setRadius(0.0008);
+      isolineCurve->setColor({0.0, 0.0, 0.0});
+      isolineCurve->setEnabled(true);
+      isolineIdx++;
+    }
+  }
+
   // Compute a smooth 1-direction field
   FaceData<Vector2> smoothDirectionField = computeSmoothestBoundaryAlignedFaceDirectionField(*globalGeometry, 1);
   FaceData<Vector3> basisX(globalGeometry->mesh);
@@ -197,21 +225,6 @@ void showStripePatterns(){
       for (auto p : allSaddleLoops){
         globalPSMesh->addEdgeScalarQuantity("saddle loop " + std::to_string(k++), p);
       }
-
-      //viz for balanced pair
-      Eigen::MatrixXd iV1;
-      Eigen::MatrixXd iE1;
-      std::vector<int> f1;
-      std::tie(iV1, iE1, f1) = getIsoLine(V, F, timeFunctionGlobal, 0.2);
-
-      //viz for balanced pair
-      Eigen::MatrixXd iV2;
-      Eigen::MatrixXd iE2;
-      std::vector<int> f2;
-      std::tie(iV2, iE2, f2) = getIsoLine(V, F, timeFunctionGlobal, 0.23);
-      polyscope::registerCurveNetwork("isoval 0.3" + std::to_string(saddleLoopCtr), iV1, iE1);
-      polyscope::registerCurveNetwork("isoval 0.33" + std::to_string(saddleLoopCtr), iV2, iE2);
-      polyscope::show();
   }
   else{
     //in this intrinsic setting, can't visualize saddle loops
