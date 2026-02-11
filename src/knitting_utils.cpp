@@ -4094,40 +4094,52 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     }
     polyscope::show();
 
-    // // //write a nested callback to debug the evolution of our method for the positive sites
-    // // //Register the callback which creates the UI and does the hard work
-    // // int step = 0;
-    // // int iSite = 0;
-    // // auto positivePopUpUI = [&](){
-    // //     static bool showWindow = true;
-    // //     ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
-    // //     ImGui::Begin("Positive sites", &showWindow);
-    // //     ImGui::PushItemWidth(400);
-    // //     ImGui::Separator();
-    // //     ImGui::InputInt("Site", &iSite);
-    // //     ImGui::InputInt("Time Step", &step);
-    // //     // Clamp to bounds after user input
-    // //     iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
-    // //     step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution[iSite].size() - 1));
-    // //     //need setEnabled(true) otherwise we run into OpenGL errors? weird
-    // //     // psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
-    // //     //polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+    // Generate shuffled colors for sites ONCE (reused in popup and final viz)
+    std::vector<Vector3> posSiteColors(posOptions.nSites);
+    for (size_t i = 0; i < posOptions.nSites; i++){
+        double r,g,b;
+        hsv_to_rgb((double)i/posOptions.nSites * 360, 0.75, 1., r, g, b);
+        posSiteColors[i] = {r,g,b};
+    }
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(posSiteColors.begin(), posSiteColors.end(), g);
 
-    // //     //should do this outside the ImGUI
-    // //     std::vector<Vector3> currentSites; 
-    // //     for (int i = 0; i < posOptions.nSites; i++){
-    // //         currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
-    // //     }
-    // //     auto pc = polyscope::registerPointCloud("all pos sites", currentSites);
-    // //     // --- Uniform color: just fill all points with one RGB value
-    // //     std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
-    // //     pc->addColorQuantity("uniform color", colors)->setEnabled(true);
+    //write a nested callback to debug the evolution of our method for the positive sites
+    //Register the callback which creates the UI and does the hard work
+    int step = 0;
+    int iSite = 0;
+    auto positivePopUpUI = [&](){
+        static bool showWindow = true;
+        ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
+        ImGui::Begin("Positive sites", &showWindow);
+        ImGui::PushItemWidth(400);
+        ImGui::Separator();
+        ImGui::InputInt("Site", &iSite);
+        ImGui::InputInt("Time Step", &step);
+        // Clamp to bounds after user input
+        iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
+        // stepSiteDistribution is indexed as [step][site], so size() gives number of steps
+        step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution.size() - 1));
+        //need setEnabled(true) otherwise we run into OpenGL errors? weird
+        // psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
+        //polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
 
-    // //     if (ImGui::Button("Done"))
-    // //         polyscope::popContext();
-    // //     ImGui::SameLine();
-    // // };
-    // // //polyscope::pushContext(positivePopUpUI);  
+        //should do this outside the ImGUI
+        std::vector<Vector3> currentSites;
+        for (int i = 0; i < posOptions.nSites; i++){
+            currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
+        }
+        auto pc = polyscope::registerPointCloud("all pos sites", currentSites);
+        // --- Uniform color: just fill all points with one RGB value
+        std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
+        pc->addColorQuantity("uniform color", colors)->setEnabled(true);
+
+        if (ImGui::Button("Done"))
+            polyscope::popContext();
+        ImGui::SameLine();
+    };
+    polyscope::pushContext(positivePopUpUI);  
 
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
@@ -4142,18 +4154,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     //     maxPosCurl = std::max(maxPosCurl, posMeasure[v]);
 
     //print the positive masses
-    //render the fuzzy cells
-    std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
-    std::vector<Vector3> posSiteColors(posSiteDistributions.size());
-    for (size_t i = 0; i < posSiteDistributions.size(); i++){
-        double r,g,b;
-        hsv_to_rgb((double)i/posSiteDistributions.size() * 360, 0.75, 1., r, g, b);
-        posSiteColors[i] = {r,g,b};
-    }
-    std::random_device rd;              // non-deterministic seed
-    std::mt19937 g(rd());               // Mersenne Twister engine
-    std::shuffle(posSiteColors.begin(), posSiteColors.end(), g);
-
+    //render the fuzzy cells (reuse posSiteColors generated before popup)
+    std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0});
     for (size_t i = 0; i < posSiteDistributions.size(); i++){
         double mass = 0;
         for (Vertex v : globalMesh.vertices()){ 
