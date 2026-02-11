@@ -365,11 +365,11 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
       for (Vertex v : mesh.vertices()) thisFracD[v] /= normD[v];
 
       //WEIGHT THE DISTRIBUTION BY THE CURL MEASURE
-      for (Vertex v : mesh.vertices()){ 
-        // H(thisFracD[v]);
-        // thisFracD[v] *= measure[v]; // density (this is what we want, i think)
-        // thisFracD[v] *= measure[v] * geom.vertexDualAreas[v]; // mass
-      }
+      // for (Vertex v : mesh.vertices()){ 
+      //   // H(thisFracD[v]);
+      //   thisFracD[v] *= measure[v]; // density (this is what we want, i think)
+      //   thisFracD[v] *= measure[v] * geom.vertexDualAreas[v]; // mass
+      // }
 
       result.siteDistributions.push_back(thisFracD);
     }

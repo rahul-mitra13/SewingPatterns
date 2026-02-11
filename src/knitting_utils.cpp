@@ -4135,6 +4135,9 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
         pc->addColorQuantity("uniform color", colors)->setEnabled(true);
 
+        //trying to grab the distribututions for viz
+        //std::vector<VertexData<double>> currSiteDistribution = posStepSiteDistribution[step];
+
         if (ImGui::Button("Done"))
             polyscope::popContext();
         ImGui::SameLine();
