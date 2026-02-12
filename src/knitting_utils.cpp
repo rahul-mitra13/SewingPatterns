@@ -4136,7 +4136,15 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         pc->addColorQuantity("uniform color", colors)->setEnabled(true);
 
         //trying to grab the distribututions for viz
-        //std::vector<VertexData<double>> currSiteDistribution = posStepSiteDistribution[step];
+        std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0});
+        std::vector<VertexData<double>> currSiteDistribution = posStepSiteDistribution[step];
+        for (size_t i = 0; i < currSiteDistribution.size(); i++){
+            for (Vertex v : globalMesh.vertices()) {
+                posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * currSiteDistribution[i][v];
+            }
+        }
+    psMesh.addVertexColorQuantity("pos site dist blend (course) " + std::to_string(step), posSiteDistributionColor)->setEnabled(true);
+
 
         if (ImGui::Button("Done"))
             polyscope::popContext();

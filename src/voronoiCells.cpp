@@ -108,7 +108,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
   size_t nSites = siteLocations.size();
   VoronoiResult result;
   result.steps.resize(nSites);
-  result.stepSiteDistribution.resize(nSites);
+  //result.stepSiteDistribution.resize(nSites);
   result.initialSites = siteLocations;
 
   //add the inital step 
@@ -241,6 +241,34 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
       for (int i = 0; i < omp_get_max_threads(); i++)
         fracDKarcher.emplace_back(VertexData<double>(mesh, 0));
 
+      // Collect distributions for all sites in this iteration (thread-safe)
+      vector<VertexData<double>> currentStepDistributions;
+
+      //-------------------------------------------//
+      //render the fuzzy power cells per iteration
+      rhs = computeRHSWithWeights(siteLocations, phiWeights, shortTime); // make it sharp just for visu
+      for (int i = 0; i < siteLocations.size(); i++)
+        normRHS += rhs[i];
+      normD = vSolver.scalarDiffuse(normRHS);
+      for (size_t iSite = 0; iSite < nSites; iSite++) {
+        SurfacePoint site = siteLocations[iSite];
+
+        // === Compute the nearest distribution
+        VertexData<double> thisFracD = vSolver.scalarDiffuse(rhs[iSite]);
+        for (Vertex v : mesh.vertices()) thisFracD[v] /= normD[v];
+
+        //WEIGHT THE DISTRIBUTION BY THE CURL MEASURE
+        // for (Vertex v : mesh.vertices()){ 
+        //   // H(thisFracD[v]);
+        //   thisFracD[v] *= measure[v]; // density (this is what we want, i think)
+        //   thisFracD[v] *= measure[v] * geom.vertexDualAreas[v]; // mass
+        // }
+
+        currentStepDistributions.push_back(thisFracD);
+      }
+      //After the oop, save all distributions for this iteration
+      result.stepSiteDistribution.push_back(currentStepDistributions);
+
       // // This doesn't work because it's an intrisic geometry fml
       // vector<Vector3> sites;
       // for (auto &site: siteLocations) {
@@ -312,14 +340,15 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
         TraceGeodesicResult traceResult = traceGeodesic(geom, site, options.stepSize * update);
 
         site = traceResult.endPoint;
-        //viz the path it's taking 
+        //viz the path it's taking
         result.steps[iSite].push_back(site);
-        //viz the distribution at every step
-        result.stepSiteDistribution[iSite].push_back(fracDKarcher[tid]);
+
+        //save the distribution for this site (thread-safe: each thread writes to its own index)
+        //currentStepDistributions[iSite] = fracDKarcher[tid];
 
         siteLocations[iSite] = site;
       }
-
+      
       H(energy);
 
       options.initialSites = siteLocations;
@@ -365,10 +394,8 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
       for (Vertex v : mesh.vertices()) thisFracD[v] /= normD[v];
 
       //WEIGHT THE DISTRIBUTION BY THE CURL MEASURE
-      // for (Vertex v : mesh.vertices()){ 
-      //   // H(thisFracD[v]);
-      //   thisFracD[v] *= measure[v]; // density (this is what we want, i think)
-      //   thisFracD[v] *= measure[v] * geom.vertexDualAreas[v]; // mass
+      // for (Vertex v : mesh.vertices()){
+      //   thisFracD[v] *= measure[v]; // density (match iteration weighting)
       // }
 
       result.siteDistributions.push_back(thisFracD);
