@@ -4130,7 +4130,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         for (int i = 0; i < posOptions.nSites; i++){
             currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
         }
-        auto pc = polyscope::registerPointCloud("all pos sites", currentSites);
+        auto pc = polyscope::registerPointCloud("all pos sites ", currentSites);
         // --- Uniform color: just fill all points with one RGB value
         std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
         pc->addColorQuantity("uniform color", colors)->setEnabled(true);
@@ -4143,7 +4143,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
                 posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * currSiteDistribution[i][v];
             }
         }
-    psMesh.addVertexColorQuantity("pos site dist blend (course) " + std::to_string(step), posSiteDistributionColor)->setEnabled(true);
+        psMesh.addVertexColorQuantity("pos site dist blend (course) " + std::to_string(step), posSiteDistributionColor)->setEnabled(true);
 
 
         if (ImGui::Button("Done"))
