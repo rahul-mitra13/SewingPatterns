@@ -4077,20 +4077,20 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         }
 
         // ---- Register curve network ----
-        polyscope::CurveNetwork* psCurve =
-            polyscope::registerCurveNetwork(
-                "Positive Lloyd path " + std::to_string(i),
-                nodes,
-                edges
-            );
+        // polyscope::CurveNetwork* psCurve =
+        //     polyscope::registerCurveNetwork(
+        //         "Positive Lloyd path " + std::to_string(i),
+        //         nodes,
+        //         edges
+        //     );
 
         // ---- Color by index (HSV → RGB) ----
         float hue = float(i) / float(posSteps.size()); // [0,1]
         //glm::vec3 color = convertHSVtoRGB(hue, 0.8f, 0.9f);
         glm::vec3 color = glm::vec3(0.4f, hue, 0.5f);
 
-        psCurve->setColor({color.x, color.y, color.z});
-        psCurve->setRadius(0.002);
+        // psCurve->setColor({color.x, color.y, color.z});
+        // psCurve->setRadius(0.002);
     }
     polyscope::show();
 
@@ -4592,13 +4592,13 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
                 edges.push_back({i0, i1});
             }
         }
-        polyscope::CurveNetwork* psCurve =
-        polyscope::registerCurveNetwork(
-            "halfedge strip path (curve network)" + std::to_string(i),
-                nodes, edges
-        );
-        psCurve->setRadius(0.002);   // tweak for visibility
-        psCurve->setColor({1.0, 0.2, 0.2}); // red
+        // polyscope::CurveNetwork* psCurve =
+        // polyscope::registerCurveNetwork(
+        //     "halfedge strip path (curve network)" + std::to_string(i),
+        //         nodes, edges
+        // );
+        // psCurve->setRadius(0.002);   // tweak for visibility
+        // psCurve->setColor({1.0, 0.2, 0.2}); // red
 
         std::vector<double> edgePath(globalMesh.nEdges(), 0.0);
         halfedgePathConstraints.push_back(std::make_pair(stripHalfedgePath, 0.0));
