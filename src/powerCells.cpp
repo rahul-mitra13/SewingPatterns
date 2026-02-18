@@ -152,7 +152,7 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
 
     std::vector<std::pair<SurfacePoint, SurfacePoint>> allMatchedPairs;
 
-    //solve the problem per bucket of vertices
+    //solve the problem per bucket (= connected component) of vertices
     for (int i = 0; i < buckets.size(); i++){
         VertexData<double> bucketCurl(gluedMesh, 0.);
         auto bucket = buckets[i];
@@ -160,6 +160,7 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
         for (Vertex v : bucket){
             bucketCurl[v] = courseMeasure[v];
         }
+        options.statsPath = "PC_stats_CC" + std::to_string(i) + ".csv";
         auto matchedPairs = computeBucketSingularities(options, bucketCurl, allDist, cylindricalParameterization);
         std::vector<Vector3> positiveCenters;
         for (int i = 0; i < matchedPairs.size(); i++){
@@ -214,8 +215,7 @@ VertexData<double> computeCourseCurlMeasure(powerCellOptions& options){
     return curlGlued;
 }
 
-std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(powerCellOptions& options, VertexData<double>& curlMeasure, VertexData<double>& allDist,
-                                                                            bool cylindricalParameterization){
+std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(powerCellOptions& options, VertexData<double>& curlMeasure, VertexData<double>& allDist, bool cylindricalParameterization){
     
     EdgeLengthGeometry* gluedGeometry = options.gluedGeometry;
     SurfaceMesh& gluedMesh = gluedGeometry->mesh;
@@ -225,6 +225,10 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(po
     double period = options.period;
     VertexData<double> timeFunction = options.timeFunction;
     
+    // Set up stats file
+    std::ofstream statsFile;
+    if (options.statsPath.size()) statsFile.open(options.statsPath);
+
     // Cap curl measure to avoid high concentration of singularities
     for (Vertex v : gluedMesh.vertices()) {
         curlMeasure[v] = fmin(curlMeasure[v], period / (3*globalGeometry->vertexDualAreas[v]));
@@ -263,6 +267,13 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(po
         }
         std::cout << "positive mass at site " << i << " = " << mass << std::endl;
     }
+
+    // [pos] Write objective function history to file
+    if (statsFile.is_open()) {
+        statsFile << "pos" << std::endl;
+        for (double obj : posVoronoiCenters.objHistory)
+            statsFile << obj << std::endl;        
+    }
     
 
     //negative sites 
@@ -280,7 +291,14 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeBucketSingularities(po
         }
         std::cout << "negative mass at site " << i << " = " << mass << std::endl;
     }
-    
+
+    // [neg] Write objective function history to file
+    if (statsFile.is_open()) {
+        statsFile << "neg" << std::endl;
+        for (double obj : negVoronoiCenters.objHistory)
+            statsFile << obj << std::endl;        
+    }
+
     //render surface points and pair up time functions
     std::vector<Vector3> positiveCenters;
     std::vector<std::pair<SurfacePoint, double>> posSiteTimeFunctions;

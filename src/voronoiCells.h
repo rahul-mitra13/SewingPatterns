@@ -18,6 +18,7 @@ struct VoronoiResult {
   std::vector<std::vector<SurfacePoint>> steps;       // DEBUG: steps taken from each starting point
   std::vector<std::vector<VertexData<double>>> stepSiteDistribution; // DEBUG: visualize the size distrubutions during the steps
   std::vector<SurfacePoint> initialSites;             //DEBUG: location of initial sites
+  std::vector<double> objHistory;                     // history of the OT objective function (unused for now)
 };
 
 struct VoronoiOptions {

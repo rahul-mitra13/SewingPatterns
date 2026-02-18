@@ -19,6 +19,7 @@ struct powerCellOptions {
   VertexData<double> timeFunction;//time function over the mesh 
   HalfedgeData<double> heWeights;//halfedge weights used during the optimal matching
   bool usePathCost = false;//if you want to use the path cost in the bipartite matching problem 
+  std::string statsPath; // path to file to dump some stats in
 };
 
 struct ComponentMesh {

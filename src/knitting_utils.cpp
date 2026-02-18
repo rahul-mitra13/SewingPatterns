@@ -2234,7 +2234,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
         }
     }
-    psMesh.addVertexColorQuantity("pos site dist blend (wale)", posSiteDistributionColor)->setEnabled(true);
+    psMesh.addVertexColorQuantity("pos site dist blend (wale)", posSiteDistributionColor)->setEnabled(false);
 
    
     VoronoiOptions negOptions = defaultVoronoiOptions;
@@ -4126,6 +4126,11 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     psMesh.addVertexColorQuantity("pos site dist blend (course)", posSiteDistributionColor)->setEnabled(false);
     //polyscope::show();
     
+    // Write the objective function history to file for positive wale
+    std::ofstream OTCostPosCourseFile("OT_cost_pos_course.csv");
+    for (double energy : posVoronoiCenters.objHistory)
+        OTCostPosCourseFile << energy << std::endl;
+
 
     // // NEGATIVE COURSE
 
@@ -4204,7 +4209,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     }
     psMesh.addVertexColorQuantity("neg site dist blend (course)", negSiteDistributionColor)->setEnabled(false);
 
-    polyscope::show();
+    // polyscope::show();
     
     // //perform optimal matching after projecting surface points to vertices
     // //store a vector of vertex ids and singularity indices (for optimal matching)
@@ -4544,6 +4549,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         );
         psCurve->setRadius(0.002);   // tweak for visibility
         psCurve->setColor({1.0, 0.2, 0.2}); // red
+        psCurve->setEnabled(false);
 
         std::vector<double> edgePath(globalMesh.nEdges(), 0.0);
         halfedgePathConstraints.push_back(std::make_pair(stripHalfedgePath, 0.0));

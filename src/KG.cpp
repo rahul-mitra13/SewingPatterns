@@ -1820,8 +1820,8 @@ void KG::tagIncreasesAndDecreases(){
         }
     }
 
-    polyscope::registerPointCloud("standardDecreases", standardDecreases);
-    polyscope::registerPointCloud("standardIncreases", standardIncreases);
+    polyscope::registerPointCloud("standardDecreases", standardDecreases)->setEnabled(false);
+    polyscope::registerPointCloud("standardIncreases", standardIncreases)->setEnabled(false);
 }
 
 void KG::buildFinalVerticesFromAdjusted() {

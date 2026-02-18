@@ -209,9 +209,9 @@ void showStripePatterns(){
       Eigen::MatrixXd iE2;
       std::vector<int> f2;
       std::tie(iV2, iE2, f2) = getIsoLine(V, F, timeFunctionGlobal, 0.23);
-      polyscope::registerCurveNetwork("isoval 0.3" + std::to_string(saddleLoopCtr), iV1, iE1);
-      polyscope::registerCurveNetwork("isoval 0.33" + std::to_string(saddleLoopCtr), iV2, iE2);
-      polyscope::show();
+      polyscope::registerCurveNetwork("isoval 0.3" + std::to_string(saddleLoopCtr), iV1, iE1)->setEnabled(false);
+      polyscope::registerCurveNetwork("isoval 0.33" + std::to_string(saddleLoopCtr), iV2, iE2)->setEnabled(false);
+      // polyscope::show();
   }
   else{
     //in this intrinsic setting, can't visualize saddle loops
@@ -397,7 +397,7 @@ void showStripePatterns(){
   polyscope::registerCurveNetwork("wale singular edges (+1)", waleSingularEdgePointsPos, waleSingularEdgesPos)->setRadius(0.001)->setColor({1,0,0})->setEnabled(false);
   polyscope::registerCurveNetwork("wale singular edges (-1)", waleSingularEdgePointsNeg, waleSingularEdgesNeg)->setRadius(0.001)->setColor({0,0,1})->setEnabled(false);
 
-  polyscope::show();
+  // polyscope::show();
 
   //transfer the stripe texturing coordinates to the glued setting 
   CornerData<double> courseStripeValuesGlued(gluedELG->mesh);
@@ -409,7 +409,7 @@ void showStripePatterns(){
     waleStripeValuesGlued[c] = waleStripeValues[c.getIndex()];
   }
 
-  polyscope::show();
+  // polyscope::show();
 
   // generate the new knit graph
   KG graph = KG(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,

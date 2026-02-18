@@ -213,6 +213,7 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     oldOTEnergy = newOTEnergy;
 
     file << newOTEnergy << std::endl;
+    result.objHistory.push_back(newOTEnergy);
 
     cout << endl;
     // double minCellMass = *min_element(cellMasses.begin(), cellMasses.end());
