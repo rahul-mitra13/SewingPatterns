@@ -1703,6 +1703,9 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
     EdgeData<double> checked(globalGeometry.mesh, 0.0);
 
+    auto start = std::chrono::high_resolution_clock::now();
+
+
     bool toBreak = false;
     while(true){
         std::vector<std::pair<int, int>> waleSingularityEdges = findWaleSingularityEdges(globalGeometry, gluedGeometry,
@@ -1858,6 +1861,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         }
         if (toBreak) break;//we are no longer improving the distance to unit norm 
     }
+
+    auto end = std::chrono::high_resolution_clock::now();
 
     // Compute the final non-integer 1-form
     std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
@@ -3167,7 +3172,7 @@ bool isValidEdgePair(VertexPositionGeometry& globalGeometry, EdgeData<double>& e
 //@clean 
 //the below two functions use the energy min ||\del sigma_i - \nabla \sigma_{i - 1} / ||\nabla \sigma_{i - 1}|| ||^2
 //if i = 1, use \nabla h / ||\nabla h||
-std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
+std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& gluedGeometry, 
                                                                     VertexData<double>& globalTimeFunction, FaceData<Vector3>& globalTimeFunctionGradientsNormalized,
                                                                     std::map<int, int>& vertexMap, std::map<int, int>& edgeMap, polyscope::SurfaceMesh& psMesh,
                                                                     globalBoundaryConditions& boundaryConditions, double period,
@@ -3418,7 +3423,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
         psMesh.addVertexScalarQuantity("initial all distance course", allDistGlobal);
         for (Vertex v : globalMesh.vertices()){
             //vertexCurl[v] = (1 - exp(-pow(allDistGlobal[v], 2.) / (2 * pow(period, 2)))) * vertexCurl[v];
-            courseWeighting[v] = (allDistGlobal[v] > 2*period);
+            courseWeighting[v] = (allDistGlobal[v] > 2. * period);
             vertexCurl[v] = courseWeighting[v] * vertexCurl[v];
         }
     }
@@ -3467,6 +3472,7 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
     psMesh.addEdgeScalarQuantity("edge curl after " + std::to_string(numRuns - 1) + " singularity insertions (after subtracting)", edgeCurl);
     int numSingularities = 0;
 
+    polyscope::show();
     auto start = std::chrono::high_resolution_clock::now();
 
     int numIters = 0;
@@ -3648,36 +3654,37 @@ std::tuple<CornerData<double>, EdgeData<double>> implCourseHarmonic1Form(VertexP
 
 
     //solve the final model with the singularities and homology generators 
-    std::cout << "solving final course stripes...." << std::endl;
+    //std::cout << "solving final course stripes...." << std::endl;
     model.setHomologyGenerators(homologyGenerators);
     std::tie(gluedSigmaTilde, currObj) = computeCourseOneForm(globalGeometry, gluedGeometry, model, vertexMap, G, psMesh);
+    std::cout << "Final course objective = " << currObj << std::endl;
     std::tie(stripeValuesSigmaCourse, stripeIndicesSigmaCourse) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, gluedSigmaTilde, period);
     std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesSigmaCourse, stripeIndicesSigmaCourse, period, 
                                                 edgeMap, components);
 
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Time taken by process: " << (duration.count() / 1e6) << " second" << std::endl;
+    std::cout << "Time taken for course: " << (duration.count() / 1e6) << " second" << std::endl;
                                         
     //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
-    courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numSingularities) + 
-                                                    " singularity insertions", uniquePos, uniqueEdges);
-    courseStripes -> setRadius(0.001);
-    courseStripes -> setEnabled(false);
+    // courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes after " + std::to_string(numSingularities) + 
+    //                                                 " singularity insertions", uniquePos, uniqueEdges);
+    // courseStripes -> setRadius(0.001);
+    // courseStripes -> setEnabled(false);
 
 
     // Plot stripe values with offset (to debug knit graph)
-    CornerData<double> stripeValuesWithOffset = stripeValuesSigmaCourse;
-    for (Corner co : globalMesh.corners())
-        stripeValuesWithOffset[co] -= period/4;
-    std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesWithOffset, stripeIndicesSigmaCourse, period, edgeMap, components);
-    //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
-    courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes with offset", uniquePos, uniqueEdges);
-    courseStripes -> setRadius(0.001);
-    courseStripes -> setEnabled(false);
+    // CornerData<double> stripeValuesWithOffset = stripeValuesSigmaCourse;
+    // for (Corner co : globalMesh.corners())
+    //     stripeValuesWithOffset[co] -= period/4;
+    // std::tie(uniquePos, uniqueEdges) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesWithOffset, stripeIndicesSigmaCourse, period, edgeMap, components);
+    // //std::cout << "Number of components after " << std::to_string(numSingularities) << " singularity insertions is " << components.size() << std::endl;
+    // courseStripes = polyscope::registerCurveNetwork("sigma tilde stripes with offset", uniquePos, uniqueEdges);
+    // courseStripes -> setRadius(0.001);
+    // courseStripes -> setEnabled(false);
 
-    std::cout << "Number of iterations = " << numIters << std::endl;
-    std::cout << "Number of singularities inserted = " << numSingularities << std::endl;
+    // std::cout << "Number of iterations = " << numIters << std::endl;
+    // std::cout << "Number of singularities inserted = " << numSingularities << std::endl;
     return std::tie(stripeValuesSigmaCourse, edgeSingularities);
 
 }

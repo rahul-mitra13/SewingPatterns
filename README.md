@@ -1,6 +1,13 @@
-# sewing panels in the wild to low-poly meshes
+# Curl Quantization
+Quantizing curl on surfaces for knitting.
 
-deps: libigl, geometry-central, polyscope, gurobi, eigen 
+## Dependencies: 
 
-Stay tuned for more docs.
+```
+libigl, 
+geometry-central
+polyscope 
+gurobi 
+eigen
+```
 

@@ -172,12 +172,21 @@ void showStripePatterns(){
   CornerData<double> courseStripeValues(globalGeometry -> mesh);
   EdgeData<double> courseSingularEdgesGlobal(globalGeometry -> mesh);
   FaceData<Vector3> courseOneFormGrad(globalGeometry -> mesh);
-  std::tie(courseStripeValues, courseSingularEdgesGlobal) = implCourseHarmonic1Form(*globalGeometry, *gluedELG, timeFunctionGlobal,
+  std::tie(courseStripeValues, courseSingularEdgesGlobal) = computeCourseStripeInfo(*globalGeometry, *gluedELG, timeFunctionGlobal,
                                                                     timeFunctionGradientGlobalNormalized, vertexMap, edgeMap, *globalPSMesh,
                                                                     globalBdyConditions, coursePeriod, V, F, G, courseOneFormGrad, gluedOneRingMap, 
                                                                     allSaddleLoops, homologyGenerators);
 
   
+  int numCourseSings = 0;
+  for (Edge e : globalMesh->edges()){
+    if (std::fabs(courseSingularEdgesGlobal[e]) != 0){
+      numCourseSings++;
+    }
+  }
+  std::cout << "Total number of course singularities (positive and negative) = " << numCourseSings << std::endl;
+  polyscope::show();
+
   globalPSMesh -> addEdgeScalarQuantity("course singular edges", courseSingularEdgesGlobal);
   // Store course singular edges for rendering later
   RichSurfaceMeshData richData(globalGeometry->mesh);
@@ -186,11 +195,11 @@ void showStripePatterns(){
   richData.addEdgeProperty("courseSingularEdge", courseSingularEdgesGlobal);
 
 
-  // // FaceData<int> stripeIndicesSigmaCourse(*globalMesh, 0);
-  // // std::vector<Vector3> positionsCourse;
-  // // std::vector<std::array<int, 2>> edgesCourse;
-  // // std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, courseStripeValues, stripeIndicesSigmaCourse, coursePeriod);
-  // // auto courseStripes = polyscope::registerCurveNetwork("final course stripes ", positionsCourse, edgesCourse);
+  FaceData<int> stripeIndicesSigmaCourse(*globalMesh, 0);
+  std::vector<Vector3> positionsCourse;
+  std::vector<std::array<int, 2>> edgesCourse;
+  std::tie(positionsCourse, edgesCourse) = generateIsoLines(*globalGeometry, courseStripeValues, stripeIndicesSigmaCourse, coursePeriod);
+  auto courseStripes = polyscope::registerCurveNetwork("final course stripes ", positionsCourse, edgesCourse);
   // // courseStripes -> setRadius(0.001);
   // // courseStripes -> setEnabled(false);
 
@@ -207,6 +216,22 @@ void showStripePatterns(){
                                                                     courseOneFormGrad, G, walePeriod, knoppelFrequency, globalBdyConditions, 
                                                                     courseSingularEdgesGlobal, gluedOneRingMap,*globalPSMesh, allSaddleLoops,
                                                                     homologyGenerators);
+  
+  int plusWale = 0;
+  int minusWale = 0;
+  for (Edge e : globalMesh->edges()){
+    if (waleSingularEdgesGlobal[e] > 0){
+      plusWale++;
+    }
+    else if (waleSingularEdgesGlobal[e] < 0){
+      minusWale++;
+    }
+  }
+  std::cout << "Number of positive wale singularities = " << plusWale << std::endl;
+  std::cout << "Number of negative wale singularities =  " << minusWale << std::endl;
+  polyscope::show();
+
+  
   // // Store wale singular edges for rendering later
   // richData.addEdgeProperty("waleSingularEdges", waleSingularEdgesGlobal);
 
@@ -215,7 +240,7 @@ void showStripePatterns(){
   std::vector<Vector3> positionsWale;
   std::vector<std::array<int, 2>> edgesWale;
   std::tie(positionsWale, edgesWale) = generateIsoLines(*globalGeometry, waleStripeValues, waleSingularFaces, walePeriod);
-  auto waleStripes = polyscope::registerCurveNetwork("wale stripes", positionsWale, edgesWale);
+  auto waleStripes = polyscope::registerCurveNetwork("final wale stripes", positionsWale, edgesWale);
   // globalPSMesh -> addEdgeScalarQuantity("wale singularities", waleSingularEdgesGlobal);
   // waleStripes -> setRadius(0.001);
   // waleStripes -> setEnabled(false);
