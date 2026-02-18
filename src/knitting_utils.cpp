@@ -4045,47 +4045,112 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     std::cout << "number of sings = " << posOptions.nSites << std::endl;
     posOptions.useDelaunay = false;
     posOptions.computeDistributions = true;
-    posOptions.seed = 42;
+    posOptions.seed = 27;
 
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
     std::vector<std::vector<VertexData<double>>> posStepSiteDistribution = posVoronoiCenters.stepSiteDistribution;
     std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
     std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
 
-    // // //write a nested callback to debug the evolution of our method for the positive sites
-    // // //Register the callback which creates the UI and does the hard work
-    // // int step = 0;
-    // // int iSite = 0;
-    // // auto positivePopUpUI = [&](){
-    // //     static bool showWindow = true;
-    // //     ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
-    // //     ImGui::Begin("Positive sites", &showWindow);
-    // //     ImGui::PushItemWidth(400);
-    // //     ImGui::Separator();
-    // //     ImGui::InputInt("Site", &iSite);
-    // //     ImGui::InputInt("Time Step", &step);
-    // //     // Clamp to bounds after user input
-    // //     iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
-    // //     step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution[iSite].size() - 1));
-    // //     //need setEnabled(true) otherwise we run into OpenGL errors? weird
-    // //     // psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
-    // //     //polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+    std::vector<std::vector<glm::vec3>> polylines;
 
-    // //     //should do this outside the ImGUI
-    // //     std::vector<Vector3> currentSites; 
-    // //     for (int i = 0; i < posOptions.nSites; i++){
-    // //         currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
-    // //     }
-    // //     auto pc = polyscope::registerPointCloud("all pos sites", currentSites);
-    // //     // --- Uniform color: just fill all points with one RGB value
-    // //     std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
-    // //     pc->addColorQuantity("uniform color", colors)->setEnabled(true);
+    for (size_t i = 0; i < posSteps.size(); ++i) {
 
-    // //     if (ImGui::Button("Done"))
-    // //         polyscope::popContext();
-    // //     ImGui::SameLine();
-    // // };
-    // // //polyscope::pushContext(positivePopUpUI);  
+        const std::vector<SurfacePoint>& step = posSteps[i];
+        if (step.size() < 2) continue;
+
+        std::vector<glm::vec3> nodes;
+        std::vector<std::array<size_t, 2>> edges;
+
+        nodes.reserve(step.size());
+        edges.reserve(step.size() - 1);
+
+        // ---- Convert SurfacePoints to nodes ----
+        for (const SurfacePoint& p : step) {
+            Vector3 pos = p.interpolate(globalGeometry.vertexPositions);
+            nodes.emplace_back(pos.x, pos.y, pos.z);
+        }
+
+        // ---- Connect consecutive nodes ----
+        for (size_t j = 0; j + 1 < nodes.size(); ++j) {
+            edges.push_back({j, j + 1});
+        }
+
+        // ---- Register curve network ----
+        // polyscope::CurveNetwork* psCurve =
+        //     polyscope::registerCurveNetwork(
+        //         "Positive Lloyd path " + std::to_string(i),
+        //         nodes,
+        //         edges
+        //     );
+
+        // ---- Color by index (HSV → RGB) ----
+        float hue = float(i) / float(posSteps.size()); // [0,1]
+        //glm::vec3 color = convertHSVtoRGB(hue, 0.8f, 0.9f);
+        glm::vec3 color = glm::vec3(0.4f, hue, 0.5f);
+
+        // psCurve->setColor({color.x, color.y, color.z});
+        // psCurve->setRadius(0.002);
+    }
+    polyscope::show();
+
+    // Generate shuffled colors for sites ONCE (reused in popup and final viz)
+    std::vector<Vector3> posSiteColors(posOptions.nSites);
+    for (size_t i = 0; i < posOptions.nSites; i++){
+        double r,g,b;
+        hsv_to_rgb((double)i/posOptions.nSites * 360, 0.75, 1., r, g, b);
+        posSiteColors[i] = {r,g,b};
+    }
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(posSiteColors.begin(), posSiteColors.end(), g);
+
+    //write a nested callback to debug the evolution of our method for the positive sites
+    //Register the callback which creates the UI and does the hard work
+    int step = 0;
+    int iSite = 0;
+    auto positivePopUpUI = [&](){
+        static bool showWindow = true;
+        ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
+        ImGui::Begin("Positive sites", &showWindow);
+        ImGui::PushItemWidth(400);
+        ImGui::Separator();
+        ImGui::InputInt("Site", &iSite);
+        ImGui::InputInt("Time Step", &step);
+        // Clamp to bounds after user input
+        iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
+        // stepSiteDistribution is indexed as [step][site], so size() gives number of steps
+        step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution.size() - 1));
+        //need setEnabled(true) otherwise we run into OpenGL errors? weird
+        // psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
+        //polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+
+        //should do this outside the ImGUI
+        std::vector<Vector3> currentSites;
+        for (int i = 0; i < posOptions.nSites; i++){
+            currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
+        }
+        auto pc = polyscope::registerPointCloud("all pos sites ", currentSites);
+        // --- Uniform color: just fill all points with one RGB value
+        std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
+        pc->addColorQuantity("uniform color", colors)->setEnabled(true);
+
+        //trying to grab the distribututions for viz
+        std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0});
+        std::vector<VertexData<double>> currSiteDistribution = posStepSiteDistribution[step];
+        for (size_t i = 0; i < currSiteDistribution.size(); i++){
+            for (Vertex v : globalMesh.vertices()) {
+                posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * currSiteDistribution[i][v];
+            }
+        }
+        psMesh.addVertexColorQuantity("pos site dist blend (course) " + std::to_string(step), posSiteDistributionColor)->setEnabled(true);
+
+
+        if (ImGui::Button("Done"))
+            polyscope::popContext();
+        ImGui::SameLine();
+    };
+    polyscope::pushContext(positivePopUpUI);  
 
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
@@ -4100,18 +4165,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     //     maxPosCurl = std::max(maxPosCurl, posMeasure[v]);
 
     //print the positive masses
-    //render the fuzzy cells
-    std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
-    std::vector<Vector3> posSiteColors(posSiteDistributions.size());
-    for (size_t i = 0; i < posSiteDistributions.size(); i++){
-        double r,g,b;
-        hsv_to_rgb((double)i/posSiteDistributions.size() * 360, 0.75, 1., r, g, b);
-        posSiteColors[i] = {r,g,b};
-    }
-    std::random_device rd;              // non-deterministic seed
-    std::mt19937 g(rd());               // Mersenne Twister engine
-    std::shuffle(posSiteColors.begin(), posSiteColors.end(), g);
-
+    //render the fuzzy cells (reuse posSiteColors generated before popup)
+    std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0});
     for (size_t i = 0; i < posSiteDistributions.size(); i++){
         double mass = 0;
         for (Vertex v : globalMesh.vertices()){ 
@@ -4138,7 +4193,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     negOptions.nSites = posOptions.nSites;
     negOptions.useDelaunay = false;
     negOptions.computeDistributions = true;
-    negOptions.seed = 42;
+    negOptions.seed = 27;
     std::cout << "# positive sites " << posOptions.nSites << std::endl;
     std::cout << "# negative sites " << negOptions.nSites << std::endl;
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
@@ -4542,14 +4597,13 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
                 edges.push_back({i0, i1});
             }
         }
-        polyscope::CurveNetwork* psCurve =
-        polyscope::registerCurveNetwork(
-            "halfedge strip path (curve network)" + std::to_string(i),
-                nodes, edges
-        );
-        psCurve->setRadius(0.002);   // tweak for visibility
-        psCurve->setColor({1.0, 0.2, 0.2}); // red
-        psCurve->setEnabled(false);
+        // polyscope::CurveNetwork* psCurve =
+        // polyscope::registerCurveNetwork(
+        //     "halfedge strip path (curve network)" + std::to_string(i),
+        //         nodes, edges
+        // );
+        // psCurve->setRadius(0.002);   // tweak for visibility
+        // psCurve->setColor({1.0, 0.2, 0.2}); // red
 
         std::vector<double> edgePath(globalMesh.nEdges(), 0.0);
         halfedgePathConstraints.push_back(std::make_pair(stripHalfedgePath, 0.0));
@@ -4581,7 +4635,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
 
     // New short row ordering constraints
     std::vector<Edge> verticalPathEdges;
-    for (int iPair = 0; iPair < singularHalfedgesOrdered.size()-1; iPair++) {
+    for (int iPair = 0; iPair + 1 < singularHalfedgesOrdered.size(); iPair++) {
         double targetTimeValue = timeValuesOrdered[iPair+1];
 
         // Get lower half-edge, and orient it such that it points upwards
