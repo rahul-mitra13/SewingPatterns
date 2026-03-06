@@ -3,6 +3,7 @@
 #include "float.h"
 #include "knitting_utils.h"
 #include "helpers.h"
+#include <iomanip>
 
 using namespace std;
 
@@ -171,11 +172,19 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
   // == Iterations
   bool stop = false; // flag if stopping criterion on sumUpdateNorm is reached
   double sumUpdateNorm = 1; // just a starting point to determine a tolerance on weights grad norm
+
+  std::cout << std::left
+            << std::setw(6)  << "Iter"
+            << std::setw(12) << "L-BFGS"
+            << std::setw(16) << "OT Energy"
+            << std::setw(16) << "Karcher Energy"
+            << std::setw(16) << "Max Update"
+            << std::setw(16) << "Threshold"
+            << std::endl;
+  std::cout << std::string(82, '-') << std::endl;
+
   for (size_t iIter = 0; iIter < options.iterations && !stop; iIter++) {//Lloyd iterations
 
-    std::cout << "Logging info..." << std::endl;
-    std::cout << "LLoyd iteration number " << iIter << std::endl;
-    
     // UPDATE WEIGHTS WITH FIXED SITES (using Karcher mean)
 
     //double alpha = 1.0, beta = 0.9;
@@ -192,7 +201,8 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     // New L-BFGS stuff
     options.epsWeights = max(1e-8, 1e-4 * sumUpdateNorm); // we want the weights to be converged, but only relative to the sites
     newOTEnergy = 0.0;
-    std::tie(newOTEnergy, phiWeights) =
+    int lbfgsIter = 0;
+    std::tie(newOTEnergy, phiWeights, lbfgsIter) =
         computePhiWeights(mesh, geom, phiWeights, vSolvers,
                           options, measure, psMesh);
     
@@ -217,8 +227,6 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
     file << newOTEnergy << std::endl;
     result.objHistory.push_back(newOTEnergy);
 
-    cout << endl;
-   
     // UPDATE SITES WITH FIXED WEIGHTS (using Karcher mean)
     double energy = 0;
 
@@ -350,8 +358,6 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
         siteLocations[iSite] = site;
       }
       
-      H(energy);
-
       options.initialSites = siteLocations;
 
       sumUpdateNorm = 0;
@@ -360,18 +366,23 @@ VoronoiResult computeGeodesicCentroidalVoronoiTessellationWithWeights(SurfaceMes
       // Convergence criterion: max update should be a fraction of edge length
       double maxUpdateNorm = *max_element(updateNorm.begin(), updateNorm.end());
       double eps_rel = 1e-2; // feel free to tweak this
-      cout << "Lloyd convergence: " << maxUpdateNorm << " / " << eps_rel * meanEdgeLength << std::endl; 
+
+      std::cout << "\r" << std::left
+                << std::setw(6)  << iIter
+                << std::setw(12) << lbfgsIter
+                << std::setw(16) << newOTEnergy
+                << std::setw(16) << energy
+                << std::setw(16) << maxUpdateNorm
+                << std::setw(16) << eps_rel * meanEdgeLength
+                << std::flush;
 
       if (maxUpdateNorm < eps_rel * meanEdgeLength) {
         stop = true;
         break;
       }
     }//end of Karcher mean step to find mean of distribution
-    cout << endl;
-
-    if (VORONOI_PRINT) std::cout << "Finished iteration " << iIter << "  energy " << energy << std::endl;
-    std::cout << "-------------------------" << std::endl;
   }
+  std::cout << std::endl; // finish the overwrite line
 
   // geom.unrequireVertexDualAreas();
 
@@ -459,7 +470,7 @@ void alignPointsOnIsolineFast(SurfaceMesh& mesh, VertexPositionGeometry& geom, a
 }
 
 //computing equal weights using LBFGS
-std::tuple<double, std::vector<double>> computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom, std::vector<double>& initWeights, vector<VectorHeatMethodSolver>& vSolvers, VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh){
+std::tuple<double, std::vector<double>, int> computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom, std::vector<double>& initWeights, vector<VectorHeatMethodSolver>& vSolvers, VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh){
   
   //set the measure in Voronoi options (TO DO: specify this elsewhere) 
   options.measure = measure;
@@ -496,8 +507,7 @@ std::tuple<double, std::vector<double>> computePhiWeights(SurfaceMesh& mesh, Int
   // x will be overwritten to be the best point found
   double fx = 0;
   int niter = solver.minimize(fun, x, fx);
-  std::cout << niter << " L-BFGS iterations" << std::endl;
-  return std::make_tuple(fx, vector<double>(x.data(), x.data()+x.size()));
+  return std::make_tuple(fx, vector<double>(x.data(), x.data()+x.size()), niter);
 }
 
 } // namespace surface

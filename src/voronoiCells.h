@@ -70,7 +70,7 @@ VoronoiResult computeSitesWithFunction(SurfaceMesh& mesh, IntrinsicGeometryInter
                                       VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
 
 //computing equal weights using LBFGS
-std::tuple<double, std::vector<double>> computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom, std::vector<double>& initWeights, std::vector<VectorHeatMethodSolver>& vSolvers, VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
+std::tuple<double, std::vector<double>, int> computePhiWeights(SurfaceMesh& mesh, IntrinsicGeometryInterface& geom, std::vector<double>& initWeights, std::vector<VectorHeatMethodSolver>& vSolvers, VoronoiOptions options, VertexData<double>& measure, polyscope::SurfaceMesh &psMesh);
 
 
 //defining a class to do LBFGS with F_OT as defined by the seminal work, "Stochastic Wassertein Barycenters"

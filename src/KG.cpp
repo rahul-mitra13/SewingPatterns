@@ -472,7 +472,6 @@ void KG::intrinsicMerge(){
     }
 
     polyscope::registerPointCloud("problem vertices", problemVertex);
-    polyscope::show();
 
     //also ensure all the ordering is correct
     for (Face f : gluedGeometry->mesh.faces()) {

@@ -4092,7 +4092,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         // psCurve->setColor({color.x, color.y, color.z});
         // psCurve->setRadius(0.002);
     }
-    polyscope::show();
 
     // Generate shuffled colors for sites ONCE (reused in popup and final viz)
     std::vector<Vector3> posSiteColors(posOptions.nSites);
@@ -4150,7 +4149,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
             polyscope::popContext();
         ImGui::SameLine();
     };
-    polyscope::pushContext(positivePopUpUI);  
+    // polyscope::pushContext(positivePopUpUI); 
+    // TODO: UNDERSTAND WHY PUSHCONTEXT PAUSES THINGS
 
     std::vector<Vector3> positiveCenters;
     for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
@@ -4185,7 +4185,6 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     std::ofstream OTCostPosCourseFile("OT_cost_pos_course.csv");
     for (double energy : posVoronoiCenters.objHistory)
         OTCostPosCourseFile << energy << std::endl;
-
 
     // // NEGATIVE COURSE
 
