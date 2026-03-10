@@ -22,6 +22,8 @@
 #include "nlohmann/json.hpp"
 #include "imgui.h"
 #include <CLI/CLI.hpp>
+#include <chrono>
+#include <fstream>
 
 //file includes
 #include "powerCells.h"
@@ -93,7 +95,30 @@ optional<string> richDataFile;
 // TODO: setup command line interface with CLI11
 Options opts;
 
-//here we will do as much processing as possible directly on the glued together mesh 
+// === Stats / UI globals ===
+std::string statsFilePath;
+std::string knitgraphFilePath = "model.txt";
+std::chrono::steady_clock::time_point programStart;
+bool nogui = false;
+enum class KGStatus { NOT_STARTED, IN_PROGRESS, SUCCEEDED };
+KGStatus kgStatus = KGStatus::NOT_STARTED;
+int nCoursePosSing = -1, nCourseNegSing = -1, nWalePosSing = -1, nWaleNegSing = -1;
+double elapsedSeconds = -1;
+
+void writeStats() {
+  if (statsFilePath.empty()) return;
+  std::ofstream f(statsFilePath);
+  f << "runtime_s: " << elapsedSeconds << "\n";
+  f << "kg_build: ";
+  if (kgStatus == KGStatus::SUCCEEDED)   f << "succeeded\n";
+  else if (kgStatus == KGStatus::IN_PROGRESS) f << "failed\n";
+  else                                   f << "not_run\n";
+  if (nCoursePosSing >= 0) f << "short_rows: "    << nCoursePosSing / 2 << "\n";
+  if (nWalePosSing   >= 0) f << "wale_pos_sing: " << nWalePosSing       << "\n";
+  if (nWaleNegSing   >= 0) f << "wale_neg_sing: " << nWaleNegSing       << "\n";
+}
+
+//here we will do as much processing as possible directly on the glued together mesh
 void showStripePatterns(){
   
   // Scold the user if they want to use V coord as guidance but have not specified it
@@ -409,6 +434,10 @@ void showStripePatterns(){
   }
   polyscope::registerCurveNetwork("wale singular edges (+1)", waleSingularEdgePointsPos, waleSingularEdgesPos)->setRadius(0.001)->setColor({1,0,0})->setEnabled(false);
   polyscope::registerCurveNetwork("wale singular edges (-1)", waleSingularEdgePointsNeg, waleSingularEdgesNeg)->setRadius(0.001)->setColor({0,0,1})->setEnabled(false);
+  nCoursePosSing = courseSingularEdgePos.size();
+  nCourseNegSing = courseSingularEdgeNeg.size();
+  nWalePosSing   = waleSingularEdgesPos.size();
+  nWaleNegSing   = waleSingularEdgesNeg.size();
 
   // polyscope::show();
 
@@ -428,7 +457,10 @@ void showStripePatterns(){
   KG graph = KG(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
                       courseStripeValuesGlued, courseSingularEdgesGlobal, waleStripeValuesGlued, waleSingularEdgesGlobal,
                       edgeMap);
+  kgStatus = KGStatus::IN_PROGRESS;
   graph.buildGraph();
+  kgStatus = KGStatus::SUCCEEDED;
+  graph.writeKnitGraphToTxtFile(knitgraphFilePath);
 
 }
 
@@ -454,13 +486,19 @@ void callBacks() {
 
 int main(int argc, char **argv) {
 
+  programStart = std::chrono::steady_clock::now();
+  std::atexit(writeStats);
+
   // Setup command-line interface with CLI11
   string inFileName;
   optional<double> period;
-  
+
   CLI::App app {"SewingPatterns"};
   app.add_option("inFileName", inFileName, "Input mesh and metadata as .json, .obj or .msh.")->required()->check(CLI::ExistingFile);
   app.add_option("-p,--period", period, "Period for the stripe pattern; default is 2*mesh_size.");
+  app.add_option("-o,--output", knitgraphFilePath, "Output knit graph file (default: model.txt)");
+  app.add_option("--stats", statsFilePath, "File to write runtime stats.");
+  app.add_flag("--nogui", nogui, "Disable the polyscope viewer");
   app.add_option("--ply", richDataFile, "Rich data file (.ply) containing precomputed stripe values.")->check(CLI::ExistingFile);
   app.add_option("--in-course-sing", opts.inputCourseSingPath, "File (.txt) containing course singularity positions.")->check(CLI::ExistingFile);
   app.add_option("--out-course-sing", opts.outputCourseSingPath, "File (.txt) to write course singularity positions.");
@@ -663,7 +701,11 @@ int main(int argc, char **argv) {
                                 "windowHeight":975,"windowWidth":1728})";
   polyscope::view::setViewFromJson(viewerString, false);
   
-  polyscope::show();
+  elapsedSeconds = std::chrono::duration<double>(
+      std::chrono::steady_clock::now() - programStart).count();
 
-  return EXIT_SUCCESS; 
+  if (!nogui) polyscope::show();
+
+  writeStats();
+  return EXIT_SUCCESS;
 }

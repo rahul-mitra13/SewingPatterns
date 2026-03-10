@@ -231,8 +231,6 @@ class KG{
             //trace short-rows in the graph
             void traceShortRows();
 
-            //write knit graph to txt file
-            void writeKnitGraphToTxtFile();
 
             
             
@@ -266,7 +264,10 @@ class KG{
 
             
 
-            //build the knit graph 
+            //build the knit graph
             void buildGraph();
+
+            //write knit graph to txt file
+            void writeKnitGraphToTxtFile(const std::string& fileName = "model.txt");
 
 };

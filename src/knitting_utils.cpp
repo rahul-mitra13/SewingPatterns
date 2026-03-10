@@ -524,6 +524,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& geometry, Model& gbModel
         // Create an environment
         GRBEnv env = GRBEnv(true);
         env.set("LogFile", "1-form computation.log");
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
 
         // Create an empty model
@@ -665,6 +666,7 @@ EdgeData<double> computeOneForm(VertexPositionGeometry& globalGeometry, EdgeLeng
         // Create an environment
         GRBEnv env = GRBEnv(true);
         env.set("LogFile", "1-form computation.log");
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
 
         // Create an empty model
@@ -1002,6 +1004,7 @@ HalfedgeData<double> computeVertexSingularityField(VertexPositionGeometry& globa
         // Create an environment
         GRBEnv env = GRBEnv(true);
         env.set("LogFile", "1-form computation.log");
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
 
         // Create an empty model
@@ -1253,8 +1256,7 @@ std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeomet
         // Create an environment
         GRBEnv env = GRBEnv(true);
         env.set("LogFile", "1-form computation.log");
-        //don't log output to console
-        //env.set(GRB_IntParam_OutputFlag, 0);
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
         // Create an empty model
         GRBModel model = GRBModel(env);
@@ -1429,6 +1431,7 @@ VertexData<double> computeWaleCurlFunction(VertexPositionGeometry& globalGeometr
         //don't log output to console 
         env.set(GRB_IntParam_OutputFlag, 0);
         env.set("LogFile", "1-form computation.log");
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
 
         // Create an empty model
@@ -2128,6 +2131,21 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
 
 
     psMesh.addVertexScalarQuantity("initial curl measure without masking (wale)", curlMeasure);
+
+    // Measure total positive and negative curl before masking
+    double totalPosMeasureBeforeMasking = 0;
+    double totalNegMeasureBeforeMasking = 0;
+    for (Vertex v : globalMesh.vertices()){
+        if (curlMeasure[v] > 0){
+            totalPosMeasureBeforeMasking += globalGeometry.vertexDualAreas[v] * curlMeasure[v];
+        }
+        else{
+            totalNegMeasureBeforeMasking += globalGeometry.vertexDualAreas[v] * (-curlMeasure[v]);
+        }
+    }
+    std::cout << "Total positive wale curl before masking: " << totalPosMeasureBeforeMasking << std::endl;
+    std::cout << "Total negative wale curl before masking: " << totalNegMeasureBeforeMasking << std::endl;
+
     // polyscope::show();
 
     if (heatSourceVerts.size() != 0){
@@ -2156,7 +2174,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
         //have a hard mask in the course direction
         for (Vertex v : globalMesh.vertices()){
             //maybe change the masking weight to be something less aggressive
-            waleWeighting[v] = (allDist[v] > 4.0 * period);
+            waleWeighting[v] = (allDist[v] > 2.0 * period);
             curlMeasure[v] = waleWeighting[v] * curlMeasure[v];
         }
     }
@@ -2171,6 +2189,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     }
 
     psMesh.addVertexScalarQuantity("initial curl measure (capped)", curlMeasure);
+
     //now divide the measure into positive and negative 
     VertexData<double> posMeasure(globalMesh, 0.0);
     VertexData<double> negMeasure(globalMesh, 0.0);
@@ -2186,8 +2205,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
             totalNegMeasure += globalGeometry.vertexDualAreas[v] * negMeasure[v];
         }
     }
-    H(totalPosMeasure);
-    H(totalNegMeasure);
+    std::cout << "Total positive wale curl after masking: " << totalPosMeasure << std::endl;
+    std::cout << "Total negative wale curl after masking: " << totalNegMeasure << std::endl;
 
     psMesh.addVertexScalarQuantity("initial positive measure ", posMeasure);
     psMesh.addVertexScalarQuantity("initial negative measure ", negMeasure);
@@ -2199,6 +2218,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     //posOptions.iterations = 500;
     // Start timer
     auto start = std::chrono::high_resolution_clock::now();
+    std::cout << "Starting PC computation for positive wale singularities." << std::endl;
     VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
     // Stop timer
     auto end = std::chrono::high_resolution_clock::now();
@@ -2246,6 +2266,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     std::cout << "# negative sites " << negOptions.nSites << std::endl;
     //Start timer
     start = std::chrono::high_resolution_clock::now();
+    std::cout << "Starting PC computation for negative wale singularities." << std::endl;
     VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
     // Stop timer
     end = std::chrono::high_resolution_clock::now();
@@ -2481,9 +2502,8 @@ HalfedgeData<double> computeWaleVirtualSigma(VertexPositionGeometry& globalGeome
         //reformulate the problem in terms of halfedges 
         // Create an environment
         GRBEnv env = GRBEnv(true);
-        //don't log output to console 
-        //env.set(GRB_IntParam_OutputFlag, 0);
         env.set("LogFile", "1-form computation.log");
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
 
         // Create an empty model
@@ -3563,6 +3583,7 @@ void revealCurl(VertexPositionGeometry& globalGeometry, EdgeLengthGeometry& glue
 
     try {
         GRBEnv env(true);
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
 
         GRBModel model = GRBModel(env);
@@ -4038,230 +4059,230 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
 
     // Old code for visualization
 
-    //  POSITIVE COURSE
+    // //  POSITIVE COURSE
 
-    VoronoiOptions posOptions = defaultVoronoiOptions;
-    posOptions.nSites = std::round(avgTotalMeasure / period); //40 used for square figs
-    std::cout << "number of sings = " << posOptions.nSites << std::endl;
-    posOptions.useDelaunay = false;
-    posOptions.computeDistributions = true;
-    posOptions.seed = 27;
+    // VoronoiOptions posOptions = defaultVoronoiOptions;
+    // posOptions.nSites = std::round(avgTotalMeasure / period); //40 used for square figs
+    // std::cout << "number of sings = " << posOptions.nSites << std::endl;
+    // posOptions.useDelaunay = false;
+    // posOptions.computeDistributions = true;
+    // posOptions.seed = 27;
 
-    VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
-    std::vector<std::vector<VertexData<double>>> posStepSiteDistribution = posVoronoiCenters.stepSiteDistribution;
-    std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
-    std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
+    // VoronoiResult posVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, posOptions, posMeasure, psMesh);
+    // std::vector<std::vector<VertexData<double>>> posStepSiteDistribution = posVoronoiCenters.stepSiteDistribution;
+    // std::vector<std::vector<SurfacePoint>> posSteps = posVoronoiCenters.steps;
+    // std::vector<SurfacePoint> posInitialSites = posVoronoiCenters.initialSites;
 
-    std::vector<std::vector<glm::vec3>> polylines;
+    // std::vector<std::vector<glm::vec3>> polylines;
 
-    for (size_t i = 0; i < posSteps.size(); ++i) {
+    // for (size_t i = 0; i < posSteps.size(); ++i) {
 
-        const std::vector<SurfacePoint>& step = posSteps[i];
-        if (step.size() < 2) continue;
+    //     const std::vector<SurfacePoint>& step = posSteps[i];
+    //     if (step.size() < 2) continue;
 
-        std::vector<glm::vec3> nodes;
-        std::vector<std::array<size_t, 2>> edges;
+    //     std::vector<glm::vec3> nodes;
+    //     std::vector<std::array<size_t, 2>> edges;
 
-        nodes.reserve(step.size());
-        edges.reserve(step.size() - 1);
+    //     nodes.reserve(step.size());
+    //     edges.reserve(step.size() - 1);
 
-        // ---- Convert SurfacePoints to nodes ----
-        for (const SurfacePoint& p : step) {
-            Vector3 pos = p.interpolate(globalGeometry.vertexPositions);
-            nodes.emplace_back(pos.x, pos.y, pos.z);
-        }
+    //     // ---- Convert SurfacePoints to nodes ----
+    //     for (const SurfacePoint& p : step) {
+    //         Vector3 pos = p.interpolate(globalGeometry.vertexPositions);
+    //         nodes.emplace_back(pos.x, pos.y, pos.z);
+    //     }
 
-        // ---- Connect consecutive nodes ----
-        for (size_t j = 0; j + 1 < nodes.size(); ++j) {
-            edges.push_back({j, j + 1});
-        }
+    //     // ---- Connect consecutive nodes ----
+    //     for (size_t j = 0; j + 1 < nodes.size(); ++j) {
+    //         edges.push_back({j, j + 1});
+    //     }
 
-        // ---- Register curve network ----
-        // polyscope::CurveNetwork* psCurve =
-        //     polyscope::registerCurveNetwork(
-        //         "Positive Lloyd path " + std::to_string(i),
-        //         nodes,
-        //         edges
-        //     );
+    //     // ---- Register curve network ----
+    //     // polyscope::CurveNetwork* psCurve =
+    //     //     polyscope::registerCurveNetwork(
+    //     //         "Positive Lloyd path " + std::to_string(i),
+    //     //         nodes,
+    //     //         edges
+    //     //     );
 
-        // ---- Color by index (HSV → RGB) ----
-        float hue = float(i) / float(posSteps.size()); // [0,1]
-        //glm::vec3 color = convertHSVtoRGB(hue, 0.8f, 0.9f);
-        glm::vec3 color = glm::vec3(0.4f, hue, 0.5f);
+    //     // ---- Color by index (HSV → RGB) ----
+    //     float hue = float(i) / float(posSteps.size()); // [0,1]
+    //     //glm::vec3 color = convertHSVtoRGB(hue, 0.8f, 0.9f);
+    //     glm::vec3 color = glm::vec3(0.4f, hue, 0.5f);
 
-        // psCurve->setColor({color.x, color.y, color.z});
-        // psCurve->setRadius(0.002);
-    }
+    //     // psCurve->setColor({color.x, color.y, color.z});
+    //     // psCurve->setRadius(0.002);
+    // }
 
-    // Generate shuffled colors for sites ONCE (reused in popup and final viz)
-    std::vector<Vector3> posSiteColors(posOptions.nSites);
-    for (size_t i = 0; i < posOptions.nSites; i++){
-        double r,g,b;
-        hsv_to_rgb((double)i/posOptions.nSites * 360, 0.75, 1., r, g, b);
-        posSiteColors[i] = {r,g,b};
-    }
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(posSiteColors.begin(), posSiteColors.end(), g);
+    // // Generate shuffled colors for sites ONCE (reused in popup and final viz)
+    // std::vector<Vector3> posSiteColors(posOptions.nSites);
+    // for (size_t i = 0; i < posOptions.nSites; i++){
+    //     double r,g,b;
+    //     hsv_to_rgb((double)i/posOptions.nSites * 360, 0.75, 1., r, g, b);
+    //     posSiteColors[i] = {r,g,b};
+    // }
+    // std::random_device rd;
+    // std::mt19937 g(rd());
+    // std::shuffle(posSiteColors.begin(), posSiteColors.end(), g);
 
-    //write a nested callback to debug the evolution of our method for the positive sites
-    //Register the callback which creates the UI and does the hard work
-    int step = 0;
-    int iSite = 0;
-    auto positivePopUpUI = [&](){
-        static bool showWindow = true;
-        ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
-        ImGui::Begin("Positive sites", &showWindow);
-        ImGui::PushItemWidth(400);
-        ImGui::Separator();
-        ImGui::InputInt("Site", &iSite);
-        ImGui::InputInt("Time Step", &step);
-        // Clamp to bounds after user input
-        iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
-        // stepSiteDistribution is indexed as [step][site], so size() gives number of steps
-        step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution.size() - 1));
-        //need setEnabled(true) otherwise we run into OpenGL errors? weird
-        // psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
-        //polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
-
-        //should do this outside the ImGUI
-        std::vector<Vector3> currentSites;
-        for (int i = 0; i < posOptions.nSites; i++){
-            currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
-        }
-        auto pc = polyscope::registerPointCloud("all pos sites ", currentSites);
-        // --- Uniform color: just fill all points with one RGB value
-        std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
-        pc->addColorQuantity("uniform color", colors)->setEnabled(true);
-
-        //trying to grab the distribututions for viz
-        std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0});
-        std::vector<VertexData<double>> currSiteDistribution = posStepSiteDistribution[step];
-        for (size_t i = 0; i < currSiteDistribution.size(); i++){
-            for (Vertex v : globalMesh.vertices()) {
-                posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * currSiteDistribution[i][v];
-            }
-        }
-        psMesh.addVertexColorQuantity("pos site dist blend (course) " + std::to_string(step), posSiteDistributionColor)->setEnabled(true);
-
-
-        if (ImGui::Button("Done"))
-            polyscope::popContext();
-        ImGui::SameLine();
-    };
-    // polyscope::pushContext(positivePopUpUI); 
-    // TODO: UNDERSTAND WHY PUSHCONTEXT PAUSES THINGS
-
-    std::vector<Vector3> positiveCenters;
-    for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
-        positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-    }
-    polyscope::registerPointCloud("Voronoi sites unaligned (+)", positiveCenters)->setEnabled(false);
-    std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
-
-    // //Compute max curl for normalization
-    // double maxPosCurl = 0;
-    // for (Vertex v : globalMesh.vertices())
-    //     maxPosCurl = std::max(maxPosCurl, posMeasure[v]);
-
-    //print the positive masses
-    //render the fuzzy cells (reuse posSiteColors generated before popup)
-    std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0});
-    for (size_t i = 0; i < posSiteDistributions.size(); i++){
-        double mass = 0;
-        for (Vertex v : globalMesh.vertices()){ 
-            mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
-        }
-        std::cout << "positive mass at site " << i << " = " << mass << std::endl;
-    
-        for (Vertex v : globalMesh.vertices()) {
-            posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
-        }
-    }
-    psMesh.addVertexColorQuantity("pos site dist blend (course)", posSiteDistributionColor)->setEnabled(false);
-    //polyscope::show();
-    
-    // Write the objective function history to file for positive wale
-    std::ofstream OTCostPosCourseFile("OT_cost_pos_course.csv");
-    for (double energy : posVoronoiCenters.objHistory)
-        OTCostPosCourseFile << energy << std::endl;
-
-    // // NEGATIVE COURSE
-
-    VoronoiOptions negOptions = defaultVoronoiOptions;
-    negOptions.nSites = posOptions.nSites;
-    negOptions.useDelaunay = false;
-    negOptions.computeDistributions = true;
-    negOptions.seed = 27;
-    std::cout << "# positive sites " << posOptions.nSites << std::endl;
-    std::cout << "# negative sites " << negOptions.nSites << std::endl;
-    VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
-    std::vector<std::vector<VertexData<double>>> negStepSiteDistribution = negVoronoiCenters.stepSiteDistribution;
-    std::vector<std::vector<SurfacePoint>> negSteps = negVoronoiCenters.steps;
-    std::vector<SurfacePoint> negInitialSites = negVoronoiCenters.initialSites;
-
-
-    // //write a nested callback to debug the evolution of our method for the negative sites
+    // //write a nested callback to debug the evolution of our method for the positive sites
     // //Register the callback which creates the UI and does the hard work
-    // step = 0;
-    // iSite = 0;
-    // auto negativePopUpUI = [&](){
+    // int step = 0;
+    // int iSite = 0;
+    // auto positivePopUpUI = [&](){
     //     static bool showWindow = true;
     //     ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
-    //     ImGui::Begin("Negative sites", &showWindow);
+    //     ImGui::Begin("Positive sites", &showWindow);
     //     ImGui::PushItemWidth(400);
     //     ImGui::Separator();
     //     ImGui::InputInt("Site", &iSite);
     //     ImGui::InputInt("Time Step", &step);
     //     // Clamp to bounds after user input
     //     iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
-    //     step = std::clamp(step, 0, static_cast<int>(negStepSiteDistribution[iSite].size() - 1));
+    //     // stepSiteDistribution is indexed as [step][site], so size() gives number of steps
+    //     step = std::clamp(step, 0, static_cast<int>(posStepSiteDistribution.size() - 1));
     //     //need setEnabled(true) otherwise we run into OpenGL errors? weird
-    //     psMesh.addVertexScalarQuantity("distribution", negStepSiteDistribution[iSite][step])->setEnabled(true);
-    //     polyscope::registerPointCloud("site ", std::vector<Vector3>{negSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+    //     // psMesh.addVertexScalarQuantity("distribution", posStepSiteDistribution[iSite][step])->setEnabled(true);
+    //     //polyscope::registerPointCloud("site ", std::vector<Vector3>{posSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+
     //     //should do this outside the ImGUI
-    //     // std::vector<Vector3> currentSites; 
-    //     // for (int i = 0; i < posOptions.nSites; i++){
-    //     //     currentSites.push_back(negSteps[i][step].interpolate(globalGeometry.vertexPositions));
-    //     // }
-    //     // polyscope::registerPointCloud("all negative sites", currentSites);
+    //     std::vector<Vector3> currentSites;
+    //     for (int i = 0; i < posOptions.nSites; i++){
+    //         currentSites.push_back(posSteps[i][step].interpolate(globalGeometry.vertexPositions));
+    //     }
+    //     auto pc = polyscope::registerPointCloud("all pos sites ", currentSites);
+    //     // --- Uniform color: just fill all points with one RGB value
+    //     std::vector<glm::vec3> colors(currentSites.size(), glm::vec3(1.0f, 0.0f, 0.0f)); // red
+    //     pc->addColorQuantity("uniform color", colors)->setEnabled(true);
+
+    //     //trying to grab the distribututions for viz
+    //     std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0});
+    //     std::vector<VertexData<double>> currSiteDistribution = posStepSiteDistribution[step];
+    //     for (size_t i = 0; i < currSiteDistribution.size(); i++){
+    //         for (Vertex v : globalMesh.vertices()) {
+    //             posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * currSiteDistribution[i][v];
+    //         }
+    //     }
+    //     psMesh.addVertexColorQuantity("pos site dist blend (course) " + std::to_string(step), posSiteDistributionColor)->setEnabled(true);
+
 
     //     if (ImGui::Button("Done"))
     //         polyscope::popContext();
     //     ImGui::SameLine();
     // };
-    // //polyscope::pushContext(negativePopUpUI);  
+    // // polyscope::pushContext(positivePopUpUI); 
+    // // TODO: UNDERSTAND WHY PUSHCONTEXT PAUSES THINGS
 
-    std::vector<Vector3> negativeCenters;
-    for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
-    negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
-    }
-    polyscope::registerPointCloud("Voronoi sites unaligned (-)", negativeCenters)->setEnabled(false);
-    std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
+    // std::vector<Vector3> positiveCenters;
+    // for (int i = 0; i < posVoronoiCenters.siteLocations.size(); i++){
+    //     positiveCenters.push_back(posVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+    // }
+    // polyscope::registerPointCloud("Voronoi sites unaligned (+)", positiveCenters)->setEnabled(false);
+    // std::vector<VertexData<double>> posSiteDistributions = posVoronoiCenters.siteDistributions;
 
-    //print the negative masses
-    //render the fuzzy cells
-    std::vector<Vector3> negSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
-    std::vector<Vector3> negSiteColors(posSiteDistributions.size());
-    for (size_t i = 0; i < negSiteDistributions.size(); i++){
-        double r,g,b;
-        hsv_to_rgb((double)i/negSiteDistributions.size() * 360, 0.75, 1., r, g, b);
-        posSiteColors[i] = {r,g,b};
-    }
-    std::shuffle(negSiteColors.begin(), negSiteColors.end(), g);
+    // // //Compute max curl for normalization
+    // // double maxPosCurl = 0;
+    // // for (Vertex v : globalMesh.vertices())
+    // //     maxPosCurl = std::max(maxPosCurl, posMeasure[v]);
 
-    for (size_t i = 0; i < negSiteDistributions.size(); i++){
-        double mass = 0;
-        for (Vertex v : globalMesh.vertices()){ 
-            mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
-        }
-        std::cout << "negative mass at site " << i << " = " << mass << std::endl;
+    // //print the positive masses
+    // //render the fuzzy cells (reuse posSiteColors generated before popup)
+    // std::vector<Vector3> posSiteDistributionColor(globalMesh.nVertices(), {0,0,0});
+    // for (size_t i = 0; i < posSiteDistributions.size(); i++){
+    //     double mass = 0;
+    //     for (Vertex v : globalMesh.vertices()){ 
+    //         mass += posSiteDistributions[i][v] * posMeasure[v] * globalGeometry.vertexDualAreas[v];
+    //     }
+    //     std::cout << "positive mass at site " << i << " = " << mass << std::endl;
+    
+    //     for (Vertex v : globalMesh.vertices()) {
+    //         posSiteDistributionColor[v.getIndex()] += posSiteColors[i] * posSiteDistributions[i][v];
+    //     }
+    // }
+    // psMesh.addVertexColorQuantity("pos site dist blend (course)", posSiteDistributionColor)->setEnabled(false);
+    // //polyscope::show();
+    
+    // // Write the objective function history to file for positive wale
+    // std::ofstream OTCostPosCourseFile("OT_cost_pos_course.csv");
+    // for (double energy : posVoronoiCenters.objHistory)
+    //     OTCostPosCourseFile << energy << std::endl;
+
+    // // NEGATIVE COURSE
+
+    // VoronoiOptions negOptions = defaultVoronoiOptions;
+    // negOptions.nSites = posOptions.nSites;
+    // negOptions.useDelaunay = false;
+    // negOptions.computeDistributions = true;
+    // negOptions.seed = 27;
+    // std::cout << "# positive sites " << posOptions.nSites << std::endl;
+    // std::cout << "# negative sites " << negOptions.nSites << std::endl;
+    // VoronoiResult negVoronoiCenters = computeGeodesicCentroidalVoronoiTessellationWithWeights(globalMesh, globalGeometry, negOptions, negMeasure, psMesh);
+    // std::vector<std::vector<VertexData<double>>> negStepSiteDistribution = negVoronoiCenters.stepSiteDistribution;
+    // std::vector<std::vector<SurfacePoint>> negSteps = negVoronoiCenters.steps;
+    // std::vector<SurfacePoint> negInitialSites = negVoronoiCenters.initialSites;
+
+
+    // // //write a nested callback to debug the evolution of our method for the negative sites
+    // // //Register the callback which creates the UI and does the hard work
+    // // step = 0;
+    // // iSite = 0;
+    // // auto negativePopUpUI = [&](){
+    // //     static bool showWindow = true;
+    // //     ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Once);
+    // //     ImGui::Begin("Negative sites", &showWindow);
+    // //     ImGui::PushItemWidth(400);
+    // //     ImGui::Separator();
+    // //     ImGui::InputInt("Site", &iSite);
+    // //     ImGui::InputInt("Time Step", &step);
+    // //     // Clamp to bounds after user input
+    // //     iSite = std::clamp(iSite, 0, static_cast<int>(posOptions.nSites - 1));
+    // //     step = std::clamp(step, 0, static_cast<int>(negStepSiteDistribution[iSite].size() - 1));
+    // //     //need setEnabled(true) otherwise we run into OpenGL errors? weird
+    // //     psMesh.addVertexScalarQuantity("distribution", negStepSiteDistribution[iSite][step])->setEnabled(true);
+    // //     polyscope::registerPointCloud("site ", std::vector<Vector3>{negSteps[iSite][step].interpolate(globalGeometry.vertexPositions)});
+    // //     //should do this outside the ImGUI
+    // //     // std::vector<Vector3> currentSites; 
+    // //     // for (int i = 0; i < posOptions.nSites; i++){
+    // //     //     currentSites.push_back(negSteps[i][step].interpolate(globalGeometry.vertexPositions));
+    // //     // }
+    // //     // polyscope::registerPointCloud("all negative sites", currentSites);
+
+    // //     if (ImGui::Button("Done"))
+    // //         polyscope::popContext();
+    // //     ImGui::SameLine();
+    // // };
+    // // //polyscope::pushContext(negativePopUpUI);  
+
+    // std::vector<Vector3> negativeCenters;
+    // for (int i = 0; i < negVoronoiCenters.siteLocations.size(); i++){
+    // negativeCenters.push_back(negVoronoiCenters.siteLocations[i].interpolate(globalGeometry.vertexPositions));
+    // }
+    // polyscope::registerPointCloud("Voronoi sites unaligned (-)", negativeCenters)->setEnabled(false);
+    // std::vector<VertexData<double>> negSiteDistributions = negVoronoiCenters.siteDistributions;
+
+    // //print the negative masses
+    // //render the fuzzy cells
+    // std::vector<Vector3> negSiteDistributionColor(globalMesh.nVertices(), {0,0,0}); // start from white and subtract RGB
+    // std::vector<Vector3> negSiteColors(posSiteDistributions.size());
+    // for (size_t i = 0; i < negSiteDistributions.size(); i++){
+    //     double r,g,b;
+    //     hsv_to_rgb((double)i/negSiteDistributions.size() * 360, 0.75, 1., r, g, b);
+    //     posSiteColors[i] = {r,g,b};
+    // }
+    // std::shuffle(negSiteColors.begin(), negSiteColors.end(), g);
+
+    // for (size_t i = 0; i < negSiteDistributions.size(); i++){
+    //     double mass = 0;
+    //     for (Vertex v : globalMesh.vertices()){ 
+    //         mass += negSiteDistributions[i][v] * negMeasure[v] * globalGeometry.vertexDualAreas[v];
+    //     }
+    //     std::cout << "negative mass at site " << i << " = " << mass << std::endl;
         
-        for (Vertex v : globalMesh.vertices()) {
-            negSiteDistributionColor[v.getIndex()] += posSiteColors[i] * negSiteDistributions[i][v];
-        }
-    }
-    psMesh.addVertexColorQuantity("neg site dist blend (course)", negSiteDistributionColor)->setEnabled(false);
+    //     for (Vertex v : globalMesh.vertices()) {
+    //         negSiteDistributionColor[v.getIndex()] += posSiteColors[i] * negSiteDistributions[i][v];
+    //     }
+    // }
+    // psMesh.addVertexColorQuantity("neg site dist blend (course)", negSiteDistributionColor)->setEnabled(false);
 
     // polyscope::show();
     
@@ -5290,6 +5311,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
         // Create an environment
         GRBEnv env = GRBEnv(true);
         env.set("LogFile", "1-form computation.log");
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
 
         // Create an empty model
@@ -5670,6 +5692,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseVirtualSigma(VertexPositio
         //don't log output to console 
         env.set(GRB_IntParam_OutputFlag, 0);
         env.set("LogFile", "1-form computation.log");
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
 
         // Create an empty model
@@ -5775,6 +5798,7 @@ std::tuple<HalfedgeData<double>, double> computeHarmonicCourseOneForm(VertexPosi
         // Create an environment
         GRBEnv env = GRBEnv(true);
         env.set("LogFile", "1-form computation.log");
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
 
         // Create an empty model

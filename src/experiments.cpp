@@ -444,6 +444,7 @@ std::tuple<HalfedgeData<double>, double> computeStrategy1_oneForm(VertexPosition
         // Create an environment
         GRBEnv env = GRBEnv(true);
         env.set("LogFile", "1-form computation.log");
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
 
         // Create an empty model
@@ -646,6 +647,7 @@ std::tuple<HalfedgeData<double>, double> computeEquallySpacedOneForm(VertexPosit
         // Create an environment
         GRBEnv env = GRBEnv(true);
         env.set("LogFile", "1-form computation.log");
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
 
         // Create an empty model
@@ -974,6 +976,7 @@ void vizEdgeDifference(VertexPositionGeometry& globalGeometry, EdgeLengthGeometr
         // Create an environment
         GRBEnv env = GRBEnv(true);
         env.set("LogFile", "1-form computation.log");
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
 
         // Create an empty model
@@ -1406,6 +1409,7 @@ std::tuple<HalfedgeData<double>, double> computeHarmonic1Form(VertexPositionGeom
         // Create an environment
         GRBEnv env = GRBEnv(true);
         env.set("LogFile", "1-form computation.log");
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
 
         // Create an empty model

@@ -161,6 +161,7 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> computeCourseSingularities(po
             bucketCurl[v] = courseMeasure[v];
         }
         options.statsPath = "PC_stats_CC" + std::to_string(i) + ".csv";
+        std::cout << "Starting PC computation for pos/neg course singularities (bucket " << i+1 << "/" << buckets.size() << ")." << std::endl;
         auto matchedPairs = computeBucketSingularities(options, bucketCurl, allDist, cylindricalParameterization);
         std::vector<Vector3> positiveCenters;
         for (int i = 0; i < matchedPairs.size(); i++){
@@ -591,6 +592,7 @@ std::vector<std::pair<SurfacePoint, SurfacePoint>> timeFuncAndDistOTMatching(pow
         // Create an environment
         GRBEnv env = GRBEnv(true);
         env.set("LogFile", "1-form computation.log");
+        env.set(GRB_IntParam_OutputFlag, 0);
         env.start();
 
         // Create an empty model

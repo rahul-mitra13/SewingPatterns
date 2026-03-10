@@ -1903,10 +1903,9 @@ void KG::renderFinalGraph(){
 }
 
 //write knit graph to txt file 
-void KG::writeKnitGraphToTxtFile(){
-    
+void KG::writeKnitGraphToTxtFile(const std::string& fileName){
 
-    std::ofstream file("model_knitgraph_new.txt");
+    std::ofstream file(fileName);
     
 
     for (auto &up : finalVertices){
