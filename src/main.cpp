@@ -451,7 +451,7 @@ void showStripePatterns(){
     waleStripeValuesGlued[c] = waleStripeValues[c.getIndex()];
   }
 
-  // polyscope::show();
+  if (!nogui) polyscope::show();
 
   // generate the new knit graph
   KG graph = KG(*globalGeometry, *gluedELG, *globalPSMesh, coursePeriod, walePeriod,
