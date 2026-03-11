@@ -2389,60 +2389,60 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     for (int i = 0; i < gluedGeometry.mesh.nEdges(); i++)
         sumIndices += edgeIndices[i];
 
-    // Compute (non-integer) number of stripes on boundaries
-    std::vector<double> boundaryStripes;
-    for (std::vector<double> path : globalBdyConditions.waleBdyPathConstraints) {
-        std::vector<int> pathEdges;
-        double integral = 0;
-        for (int i = 0; i < path.size(); i++) if (path[i] != 0) {
-            Edge e = gluedGeometry.mesh.edge(i);
-            integral += sigmaWaleGlued[e.halfedge()] * path[i];
-            pathEdges.push_back(e.getIndex());
-        }
-        boundaryStripes.push_back(integral / period);
-    }
-    // Round it up
-    std::vector<int> boundaryStripesInt = roundWithSum(boundaryStripes, sumIndices);
+    // // Compute (non-integer) number of stripes on boundaries
+    // std::vector<double> boundaryStripes;
+    // for (std::vector<double> path : globalBdyConditions.waleBdyPathConstraints) {
+    //     std::vector<int> pathEdges;
+    //     double integral = 0;
+    //     for (int i = 0; i < path.size(); i++) if (path[i] != 0) {
+    //         Edge e = gluedGeometry.mesh.edge(i);
+    //         integral += sigmaWaleGlued[e.halfedge()] * path[i];
+    //         pathEdges.push_back(e.getIndex());
+    //     }
+    //     boundaryStripes.push_back(integral / period);
+    // }
+    // // Round it up
+    // std::vector<int> boundaryStripesInt = roundWithSum(boundaryStripes, sumIndices);
 
-    H(boundaryStripesInt);
+    // H(boundaryStripesInt);
 
-    // Set up the edge path constraints FOR BOUNDARIES ONLY
-    std::vector<std::pair<std::vector<double>, double>> waleEdgePathConstraints;
-    for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
-        std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
-        waleEdgePathConstraints.push_back(std::make_pair(path, +boundaryStripesInt[i]));
-    }
+    // // Set up the edge path constraints FOR BOUNDARIES ONLY
+    // std::vector<std::pair<std::vector<double>, double>> waleEdgePathConstraints;
+    // for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
+    //     std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
+    //     waleEdgePathConstraints.push_back(std::make_pair(path, +boundaryStripesInt[i]));
+    // }
 
-    // OK! Now recompute the one-form with the boundaries constrained to integers
-    modelWale.setEdgePathConstraints(waleEdgePathConstraints);
-    std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
+    // // OK! Now recompute the one-form with the boundaries constrained to integers
+    // modelWale.setEdgePathConstraints(waleEdgePathConstraints);
+    // std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
 
-    // // Compute and visualize unconstrainted stripes
+    // // Compute and visualize unconstrained stripes
     // std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
     // std::tie(uniquePos, uniqueEdges, components) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesOneFormGlued, stripeIndicesOneFormGlued, period, edgeMap);
     // polyscope::registerCurveNetwork("wale stripes (unconstr. HG)", uniquePos, uniqueEdges)->setRadius(0.001)->setEnabled(false);
 
-    // Now we'll do the rounding for the homology generators
-    // Here we can do greedy rounding (This seems to only work for certain instances, have to debug)
-    std::vector<double> homologyStripes;
-    for (std::vector<double> path : homologyGenerators){
-        double integral = 0;
-        std::vector<int> pathEdges;
-        for (int i = 0; i < path.size(); i++) if (path[i] != 0) {
-            Edge e = gluedGeometry.mesh.edge(i);
-            integral += sigmaWaleGlued[e.halfedge()] * path[i];
-            pathEdges.push_back(e.getIndex());
-        }
-        waleEdgePathConstraints.push_back(std::make_pair(path, round(integral/period)));
-    }
+    // // Now we'll do the rounding for the homology generators
+    // // Here we can do greedy rounding (This seems to only work for certain instances, have to debug)
+    // std::vector<double> homologyStripes;
+    // for (std::vector<double> path : homologyGenerators){
+    //     double integral = 0;
+    //     std::vector<int> pathEdges;
+    //     for (int i = 0; i < path.size(); i++) if (path[i] != 0) {
+    //         Edge e = gluedGeometry.mesh.edge(i);
+    //         integral += sigmaWaleGlued[e.halfedge()] * path[i];
+    //         pathEdges.push_back(e.getIndex());
+    //     }
+    //     waleEdgePathConstraints.push_back(std::make_pair(path, round(integral/period)));
+    // }
 
 
     // solve the model with all the path constraints and boundary constraints 
     //modelWale.setBdyEdges(waleBdyEdges);
     modelWale.setEdgeIndices(edgeIndices);
-    modelWale.setEdgePathConstraints(waleEdgePathConstraints);
+    // modelWale.setEdgePathConstraints(waleEdgePathConstraints);
     // Have to re-add this for models with genus (Not sure why, the code above should do the rounding appropriately but we get infeasability issues)
-    // modelWale.setHomologyGenerators(homologyGenerators);
+    modelWale.setHomologyGenerators(homologyGenerators);
     
     std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
 
@@ -4491,8 +4491,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
 
     std::cout << "Number of singularity pairs missing = " << singularEdges.size() - indicesToUse.size() << std::endl;
     if (problemCount > 0) {
-        P("Stopping because some singularity pairs were dropped");
-        polyscope::show();
+        P("Warning: some singularity pairs were dropped");
+        // polyscope::show();
     }
 
     //set the singular edges where path exists
@@ -4537,6 +4537,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
     std::vector<std::pair<std::vector<double>, double>> halfedgePathConstraints;
     
     //construct edge paths between singular edges
+    // Note that the loop does not iterate in order; functionally that's fine, but for proper viz we should fix that.
     for (int i : indicesToUse){
         auto p = singularEdges[i];
         auto timeFuncPair = pairedTimeFunctions[i];
@@ -4617,13 +4618,10 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
                 edges.push_back({i0, i1});
             }
         }
-        // polyscope::CurveNetwork* psCurve =
-        // polyscope::registerCurveNetwork(
-        //     "halfedge strip path (curve network)" + std::to_string(i),
-        //         nodes, edges
-        // );
-        // psCurve->setRadius(0.002);   // tweak for visibility
-        // psCurve->setColor({1.0, 0.2, 0.2}); // red
+        polyscope::registerCurveNetwork(
+            "halfedge strip path (curve network)" + std::to_string(i),
+                nodes, edges
+        )->setRadius(0.002)->setColor({1.0, 0.2, 0.2})->setEnabled(false);
 
         std::vector<double> edgePath(globalMesh.nEdges(), 0.0);
         halfedgePathConstraints.push_back(std::make_pair(stripHalfedgePath, 0.0));
@@ -4731,6 +4729,8 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
         // Finally, add half of the "back-window" of both sings: b/2 = (a-P)/2
         hePath[startHe] += 0.5;
         hePath[endHe] += 0.5;
+        psMesh.addHalfedgeScalarQuantity("ordering path " + std::to_string(iPair), hePath)->setEnabled(false);
+
 
 
         //--------------------------------------------------------------------//
@@ -4779,7 +4779,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeCourseStripeInfo(VertexP
             heWeights[he.getIndex()] = hePath[he];
         auto constraint = make_pair(heWeights, 0.);
         model.addHalfedgePathInequalityConstraint(constraint);
-        //showEdges("ordering path "+std::to_string(iPair), edgePath, globalGeometry)->setEnabled(false);
+        // showEdges("ordering path "+std::to_string(iPair), edgePath, globalGeometry)->setEnabled(false);
     }
 
     showEdges("vertical paths", verticalPathEdges, globalGeometry)->setEnabled(false);
@@ -5651,6 +5651,7 @@ std::tuple<HalfedgeData<double>, double> computeCourseOneForm(VertexPositionGeom
     catch(GRBException e) {
         std::cout << "Error code = " << e.getErrorCode() << std::endl;
         std::cout << e.getMessage() << std::endl;
+        polyscope::show();
     } catch(...) {
         std::cout << "Exception during optimization" << std::endl;
     }

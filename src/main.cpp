@@ -502,6 +502,9 @@ int main(int argc, char **argv) {
   app.add_option("--ply", richDataFile, "Rich data file (.ply) containing precomputed stripe values.")->check(CLI::ExistingFile);
   app.add_option("--in-course-sing", opts.inputCourseSingPath, "File (.txt) containing course singularity positions.")->check(CLI::ExistingFile);
   app.add_option("--out-course-sing", opts.outputCourseSingPath, "File (.txt) to write course singularity positions.");
+  app.add_option("--short-rows", opts.targetShortRows, "Target number of short rows (= pos course sings = neg course sings).");
+  app.add_option("--wale-pos", opts.targetWalePosSing, "Target number of positive wale singularities.");
+  app.add_option("--wale-neg", opts.targetWaleNegSing, "Target number of negative wale singularities.");
 
   try {
     app.parse(argc, argv);
@@ -704,8 +707,14 @@ int main(int argc, char **argv) {
   elapsedSeconds = std::chrono::duration<double>(
       std::chrono::steady_clock::now() - programStart).count();
 
+  writeStats();
+
+  if (!statsFilePath.empty()) {
+    std::ifstream sf(statsFilePath);
+    if (sf) std::cout << sf.rdbuf();
+  }
+
   if (!nogui) polyscope::show();
 
-  writeStats();
   return EXIT_SUCCESS;
 }

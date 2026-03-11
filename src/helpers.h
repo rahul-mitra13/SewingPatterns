@@ -77,6 +77,11 @@ struct Options {
 
   // Paths to input and output files for course singularity positions
   std::filesystem::path inputCourseSingPath, outputCourseSingPath;
+
+  // Target singularity counts (-1 = no target, let the algorithm decide)
+  int targetShortRows  = -1;  // number of short rows (= pos course sings = neg course sings)
+  int targetWalePosSing = -1;  // number of positive wale singularities
+  int targetWaleNegSing = -1;  // number of negative wale singularities
 };
 
 //boundary conditions on the GLUED MESH
