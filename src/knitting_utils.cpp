@@ -1242,7 +1242,7 @@ std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeomet
     std::vector<std::pair<std::vector<double>, double>> edgePathConstraints = model.getEdgePathConstraints();
     std::vector<int> edgeIndices = model.getEdgeIndices();
     std::vector<int> bdyEdges = model.getBdyEdges();
-    std::vector<std::vector<double>> homologyGenerators = model.getHomologyGenerators();
+    //std::vector<std::vector<double>> homologyGenerators = model.getHomologyGenerators();
     //require the face areas
     gluedGeometry.requireFaceAreas();
     HalfedgeData<double> oneForm(gluedMesh);
@@ -1262,12 +1262,12 @@ std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeomet
 
         //model.set(GRB_IntParam_Method, 2);
 
-        std::vector<GRBVar> generatorIntegers;
-        for (size_t i = 0; i < homologyGenerators.size(); i++){
-            GRBVar k_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_INTEGER);
-            //add gurobi vars
-            generatorIntegers.push_back(k_i);//decision variables
-        }
+        // std::vector<GRBVar> generatorIntegers;
+        // for (size_t i = 0; i < homologyGenerators.size(); i++){
+        //     GRBVar k_i = model.addVar(-GRB_INFINITY, GRB_INFINITY, 1.0, GRB_INTEGER);
+        //     //add gurobi vars
+        //     generatorIntegers.push_back(k_i);//decision variables
+        // }
 
         //defined over halfedges
         std::vector<GRBVar> sigma;
@@ -1297,25 +1297,25 @@ std::tuple<HalfedgeData<double>, double> computeWaleOneForm(VertexPositionGeomet
         }
 
         //constraint: add integer variables for homology generators
-        for (int i = 0; i < homologyGenerators.size(); i++){
-            std::vector<double> path = homologyGenerators[i];
-            GRBLinExpr pathIntegral = 0;
-            std::vector<double> hePath(gluedMesh.nHalfedges(), 0.0);
-            for (int j = 0; j < gluedMesh.nEdges(); j++){
-                if (path[j] > 0){
-                    hePath[gluedMesh.edge(j).halfedge().getIndex()] = std::fabs(path[j]);
-                }
-                else if (path[j] < 0){
-                    hePath[gluedMesh.edge(j).halfedge().twin().getIndex()] = std::fabs(path[j]);
-                }
-            }
-            for (int k = 0; k < gluedMesh.nHalfedges(); k++){
-                pathIntegral += hePath[k] * sigma[k];
-            }
-            //add the constraints for the homology generators
-            model.addConstr(pathIntegral == period * generatorIntegers[i]);
-            // model.addConstr(pathIntegral == 0.);
-        }
+        // for (int i = 0; i < homologyGenerators.size(); i++){
+        //     std::vector<double> path = homologyGenerators[i];
+        //     GRBLinExpr pathIntegral = 0;
+        //     std::vector<double> hePath(gluedMesh.nHalfedges(), 0.0);
+        //     for (int j = 0; j < gluedMesh.nEdges(); j++){
+        //         if (path[j] > 0){
+        //             hePath[gluedMesh.edge(j).halfedge().getIndex()] = std::fabs(path[j]);
+        //         }
+        //         else if (path[j] < 0){
+        //             hePath[gluedMesh.edge(j).halfedge().twin().getIndex()] = std::fabs(path[j]);
+        //         }
+        //     }
+        //     for (int k = 0; k < gluedMesh.nHalfedges(); k++){
+        //         pathIntegral += hePath[k] * sigma[k];
+        //     }
+        //     //add the constraints for the homology generators
+        //     model.addConstr(pathIntegral == period * generatorIntegers[i]);
+        //     // model.addConstr(pathIntegral == 0.);
+        // }
 
         // constraint: 
         // specify singular halfedges and also specify that form values 
@@ -2358,48 +2358,37 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     
     std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
 
-    // // Compute and visualize unconstrainted stripes
-    // std::tie(uniquePos, uniqueEdges, components) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesOneFormGlued, stripeIndicesOneFormGlued, period, edgeMap);
-    // polyscope::registerCurveNetwork("wale stripes (unconstr. B+HG)", uniquePos, uniqueEdges)->setRadius(0.001)->setEnabled(false);
-    // polyscope::show();
-
+    // You don't want to roundWithSum() and specify homology generators
+    // The homology generators + singular indices imply the integer value for the boundary stripes
     // Compute (integer) sum of indices
-    int sumIndices = 0;
-    for (int i = 0; i < gluedGeometry.mesh.nEdges(); i++)
-        sumIndices += edgeIndices[i];
+    // int sumIndices = 0;
+    // for (int i = 0; i < gluedGeometry.mesh.nEdges(); i++)
+    //     sumIndices += edgeIndices[i];
 
-    // Compute (non-integer) number of stripes on boundaries
-    std::vector<double> boundaryStripes;
-    for (std::vector<double> path : globalBdyConditions.waleBdyPathConstraints) {
-        std::vector<int> pathEdges;
-        double integral = 0;
-        for (int i = 0; i < path.size(); i++) if (path[i] != 0) {
-            Edge e = gluedGeometry.mesh.edge(i);
-            integral += sigmaWaleGlued[e.halfedge()] * path[i];
-            pathEdges.push_back(e.getIndex());
-        }
-        boundaryStripes.push_back(integral / period);
-    }
-    // Round it up
-    std::vector<int> boundaryStripesInt = roundWithSum(boundaryStripes, sumIndices);
+    // // Compute (non-integer) number of stripes on boundaries
+    // std::vector<double> boundaryStripes;
+    // for (std::vector<double> path : globalBdyConditions.waleBdyPathConstraints) {
+    //     std::vector<int> pathEdges;
+    //     double integral = 0;
+    //     for (int i = 0; i < path.size(); i++) if (path[i] != 0) {
+    //         Edge e = gluedGeometry.mesh.edge(i);
+    //         integral += sigmaWaleGlued[e.halfedge()] * path[i];
+    //         pathEdges.push_back(e.getIndex());
+    //     }
+    //     boundaryStripes.push_back(integral / period);
+    // }
+    // // Round it up
+    // std::vector<int> boundaryStripesInt = roundWithSum(boundaryStripes, sumIndices);
 
-    H(boundaryStripesInt);
+    // H(boundaryStripesInt);
+
+    std::vector<std::pair<std::vector<double>, double>> waleEdgePathConstraints;
 
     // Set up the edge path constraints FOR BOUNDARIES ONLY
-    std::vector<std::pair<std::vector<double>, double>> waleEdgePathConstraints;
-    for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
-        std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
-        waleEdgePathConstraints.push_back(std::make_pair(path, +boundaryStripesInt[i]));
-    }
-
-    // OK! Now recompute the one-form with the boundaries constrained to integers
-    modelWale.setEdgePathConstraints(waleEdgePathConstraints);
-    std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
-
-    // // Compute and visualize unconstrainted stripes
-    // std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
-    // std::tie(uniquePos, uniqueEdges, components) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesOneFormGlued, stripeIndicesOneFormGlued, period, edgeMap);
-    // polyscope::registerCurveNetwork("wale stripes (unconstr. HG)", uniquePos, uniqueEdges)->setRadius(0.001)->setEnabled(false);
+    // for (int i = 0; i < globalBdyConditions.waleBdyPathConstraints.size(); i++){
+    //     std::vector<double> path = globalBdyConditions.waleBdyPathConstraints[i];
+    //     waleEdgePathConstraints.push_back(std::make_pair(path, boundaryStripesInt[i]));
+    // }
 
     // Now we'll do the rounding for the homology generators
     // Here we can do greedy rounding (This seems to only work for certain instances, have to debug)
@@ -2422,9 +2411,16 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     modelWale.setEdgePathConstraints(waleEdgePathConstraints);
     // Have to re-add this for models with genus (Not sure why, the code above should do the rounding appropriately but we get infeasability issues)
     // modelWale.setHomologyGenerators(homologyGenerators);
-    
+    // OK! Now recompute the one-form with the boundaries constrained to integers and add homology generators
+    modelWale.setEdgePathConstraints(waleEdgePathConstraints);
     std::tie(sigmaWaleGlued, currObj) = computeWaleOneForm(globalGeometry, gluedGeometry, modelWale, G, vertexMap);
 
+    // // Compute and visualize unconstrainted stripes
+    // std::tie(stripeValuesOneFormGlued, stripeIndicesOneFormGlued) = computeStripeValuesFromOneForm(globalGeometry, gluedGeometry, sigmaWaleGlued, period);
+    // std::tie(uniquePos, uniqueEdges, components) = findStripeConnectedComponents(globalGeometry, gluedGeometry, stripeValuesOneFormGlued, stripeIndicesOneFormGlued, period, edgeMap);
+    // polyscope::registerCurveNetwork("wale stripes (unconstr. HG)", uniquePos, uniqueEdges)->setRadius(0.001)->setEnabled(false);
+
+    
     std::cout << "Final wale obj = " << currObj << std::endl;
 
     // // Sanity check: compute integrals and visualize paths
@@ -2451,7 +2447,7 @@ std::tuple<CornerData<double>, EdgeData<double>> computeWaleStripeInfo(VertexPos
     waleStripes -> setRadius(0.001);
     waleStripes -> setEnabled(false);
 
-    std::cout << "boundary sum = " << sumIndices << std::endl;
+    // std::cout << "boundary sum = " << sumIndices << std::endl;
     // std::cout << "Number of positive edges sampled = " << numPos << std::endl;
     // std::cout << "Number of negative edges sampled = " << numNeg << std::endl;
 
